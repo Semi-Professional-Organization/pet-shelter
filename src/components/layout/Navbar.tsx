@@ -246,6 +246,17 @@ export function Navbar() {
               {isMs ? "Taja & Sumbang" : "Donate & Sponsor"}
             </Link>
 
+            <Link
+              href="/impact"
+              className={`text-sm font-semibold transition-colors hover:text-foreground focus-visible:ring-2 ${
+                pathname === "/impact"
+                  ? "text-foreground border-b-2 border-foreground pb-0.5"
+                  : "text-muted-foreground"
+              }`}
+            >
+              {isMs ? "Impak" : "Impact"}
+            </Link>
+
             {/* Top Level: FAQ */}
             <Link
               href="/faq"

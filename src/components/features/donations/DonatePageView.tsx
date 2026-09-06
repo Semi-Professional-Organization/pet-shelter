@@ -168,6 +168,19 @@ export function DonatePageView({
                 {isMs ? "Jaminan Adopsi 100% Percuma" : "100% Free Adoption Guarantee"}
               </span>
             </div>
+
+            <div className="pt-5">
+              <Link
+                href="/impact"
+                className={buttonVariants({
+                  size: "sm",
+                  className: "gap-2 rounded-xl px-5 text-xs font-bold uppercase tracking-wider",
+                })}
+              >
+                {isMs ? "Lihat Laporan Impak" : "View impact report"}
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
           </div>
         </div>
       </section>
