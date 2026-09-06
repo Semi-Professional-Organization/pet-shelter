@@ -43,7 +43,7 @@ export default async function HomePage() {
   const metrics = selectHomeMetrics(impactStats);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col bg-background">
       {/* 1. Hero Section with 5 Impact Stats */}
       <Hero metrics={metrics} />
 
@@ -53,14 +53,14 @@ export default async function HomePage() {
       <HomeQuickActionsSection />
 
       {/* 3. Latest bulletins */}
-      <section className="border-t border-border bg-background py-10 sm:py-14">
+      <section className="bg-work-ground py-16 sm:py-20">
         <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
           <BulletinFeed bulletins={bulletins} titleKey="home.bulletinsTitle" />
         </div>
       </section>
 
       {/* 4. Adoptable & Recovering Pets Gallery Showcase */}
-      <section id="adopt" className="border-t border-border bg-card py-14 sm:py-18">
+      <section id="adopt" className="bg-work-ground py-16 sm:py-20">
         <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
           <Suspense fallback={<HomeGalleryLoading />}>
             <PetGallery

@@ -25,18 +25,16 @@ import {
 
 /**
  * Presentation for the five counters. Kept here rather than in the domain module
- * so `metrics.ts` stays React-free and testable in the node tier; the tone
- * classes are the seven-token set the design-system guards enforce.
+ * so `metrics.ts` stays React-free and testable in the node tier. There is no
+ * per-counter tone: tones were picked by hue rather than meaning, which had
+ * "Adopted into Homes" in `danger` red, so every figure takes `text-primary`.
  */
-const METRIC_PRESENTATION: Record<
-  HomeMetricIcon,
-  { icon: typeof ShieldCheck; color: string }
-> = {
-  neutered: { icon: ShieldCheck, color: "text-success-accent" },
-  rehabilitated: { icon: Stethoscope, color: "text-care-accent" },
-  adopted: { icon: Heart, color: "text-danger-accent" },
-  volunteers: { icon: Users2, color: "text-warning-accent" },
-  collaborations: { icon: Award, color: "text-info-accent" },
+const METRIC_PRESENTATION: Record<HomeMetricIcon, { icon: typeof ShieldCheck }> = {
+  neutered: { icon: ShieldCheck },
+  rehabilitated: { icon: Stethoscope },
+  adopted: { icon: Heart },
+  volunteers: { icon: Users2 },
+  collaborations: { icon: Award },
 };
 
 const COUNT_UP_MS = 1100;
@@ -87,17 +85,17 @@ function useCountUp(value: string): string {
 
 /** One card, so the count-up hook has a component of its own to live in. */
 function ImpactStatCard({ metric, isMs }: { metric: HomeMetric; isMs: boolean }) {
-  const { icon: Icon, color } = METRIC_PRESENTATION[metric.icon];
+  const { icon: Icon } = METRIC_PRESENTATION[metric.icon];
   const display = useCountUp(metric.value);
 
   return (
     <div
       data-testid={`impact-stat-${metric.key}`}
-      className="border border-border bg-card p-4 rounded-2xl space-y-1.5 shadow-xs"
+      className="border border-border bg-work-panel p-4 rounded-2xl space-y-1.5 shadow-xs"
     >
       <div className="flex items-center justify-between">
         <span
-          className={`font-heading text-2xl sm:text-3xl font-bold tracking-tight tabular-nums ${color}`}
+          className="font-heading text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-primary"
         >
           {/*
             The climbing digits are decoration, so they are hidden and the
@@ -134,7 +132,7 @@ export function Hero({ metrics }: HeroProps = {}) {
     metrics && metrics.length > 0 ? metrics : [...HOME_METRIC_BASELINE];
 
   return (
-    <section className="border-b border-border bg-muted/20">
+    <section className="flex min-h-[calc(100dvh-4rem)] items-center bg-work-ground">
       <div className="w-full px-6 py-12 sm:px-8 sm:py-16 lg:px-12 lg:py-20">
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-12 lg:gap-12 max-w-7xl mx-auto">
           
@@ -224,10 +222,10 @@ export function Hero({ metrics }: HeroProps = {}) {
         </div>
 
         {/* Impact Showcase Strip (FE-02) */}
-        <div className="max-w-7xl mx-auto mt-12 sm:mt-16 pt-8 border-t border-border/80">
+        <div className="max-w-7xl mx-auto mt-20 sm:mt-24">
           <div className="mb-4">
             <span className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">
-              {isMs ? "Impak Kami Setakat Ini" : "Our Impact So Far"}
+              {isMs ? "Kerja yang sedang berjalan" : "Work already underway"}
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
