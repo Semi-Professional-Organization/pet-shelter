@@ -50,6 +50,15 @@
      contrast guard measures it alongside `--background` and `--card`. */
   --page-warm: #fefae6;
 
+  /* --- Home page shell: neutral gray ground, white cards, colour carried by the text ---
+     Tailwind's gray ramp verbatim (100 / white), declared here rather than written as
+     `bg-gray-100` at the call site: the palette guard rejects a raw Tailwind utility because
+     it cannot follow the theme, and a token gives the same colour with a dark twin.
+     Tone text on the white panel measures 7.09–10.05:1. --- */
+  --work-ground: #f3f4f6;
+  --work-panel: #ffffff;
+  --band-blush: #ffeef1;
+  --band-mint: #e8f8f0;
   /* The same red as `--tone-danger-text`, and deliberately not a third one. A destructive
      action and the danger tone mean the same thing, and two hand-maintained reds is how the
      palette ends up with a "delete" that does not match "rejected". `designSystemGuards`
@@ -254,6 +263,11 @@
   /* The same warm lean re-lit for a dark ground — see the note in `:root`. */
   --page-warm: #1a1610;
 
+  /* gray-900 / gray-800 — the same ramp, one step apart, so the panel still lifts. */
+  --work-ground: #111827;
+  --work-panel: #1f2937;
+  --band-blush: #251a1d;
+  --band-mint: #15211b;
   /* Tracks `--tone-danger-text` here too — see the note in `:root`. Note this does NOT fix the
      dark theme's own problem: `--primary` (#eaa39b) and this are both light pinks, ΔEok 0.036
      apart, so destructive and brand still read alike in dark mode. That needs the dark primary
@@ -393,6 +407,8 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-page-warm: var(--page-warm);
+  --color-work-ground: var(--work-ground);
+  --color-work-panel: var(--work-panel);
 
   --color-brand-mark: var(--brand-mark);
   --color-brand-mark-ring: var(--brand-mark-ring);
