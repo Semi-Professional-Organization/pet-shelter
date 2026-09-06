@@ -42,6 +42,14 @@
   /* Hover wash for ghost / outline controls — one step lighter than `--secondary`. */
   --accent-subtle: #fff1ec;
   --accent-subtle-strong: #fbeee9;
+  /* The ground for the donor-facing narrative pages (/donate, /impact). Those pages run as
+     one continuous field rather than alternating card/muted bands divided by rules, so the
+     colour is the only thing left doing the separating and it has to hold every ink the pages
+     put on it. Lightness is not free here: the pages set `text-primary` on this ground, and a
+     more saturated yellow drops it below AA — #fdf6dd measures 4.38:1. This is 4.52:1, and the
+     contrast guard measures it alongside `--background` and `--card`. */
+  --page-warm: #fefae6;
+
   /* The same red as `--tone-danger-text`, and deliberately not a third one. A destructive
      action and the danger tone mean the same thing, and two hand-maintained reds is how the
      palette ends up with a "delete" that does not match "rejected". `designSystemGuards`
@@ -243,6 +251,9 @@
   --accent-foreground: #221718;
   --accent-subtle: #2d2424;
   --accent-subtle-strong: #34292a;
+  /* The same warm lean re-lit for a dark ground — see the note in `:root`. */
+  --page-warm: #1a1610;
+
   /* Tracks `--tone-danger-text` here too — see the note in `:root`. Note this does NOT fix the
      dark theme's own problem: `--primary` (#eaa39b) and this are both light pinks, ΔEok 0.036
      apart, so destructive and brand still read alike in dark mode. That needs the dark primary
@@ -381,6 +392,7 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-page-warm: var(--page-warm);
 
   --color-brand-mark: var(--brand-mark);
   --color-brand-mark-ring: var(--brand-mark-ring);
