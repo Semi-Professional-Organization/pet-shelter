@@ -19,8 +19,12 @@ missing `setValue` line, and two separate things were wrong:
 
 Seventeen new unit tests were green, and every one of them exercised the schema, the server
 action or the mapper. The dialog had no test file at all — `tests/components/` contained no
-`PetFormDialog` test before this session — so nothing in the suite ever picked a date and then
-typed in a field.
+`PetFormDialog` test — so nothing in the suite ever picked a date and then typed in a field.
+
+The fix and its tests are not in this branch's final diff: PR #94 rewrote the same form from the
+other direction, rendering age and band read-only so the reverse derivation stops existing, and
+this branch yielded the form rather than contest it. The defect was real and was reproduced;
+what it teaches survives the code being replaced.
 
 **Rule:** When a change adds an exact input beside an existing inferred one, grep for what else
 writes the inferred field and write the test that sets the exact value and *then* touches the

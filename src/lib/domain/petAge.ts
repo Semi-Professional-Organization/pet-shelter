@@ -150,44 +150,34 @@ export function deriveBirthDate(pet: { birthDate?: string; age?: string; intakeD
 }
 
 /**
- * The age units this module understands, English and Malay. Module constants rather than
- * literals inside `approximateBirthDate`, because `hasAgeUnit` has to answer for exactly the
- * same token set — a second copy in the admin dialog would drift the first time one grows.
- * Both are applied to an already-lowercased string, so neither needs the `i` flag.
+ * The age units this module understands, English and Malay. Named constants rather than literals
+ * inside `approximateBirthDate` so the two branches below are visibly one vocabulary. Both are
+ * applied to an already-lowercased string, so neither needs the `i` flag.
  */
 const AGE_YEARS_PATTERN = /(\d+)\s*(?:y|yr|year|thn|tahun)/;
 const AGE_MONTHS_PATTERN = /(\d+)\s*(?:m|mo|month|bln|bulan)/;
 
 /**
- * Whether an age string names a unit `approximateBirthDate` can actually reckon from. Callers
- * use it to avoid deriving a birthday from a bare "2", which is a half-typed "2 years" far more
- * often than it is an answer.
- */
-export function hasAgeUnit(ageStr: string): boolean {
-  const norm = ageStr.toLowerCase().trim();
-  return AGE_YEARS_PATTERN.test(norm) || AGE_MONTHS_PATTERN.test(norm);
-}
-
-/**
- * Builds a UTC day, clamping the day of month to the target month's last day instead of letting
- * `Date.UTC` roll it forward. Without this, subtracting one month from the 31st lands in the
- * month *after* the one asked for — 2026-03-31 less a month gave 2026-03-03, a 28-day "month" —
- * and a year off 2024-02-29 gave 2023-03-01. A month of error moves an animal across an
- * `AGE_BAND_MIN_MONTHS` boundary, so the band shown to adopters changes.
- */
-function utcDayClamped(year: number, month: number, day: number): Date {
-  const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(year, month, Math.min(day, lastDayOfMonth)));
-}
-
-/**
  * Approximates a birth date from an age string (e.g. "2 years", "4 months", "2 tahun") relative
- * to the given reference day. Timezone-invariant UTC arithmetic, clamped at month ends.
+ * to the intake date. Timezone-invariant UTC arithmetic.
  *
- * The reference is the caller's to choose and the two callers differ on purpose: the admin
- * dialog passes *today*, because the age an operator types is the animal's age now, while
- * `deriveBirthDate` passes the intake date, because a legacy row's `age` string was whatever was
- * written down when the animal arrived.
+ * **This function is transcribed into SQL, and the transcriptions are the reason not to "fix"
+ * the rollover below.** The production backfill that fills `pets.birthDate` from the old `age`
+ * prose reimplements this arithmetic in Postgres —
+ * `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` (expand) and
+ * `20260922_pet_birth_date/migration.sql` (contract). A backfill's job is to store what the
+ * application itself would have computed, so the three must agree case for case.
+ *
+ * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
+ * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
+ * 2026-03-03, not 2026-02-28. Clamping reads better and keeps the anniversary in the intended
+ * month, and it was briefly implemented here — but Postgres `make_interval` clamps while
+ * JavaScript rolls, so both SQL files build the date with `make_date(y, m, 1) + (day - 1)` to
+ * match *this* function. Changing the behaviour here silently changes what a migrated row should
+ * have contained. The cost of the rollover is bounded and understood: it biases an animal a few
+ * days younger, and only a row sitting within a day or two of exactly 12, 36 or 96 months lands
+ * in a different `AGE_BAND_MIN_MONTHS` band as a result. Every value it produces carries
+ * `birthDateIsEstimate: true`. The tests below pin it; they fail on an improvement, on purpose.
  */
 export function approximateBirthDate(
   ageStr: string,
@@ -202,14 +192,14 @@ export function approximateBirthDate(
   const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    const d = utcDayClamped(parts.year - years, parts.month, parts.day);
+    const d = new Date(Date.UTC(parts.year - years, parts.month, parts.day));
     return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
   }
 
   const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    const d = utcDayClamped(parts.year, parts.month - months, parts.day);
+    const d = new Date(Date.UTC(parts.year, parts.month - months, parts.day));
     return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
   }
 
