@@ -18,9 +18,11 @@ import type { TranslationKey } from "@/lib/i18n/translations";
 import { Section, SectionHeader } from "@/components/layout/Section";
 
 /**
- * The two strings `src/app/page.tsx` used to render itself.
+ * The gallery's loading fallback, which `src/app/page.tsx` used to render
+ * itself. (The view-all link it rendered beside it now sits in the featured
+ * `PetGallery`'s own header, a client component that calls `t()` directly.)
  *
- * They live here because `page.tsx` is a Server Component under
+ * It lives here because `page.tsx` is a Server Component under
  * `revalidate = 300`, and the reader's language is client state —
  * `LanguageProvider` reads `localStorage`, and its `getServerSnapshot` returns
  * `null`, so a server render can only ever produce English. Reading the
@@ -29,7 +31,7 @@ import { Section, SectionHeader } from "@/components/layout/Section";
  * already declined. Moving the literals across the client boundary costs
  * nothing and lets them call `t()`.
  *
- * Like every other Malay string on the site, these switch after hydration: the
+ * Like every other Malay string on the site, this switches after hydration: the
  * **served HTML** is English, because the server cannot know the language. The
  * `<html lang>` attribute takes the same path rather than being simply wrong —
  * `layout.tsx` serves `lang="en"` and `LanguageProvider` corrects
@@ -45,25 +47,6 @@ export function HomeGalleryLoading() {
     <div className="flex items-center justify-center py-20 text-muted-foreground">
       <Loader2 className="size-6 animate-spin mr-2" />
       <span>{t("home.galleryLoading")}</span>
-    </div>
-  );
-}
-
-export function HomeViewAllPetsLink() {
-  const { t } = useTypedTranslation();
-
-  return (
-    <div className="flex justify-center pt-6">
-      <Link
-        href="/pets"
-        className={buttonVariants({
-          variant: "outline",
-          className: "text-sm font-semibold uppercase tracking-wider focus-visible:ring-2 rounded-xl gap-2",
-        })}
-      >
-        {t("home.viewAllPets")}
-        <ArrowRight className="size-4" />
-      </Link>
     </div>
   );
 }

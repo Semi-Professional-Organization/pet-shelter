@@ -8,8 +8,8 @@ import {
   HomeOurWorkSection,
   HomeProcessSection,
   HomeQuickActionsSection,
-  HomeViewAllPetsLink,
 } from "@/components/layout/HomeSections";
+import { Section } from "@/components/layout/Section";
 import { getPublicPets } from "@/actions/pets";
 import { getPublicBulletins } from "@/lib/server/bulletinRepository";
 import { readHomeImpactStats } from "@/lib/server/transparencyRepository";
@@ -35,7 +35,7 @@ export default async function HomePage() {
     // launch notices when the table does not exist yet (see
     // `mayServeFixtureAfter`) — so a slow or failing feed cannot take the home
     // page down over one section.
-    getPublicBulletins("home", 2),
+    getPublicBulletins("home", 4),
   ]);
 
   // Staff-curated figures overlaid on the FE-02 baseline. See src/lib/domain/metrics.ts
@@ -55,25 +55,26 @@ export default async function HomePage() {
       {/* 3. Latest bulletins */}
       <section className="bg-work-ground py-16 sm:py-20">
         <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-          <BulletinFeed bulletins={bulletins} titleKey="home.bulletinsTitle" />
+          <BulletinFeed
+            bulletins={bulletins}
+            titleKey="home.bulletinsTitle"
+            subtitleKey="home.bulletinsSubtitle"
+            layout="carousel"
+          />
         </div>
       </section>
 
       {/* 4. Adoptable & Recovering Pets Gallery Showcase */}
-      <section id="adopt" className="bg-work-ground py-16 sm:py-20">
-        <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-          <Suspense fallback={<HomeGalleryLoading />}>
-            <PetGallery
-              initialPets={initialPets}
-              featuredOnly
-              showFilters={false}
-              syncUrl={false}
-            />
-          </Suspense>
-
-          <HomeViewAllPetsLink />
-        </div>
-      </section>
+      <Section id="adopt">
+        <Suspense fallback={<HomeGalleryLoading />}>
+          <PetGallery
+            initialPets={initialPets}
+            featuredOnly
+            showFilters={false}
+            syncUrl={false}
+          />
+        </Suspense>
+      </Section>
 
       {/* 5. Adoption Process Steps — the #how-it-works anchor */}
       <HomeProcessSection />
