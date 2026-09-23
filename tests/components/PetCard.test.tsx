@@ -17,7 +17,9 @@ describe("PetCard", () => {
   describe("the sex label", () => {
     it("labels the two recorded sexes", () => {
       renderCard({ gender: "Male", age: "2 years" });
-      expect(screen.getByText(/Male • 2 years/)).toBeTruthy();
+      // The pill carries the sex alone; the age sits beside the name, where the weight was.
+      expect(screen.getByText("Male")).toBeTruthy();
+      expect(screen.getByText("2 years")).toBeTruthy();
     });
 
     it.each(["male", "Unknown", ""])(
@@ -33,7 +35,7 @@ describe("PetCard", () => {
         // dialog, detail page and carousel. Pinning the wording would make that a requirement.
         renderCard({ gender: stored as Pet["gender"], age: "1 year" });
 
-        expect(screen.getByText(/(Male|Female) • 1 year/)).toBeTruthy();
+        expect(screen.getByText(/^(Male|Female)$/)).toBeTruthy();
       }
     );
   });

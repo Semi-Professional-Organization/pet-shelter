@@ -6,9 +6,9 @@ import {
   HomeGalleryLoading,
   HomeOurWorkSection,
   HomeProcessSection,
-  HomeViewAllPetsLink,
 } from "@/components/layout/HomeSections";
 import { BulletinFeed } from "@/components/features/bulletins/BulletinFeed";
+import { PetGallery } from "@/components/features/pets/PetGallery";
 import type { Bulletin, BulletinCategory } from "@/types/bulletin";
 import { renderWithLanguage } from "./support/render";
 
@@ -77,7 +77,11 @@ describe("Home gallery chrome on the Malay site", () => {
   });
 
   it("translates the view-all link", () => {
-    renderWithLanguage(<HomeViewAllPetsLink />, { language: "ms" });
+    // The link sits in the featured gallery's own header, beside its heading.
+    renderWithLanguage(
+      <PetGallery initialPets={[]} featuredOnly showFilters={false} syncUrl={false} />,
+      { language: "ms" }
+    );
 
     expect(
       screen.getByRole("link", { name: /Lihat Semua Haiwan Sedia Diadopsi/i })
