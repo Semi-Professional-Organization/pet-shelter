@@ -93,7 +93,6 @@ export interface TranslationDictionary {
     availableSubtitle: string;
     viewAllPets: string;
     galleryLoading: string;
-    howItWorksEyebrow: string;
     howItWorksTitle: string;
     howItWorksSubtitle: string;
     step1Title: string;
@@ -465,7 +464,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       availableSubtitle: "Health-checked, vaccinated, microchipped, and sterilized before rehoming.",
       viewAllPets: "View All Adoptable Pets",
       galleryLoading: "Loading rescue animals...",
-      howItWorksEyebrow: "From first visit to a new home",
       howItWorksTitle: "A careful match, step by step",
       howItWorksSubtitle: "We ensure every rescue goes to a safe, committed home through a straightforward 3-step process with zero commercial adoption fees.",
       step1Title: "Browse & Submit Application",
@@ -840,7 +838,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       availableSubtitle: "Telah diperiksa kesihatan, divaksin, dipasang cip mikro, dan dimandulkan sebelum adopsi.",
       viewAllPets: "Lihat Semua Haiwan Sedia Diadopsi",
       galleryLoading: "Memuatkan haiwan reskue...",
-      howItWorksEyebrow: "Dari lawatan pertama ke rumah baharu",
       howItWorksTitle: "Padanan yang teliti, langkah demi langkah",
       howItWorksSubtitle: "Kami memastikan setiap haiwan diserahkan kepada keluarga yang selamat dan bertanggungjawab melalui 3 langkah mudah tanpa sebarang yuran komersial.",
       step1Title: "Semak & Hantar Permohonan",
