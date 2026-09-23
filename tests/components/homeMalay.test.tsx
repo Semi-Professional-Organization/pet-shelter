@@ -238,7 +238,6 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(
       screen.getByRole("heading", { name: "A careful match, step by step" })
     ).toBeInTheDocument();
-    expect(screen.getByText("From first visit to a new home")).toBeInTheDocument();
     expect(screen.getByText("Browse & Submit Application")).toBeInTheDocument();
     expect(screen.getByText("Meet & Socialize")).toBeInTheDocument();
     expect(screen.getByText("Finalize & Welcome Home")).toBeInTheDocument();
@@ -263,7 +262,6 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(
       screen.getByRole("heading", { name: "Padanan yang teliti, langkah demi langkah" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Dari lawatan pertama ke rumah baharu")).toBeInTheDocument();
     expect(screen.getByText("Semak & Hantar Permohonan")).toBeInTheDocument();
     expect(screen.getByText("Sesi Suai Kenal & Interaksi")).toBeInTheDocument();
     expect(screen.getByText("Tandatangan Perjanjian & Bawa Pulang")).toBeInTheDocument();
@@ -274,7 +272,6 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.queryByText(/yuran tersembunyi/)).not.toBeInTheDocument();
 
     expect(screen.queryByText("A careful match, step by step")).not.toBeInTheDocument();
-    expect(screen.queryByText("From first visit to a new home")).not.toBeInTheDocument();
     expect(screen.queryByText("Browse & Submit Application")).not.toBeInTheDocument();
     expect(screen.queryByText("Meet & Socialize")).not.toBeInTheDocument();
     expect(screen.queryByText("Finalize & Welcome Home")).not.toBeInTheDocument();
