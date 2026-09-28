@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { act, screen } from "@testing-library/react";
 
 import { Hero } from "@/components/layout/Hero";
+import { HomeQuickActionsSection } from "@/components/layout/HomeSections";
 import { selectHomeMetrics } from "@/lib/domain/metrics";
 import { renderWithLanguage } from "./support/render";
 
@@ -191,32 +192,38 @@ describe("Hero impact metrics — accessibility", () => {
 });
 
 describe("Hero action triggers", () => {
-  it("routes to the three destinations the sitemap requires", () => {
+  // One call to action since the cut-out redesign. This used to pin three hero links as "the
+  // three destinations the sitemap requires", but no such sitemap was ever written down —
+  // `tasks/decisions/2026-09-22-hero-drops-the-unopenable-quiz-and-sponsor-dialogs.md` traced
+  // it. What that test did protect is that Donate and Get Involved stay reachable from `/`;
+  // the quick actions below carry them now, so that is what the last case pins.
+  it("routes its call to action to the animals page", () => {
     renderWithLanguage(<Hero />);
 
-    const hrefs = screen
-      .getAllByRole("link")
-      .map((link) => link.getAttribute("href"));
-
-    expect(hrefs).toContain("/pets");
-    expect(hrefs).toContain("/donate");
-    expect(hrefs).toContain("/get-involved");
+    expect(screen.getByRole("link", { name: /Meet Our Animals/i })).toHaveAttribute(
+      "href",
+      "/pets"
+    );
   });
 
-  it("labels the action triggers in Malay on the Malay site", () => {
+  it("labels the call to action in Malay on the Malay site", () => {
     renderWithLanguage(<Hero />, { language: "ms" });
 
     expect(screen.getByRole("link", { name: /Lihat Haiwan Reskue/i })).toHaveAttribute(
       "href",
       "/pets"
     );
-    expect(screen.getByRole("link", { name: /Sumbang & Taja/i })).toHaveAttribute(
-      "href",
-      "/donate"
-    );
-    expect(screen.getByRole("link", { name: /Jadi Sukarelawan/i })).toHaveAttribute(
-      "href",
-      "/get-involved"
-    );
+    expect(screen.queryByRole("link", { name: /Meet Our Animals/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps Donate and Get Involved one section below the hero", () => {
+    renderWithLanguage(<HomeQuickActionsSection />);
+
+    const hrefs = screen
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+
+    expect(hrefs).toContain("/donate");
+    expect(hrefs).toContain("/get-involved");
   });
 });

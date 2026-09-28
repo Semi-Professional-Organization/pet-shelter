@@ -26,9 +26,8 @@ import { FaqItem } from "@/types/faq";
 import { cn } from "@/lib/utils";
 
 /**
- * The "all" tab has no data row to come from, so this strip supplies its own —
- * the same arrangement `PetsFaqSection` uses, and worded for a page that is
- * only about FAQs.
+ * The "all" tab has no data row to come from, so this strip supplies its own,
+ * worded for a page that is only about FAQs.
  */
 const ALL_FAQ_TAB: CategoryTab = {
   value: ALL_CATEGORY_VALUE,

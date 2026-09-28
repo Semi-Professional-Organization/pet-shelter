@@ -18,8 +18,8 @@ interface BulletinFeedProps {
   /**
    * Already filtered, sorted and limited by `getPublicBulletins` on the server.
    *
-   * The page reads and this component renders, matching how `PetsFaqSection`
-   * takes `initialFaqs` and `PetGallery` takes `initialPets`. It also means the
+   * The page reads and this component renders, matching how `FaqBrowser`
+   * takes `faqs` and `PetGallery` takes `initialPets`. It also means the
    * home page can fold its bulletin read into the `Promise.all` it already runs
    * rather than serialising a second round trip behind it.
    */

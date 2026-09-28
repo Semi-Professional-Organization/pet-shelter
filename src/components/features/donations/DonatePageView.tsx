@@ -1,6 +1,6 @@
 "use client";
 
-import { LHDN_TAX_DEDUCTIBLE_REF, PUBLIC_ROS_REGISTRATION_NO, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
+import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React, { Suspense } from "react";
 import Link from "next/link";
 import {
@@ -9,7 +9,6 @@ import {
   MapPin,
   Clock,
   Phone,
-  HelpCircle,
   CheckCircle2,
   Package,
   Award,
@@ -90,45 +89,6 @@ export function DonatePageView({
         "Durable rubber chew toys (Kongs) for kennel enrichment",
         "Standard 6-foot nylon dog leashes & sturdy collars",
       ],
-    },
-  ];
-
-  const faqs = [
-    {
-      q: isMs ? "Adakah sumbangan saya layak mendapat potongan cukai di Malaysia?" : "Is my contribution tax-deductible in Malaysia?",
-      a: isMs
-        ? "Ya! Pertubuhan Kebajikan Hope for Strays merupakan organisasi kebajikan yang diluluskan pengecualian cukai di bawah Seksyen 44(6) Akta Cukai Pendapatan 1967 (No. Rujukan Kelulusan: " + LHDN_TAX_DEDUCTIBLE_REF + "). Semua sumbangan tunai layak untuk potongan cukai rasmi individu dan korporat."
-        : "Yes! Pertubuhan Kebajikan Hope for Strays is an approved tax-exempt non-profit organisation under Subsection 44(6) of the Income Tax Act 1967 (Approval Ref: " + LHDN_TAX_DEDUCTIBLE_REF + "). All monetary donations are eligible for official tax deductions on your individual or corporate tax return.",
-    },
-    {
-      q: isMs ? "Bagaimanakah saya menerima resit rasmi potongan cukai?" : "How do I receive my official tax receipt?",
-      a: isMs
-        ? "Selepas anda menghantar borang, kami memberikan nombor rujukan ikrar untuk dicatat dalam pemindahan anda. e-Resit rasmi dengan nombor rujukan LHDN lengkap dihantar ke e-mel anda sebaik sahaja penyelaras kami memadankan pemindahan itu dengan penyata bank, biasanya dalam 2 hari bekerja."
-        : "When you submit the form we give you a pledge reference to quote on your transfer. Your official e-Receipt, with full LHDN reference numbers, is emailed to you once our coordinator has matched that transfer against the shelter's bank statement, usually within 2 working days.",
-    },
-    {
-      q: isMs ? "Bolehkah syarikat korporat menderma dan menuntut pelepasan cukai?" : "Can corporate organizations donate and claim tax relief?",
-      a: isMs
-        ? "Ya! Penderma korporat boleh memasukkan Nama Syarikat Rasmi dan Nombor Pendaftaran SSM dalam borang penderma untuk menjana resit pengecualian cukai korporat yang sah."
-        : "Yes! Corporate donors can provide their official Company Name and SSM Registration Number in the donor form to generate a valid corporate tax-exemption receipt.",
-    },
-    {
-      q: isMs ? "Bagaimanakah cara membuat pindahan bank terus atau imbas DuitNow QR?" : "How do I make a direct bank transfer or scan DuitNow QR?",
-      a: isMs
-        ? "Anda boleh mengimbas kod DuitNow QR nasional kami menggunakan sebarang aplikasi perbankan Malaysia (Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, dll.) atau pindahan terus ke Akaun Maybank kami: 5140 1234 5678 (Pertubuhan Kebajikan Hope for Strays)."
-        : "You can scan our national DuitNow QR code using any Malaysian banking app (Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, etc.) or transfer directly to our Maybank Account: 5140 1234 5678 (Pertubuhan Kebajikan Hope for Strays).",
-    },
-    {
-      q: isMs ? "Bolehkah saya menaja haiwan reskue yang khusus?" : "Can I sponsor a specific rescue pet?",
-      a: isMs
-        ? "Sudah tentu! Anda boleh memasukkan nama mana-mana haiwan reskue dalam ruangan 'Dedikasi Haiwan', atau klik 'Taja Rawatan' terus dari halaman profil haiwan tersebut."
-        : "Absolutely! You can enter the name of any rescue pet in our 'Dedicate Donation' field, or click 'Sponsor Care' directly from any pet's profile page.",
-    },
-    {
-      q: isMs ? "Bolehkah saya menghantar bekalan fizikal terus ke pusat perlindungan?" : "Can I drop off physical supplies at the shelter?",
-      a: isMs
-        ? "Ya! Kami mengalu-alukan penghantaran barangan keperluan ke pusat perlindungan kami di Petaling Jaya (No. 18, Jalan SS 2/72) dari Selasa hingga Ahad, 10:00 pagi – 5:00 petang (Tutup pada hari Isnin)."
-        : "Yes! We welcome physical supply drop-offs at our Petaling Jaya sanctuary (No. 18, Jalan SS 2/72) from Tuesday to Sunday, 10:00 AM – 5:00 PM (Closed Mondays).",
     },
   ];
 
@@ -317,40 +277,9 @@ export function DonatePageView({
         </div>
       </section>
 
-      {/* 5. Frequently Asked Questions */}
+      {/* 5. Browse the animals */}
       <section className="py-14 sm:py-18 border-t border-border bg-card">
         <div className="w-full px-6 sm:px-8 lg:px-12 max-w-4xl mx-auto space-y-8">
-          <div className="text-center space-y-2 max-w-2xl mx-auto">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary block">
-              {isMs ? "Soalan Lazim" : "Clear Answers"}
-            </span>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {isMs ? "Soalan Lazim Mengenai Sumbangan & Pelepasan Cukai" : "Frequently Asked Questions About Donations"}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {isMs ? "Ada soalan mengenai sumbangan anda, potongan cukai, atau kaedah pembayaran?" : "Have questions about your contribution, tax deductions, or payment methods?"}
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {faqs.map((faq, idx) => (
-              <div
-                key={idx}
-                className="border border-border bg-background p-5 sm:p-6 rounded-2xl space-y-2 shadow-xs"
-              >
-                <div className="flex items-start gap-2.5">
-                  <HelpCircle className="size-4.5 text-primary shrink-0 mt-0.5" />
-                  <h3 className="font-heading text-base font-bold text-foreground">
-                    {faq.q}
-                  </h3>
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed pl-7">
-                  {faq.a}
-                </p>
-              </div>
-            ))}
-          </div>
-
           {/* Bottom CTA to browse pets */}
           <div className="text-center pt-8 border-t border-border space-y-3">
             <p className="text-sm text-muted-foreground">

@@ -132,18 +132,6 @@ export function Navbar() {
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center gap-5 xl:gap-6 lg:flex" aria-label="Main Navigation">
-            {/* Top Level: Meet Our Animals */}
-            <Link
-              href="/pets"
-              className={`text-sm font-semibold transition-colors hover:text-foreground focus-visible:ring-2 ${
-                pathname === "/pets"
-                  ? "text-foreground border-b-2 border-foreground pb-0.5"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {isMs ? "Haiwan Kami" : "Meet Our Animals"}
-            </Link>
-
             {/* Dropdown: Adoption */}
             <div
               className="relative"

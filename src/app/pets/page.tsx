@@ -1,14 +1,7 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
 import { PetGallery } from "@/components/features/pets/PetGallery";
-import { BulletinFeed } from "@/components/features/bulletins/BulletinFeed";
-import { PetsFaqSection } from "@/components/layout/PetsFaqSection";
 import { getPublicPets } from "@/actions/pets";
-import {
-  getServerFaqsAsync,
-  getServerFaqCategoriesAsync,
-} from "@/lib/server/faqRepository";
-import { getPublicBulletins } from "@/lib/server/bulletinRepository";
 import { Loader2 } from "lucide-react";
 
 /**
@@ -45,17 +38,6 @@ export default async function PetsDirectoryPage() {
   // hundreds); page it, or move faceting to the server, if the catalogue outgrows ~500.
   const initialPets = await getPublicPets();
 
-  // Only the categories the published data actually populates, so the tab strip
-  // cannot offer a filter that matches nothing. Both reads hit the same source
-  // and are independent, so they run together rather than making this page's
-  // TTFB the sum of two round trips.
-  const [initialFaqs, initialFaqCategories, bulletins] = await Promise.all([
-    getServerFaqsAsync(),
-    getServerFaqCategoriesAsync(),
-    // Notices targeted at this page, plus the ones targeted at every feed.
-    getPublicBulletins("pets", 2),
-  ]);
-
   return (
     <div className="min-h-screen bg-card pb-20">
       {/* Directory Gallery */}
@@ -75,17 +57,6 @@ export default async function PetsDirectoryPage() {
         </Suspense>
       </div>
 
-      {/* Directory Bulletins / Notices */}
-      <section className="w-full px-6 sm:px-8 lg:px-12 pt-10 border-t border-border mt-10">
-        <BulletinFeed
-          bulletins={bulletins}
-          titleKey="bulletins.petsFeedTitle"
-          compact={true}
-        />
-      </section>
-
-      {/* FAQs */}
-      <PetsFaqSection initialFaqs={initialFaqs} initialCategories={initialFaqCategories} />
     </div>
   );
 }

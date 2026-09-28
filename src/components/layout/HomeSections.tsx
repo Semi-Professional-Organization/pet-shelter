@@ -126,9 +126,9 @@ export function HomeOurWorkSection() {
       titleEn: "Sanctuary & Rehabilitation",
       titleMs: "Santuari & Rumah Pemulihan",
       descEn:
-        "Animals with severe fractures, chronic mange, or trauma are admitted to our Petaling Jaya Rehabilitation House. Under veterinary supervision, they receive medical care until fully healed.",
+        "Animals with severe fractures, chronic mange, or trauma are admitted to our Rehabilitation House. Under veterinary supervision, they receive medical care until fully healed.",
       descMs:
-        "Haiwan yang cedera parah, menghidap kurap teruk, atau trauma dimasukkan ke Rumah Pemulihan Petaling Jaya kami untuk rawatan rapi dan terapi pemulihan berterusan.",
+        "Haiwan yang cedera parah, menghidap kurap teruk, atau trauma dimasukkan ke Rumah Pemulihan kami untuk rawatan rapi dan terapi pemulihan berterusan.",
       highlightsEn: [
         "Post-op sterile recovery enclosures & wound care",
         "Medicated baths & demodicosis/sarcoptic therapy",

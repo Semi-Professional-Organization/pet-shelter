@@ -106,7 +106,7 @@ export function PetGallery({
     subtitle ||
     (featuredOnly
       ? t("home.availableSubtitle")
-      : t("pets.subtitle", "Browse rescued dogs, cats, puppies, and kittens awaiting their forever homes in Petaling Jaya."));
+      : t("pets.subtitle", "Browse rescued dogs, cats, and kittens awaiting their forever homes in Petaling Jaya."));
 
   return (
     <section className="w-full">
