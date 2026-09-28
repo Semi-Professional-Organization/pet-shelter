@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Pet, MedicalTimelineCategory } from "@/types/pet";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
 import { getCategoryBadgeClasses } from "@/lib/presentation/medicalTimelinePresentation";
@@ -23,26 +23,9 @@ interface MedicalTimelineProps {
 
 export function MedicalTimeline({ pet, compact = false }: MedicalTimelineProps) {
   const { language, t, isMs } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState<"all" | MedicalTimelineCategory>("all");
-
   const timelineEvents = useMemo(() => {
     return getPetMedicalTimeline(pet, language);
   }, [pet, language]);
-
-  const filteredEvents = useMemo(() => {
-    if (selectedCategory === "all") return timelineEvents;
-    return timelineEvents.filter((e) => e.category === selectedCategory);
-  }, [timelineEvents, selectedCategory]);
-
-  const categories: { key: "all" | MedicalTimelineCategory; label: string }[] = [
-    { key: "all", label: t("medicalTimeline.filterAll", "All Milestones") },
-    { key: "intake", label: t("medicalTimeline.filterIntake", "Rescue Intake") },
-    { key: "diagnostic", label: t("medicalTimeline.filterDiagnostic", "Diagnostics") },
-    { key: "treatment", label: t("medicalTimeline.filterTreatment", "Treatments") },
-    { key: "vaccination", label: t("medicalTimeline.filterVaccination", "Vaccinations") },
-    { key: "surgery", label: t("medicalTimeline.filterSurgery", "Surgeries") },
-    { key: "clearance", label: t("medicalTimeline.filterClearance", "Clearance") },
-  ];
 
   const getCategoryIcon = (category: MedicalTimelineCategory) => {
     switch (category) {
@@ -100,30 +83,10 @@ export function MedicalTimeline({ pet, compact = false }: MedicalTimelineProps) 
         </div>
       </div>
 
-      {/* Category Filter Pills */}
-      <div className="flex flex-wrap gap-1.5 pt-1 overflow-x-auto pb-1" role="tablist" aria-label="Timeline Filters">
-        {categories.map((cat) => (
-          <button
-            key={cat.key}
-            type="button"
-            role="tab"
-            aria-selected={selectedCategory === cat.key}
-            onClick={() => setSelectedCategory(cat.key)}
-            className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-              selectedCategory === cat.key
-                ? "bg-foreground text-background border-foreground font-bold shadow-xs"
-                : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
       {/* Timeline Stream */}
-      {filteredEvents.length === 0 ? (
+      {timelineEvents.length === 0 ? (
         <div className="text-center py-6 text-xs text-muted-foreground bg-muted/20 border border-border p-4 rounded-xl">
-          {t("medicalTimeline.noMilestones", "No milestones found for the selected category filter.")}
+          {t("medicalTimeline.noRecords", "No veterinary records yet.")}
         </div>
       ) : (
         <div className="relative pl-6 sm:pl-8 space-y-4 pt-2">
@@ -133,7 +96,7 @@ export function MedicalTimeline({ pet, compact = false }: MedicalTimelineProps) 
             aria-hidden="true"
           />
 
-          {filteredEvents.map((event, index) => (
+          {timelineEvents.map((event, index) => (
             <div key={event.id || index} className="relative group">
               {/* Timeline Node Dot */}
               <div
@@ -145,26 +108,17 @@ export function MedicalTimeline({ pet, compact = false }: MedicalTimelineProps) 
 
               {/* Event Card */}
               <div className="bg-background border border-border rounded-xl p-3.5 sm:p-4 shadow-xs space-y-1.5 transition-colors hover:border-foreground/30">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-2xs font-bold text-muted-foreground uppercase tracking-wider">
-                      {formatDate(event.date)}
-                    </span>
-                    {event.badge && (
-                      <span
-                        className={`text-3xs font-bold px-2 py-0.5 rounded-full border ${getCategoryBadgeClasses(
-                          event.category
-                        )}`}
-                      >
-                        {event.badge}
-                      </span>
-                    )}
-                  </div>
-
-                  {event.verified && (
-                    <span className="text-3xs text-muted-foreground font-medium flex items-center gap-1">
-                      <Check className="size-3 text-success-accent stroke-[2.5]" />
-                      {t("common.verified", "Verified")}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-2xs font-bold text-muted-foreground uppercase tracking-wider">
+                    {formatDate(event.date)}
+                  </span>
+                  {event.badge && (
+                    <span
+                      className={`text-3xs font-bold px-2 py-0.5 rounded-full border ${getCategoryBadgeClasses(
+                        event.category
+                      )}`}
+                    >
+                      {event.badge}
                     </span>
                   )}
                 </div>

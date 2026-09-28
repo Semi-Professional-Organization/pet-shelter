@@ -35,7 +35,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Hope for Strays | Animal Rescue & Adoption (Petaling Jaya, Selangor)",
   description:
-    "Hope for Strays is a non-profit animal shelter in Petaling Jaya, Selangor. Adopt rescued dogs, cats, puppies, and kittens with complete veterinary care and vaccination.",
+    "Hope for Strays is a non-profit animal shelter in Petaling Jaya, Selangor. Adopt rescued dogs, cats, and kittens with complete veterinary care and vaccination.",
   manifest: "/manifest.json",
   other: {
     "msapplication-config": "/browserconfig.xml",

@@ -31,7 +31,7 @@ export default async function NeedsPage() {
             Rehabilitation House Needs
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground max-w-3xl leading-relaxed">
-            Our Petaling Jaya Sanctuary & Rehabilitation House cares for 40+ recovering dogs and cats post-surgery, trauma treatment, and mange therapy. Support their direct recovery by donating essential clinical nutrition, sterile wound supplies, and humane TNRM equipment.
+            Our Sanctuary & Rehabilitation House cares for 40+ recovering dogs and cats post-surgery, trauma treatment, and mange therapy. Support their direct recovery by donating essential clinical nutrition, sterile wound supplies, and humane TNRM equipment.
           </p>
         </div>
       </section>

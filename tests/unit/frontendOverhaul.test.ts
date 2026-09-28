@@ -68,7 +68,7 @@ describe("Frontend TNRM Overhaul & UI Contracts", () => {
     });
   });
 
-  describe("Interactive FAQ Accordion Data Layer (FE-09 / PetsFaqSection)", () => {
+  describe("Interactive FAQ Accordion Data Layer (FE-09 / FaqBrowser)", () => {
     it("should retrieve every committed FAQ", () => {
       // Counted from the fixture rather than restated: the FAQ set grows as
       // staff questions accumulate, and a hardcoded total turns every content

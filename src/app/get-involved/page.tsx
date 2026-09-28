@@ -81,7 +81,7 @@ export default async function GetInvolvedPage() {
                 </h3>
               </div>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                Every Saturday & Sunday, 10:00 AM – 12:00 PM. Walk and socialize shelter rescues in our outdoor exercise yard in Petaling Jaya.
+                Every Saturday & Sunday, 10:00 AM – 12:00 PM. Walk and socialize shelter rescues in our outdoor exercise yard.
               </p>
               <div className="pt-2 text-xs font-bold text-foreground/80">
                 Commitment: 2 hours / session

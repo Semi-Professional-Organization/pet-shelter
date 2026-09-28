@@ -103,7 +103,7 @@ export default function ImpactPage() {
               Where your support goes
             </h1>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
-              Every donation helps fund rescue, treatment, shelter care, and long-term recovery for stray dogs and cats in Selangor.
+              Every donation helps fund rescue, treatment, shelter care, and long-term recovery for stray dogs and cats.
             </p>
           </div>
         </div>

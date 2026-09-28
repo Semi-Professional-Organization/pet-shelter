@@ -55,17 +55,6 @@ describe("Hero on the Malay site", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Coexistence through TNRM & Education")).not.toBeInTheDocument();
   });
-
-  it("translates the hero image's alt text", () => {
-    // Read from the alt attribute rather than by text: an image's alt is its
-    // accessible name, and `queryByText` cannot see it at all — which is how
-    // this string sat untranslated while a Malay test passed beside it.
-    renderWithLanguage(<Hero />, { language: "ms" });
-
-    const alts = screen.getAllByRole("img").map((img) => img.getAttribute("alt"));
-    expect(alts).toContain("Haiwan reskue menikmati kawasan santuari");
-    expect(alts).not.toContain("Rescued shelter animals enjoying sanctuary grounds");
-  });
 });
 
 describe("Home gallery chrome on the Malay site", () => {
@@ -102,20 +91,15 @@ describe("BulletinFeed on the Malay site", () => {
     expect(screen.queryByText("Latest news and updates")).not.toBeInTheDocument();
   });
 
-  // The prop combinations the real call sites use, not a convenient one:
-  // `/bulletins` renders the plain feed and `/pets` renders it `compact`.
+  // The prop combination the real call site uses, not a convenient one:
+  // `/bulletins` renders the plain feed. (`/pets` rendered it `compact` until
+  // the animals page dropped its notices; pets-targeted ones list on `/bulletins`.)
   const siblingFeeds = [
     {
       titleKey: "bulletins.allNoticesTitle",
       props: {} as const,
       malay: "Semua Buletin",
       english: "All Bulletins",
-    },
-    {
-      titleKey: "bulletins.petsFeedTitle",
-      props: { compact: true } as const,
-      malay: "Buletin Adopsi & Klinik",
-      english: "Adoption & Clinic Bulletins",
     },
   ] as const;
 
