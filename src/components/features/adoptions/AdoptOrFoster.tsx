@@ -66,12 +66,6 @@ export function AdoptOrFosterApply() {
           {isMs ? "Mohon untuk Asuh" : "Apply to Foster"}
           <ArrowRight className="size-4" />
         </a>
-        {/* Separator: the apply buttons start an application; tracking follows one already sent.
-            A horizontal rule when stacked on mobile, a vertical one beside the row from sm. */}
-        <span aria-hidden="true" className="my-1 h-px w-full bg-border sm:mx-2 sm:my-0 sm:h-8 sm:w-px" />
-        <Link href="/applications/track" className={buttonVariants({ size: "lg", variant: "outline" })}>
-          {isMs ? "Semak Status Permohonan" : "Track Application Status"}
-        </Link>
       </div>
     </Section>
   );
