@@ -5,6 +5,7 @@ import React from "react";
 import { PhoneCall } from "lucide-react";
 
 import { useLanguage } from "@/components/providers/LanguageProvider";
+import { buttonVariants } from "@/components/ui/button";
 
 /**
  * The "call the shelter desk" banner shown under both FAQ surfaces.
@@ -30,10 +31,10 @@ export function FaqContactBanner({
     : (title ?? "Still have a question?");
 
   return (
-    <div className="bg-muted/40 border border-border p-6 max-w-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl">
-      <div>
-        <p className="text-base font-bold text-foreground">{heading}</p>
-        <p className="text-sm text-muted-foreground mt-0.5">
+    <div className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-border bg-muted/30 p-6 sm:flex-row sm:items-center sm:p-7">
+      <div className="space-y-2">
+        <p className="font-heading text-xl font-bold tracking-tight text-foreground">{heading}</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {isMs
             ? "Hubungi meja santuari kami Selasa hingga Ahad, 10:00 pagi – 5:00 petang."
             : "Call our shelter desk Tuesday through Sunday, 10:00 AM – 5:00 PM."}
@@ -41,9 +42,9 @@ export function FaqContactBanner({
       </div>
       <a
         href={`tel:${SHELTER_PHONE_TEL}`}
-        className="inline-flex items-center gap-2 bg-foreground text-background px-5 py-2.5 text-sm font-semibold uppercase tracking-wider hover:bg-foreground/85 transition-colors focus-visible:ring-2 shrink-0 rounded-xl"
+        className={buttonVariants({ variant: "outline", className: "shrink-0 gap-2" })}
       >
-        <PhoneCall className="size-4" />
+        <PhoneCall className="size-3.5" />
         {SHELTER_PHONE_DISPLAY}
       </a>
     </div>

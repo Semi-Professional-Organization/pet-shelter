@@ -23,7 +23,7 @@ export function Section({ id, className, children }: SectionProps) {
 
 export function SectionHeader({ title, subtitle, className }: SectionHeaderProps) {
   return (
-    <div className={cn("max-w-2xl space-y-3", className)}>
+    <div className={cn("space-y-3", className)}>
       <h2 className="font-heading text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
         {title}
       </h2>

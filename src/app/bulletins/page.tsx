@@ -21,7 +21,7 @@ export default async function BulletinsPage() {
 
   return (
     <div className="min-h-screen bg-card py-12 sm:py-16">
-      <div className="w-full px-6 sm:px-8 lg:px-12">
+      <div className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12">
         <BulletinsPageIntro />
 
         <BulletinFeed bulletins={bulletins} titleKey="bulletins.allNoticesTitle" />

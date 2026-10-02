@@ -11,13 +11,6 @@ import {
   HeartHandshake,
   Compass,
   ChevronDown,
-  FileSearch,
-  Users,
-  Building2,
-  HandHeart,
-  Stethoscope,
-  Sparkles,
-  Award,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/providers/ThemeToggle";
@@ -47,23 +40,14 @@ export function Navbar() {
     {
       href: "/pets",
       label: isMs ? "Lihat Haiwan Reskue" : "Meet Our Animals",
-      desc: isMs ? "Haiwan sedia diadopsi & dalam pemulihan" : "Adoptable & recovering rescue animals",
-      icon: Heart,
     },
     {
-      href: "/#how-it-works",
+      href: "/adoption",
       label: isMs ? "Proses & Syarat Adopsi" : "Adoption Process & Criteria",
-      // "3-langkah", not "4-langkah": `HomeProcessSection` renders steps 01-03.
-      // The link pointed at an unrendered anchor until 2026-09-22, so the
-      // mismatch was invisible — restoring the destination is what exposed it.
-      desc: isMs ? "Panduan 3-langkah adopsi percuma 100%" : "Step-by-step 100% free adoption guide",
-      icon: Sparkles,
     },
     {
       href: "/applications/track",
       label: isMs ? "Semak Status Permohonan" : "Track Application Status",
-      desc: isMs ? "Semak status permohonan dengan ID rujukan" : "Check review progress via reference ID",
-      icon: FileSearch,
     },
   ];
 
@@ -71,34 +55,22 @@ export function Navbar() {
     {
       href: "/sponsors",
       label: t("nav.sponsorWall"),
-      desc: isMs
-        ? "Penyokong Gangsa, Perak & Emas kami"
-        : "Our Bronze, Silver & Gold supporters",
-      icon: Award,
     },
     {
       href: "/get-involved#volunteer",
-      label: isMs ? "Sukarelawan Santuari & TNRM" : "Volunteer & Field Shifts",
-      desc: isMs ? "Tugas berjalan, sanitasi sangkar & operasi lapangan" : "Dog walking, shelter care & field trapping",
-      icon: Users,
+      label: isMs ? "Sukarelawan" : "Volunteer",
+    },
+    {
+      href: "/get-involved#events",
+      label: isMs ? "Acara Sukarelawan" : "Volunteer Events",
     },
     {
       href: "/get-involved#foster",
-      label: isMs ? "Program Keluarga Asuh (Foster)" : "Foster-to-Adopt & Neonatal Care",
-      desc: isMs ? "Asuhan sementara pasca-pembedahan" : "Temporary care for recovering strays",
-      icon: HandHeart,
-    },
-    {
-      href: "/get-involved#corporate",
-      label: isMs ? "CSR Korporat & Universiti" : "Corporate CSR & Group Days",
-      desc: isMs ? "Hari khidmat masyarakat & padanan sumbangan" : "Workdays, education booths & matching drives",
-      icon: Building2,
+      label: isMs ? "Keluarga Asuh" : "Foster",
     },
     {
       href: "/get-involved#partnerships",
-      label: isMs ? "Rakan Kongsi & Klinik Veterinar" : "Clinical & Community Partners",
-      desc: isMs ? "Kerjasama veterinar & kelab pelajar UM" : "Vet clinic networks & student societies",
-      icon: Stethoscope,
+      label: isMs ? "Rakan Kongsi" : "Partners",
     },
   ];
 
@@ -146,7 +118,7 @@ export function Navbar() {
                 aria-expanded={openDropdown === "adoption"}
                 onClick={() => setOpenDropdown((prev) => (prev === "adoption" ? null : "adoption"))}
                 className={`inline-flex items-center gap-1 text-sm font-semibold transition-colors hover:text-foreground cursor-pointer ${
-                  pathname.startsWith("/applications")
+                  pathname.startsWith("/applications") || pathname === "/adoption"
                     ? "text-foreground font-bold"
                     : "text-muted-foreground"
                 }`}
@@ -156,20 +128,16 @@ export function Navbar() {
               </button>
 
               {openDropdown === "adoption" && (
-                <div className="absolute top-full left-0 w-72 pt-2 z-50">
+                <div className="absolute top-full left-0 w-64 pt-2 z-50">
                   <div className="border border-border bg-card shadow-lg p-2 rounded-2xl space-y-1">
                     {adoptionLinks.map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={() => setOpenDropdown(null)}
-                        className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-muted/70 transition-colors"
+                        className="block px-3 py-2.5 text-sm font-semibold text-foreground rounded-xl hover:bg-muted/70 transition-colors"
                       >
-                        <item.icon className="size-4 text-primary shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs font-bold text-foreground">{item.label}</p>
-                          <p className="text-2xs text-muted-foreground leading-tight mt-0.5">{item.desc}</p>
-                        </div>
+                        {item.label}
                       </Link>
                     ))}
                   </div>
@@ -201,20 +169,16 @@ export function Navbar() {
               </button>
 
               {openDropdown === "get-involved" && (
-                <div className="absolute top-full left-0 w-80 pt-2 z-50">
+                <div className="absolute top-full left-0 w-64 pt-2 z-50">
                   <div className="border border-border bg-card shadow-lg p-2 rounded-2xl space-y-1">
                     {getInvolvedLinks.map((item) => (
                       <Link
                         key={item.href}
                         href={item.href}
                         onClick={() => setOpenDropdown(null)}
-                        className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-muted/70 transition-colors"
+                        className="block px-3 py-2.5 text-sm font-semibold text-foreground rounded-xl hover:bg-muted/70 transition-colors"
                       >
-                        <item.icon className="size-4 text-primary shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs font-bold text-foreground">{item.label}</p>
-                          <p className="text-2xs text-muted-foreground leading-tight mt-0.5">{item.desc}</p>
-                        </div>
+                        {item.label}
                       </Link>
                     ))}
                   </div>

@@ -71,7 +71,7 @@ export function BulletinFeed({
   return (
     <section className="w-full">
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 mb-6">
-        <div className="max-w-2xl space-y-3">
+        <div className="space-y-3">
           <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
             <Translated k={titleKey} />
           </h2>

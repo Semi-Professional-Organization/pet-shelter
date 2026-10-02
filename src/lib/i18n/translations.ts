@@ -375,7 +375,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     nav: {
       adoptablePets: "Adoptable Pets",
       donate: "Donate & Sponsor",
-      trackApplication: "Track Application",
+      trackApplication: "Track Application Status",
       bulletins: "Shelter Bulletins",
       adoptionProcess: "Adoption Process",
       volunteerFoster: "Volunteer & Foster",
@@ -598,8 +598,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     tracking: {
       badge: "Adopter Self-Service Portal",
-      title: "Track Adoption Application",
-      subtitle: "Check the live review status, scheduled meet-and-greet sessions, and finalization instructions for your shelter adoption inquiry.",
+      title: "Track Application Status",
+      subtitle: "Enter your reference ID to see where your application stands.",
       refLabel: "Application Reference ID *",
       refPlaceholder: "e.g. app-1723738192000",
       emailLabel: "Applicant Email Address *",
@@ -646,7 +646,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     donations: {
       badge: "Direct Rescue Giving & Sponsorship",
-      title: "Fuel Lifesaving Medical Care & Nutrition for Rescued Strays",
+      title: "Donate & Sponsor",
       subtitle: "Every ringgit directly supports emergency surgeries, core vaccinations, and wholesome meals at our sanctuary. Because of your generosity, 100% of our rescued animals are rehomed through our Free Adoption policy.",
       rosBadge: "ROS Reg: {regNo}",
       lhdnBadge: "LHDN Tax Deductible: Sec 44(6) ITA 1967",
@@ -741,7 +741,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     nav: {
       adoptablePets: "Haiwan Angkat",
       donate: "Derma & Penajaan",
-      trackApplication: "Semak Permohonan",
+      trackApplication: "Semak Status Permohonan",
       bulletins: "Buletin Pusat Perlindungan",
       adoptionProcess: "Proses Adopsi",
       volunteerFoster: "Sukarelawan & Asuhan",
@@ -964,8 +964,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     tracking: {
       badge: "Portal Layan Diri Pengadopsi",
-      title: "Semak Status Permohonan Adopsi",
-      subtitle: "Semak status semakan langsung, jadual sesi suai kenal, dan arahan penyempurnaan adopsi haiwan perlindungan anda.",
+      title: "Semak Status Permohonan",
+      subtitle: "Masukkan ID rujukan anda untuk melihat status permohonan.",
       refLabel: "Nombor Rujukan Permohonan *",
       refPlaceholder: "cth. app-1723738192000",
       emailLabel: "Alamat E-mel Pemohon *",
@@ -1010,7 +1010,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     donations: {
       badge: "Sumbangan & Penajaan Terus",
-      title: "Taja Rawatan Perubatan & Makanan untuk Haiwan Terbiar",
+      title: "Taja & Sumbang",
       subtitle: "Setiap ringgit disalurkan terus bagi pembedahan kecemasan, vaksinasi teras, dan makanan berkhasiat di pusat perlindungan kami. Berkat kemurahan hati anda, 100% haiwan reskue kami diserahkan melalui polisi Adopsi Percuma.",
       rosBadge: "No. ROS: {regNo}",
       lhdnBadge: "Pengecualian Cukai LHDN: Sek 44(6) ACP 1967",

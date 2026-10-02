@@ -43,7 +43,7 @@ export default async function PetsDirectoryPage() {
   return (
     <div className="min-h-screen bg-card pb-20">
       {/* Directory Gallery */}
-      <div className="w-full px-6 sm:px-8 lg:px-12 pt-8 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12 pt-8 sm:pt-10">
         <Suspense
           fallback={
             <div className="flex min-h-[360px] items-center justify-center p-12 text-muted-foreground">

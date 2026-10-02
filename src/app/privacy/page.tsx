@@ -1,7 +1,7 @@
 import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-card py-12 sm:py-16">
-      <div className="mx-auto max-w-4xl px-6 sm:px-8 lg:px-10 space-y-10">
+      <div className="mx-auto max-w-4xl px-6 sm:px-8 lg:px-12 space-y-10">
         {/* Header */}
         <div className="space-y-4 border-b border-border pb-8">
           <Link
@@ -27,11 +27,6 @@ export default function PrivacyPolicyPage() {
             <ArrowLeft className="size-3.5" />
             Back to Home
           </Link>
-
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-secondary text-secondary-foreground text-xs font-semibold border border-border">
-            <ShieldCheck className="size-3.5 text-foreground" />
-            <span>Malaysian PDPA Act 2010 Compliance</span>
-          </div>
 
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
             Personal Data Protection & Privacy Notice
