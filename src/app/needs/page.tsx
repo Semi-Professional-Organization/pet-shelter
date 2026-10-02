@@ -4,7 +4,6 @@ import {
   getServerRehabCategories,
 } from "@/lib/server/rehabNeedsCatalog";
 import { RehabNeedsSection } from "@/components/features/needs/RehabNeedsSection";
-import { PackageOpen } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Rehabilitation House Needs & Wishlist | Hope for Strays UM",
@@ -22,15 +21,11 @@ export default async function NeedsPage() {
     <main className="min-h-screen bg-background pb-20">
       {/* Hero Header */}
       <section className="w-full border-b border-border bg-muted/20 py-14 sm:py-20 px-6 sm:px-8 lg:px-12">
-        <div className="max-w-5xl mx-auto space-y-4">
-          <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary text-xs font-bold px-3.5 py-1.5 rounded-full uppercase tracking-wider">
-            <PackageOpen className="size-4" />
-            Wishlist & House Supplies
-          </div>
+        <div className="max-w-7xl mx-auto space-y-4">
           <h1 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
             Rehabilitation House Needs
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-3xl leading-relaxed">
+          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
             Our Sanctuary & Rehabilitation House cares for 40+ recovering dogs and cats post-surgery, trauma treatment, and mange therapy. Support their direct recovery by donating essential clinical nutrition, sterile wound supplies, and humane TNRM equipment.
           </p>
         </div>

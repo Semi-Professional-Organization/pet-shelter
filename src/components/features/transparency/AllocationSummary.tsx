@@ -45,7 +45,7 @@ export function AllocationSummary({
     const unavailable = source === "unavailable";
 
     return (
-      <div className="rounded-2xl border border-border bg-background p-8 text-center">
+      <div className="rounded-3xl border border-border bg-work-panel p-6 text-center shadow-xs sm:p-7">
         <p className="text-sm text-muted-foreground">
           {unavailable
             ? isMs
@@ -83,15 +83,15 @@ export function AllocationSummary({
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {allocation.map((slice) => (
           <div
             key={slice.key}
-            className="flex flex-col justify-between space-y-3 rounded-2xl border border-border bg-background p-6"
+            className="flex flex-col justify-between gap-6 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7"
           >
             <div>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="font-heading text-3xl font-extrabold tabular-nums text-foreground">
+                <span className="font-heading text-3xl font-bold tracking-tight tabular-nums text-foreground">
                   {slice.percent}%
                 </span>
                 <span
@@ -100,10 +100,10 @@ export function AllocationSummary({
                   style={{ backgroundColor: categoryVar(slice.key) }}
                 />
               </div>
-              <h3 className="font-heading text-base font-bold text-foreground">
+              <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
                 {isMs ? slice.meta.labelMs : slice.meta.label}
               </h3>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 {isMs ? slice.meta.blurbMs : slice.meta.blurb}
               </p>
             </div>
@@ -130,7 +130,7 @@ export function AllocationSummary({
       </div>
 
       {impactStats.length > 0 && (
-        <dl className="grid grid-cols-1 gap-6 rounded-2xl border border-border bg-muted/30 p-6 text-center sm:grid-cols-3 sm:p-8">
+        <dl className="grid grid-cols-1 gap-6 rounded-3xl border border-border bg-muted/30 p-6 sm:grid-cols-3 sm:p-7">
           {impactStats.slice(0, 3).map((stat) => (
             <div key={stat.key} className="flex flex-col-reverse justify-end gap-1">
               <dt className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

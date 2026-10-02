@@ -112,7 +112,7 @@ export function PetDetailView(props: PetDetailViewProps) {
     <div className="min-h-screen bg-card pb-20">
       {/* Top Breadcrumbs & Back */}
       <div className="border-b border-border bg-muted/20">
-        <div className="w-full px-6 sm:px-8 lg:px-12 py-4 flex items-center justify-between">
+        <div className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12 py-4 flex items-center justify-between">
           <Link
             href="/pets"
             className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
@@ -135,7 +135,7 @@ export function PetDetailView(props: PetDetailViewProps) {
         </div>
       </div>
 
-      <div className="w-full px-6 sm:px-8 lg:px-12 pt-8 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12 pt-8 sm:pt-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 max-w-7xl mx-auto">
           
           {/* Left Column: Pet Portrait & Quick Facts */}

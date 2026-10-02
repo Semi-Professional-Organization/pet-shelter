@@ -13,9 +13,9 @@ import {
   Package,
   Award,
   ArrowRight,
-  HeartHandshake,
   Loader2,
 } from "lucide-react";
+import { Section, SectionHeader } from "@/components/layout/Section";
 import { DonationWidget } from "./DonationWidget";
 import { AllocationSummary } from "@/components/features/transparency/AllocationSummary";
 import type {
@@ -25,6 +25,11 @@ import type {
 } from "@/lib/domain/transparency";
 import { buttonVariants } from "@/components/ui/button";
 import { useLanguage } from "@/components/providers/LanguageProvider";
+
+// Shared recipes from docs/page-style-guide.md §3 and §5.
+const panel = "rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7";
+const eyebrow = "text-2xs font-bold uppercase tracking-wider text-primary";
+const iconTile = "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground";
 
 /**
  * Donate page body.
@@ -93,24 +98,18 @@ export function DonatePageView({
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      {/* 1. Hero Section */}
-      <section className="relative overflow-hidden bg-card border-b border-border py-14 sm:py-18 lg:py-22">
-        <div className="w-full px-6 sm:px-8 lg:px-12 max-w-6xl mx-auto">
-          <div className="text-center space-y-4 max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-bold uppercase tracking-wider">
-              <HeartHandshake className="size-4" />
-              {isMs ? "Sumbangan Terus & Penajaan Reskue" : "Direct Rescue Giving & Sponsorship"}
-            </div>
-
-            <h1 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-              {isMs ? "Bantu Selamatkan Nyawa & Biayai Rawatan Haiwan Terbiar" : "Fuel Lifesaving Medical Care & Nutrition for Rescued Strays"}
+    <div className="flex min-h-screen flex-col">
+      {/* 1. Title + giving form: one band, so the form reads as this page's content. */}
+      <Section>
+        <div className="space-y-12">
+          <div className="space-y-6">
+            <h1 className="font-heading text-3xl font-bold leading-[1.15] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+              {isMs ? "Taja & Sumbang" : "Donate & Sponsor"}
             </h1>
-
-            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
+            <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
               {isMs
-                ? "Setiap ringgit disalurkan terus bagi membiayai pembedahan kecemasan, vaksinasi lengkap, dan makanan berkhasiat di pusat perlindungan Petaling Jaya kami. Berkat keprihatinan anda, 100% haiwan reskue kami diserahkan kepada keluarga angkat secara percuma."
-                : "Every ringgit directly supports emergency surgeries, core vaccinations, and wholesome meals at our Petaling Jaya sanctuary. Because of your generosity, 100% of our rescued animals are rehomed through our Free Adoption policy."}
+                ? "Bantu selamatkan nyawa dan biayai rawatan haiwan terbiar. Setiap ringgit disalurkan terus bagi membiayai pembedahan kecemasan, vaksinasi lengkap, dan makanan berkhasiat di pusat perlindungan Petaling Jaya kami. Berkat keprihatinan anda, 100% haiwan reskue kami diserahkan kepada keluarga angkat secara percuma."
+                : "Fuel lifesaving medical care and nutrition for rescued strays. Every ringgit directly supports emergency surgeries, core vaccinations, and wholesome meals at our Petaling Jaya sanctuary. Because of your generosity, 100% of our rescued animals are rehomed through our Free Adoption policy."}
             </p>
 
             {/* Official Credentials Banner */}
@@ -129,28 +128,15 @@ export function DonatePageView({
               </span>
             </div>
 
-            <div className="pt-5">
-              <Link
-                href="/impact"
-                className={buttonVariants({
-                  size: "sm",
-                  className: "gap-2 rounded-xl px-5 text-xs font-bold uppercase tracking-wider",
-                })}
-              >
-                {isMs ? "Lihat Laporan Impak" : "View impact report"}
-                <ArrowRight className="size-4" />
-              </Link>
-            </div>
+            <Link href="/impact" className={buttonVariants({ variant: "outline", className: "gap-2" })}>
+              {isMs ? "Lihat Laporan Impak" : "View impact report"}
+              <ArrowRight className="size-4" />
+            </Link>
           </div>
-        </div>
-      </section>
 
-      {/* 2. Interactive Giving Engine */}
-      <section className="py-12 sm:py-16 bg-muted/20">
-        <div className="w-full px-6 sm:px-8 lg:px-12 max-w-5xl mx-auto">
           <Suspense
-          fallback={
-              <div className="flex min-h-[300px] items-center justify-center p-12 text-muted-foreground border border-border bg-card rounded-2xl">
+            fallback={
+              <div className="flex min-h-[300px] items-center justify-center rounded-3xl border border-border bg-work-panel p-12 text-muted-foreground">
                 <Loader2 className="size-6 animate-spin mr-2" />
                 <span>{isMs ? "Memuatkan borang sumbangan..." : "Loading donation form..."}</span>
               </div>
@@ -159,24 +145,19 @@ export function DonatePageView({
             <DonationWidget />
           </Suspense>
         </div>
-      </section>
+      </Section>
 
-      {/* 3. Financial Transparency & Impact Visualizer */}
-      <section className="py-14 sm:py-18 border-t border-border bg-card">
-        <div className="w-full px-6 sm:px-8 lg:px-12 max-w-6xl mx-auto space-y-10">
-          <div className="max-w-2xl">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary block mb-1">
-              {isMs ? "Ketelusan Kewangan" : "Financial Accountability"}
-            </span>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {isMs ? "Ke Mana Sumbangan Anda Disalurkan" : "Where Your Donation Goes"}
-            </h2>
-            <p className="text-sm sm:text-base text-muted-foreground mt-2 leading-relaxed">
-              {isMs
+      {/* 2. Financial transparency */}
+      <Section>
+        <div className="space-y-12">
+          <SectionHeader
+            title={isMs ? "Ke Mana Sumbangan Anda Disalurkan" : "Where Your Donation Goes"}
+            subtitle={
+              isMs
                 ? "Kami beroperasi dengan ketelusan kewangan yang teliti. Peratusan di bawah dikira secara langsung daripada lejar perbelanjaan kami yang disahkan — setiap catatan disokong invois klinik atau pembekal."
-                : "We operate with strict financial transparency. The shares below are computed live from our verified expense ledger — every entry is backed by a clinic or supplier invoice you can ask to inspect."}
-            </p>
-          </div>
+                : "We operate with strict financial transparency. The shares below are computed live from our verified expense ledger — every entry is backed by a clinic or supplier invoice you can ask to inspect."
+            }
+          />
 
           {/* Allocation and impact figures are derived from the shared expense
               ledger — the same source /transparency renders. This page used to
@@ -188,41 +169,33 @@ export function DonatePageView({
             source={source}
           />
         </div>
-      </section>
+      </Section>
 
-      {/* 4. Physical Supplies & Drop-off Wishlist */}
-      <section className="py-14 sm:py-18 border-t border-border bg-muted/20">
-        <div className="w-full px-6 sm:px-8 lg:px-12 max-w-6xl mx-auto space-y-10">
-          <div className="max-w-2xl">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary block mb-1">
-              {isMs ? "Sumbangan Barangan Keperluan" : "In-Kind Giving"}
-            </span>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {isMs ? "Senarai Keperluan Pusat Perlindungan" : "Shelter Supplies Wishlist"}
-            </h2>
-            <p className="text-sm sm:text-base text-muted-foreground mt-2 leading-relaxed">
-              {isMs
+      {/* 3. In-kind giving */}
+      <Section>
+        <div className="space-y-12">
+          <SectionHeader
+            title={isMs ? "Senarai Keperluan Pusat Perlindungan" : "Shelter Supplies Wishlist"}
+            subtitle={
+              isMs
                 ? "Ingin menyumbang barangan secara terus? Kami menerima penghantaran makanan yang belum dibuka, bekalan perubatan, dan alas tidur di pusat perlindungan Petaling Jaya kami."
-                : "Prefer to donate items directly? We gladly accept physical drop-offs of unopened food, medical supplies, and shelter bedding at our Petaling Jaya sanctuary."}
-            </p>
-          </div>
+                : "Prefer to donate items directly? We gladly accept physical drop-offs of unopened food, medical supplies, and shelter bedding at our Petaling Jaya sanctuary."
+            }
+          />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             {wishlistCategories.map((cat, idx) => (
-              <div
-                key={idx}
-                className="border border-border bg-card p-6 rounded-2xl space-y-4 shadow-xs"
-              >
+              <div key={idx} className={`${panel} space-y-4`}>
                 <div className="flex items-center gap-2.5 border-b border-border pb-3">
-                  <Package className="size-5 text-primary" />
-                  <h3 className="font-heading text-base font-bold text-foreground">
-                    {cat.category}
-                  </h3>
+                  <div className={iconTile}>
+                    <Package className="size-5" />
+                  </div>
+                  <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">{cat.category}</h3>
                 </div>
-                <ul className="space-y-2.5 text-xs sm:text-sm text-foreground/90">
+                <ul className="space-y-2.5">
                   {cat.items.map((item, itemIdx) => (
-                    <li key={itemIdx} className="flex items-start gap-2">
-                      <CheckCircle2 className="size-4 text-success-accent shrink-0 mt-0.5" />
+                    <li key={itemIdx} className="flex items-start gap-2 text-sm font-medium text-foreground/90">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -231,74 +204,56 @@ export function DonatePageView({
             ))}
           </div>
 
-          {/* Sanctuary Drop-off Address Card */}
-          <div className="border border-border bg-background p-6 sm:p-8 rounded-2xl shadow-xs">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
-                  <MapPin className="size-4" /> {isMs ? "Lokasi Penghantaran" : "Drop-off Location"}
-                </div>
-                <div className="font-bold text-foreground text-sm sm:text-base">
-                  Hope for Strays Sanctuary
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {t("footer.address", "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia")}
-                </p>
-              </div>
+          {/* Drop-off details */}
+          <div className={`${panel} grid grid-cols-1 gap-6 md:grid-cols-3`}>
+            <div className="space-y-2">
+              <p className={`flex items-center gap-2 ${eyebrow}`}>
+                <MapPin className="size-4" /> {isMs ? "Lokasi Penghantaran" : "Drop-off Location"}
+              </p>
+              <p className="font-heading text-xl font-bold tracking-tight text-foreground">Hope for Strays Sanctuary</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {t("footer.address", "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia")}
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
-                  <Clock className="size-4" /> {isMs ? "Waktu Lawatan & Penghantaran" : "Visiting & Drop-off Hours"}
-                </div>
-                <div className="font-bold text-foreground text-sm">
-                  {isMs ? "Selasa – Ahad: 10:00 Pagi – 5:00 Petang" : "Tuesday – Sunday: 10:00 AM – 5:00 PM"}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("footer.closedMondays", "Closed on Mondays for deep sanitisation")}
-                </p>
-              </div>
+            <div className="space-y-2">
+              <p className={`flex items-center gap-2 ${eyebrow}`}>
+                <Clock className="size-4" /> {isMs ? "Waktu Lawatan & Penghantaran" : "Visiting & Drop-off Hours"}
+              </p>
+              <p className="font-heading text-xl font-bold tracking-tight text-foreground">
+                {isMs ? "Selasa – Ahad: 10:00 Pagi – 5:00 Petang" : "Tuesday – Sunday: 10:00 AM – 5:00 PM"}
+              </p>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {t("footer.closedMondays", "Closed on Mondays for deep sanitisation")}
+              </p>
+            </div>
 
-              <div className="space-y-3 md:text-right">
-                <div className="flex items-center md:justify-end gap-2 text-primary font-bold text-xs uppercase tracking-wider">
-                  <Phone className="size-4" /> {isMs ? "Hubungi Terus" : "Direct Contact"}
-                </div>
-                <div>
-                  <a
-                    href={`tel:${SHELTER_PHONE_TEL}`}
-                    className="font-mono font-bold text-foreground text-base hover:underline"
-                  >
-                    {SHELTER_PHONE_DISPLAY}
-                  </a>
-                  <p className="text-xs text-muted-foreground">info@hopeforstrays.org</p>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <p className={`flex items-center gap-2 ${eyebrow}`}>
+                <Phone className="size-4" /> {isMs ? "Hubungi Terus" : "Direct Contact"}
+              </p>
+              <a href={`tel:${SHELTER_PHONE_TEL}`} className="block font-mono text-xl font-bold text-foreground hover:underline">
+                {SHELTER_PHONE_DISPLAY}
+              </a>
+              <p className="text-sm text-muted-foreground">info@hopeforstrays.org</p>
             </div>
           </div>
         </div>
-      </section>
+      </Section>
 
-      {/* 5. Browse the animals */}
-      <section className="py-14 sm:py-18 border-t border-border bg-card">
-        <div className="w-full px-6 sm:px-8 lg:px-12 max-w-4xl mx-auto space-y-8">
-          {/* Bottom CTA to browse pets */}
-          <div className="text-center pt-8 border-t border-border space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {isMs ? "Ingin melihat haiwan-haiwan yang sedang anda bantu hari ini?" : "Want to see the animals whose lives you are changing today?"}
-            </p>
-            <Link
-              href="/pets"
-              className={buttonVariants({
-                size: "lg",
-                className: "gap-2 px-8 font-bold text-sm uppercase tracking-wider shadow-xs rounded-xl",
-              })}
-            >
-              <Heart className="size-4.5 fill-current" />
-              {isMs ? "Lihat Haiwan Sedia Diadopsi" : "Meet Our Adoptable Animals"}
-              <ArrowRight className="size-4" />
-            </Link>
-          </div>
+      {/* 4. Browse the animals */}
+      <Section>
+        <div className="space-y-6">
+          <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
+            {isMs ? "Ingin melihat haiwan-haiwan yang sedang anda bantu hari ini?" : "Want to see the animals whose lives you are changing today?"}
+          </p>
+          <Link href="/pets" className={buttonVariants({ size: "lg", className: "gap-2" })}>
+            <Heart className="size-4 fill-current" />
+            {isMs ? "Lihat Haiwan Sedia Diadopsi" : "Meet Our Adoptable Animals"}
+            <ArrowRight className="size-4" />
+          </Link>
         </div>
-      </section>
+      </Section>
     </div>
   );
 }

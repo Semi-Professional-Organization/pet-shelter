@@ -269,7 +269,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
   if (completedPledge) {
     return (
-      <div className="border border-border bg-card p-6 sm:p-10 rounded-2xl shadow-sm space-y-6">
+      <div className="space-y-6 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
         <div className="bg-success-surface border border-success-accent/30 p-5 rounded-xl flex items-start gap-3.5">
           <CheckCircle2 className="size-6 text-success-accent shrink-0 mt-0.5" />
           <div>
@@ -402,7 +402,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   }
 
   return (
-    <div className="border border-border bg-card p-6 sm:p-8 lg:p-10 rounded-2xl shadow-sm space-y-8">
+    <div className="space-y-8 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
       {errorMessage && (
         <div className="bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive font-medium rounded-xl flex items-center gap-2">
           <span>⚠️ {errorMessage}</span>

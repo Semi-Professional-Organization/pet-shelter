@@ -441,7 +441,6 @@ export function HomeStandardsSection() {
           <div className="lg:col-span-4 space-y-4">
             <SectionHeader
               title={isMs ? "Piawaian Kebajikan & Santuari Haiwan" : "Our Animal Welfare & Sanctuary Standards"}
-              className="max-w-none"
             />
             <p className="text-sm font-semibold text-muted-foreground">
               {(isMs ? "Persatuan Berdaftar ROS Malaysia: " : "Malaysian Registered Society: ") + PUBLIC_ROS_REGISTRATION_NO}
