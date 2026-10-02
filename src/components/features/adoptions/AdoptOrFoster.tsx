@@ -43,43 +43,35 @@ export function AdoptOrFosterApply() {
 
   return (
     <Section className="pt-0 sm:pt-0">
-      <div className="space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Link href="/pets" className={buttonVariants({ size: "lg", className: "gap-2" })}>
-            <Heart className="size-4 fill-current" />
-            {isMs ? "Mohon untuk Adopsi" : "Apply to Adopt"}
-            <ArrowRight className="size-4" />
-          </Link>
-          {/* Same button, inverted: primary outline and text on the page ground. cn() rather than
-              buttonVariants' className, which concatenates without merging (page-style-guide §8.1). */}
-          <a
-            href={`https://wa.me/60123456789?text=${encodeURIComponent(
-              "Hi Hope for Strays, I would like to apply to foster."
-            )}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              buttonVariants({ size: "lg", variant: "outline" }),
-              "gap-2 border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:bg-transparent dark:hover:bg-primary/10"
-            )}
-          >
-            <Heart className="size-4" />
-            {isMs ? "Mohon untuk Asuh" : "Apply to Foster"}
-            <ArrowRight className="size-4" />
-          </a>
-          <Link
-            href="/applications/track"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline sm:ml-auto"
-          >
-            {isMs ? "Semak Status Permohonan" : "Track Application Status"}
-            <ArrowRight className="size-3.5" />
-          </Link>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {isMs
-            ? "Permohonan adopsi bermula daripada haiwan yang anda pilih. Permohonan asuhan melalui WhatsApp buat masa ini."
-            : "Adoption applications start from the animal you choose. Foster applications are by WhatsApp for now."}
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Link href="/pets" className={buttonVariants({ size: "lg", className: "gap-2" })}>
+          <Heart className="size-4 fill-current" />
+          {isMs ? "Mohon untuk Adopsi" : "Apply to Adopt"}
+          <ArrowRight className="size-4" />
+        </Link>
+        {/* Same button, inverted: primary outline and text on the page ground. cn() rather than
+            buttonVariants' className, which concatenates without merging (page-style-guide §8.1). */}
+        <a
+          href={`https://wa.me/60123456789?text=${encodeURIComponent(
+            "Hi Hope for Strays, I would like to apply to foster."
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            buttonVariants({ size: "lg", variant: "outline" }),
+            "gap-2 border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:bg-transparent dark:hover:bg-primary/10"
+          )}
+        >
+          <Heart className="size-4" />
+          {isMs ? "Mohon untuk Asuh" : "Apply to Foster"}
+          <ArrowRight className="size-4" />
+        </a>
+        {/* Separator: the apply buttons start an application; tracking follows one already sent.
+            A horizontal rule when stacked on mobile, a vertical one beside the row from sm. */}
+        <span aria-hidden="true" className="my-1 h-px w-full bg-border sm:mx-2 sm:my-0 sm:h-8 sm:w-px" />
+        <Link href="/applications/track" className={buttonVariants({ size: "lg", variant: "outline" })}>
+          {isMs ? "Semak Status Permohonan" : "Track Application Status"}
+        </Link>
       </div>
     </Section>
   );
