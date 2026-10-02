@@ -1,4 +1,3 @@
-import { LHDN_TAX_DEDUCTIBLE_REF, PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -32,7 +31,7 @@ export default function TermsOfServicePage() {
             Adoption Terms & Sanctuary Policies
           </h1>
           <p className="text-sm text-muted-foreground">
-            Effective Date: August 2026 • Persatuan Harapan Haiwan Terbiar Selangor ({PUBLIC_ROS_REGISTRATION_NO})
+            Effective Date: August 2026 • Hope for Strays
           </p>
         </div>
 
@@ -77,9 +76,9 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-heading text-xl font-bold text-foreground">5. Donations & Tax Deductions</h2>
+            <h2 className="font-heading text-xl font-bold text-foreground">5. Donations</h2>
             <p>
-              Monetary contributions and sponsorship gifts are voluntary donations eligible for Malaysian income tax deduction under Subsection 44(6) of the Income Tax Act 1967 (Ref: {LHDN_TAX_DEDUCTIBLE_REF}). Official e-Receipts are computer-generated and non-transferable.
+              Monetary contributions and sponsorship gifts are voluntary donations.
             </p>
           </section>
         </div>

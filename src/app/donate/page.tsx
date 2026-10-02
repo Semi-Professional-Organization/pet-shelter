@@ -5,7 +5,7 @@ import { readAllocationSummary } from "@/lib/server/transparencyRepository";
 export const metadata: Metadata = {
   title: "Donate & Sponsor a Rescue | Hope for Strays",
   description:
-    "Fund emergency surgeries, vaccinations and daily nutrition for rescued strays in Petaling Jaya. Every confirmed donation receives an official LHDN tax-deductible e-receipt.",
+    "Fund emergency surgeries, vaccinations and daily nutrition for rescued strays in Petaling Jaya.",
   alternates: { canonical: "/donate" },
 };
 

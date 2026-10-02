@@ -10,7 +10,7 @@ import {
 export const metadata: Metadata = {
   title: "Frequently Asked Questions | Hope for Strays (Petaling Jaya)",
   description:
-    "Answers on TNRM and community animals, adoption fees and home visits, sponsorship and LHDN tax receipts, volunteering, and visiting our Petaling Jaya sanctuary.",
+    "Answers on TNRM and community animals, adoption fees and home visits, sponsorship, volunteering, and visiting our Petaling Jaya sanctuary.",
 };
 
 /**
@@ -36,8 +36,8 @@ export default async function FaqPage() {
           </h1>
           <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
             Everything adopters, volunteers, sponsors and neighbours ask us most —
-            TNRM and community animals, adoption and fostering, tax-deductible
-            giving, and how to find us in Petaling Jaya.
+            TNRM and community animals, adoption and fostering, donations and
+            sponsorship, and how to find us in Petaling Jaya.
           </p>
         </div>
 

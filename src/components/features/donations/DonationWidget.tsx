@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  PUBLIC_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   QrCode,
   CheckCircle2,
   Copy,
-  ShieldCheck,
   ArrowRight,
   RotateCcw,
   RotateCw,
@@ -189,8 +184,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     if (!donorName.trim() || !donorEmail.trim()) {
       setErrorMessage(
         isMs
-          ? "Sila masukkan nama dan alamat emel anda untuk menerima resit rasmi."
-          : "Please enter your name and email address to receive your official tax receipt."
+          ? "Sila masukkan nama dan alamat emel anda untuk melengkapkan ikrar."
+          : "Please enter your name and email address to complete your pledge."
       );
       return;
     }
@@ -653,10 +648,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 <Building2 className="size-3.5" /> Beneficiary Organization
               </div>
               <div className="font-bold text-foreground text-sm">
-                Pertubuhan Kebajikan Hope for Strays
-              </div>
-              <div className="text-2xs text-muted-foreground">
-                ROS Reg: {PUBLIC_ROS_REGISTRATION_NO}
+                Hope for Strays
               </div>
             </div>
 
@@ -690,16 +682,6 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                     : t("donations.copyAccountBtn", "Copy")}
                 </Button>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 text-xs text-muted-foreground bg-success-surface p-3 rounded-xl border border-success-accent/30">
-              <ShieldCheck className="size-4 text-success-accent shrink-0" />
-              <span>
-                Official LHDN Tax-Exempt Reference:{" "}
-                <strong className="text-success-text ">
-                  {LHDN_TAX_DEDUCTIBLE_REF}
-                </strong>
-              </span>
             </div>
           </div>
         </div>
@@ -760,12 +742,12 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
         <div className="space-y-4">
           <div>
             <h3 className="font-heading text-lg font-bold text-foreground">
-              5. {isMs ? "Maklumat Penderma (Untuk e-Resit Rasmi LHDN)" : "Donor Details (For Official Tax-Exempt e-Receipt)"}
+              5. {isMs ? "Maklumat Penderma" : "Donor Details"}
             </h3>
             <p className="text-xs text-muted-foreground">
               {t(
                 "donations.taxReliefNoticeDesc",
-                "Provide your Full Name and Malaysian IC / Passport / SSM number to receive an official e-Receipt valid for tax deductions."
+                "Provide your name and email so we can confirm your pledge."
               )}
             </p>
           </div>
@@ -882,13 +864,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
         </div>
 
         {/* Submit */}
-        <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="text-xs text-muted-foreground">
-            {t(
-              "donations.taxReliefNoticeTitle",
-              "LHDN Tax Exemption (Subsek 44(6) ACP 1967)"
-            )}
-          </div>
+        <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
 
           <Button
             type="submit"
@@ -898,7 +874,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           >
             <Gift className="size-4" />
             {isProcessing
-              ? t("donations.pledgeProcessing", "Recording Tax-Deductible Pledge...")
+              ? t("donations.pledgeProcessing", "Recording Pledge...")
               : `${t("donations.pledgeBtn", "Complete Donation Pledge")} — RM ${finalAmount}`}
             <ArrowRight className="size-4" />
           </Button>

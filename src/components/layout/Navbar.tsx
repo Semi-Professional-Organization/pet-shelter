@@ -323,7 +323,7 @@ export function Navbar() {
                       onClick={() => setIsMobileOpen(false)}
                       className="block text-sm font-bold py-2 hover:text-primary transition-colors"
                     >
-                      💖 {isMs ? "Taja & Sumbang (LHDN)" : "Donate & Sponsor (LHDN)"}
+                      💖 {isMs ? "Taja & Sumbang" : "Donate & Sponsor"}
                     </Link>
 
                     <Link
