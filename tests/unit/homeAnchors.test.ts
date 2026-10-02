@@ -546,7 +546,7 @@ describe("in-app anchor links", () => {
 
     const getInvolved = idsRenderedBy(entriesForRoute("get-involved"));
     expect(getInvolved).toContain("volunteer");
-    expect(getInvolved).toContain("foster");
+    expect(getInvolved).toContain("partnerships");
     expect(getInvolved).not.toContain("how-it-works");
   });
 

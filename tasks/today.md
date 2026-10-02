@@ -9,21 +9,18 @@ Style reference: `docs/page-style-guide.md`. Plan: `tasks/ui-checklist.md`. Focu
 into one **Adopt & Foster** path, with **one explicit point where the visitor chooses adopt or
 foster** and branches from there. Decision: `tasks/decisions/2026-10-02-foster-uses-the-adoption-process.md`.
 
-## 1. Adopt & Foster — structure (UI only, no data change)
+## 1. Adopt & Foster — structure (UI only, no data change) — done
 
-- [ ] `/adoption` becomes **Adopt or Foster** (H1 = page name; navbar + footer labels match)
-- [ ] **Choice point** at the top of that page: two cards side by side —
-      **Adopt** (a permanent home) · **Foster** (a temporary home while they recover) —
-      each linking to its own branch (`#adopt`, `#foster`)
-- [ ] Each branch: what it means, who it suits, then the **shared 3-step process** and an apply CTA
-- [ ] Foster branch takes the foster content from Get Involved (post-op recovery, medical
-      isolation, neonatal nursery; "we provide food, crates, medication, vet bills")
-- [ ] Navbar **Adoption** dropdown → **Adopt & Foster**: Meet Our Animals · Adopt or Foster ·
-      Track Application Status
-- [ ] Remove Foster from Get Involved (section + dropdown); footer "Volunteer & Foster Care" →
-      split into Volunteer (→ `/get-involved#volunteer`) and Foster (→ `/adoption#foster`)
-- [ ] Animal pages (`PetCard`, `pets/[id]`): decide whether the apply button becomes
-      **Adopt / Foster** (see question below)
+- [x] `/adoption` is **Adopt or Foster**: H1 + a two-card choice (Adopt · Foster → `#adopt`,
+      `#foster`), each branch with its own CTA, then the shared 3 steps (copy now covers both),
+      standards, and "Already applied? → Track"
+- [x] Foster content moved from Get Involved into the foster branch (bilingual now — **Malay is my
+      translation, needs a native read**); foster CTA stays WhatsApp (no foster form until §2)
+- [x] Navbar **Adopt & Foster** dropdown: Meet Our Animals · Adopt or Foster · Track Application
+      Status; mobile menu gained an Adopt or Foster link; Get Involved has no Foster
+- [x] Footer: "Adopt or Foster" (→ `/adoption`) and "Volunteer" (→ `/get-involved#volunteer`) —
+      one Adopt or Foster link instead of a separate Foster link, since the page holds both
+- [ ] Animal pages (`PetCard`, `pets/[id]`): Adopt / Foster buttons — waits on the fosterer question
 
 ## 2. Adopt & Foster — data (GRAVE, `midwife` lane, plan before building)
 

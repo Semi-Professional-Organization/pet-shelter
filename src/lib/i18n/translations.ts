@@ -14,8 +14,8 @@ export interface TranslationDictionary {
     donate: string;
     trackApplication: string;
     bulletins: string;
-    adoptionProcess: string;
-    volunteerFoster: string;
+    adoptOrFoster: string;
+    volunteer: string;
     matchQuiz: string;
     sponsor: string;
     adopt: string;
@@ -370,8 +370,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       donate: "Donate & Sponsor",
       trackApplication: "Track Application Status",
       bulletins: "Shelter Bulletins",
-      adoptionProcess: "Adoption Process",
-      volunteerFoster: "Volunteer & Foster",
+      adoptOrFoster: "Adopt or Foster",
+      volunteer: "Volunteer",
       matchQuiz: "Match Quiz",
       sponsor: "Sponsor Care",
       adopt: "Adopt",
@@ -447,13 +447,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       viewAllPets: "View All Adoptable Pets",
       galleryLoading: "Loading rescue animals...",
       howItWorksTitle: "A careful match, step by step",
-      howItWorksSubtitle: "We ensure every rescue goes to a safe, committed home through a straightforward 3-step process with zero commercial adoption fees.",
+      howItWorksSubtitle: "Adopting and fostering follow the same three steps, so every rescue is matched with the right family.",
       step1Title: "Browse & Submit Application",
       step1Desc: "Browse our adoptable dogs and cats online or visit our sanctuary. Submit a straightforward application to register your household interest.",
       step2Title: "Meet & Socialize",
       step2Desc: "Spend time interacting with the animal in our outdoor play yard or cat room. If you have resident pets, we arrange a structured, supervised introduction.",
       step3Title: "Finalize & Welcome Home",
-      step3Desc: "Sign our standard adoption agreement, with no commercial adoption fees. All animals are already vaccinated, microchipped, and spayed or neutered.",
+      step3Desc: "Sign the adoption or foster agreement, with no commercial adoption fees. All animals are already vaccinated, microchipped, and spayed or neutered.",
       protocolsTitle: "Our Animal Welfare Standards",
       protocolsSubtitle: "Built upon clinical veterinary rigor, lifetime accountability, and unconditional compassion.",
       protocol1Title: "Complete Veterinary Protocol",
@@ -729,8 +729,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       donate: "Derma & Penajaan",
       trackApplication: "Semak Status Permohonan",
       bulletins: "Buletin Pusat Perlindungan",
-      adoptionProcess: "Proses Adopsi",
-      volunteerFoster: "Sukarelawan & Asuhan",
+      adoptOrFoster: "Adopsi atau Asuh",
+      volunteer: "Sukarelawan",
       matchQuiz: "Kuiz Padanan",
       sponsor: "Taja Rawatan",
       adopt: "Adopsi",
@@ -806,13 +806,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       viewAllPets: "Lihat Semua Haiwan Sedia Diadopsi",
       galleryLoading: "Memuatkan haiwan reskue...",
       howItWorksTitle: "Padanan yang teliti, langkah demi langkah",
-      howItWorksSubtitle: "Kami memastikan setiap haiwan diserahkan kepada keluarga yang selamat dan bertanggungjawab melalui 3 langkah mudah tanpa sebarang yuran komersial.",
+      howItWorksSubtitle: "Adopsi dan asuhan mengikut tiga langkah yang sama, supaya setiap haiwan reskue dipadankan dengan keluarga yang sesuai.",
       step1Title: "Semak & Hantar Permohonan",
       step1Desc: "Semak senarai anjing dan kucing sedia diadopsi dalam talian atau kunjungi pusat perlindungan kami. Hantar borang permohonan ringkas.",
       step2Title: "Sesi Suai Kenal & Interaksi",
       step2Desc: "Luangkan masa berinteraksi bersama haiwan pilihan di kawasan riadah luar atau bilik kucing. Pengenalan terselia disediakan jika anda mempunyai haiwan sedia ada.",
       step3Title: "Tandatangan Perjanjian & Bawa Pulang",
-      step3Desc: "Tandatangani perjanjian adopsi rasmi tanpa sebarang yuran adopsi komersial. Semua haiwan telah lengkap divaksin, dipasang cip mikro dan dimandulkan.",
+      step3Desc: "Tandatangani perjanjian adopsi atau asuhan tanpa sebarang yuran adopsi komersial. Semua haiwan telah lengkap divaksin, dipasang cip mikro dan dimandulkan.",
       protocolsTitle: "Piawaian Kebajikan Haiwan Kami",
       protocolsSubtitle: "Berasaskan ketelitian klinikal veterinar, kebertanggungjawaban sepanjang hayat, dan belas kasihan.",
       protocol1Title: "Protokol Veterinar Lengkap",

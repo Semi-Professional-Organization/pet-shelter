@@ -9,9 +9,9 @@ import { Section, SectionHeader } from "@/components/layout/Section";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Get Involved — Volunteer, Events, Foster & Partnerships | Hope for Strays UM",
+  title: "Get Involved — Volunteer, Events & Partnerships | Hope for Strays UM",
   description:
-    "Help the cats and dogs at the Hope for Strays sanctuary: volunteer for routine cleaning and feeding in the cat or dog area, join an occasional volunteer event, foster a recovering rescue, or partner with us.",
+    "Help the cats and dogs at the Hope for Strays sanctuary: volunteer for routine cleaning and feeding in the cat or dog area, join an occasional volunteer event, or partner with us.",
 };
 
 /**
@@ -62,7 +62,7 @@ export default async function GetInvolvedPage() {
             Get Involved
           </h1>
           <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Our cats and dogs are cared for by community hands. Help with routine shelter care, join an occasional volunteer event, foster a recovering rescue, or partner with us.
+            Our cats and dogs are cared for by community hands. Help with routine shelter care, join an occasional volunteer event, or partner with us.
           </p>
         </div>
       </Section>
@@ -169,37 +169,6 @@ export default async function GetInvolvedPage() {
           <WhatsAppLink
             text="Hi Hope for Strays, I would like to join an upcoming volunteer event."
             label="Ask About Upcoming Events"
-          />
-        </div>
-      </Section>
-
-      {/* Foster — placement under Get Involved vs Adoption is pending a stakeholder answer
-          (tasks/open/foster-placement-pending-stakeholder.md); content unchanged until then. */}
-      <Section id="foster" className="scroll-mt-24">
-        <div className="space-y-10">
-          <SectionHeader
-            title="Foster"
-            subtitle="Fostering gives vulnerable animals a calm home while they recover. We provide all food, crates, medication and vet bills — you provide love, safety and observation."
-          />
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className={`${panel} flex flex-col gap-3`}>
-              <h3 className={cardTitle}>Post-Op Spay Recovery</h3>
-              <p className={cardBody}>7–10 days of quiet indoor rest while surgical incisions heal.</p>
-            </div>
-            <div className={`${panel} flex flex-col gap-3`}>
-              <h3 className={cardTitle}>Medical Isolation Foster</h3>
-              <p className={cardBody}>2–4 weeks for mange therapy or orthopedic fracture rehabilitation.</p>
-            </div>
-            <div className={`${panel} flex flex-col gap-3`}>
-              <h3 className={cardTitle}>Neonatal Nursery</h3>
-              <p className={cardBody}>Bottle-feeding and caring for orphaned litters until 8 weeks old.</p>
-            </div>
-          </div>
-
-          <WhatsAppLink
-            text="Hi Hope for Strays, I am interested in becoming a temporary foster parent."
-            label="WhatsApp Foster Care Team"
           />
         </div>
       </Section>
