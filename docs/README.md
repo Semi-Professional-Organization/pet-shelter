@@ -12,6 +12,7 @@ Welcome to the centralized documentation repository for the **Hope for Strays** 
 - **[Commit Messages](reference/COMMIT_MESSAGES.md)**: The commit standard for humans and agents alike — Beams' seven rules over this repo's Conventional Commits grammar, the enforcing linter, and the measured baseline.
 - **[Security Controls That Read Correctly and Do Nothing](reference/INERT_SECURITY_CONTROLS.md)**: Seven defects that were present in the source, reviewed, and inert at runtime — a `rejectUnauthorized: false` that `pg` was already discarding, a rate-limit key the attacker chooses, a session that outlived its account. Three were introduced *by the fix for the other four*. Read before hardening anything: it carries the library traps, the checklist, and why mutation-testing your own fix cannot find the case you never imagined.
 - **[Design System & UI Tokens](design-system.md)**: Design philosophy, typography, colors, component guidelines, and accessibility.
+- **[Page Style Guide](page-style-guide.md)**: How a public page is composed — section frame, gutters, vertical rhythm, heading scale, the panel card recipe and CTAs. Read from the home page; follow it on every new page.
 
 ---
 

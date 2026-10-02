@@ -141,15 +141,19 @@ Warm-tinted, so shadows sit on cream without reading as grey. Five named steps, 
 
 ### Font Family
 
-- **Primary**: System stack (Segoe UI, Roboto, -apple-system, sans-serif)
-- **Fallback**: Tailwind's default sans-serif stack
+- **Headings**: Playfair Display, as `font-heading` (`--font-heading`, loaded in `src/app/layout.tsx`)
+- **Body**: Geist, as `font-sans` (the `<body>` default)
+- **Mono**: Geist Mono, as `font-mono`
 
 ### Type Scale
 
+Page-level headings and their responsive steps are owned by
+[`page-style-guide.md` §3](page-style-guide.md#3-type-hierarchy); the H1/H2 rows below mirror it.
+
 | Element | Size | Weight | Line Height | Tailwind Class |
 |---------|------|--------|-------------|----------------|
-| **H1 / Page Title** | 3rem / 48px | 700 (bold) | 1.2 | `text-4xl font-bold` |
-| **H2 / Section Title** | 2rem / 32px | 700 (bold) | 1.3 | `text-3xl font-bold` |
+| **H1 / Page Title** | 30 → 48 → 60px | 700 (bold) | 1.15 | `font-heading text-3xl sm:text-5xl lg:text-6xl font-bold` |
+| **H2 / Section Title** | 30 → 36 → 48px | 700 (bold) | — | `SectionHeader` (`text-3xl sm:text-4xl lg:text-5xl`) |
 | **H3 / Subsection** | 1.5rem / 24px | 600 (semibold) | 1.4 | `text-2xl font-semibold` |
 | **Body / Paragraph** | 1rem / 16px | 400 (normal) | 1.6 | `text-base` |
 | **Small / Caption** | 0.875rem / 14px | 400 (normal) | 1.5 | `text-sm` |
