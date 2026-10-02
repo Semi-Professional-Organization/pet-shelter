@@ -4,9 +4,6 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { 
-  FileText, 
-  Users, 
-  HomeIcon, 
   ArrowRight,
   Loader2,
   CheckCircle2,
@@ -345,25 +342,10 @@ export function HomeQuickActionsSection() {
 export function HomeProcessSection() {
   const { t } = useTypedTranslation();
 
-  const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey; icon: typeof FileText }[] = [
-    {
-      num: "01",
-      titleKey: "home.step1Title",
-      descKey: "home.step1Desc",
-      icon: FileText,
-    },
-    {
-      num: "02",
-      titleKey: "home.step2Title",
-      descKey: "home.step2Desc",
-      icon: Users,
-    },
-    {
-      num: "03",
-      titleKey: "home.step3Title",
-      descKey: "home.step3Desc",
-      icon: HomeIcon,
-    },
+  const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey }[] = [
+    { num: "01", titleKey: "home.step1Title", descKey: "home.step1Desc" },
+    { num: "02", titleKey: "home.step2Title", descKey: "home.step2Desc" },
+    { num: "03", titleKey: "home.step3Title", descKey: "home.step3Desc" },
   ];
 
   return (
@@ -371,34 +353,24 @@ export function HomeProcessSection() {
       <div className="space-y-10">
         <SectionHeader title={t("home.howItWorksTitle")} subtitle={t("home.howItWorksSubtitle")} />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div
-                key={step.num}
-                className="relative flex flex-col justify-between rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-2xl font-bold text-foreground">
-                      {step.num}
-                    </span>
-                    <div className="flex size-10 items-center justify-center bg-muted text-foreground rounded-xl">
-                      <Icon className="size-5" />
-                    </div>
-                  </div>
-                  <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
-                    {t(step.titleKey)}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {t(step.descKey)}
-                  </p>
-                </div>
+        {/* A vertical timeline, read top to bottom: each step's number sits on a rail that joins it
+            to the next, and the text runs full width beside it. */}
+        <ol>
+          {steps.map((step, idx) => (
+            <li key={step.num} className="relative flex gap-5 pb-10 last:pb-0 sm:gap-6">
+              {idx < steps.length - 1 && (
+                <span aria-hidden="true" className="absolute left-5 top-12 bottom-2 w-px -translate-x-1/2 bg-border" />
+              )}
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-sm font-bold text-primary-foreground">
+                {idx + 1}
+              </span>
+              <div className="space-y-2 pt-1.5">
+                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">{t(step.titleKey)}</h3>
+                <p className="text-base leading-relaxed text-muted-foreground">{t(step.descKey)}</p>
               </div>
-            );
-          })}
-        </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </Section>
   );
