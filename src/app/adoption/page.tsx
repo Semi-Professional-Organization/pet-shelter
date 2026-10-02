@@ -1,20 +1,27 @@
 import { Metadata } from "next";
-import { AdoptionIntro, AdoptionCallToAction } from "@/components/features/adoptions/AdoptionIntro";
+import {
+  AdoptOrFosterIntro,
+  AdoptBranch,
+  FosterBranch,
+  AdoptOrFosterCallToAction,
+} from "@/components/features/adoptions/AdoptOrFoster";
 import { HomeProcessSection, HomeStandardsSection } from "@/components/layout/HomeSections";
 
 export const metadata: Metadata = {
-  title: "Adoption Process & Criteria | Hope for Strays UM",
+  title: "Adopt or Foster | Hope for Strays UM",
   description:
-    "How 100% free adoption works at Hope for Strays UM: browse and apply, meet the animal at the sanctuary, and welcome them home — plus the veterinary and home-suitability standards behind every placement.",
+    "Adopt a rescue for life or foster one while it recovers — both are free and follow the same three steps at Hope for Strays UM: apply, meet the animal at the sanctuary, and welcome them home.",
 };
 
 export default function AdoptionPage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <AdoptionIntro />
+      <AdoptOrFosterIntro />
+      <AdoptBranch />
+      <FosterBranch />
       <HomeProcessSection />
       <HomeStandardsSection />
-      <AdoptionCallToAction />
+      <AdoptOrFosterCallToAction />
     </div>
   );
 }

@@ -43,7 +43,7 @@ export function Navbar() {
     },
     {
       href: "/adoption",
-      label: isMs ? "Proses & Syarat Adopsi" : "Adoption Process & Criteria",
+      label: isMs ? "Adopsi atau Asuh" : "Adopt or Foster",
     },
     {
       href: "/applications/track",
@@ -63,10 +63,6 @@ export function Navbar() {
     {
       href: "/get-involved#events",
       label: isMs ? "Acara Sukarelawan" : "Volunteer Events",
-    },
-    {
-      href: "/get-involved#foster",
-      label: isMs ? "Keluarga Asuh" : "Foster",
     },
     {
       href: "/get-involved#partnerships",
@@ -123,7 +119,7 @@ export function Navbar() {
                     : "text-muted-foreground"
                 }`}
               >
-                {isMs ? "Adopsi" : "Adoption"}
+                {isMs ? "Adopsi & Asuh" : "Adopt & Foster"}
                 <ChevronDown className="size-3.5 opacity-60" />
               </button>
 
@@ -317,6 +313,13 @@ export function Navbar() {
                     >
                       🐾 {isMs ? "Haiwan Reskue Kami" : "Meet Our Animals"}
                     </Link>
+                    <Link
+                      href="/adoption"
+                      onClick={() => setIsMobileOpen(false)}
+                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                    >
+                      🏡 {isMs ? "Adopsi atau Asuh" : "Adopt or Foster"}
+                    </Link>
 
                     <Link
                       href="/donate"
@@ -331,7 +334,7 @@ export function Navbar() {
                       onClick={() => setIsMobileOpen(false)}
                       className="block text-sm font-bold py-2 hover:text-primary transition-colors"
                     >
-                      👥 {isMs ? "Sertai Kami (Sukarelawan/CSR)" : "Get Involved & CSR"}
+                      👥 {isMs ? "Sertai Kami" : "Get Involved"}
                     </Link>
 
                     <Link
