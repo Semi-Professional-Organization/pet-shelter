@@ -40,16 +40,6 @@
     "isPublished": true
   },
   {
-    "id": "faq-005",
-    "category": "sponsorship",
-    "question": "Is my donation tax-deductible in Malaysia, and how do I receive an official e-Receipt?",
-    "questionMs": "Adakah sumbangan saya layak mendapat pelepasan cukai di Malaysia, dan bagaimana saya menerima e-Resit rasmi?",
-    "answer": "Yes! Hope For Strays (Persatuan Harapan Haiwan Terbiar) is a registered welfare society approved under Subsection 44(6) of the Income Tax Act 1967 (Approval Ref: LHDN.01/35/42/51/179-6.4912). When you make a donation or sponsorship pledge through our website with your Full Name and Malaysian IC / Passport / SSM Company Number, you receive a pledge reference to quote on your transfer, and an official computerized tax-exempt e-Receipt with full LHDN reference numbers is emailed to you once our coordinator has matched that transfer against the shelter's bank statement, usually within 2 working days.",
-    "answerMs": "Ya! Pertubuhan Kebajikan Hope for Strays merupakan badan kebajikan yang diluluskan di bawah Seksyen 44(6) Akta Cukai Pendapatan 1967 (Ruj: LHDN.01/35/42/51/179-6.4912). Setiap sumbangan tunai yang disahkan layak menerima e-Resit pengecualian cukai rasmi untuk taksiran cukai individu atau korporat, dihantar melalui e-mel selepas penyelaras kami memadankan pemindahan anda dengan penyata bank.",
-    "displayOrder": 1,
-    "isPublished": true
-  },
-  {
     "id": "faq-009",
     "category": "adoption",
     "question": "How much does it cost to adopt a pet from Hope for Strays?",
@@ -190,43 +180,13 @@
     "isPublished": true
   },
   {
-    "id": "faq-021",
-    "category": "general",
-    "question": "Is my donation tax-deductible in Malaysia?",
-    "questionMs": "Adakah sumbangan saya layak mendapat potongan cukai di Malaysia?",
-    "answer": "Yes. Pertubuhan Kebajikan Hope for Strays is an approved tax-exempt non-profit organisation under Subsection 44(6) of the Income Tax Act 1967 (Approval Ref: LHDN.01/35/42/51/179-6.4912). All monetary donations are eligible for official tax deductions on your individual or corporate tax return.",
-    "answerMs": "Ya. Pertubuhan Kebajikan Hope for Strays merupakan organisasi kebajikan yang diluluskan pengecualian cukai di bawah Seksyen 44(6) Akta Cukai Pendapatan 1967 (No. Rujukan Kelulusan: LHDN.01/35/42/51/179-6.4912). Semua sumbangan tunai layak untuk potongan cukai individu dan korporat.",
-    "displayOrder": 1,
-    "isPublished": true
-  },
-  {
-    "id": "faq-022",
-    "category": "general",
-    "question": "How do I receive my official tax receipt?",
-    "questionMs": "Bagaimanakah saya menerima resit rasmi potongan cukai?",
-    "answer": "Once your donation goes through, an official e-receipt with full LHDN reference numbers appears on screen and is emailed to the address you provided.",
-    "answerMs": "Sebaik sahaja sumbangan selesai, e-resit rasmi dengan nombor rujukan LHDN lengkap akan dipaparkan di skrin dan dihantar ke e-mel anda.",
-    "displayOrder": 2,
-    "isPublished": true
-  },
-  {
-    "id": "faq-023",
-    "category": "general",
-    "question": "Can companies donate and claim tax relief?",
-    "questionMs": "Bolehkah syarikat menderma dan menuntut pelepasan cukai?",
-    "answer": "Yes. Corporate donors can enter their official company name and SSM registration number in the donor form to generate a valid corporate tax-exemption receipt.",
-    "answerMs": "Ya. Penderma korporat boleh memasukkan nama syarikat rasmi dan nombor pendaftaran SSM dalam borang penderma untuk menjana resit pengecualian cukai korporat.",
-    "displayOrder": 3,
-    "isPublished": true
-  },
-  {
     "id": "faq-024",
     "category": "general",
     "question": "How do I transfer directly or pay by DuitNow QR?",
     "questionMs": "Bagaimanakah cara membuat pindahan terus atau imbas DuitNow QR?",
-    "answer": "Scan our DuitNow QR code with any Malaysian banking app, or transfer directly to our Maybank account 5140 1234 5678 (Pertubuhan Kebajikan Hope for Strays).",
-    "answerMs": "Imbas kod DuitNow QR kami menggunakan mana-mana aplikasi perbankan Malaysia, atau buat pindahan terus ke akaun Maybank 5140 1234 5678 (Pertubuhan Kebajikan Hope for Strays).",
-    "displayOrder": 4,
+    "answer": "Scan our DuitNow QR code with any Malaysian banking app, or transfer directly to our Maybank account 5140 1234 5678 (Hope for Strays).",
+    "answerMs": "Imbas kod DuitNow QR kami menggunakan mana-mana aplikasi perbankan Malaysia, atau buat pindahan terus ke akaun Maybank 5140 1234 5678 (Hope for Strays).",
+    "displayOrder": 1,
     "isPublished": true
   },
   {
@@ -236,7 +196,7 @@
     "questionMs": "Bolehkah saya menghantar bekalan terus ke pusat perlindungan?",
     "answer": "Yes. We welcome supply drop-offs at the sanctuary (No. 18, Jalan SS 2/72) from Tuesday to Sunday, 10:00 AM – 5:00 PM. Closed Mondays.",
     "answerMs": "Ya. Kami mengalu-alukan penghantaran barangan ke santuari (No. 18, Jalan SS 2/72) dari Selasa hingga Ahad, 10:00 pagi – 5:00 petang. Tutup pada hari Isnin.",
-    "displayOrder": 5,
+    "displayOrder": 2,
     "isPublished": true
   },
   {

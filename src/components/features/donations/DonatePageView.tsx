@@ -1,17 +1,15 @@
 "use client";
 
-import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
+import { SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React, { Suspense } from "react";
 import Link from "next/link";
 import {
-  ShieldCheck,
   Heart,
   MapPin,
   Clock,
   Phone,
   CheckCircle2,
   Package,
-  Award,
   ArrowRight,
   Loader2,
 } from "lucide-react";
@@ -29,6 +27,7 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 // Shared recipes from docs/page-style-guide.md §3 and §5.
 const panel = "rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7";
 const eyebrow = "text-2xs font-bold uppercase tracking-wider text-primary";
+const pill = "inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground";
 const iconTile = "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground";
 
 /**
@@ -112,17 +111,9 @@ export function DonatePageView({
                 : "Fuel lifesaving medical care and nutrition for rescued strays. Every ringgit directly supports emergency surgeries, core vaccinations, and wholesome meals at our Petaling Jaya sanctuary. Because of your generosity, 100% of our rescued animals are rehomed through our Free Adoption policy."}
             </p>
 
-            {/* Official Credentials Banner */}
-            <div className="pt-3 flex flex-wrap items-center justify-center gap-3 text-xs sm:text-sm font-semibold">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-muted/60 border border-border rounded-lg text-foreground">
-                <ShieldCheck className="size-4 text-success-accent" />
-                {t("donations.rosBadge", "ROS Reg: {regNo}", { regNo: PUBLIC_ROS_REGISTRATION_NO })}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-success-surface border border-success-accent/30 rounded-lg text-success-text ">
-                <Award className="size-4 text-success-accent" />
-                {t("donations.lhdnBadge", "LHDN Tax Deductible: Sec 44(6) ITA 1967")}
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-muted/60 border border-border rounded-lg text-foreground">
+            {/* Credentials */}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className={pill}>
                 <Heart className="size-4 text-primary" />
                 {isMs ? "Jaminan Adopsi 100% Percuma" : "100% Free Adoption Guarantee"}
               </span>

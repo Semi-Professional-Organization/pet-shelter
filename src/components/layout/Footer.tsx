@@ -1,6 +1,6 @@
 "use client";
 
-import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_WHATSAPP_URL, SHELTER_WHATSAPP_DISPLAY, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
+import { SHELTER_WHATSAPP_URL, SHELTER_WHATSAPP_DISPLAY, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import Link from "next/link";
 import { PawPrint, MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/providers/ThemeToggle";
@@ -147,8 +147,6 @@ export function Footer() {
         <div className="mt-10 border-t border-border pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex flex-wrap items-center gap-3">
             <p>© 2024 Hope for Strays.</p>
-            <span className="text-muted-foreground/40 hidden sm:inline">•</span>
-            <p className="font-mono">{t("footer.rosReg", { regNo: PUBLIC_ROS_REGISTRATION_NO })}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">

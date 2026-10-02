@@ -1,6 +1,5 @@
 "use client";
 
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -442,9 +441,6 @@ export function HomeStandardsSection() {
             <SectionHeader
               title={isMs ? "Piawaian Kebajikan & Santuari Haiwan" : "Our Animal Welfare & Sanctuary Standards"}
             />
-            <p className="text-sm font-semibold text-muted-foreground">
-              {(isMs ? "Persatuan Berdaftar ROS Malaysia: " : "Malaysian Registered Society: ") + PUBLIC_ROS_REGISTRATION_NO}
-            </p>
             <p className="text-base text-muted-foreground leading-relaxed">
               {isMs
                 ? "Beroperasi di Petaling Jaya dan kampus Universiti Malaya sejak 2016, Hope for Strays menyelamat, memulihkan, dan mencari keluarga baru untuk anjing dan kucing terbiar dengan ketelusan klinikal penuh."

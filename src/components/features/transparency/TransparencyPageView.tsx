@@ -4,18 +4,13 @@ import React from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
-  Award,
   ArrowRight,
   HeartHandshake,
   Receipt,
   ScrollText,
-  ShieldCheck,
   Wallet,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-// Statutory identifiers live in one module so a registration change cannot be
-// half-applied across the site — enforced by tests/unit/shelterIdentity.test.ts.
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   TransparencySnapshot,
@@ -68,7 +63,7 @@ function LedgerSourceNotice({ source }: { source: TransparencySnapshot["source"]
 }
 
 export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnapshot }) {
-  const { t, isMs } = useLanguage();
+  const { isMs } = useLanguage();
   const hasLedger = snapshot.totalSen > 0;
 
   return (
@@ -96,16 +91,6 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 pt-3 text-xs font-semibold sm:text-sm">
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-3 py-1 text-foreground">
-                <ShieldCheck className="size-4 text-success-accent" />
-                {t("donations.rosBadge", "ROS Reg: {regNo}", {
-                  regNo: PUBLIC_ROS_REGISTRATION_NO,
-                })}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-success-border bg-success-surface px-3 py-1 text-success-text">
-                <Award className="size-4 text-success-accent" />
-                {t("donations.lhdnBadge", "LHDN Tax Deductible: Sec 44(6) ITA 1967")}
-              </span>
               {snapshot.lastExpenseDate && (
                 <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-3 py-1 text-foreground">
                   <Receipt className="size-4 text-primary" />
@@ -232,8 +217,8 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
           </h2>
           <p className="text-sm leading-relaxed text-muted-foreground sm:text-base">
             {isMs
-              ? "Setiap sumbangan menerima e-Resit potongan cukai LHDN rasmi dengan serta-merta, dan perbelanjaan yang dibiayainya disenaraikan di halaman ini."
-              : "Every contribution receives an official LHDN tax-deductible e-Receipt instantly, and the spending it funds is listed on this page."}
+              ? "Perbelanjaan yang dibiayai oleh sumbangan anda disenaraikan di halaman ini."
+              : "The spending your contribution funds is listed on this page."}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Link
