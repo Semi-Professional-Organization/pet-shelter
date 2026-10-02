@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Heart, MessageCircle } from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
 import { Section } from "@/components/layout/Section";
 import { buttonVariants } from "@/components/ui/button";
 import { useLanguage } from "@/components/providers/LanguageProvider";
+import { cn } from "@/lib/utils";
 
 /**
  * /adoption — "Adopt or Foster". Fostering follows the same process as adoption
@@ -15,10 +16,6 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
  * WhatsApp message rather than submitting a foster application as an adoption. Adoption applications
  * still start from the animal (the form opens per pet), so "Apply to Adopt" leads to /pets.
  */
-
-// Not buttonVariants: its default fill would clash with the brand colour (page-style-guide §8.1).
-const whatsappButton =
-  "inline-flex h-11 items-center gap-2 rounded-control bg-brand-whatsapp px-8 text-xs font-semibold uppercase tracking-widest text-white shadow-brand-xs transition-colors hover:bg-brand-whatsapp-hover";
 
 /** Page title. Bottom padding is dropped so the steps that follow read as this page's content. */
 export function AdoptOrFosterIntro() {
@@ -53,25 +50,35 @@ export function AdoptOrFosterApply() {
             {isMs ? "Mohon untuk Adopsi" : "Apply to Adopt"}
             <ArrowRight className="size-4" />
           </Link>
+          {/* Same button, inverted: primary outline and text on the page ground. cn() rather than
+              buttonVariants' className, which concatenates without merging (page-style-guide §8.1). */}
           <a
             href={`https://wa.me/60123456789?text=${encodeURIComponent(
               "Hi Hope for Strays, I would like to apply to foster."
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className={whatsappButton}
+            className={cn(
+              buttonVariants({ size: "lg", variant: "outline" }),
+              "gap-2 border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:bg-transparent dark:hover:bg-primary/10"
+            )}
           >
-            <MessageCircle className="size-4" />
+            <Heart className="size-4" />
             {isMs ? "Mohon untuk Asuh" : "Apply to Foster"}
+            <ArrowRight className="size-4" />
           </a>
+          <Link
+            href="/applications/track"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline sm:ml-auto"
+          >
+            {isMs ? "Semak Status Permohonan" : "Track Application Status"}
+            <ArrowRight className="size-3.5" />
+          </Link>
         </div>
         <p className="text-sm leading-relaxed text-muted-foreground">
           {isMs
             ? "Permohonan adopsi bermula daripada haiwan yang anda pilih. Permohonan asuhan melalui WhatsApp buat masa ini."
-            : "Adoption applications start from the animal you choose. Foster applications are by WhatsApp for now."}{" "}
-          <Link href="/applications/track" className="font-semibold text-primary hover:underline">
-            {isMs ? "Sudah memohon? Semak status permohonan" : "Already applied? Track your application"}
-          </Link>
+            : "Adoption applications start from the animal you choose. Foster applications are by WhatsApp for now."}
         </p>
       </div>
     </Section>
