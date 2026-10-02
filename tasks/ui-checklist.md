@@ -44,8 +44,8 @@ Stop at 2h even if the last item is open; it carries to evening 2.
 ### Pages to convert (evenings 2–4; detail in §2 and §3)
 - [ ] needs
 - [ ] get-involved
-- [ ] donate
-- [ ] impact
+- [x] donate (1 Oct)
+- [x] impact (1 Oct)
 - [ ] bulletins
 - [ ] privacy / terms
 - [ ] pets FAQ
@@ -110,14 +110,14 @@ Taken from the new sections in `HomeSections.tsx` ("Our work", the audience card
 | `pets` | — | — | `PetCard rounded-3xl` ✓ | FAQ section |
 
 - [ ] needs
-- [ ] donate: also decide on centred or left-aligned hero (home content headers are left-aligned; only the hero is centred)
+- [x] donate: also decide on centred or left-aligned hero → **left-aligned** (1 Oct; only the home hero is centred)
 - [ ] get-involved: success-green button uses `text-white` → check it against the tone tokens
-- [ ] impact
+- [x] impact (1 Oct)
 - [ ] bulletins
 - [ ] privacy / terms
 - [ ] pets + `PetsFaqSection`
 - [ ] `pets/[id]` detail page (not surveyed yet)
-- [ ] `applications/track` (not surveyed yet)
+- [x] `applications/track` (1 Oct)
 - [ ] Shared `ui/card.tsx` default radius, so pages stop overriding it per use
 
 ## 4. Text length and copy
