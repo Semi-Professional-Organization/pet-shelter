@@ -20,7 +20,15 @@ foster** and branches from there. Decision: `tasks/decisions/2026-10-02-foster-u
       Status; mobile menu gained an Adopt or Foster link; Get Involved has no Foster
 - [x] Footer: "Adopt or Foster" (→ `/adoption`) and "Volunteer" (→ `/get-involved#volunteer`) —
       one Adopt or Foster link instead of a separate Foster link, since the page holds both
-- [ ] Animal pages (`PetCard`, `pets/[id]`): Adopt / Foster buttons — waits on the fosterer question
+- [x] **Simplified (user review):** branch sections and choice cards removed; the page is now
+      intro → 3 steps → **Apply to Adopt** (→ `/pets`) / **Apply to Foster** (WhatsApp) → track link.
+      Standards section dropped from `/adoption` (vet protocol and free policy are already in the
+      profile and step 3); home-suitability check moved into step 1, take-back safety net into step 3.
+      Standards still renders on home.
+- [ ] **Next flow (user's direction):** process info → application (adopt or foster) → choose the
+      animal inside the application; pet pages keep "Apply" with the animal preselected. Needs a
+      standalone `/apply` and the type field (§2). Open questions: one animal or several per
+      application? do fosterers choose the animal? allow "no preference"?
 
 ## 2. Adopt & Foster — data (GRAVE, `midwife` lane, plan before building)
 
