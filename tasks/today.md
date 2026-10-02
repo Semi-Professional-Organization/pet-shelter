@@ -62,7 +62,8 @@ foster** and branches from there. Decision: `tasks/decisions/2026-10-02-foster-u
 - [ ] Decide: standards on home, `/adoption`, or both — then rename `HomeProcessSection`
 - [ ] Get-involved and impact pages have no Malay — add translations
 - [ ] Hero: drop the dead CTA overrides
-- [ ] `npx prisma generate`; install `jsdom` so component tests run
+- [x] `npm install` (deps were declared, not installed): component tests run again and the 4
+      Prisma-stale unit files pass — unit + components 721/721. Lockfile churn from npm reverted.
 - [ ] Later (styling pass): reconcile `ui/card` vs panel; a `whatsapp` button variant
 
 ## Found while checking
@@ -145,7 +146,8 @@ colour — styling gets redone later.
       holder name must match the real account
 - [ ] Get adopter criteria from the shelter → section on `/adoption`
 - [ ] Hero: drop the dead CTA overrides
-- [ ] `npx prisma generate`; install `jsdom` so component tests run
+- [x] `npm install` (deps were declared, not installed): component tests run again and the 4
+      Prisma-stale unit files pass — unit + components 721/721. Lockfile churn from npm reverted.
 - [ ] Later (styling pass): reconcile `ui/card` vs panel; a `whatsapp` button variant
 
 ### Found while checking
