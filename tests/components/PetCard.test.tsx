@@ -40,3 +40,32 @@ describe("PetCard", () => {
     );
   });
 });
+
+// The card's primary action follows getPlacementOptions: adopt for an available animal, foster
+// for one tagged "Needs Socialising", sponsorship for one in rehabilitation.
+function renderCardWithActions(overrides: Partial<Pet>) {
+  renderWithLanguage(
+    <PetCard pet={makePet(overrides)} onSelectPet={vi.fn()} onAdoptPet={vi.fn()} onSponsorPet={vi.fn()} />
+  );
+}
+
+describe("PetCard primary action", () => {
+  it("offers adoption for an available animal", () => {
+    renderCardWithActions({ name: "Bolt", status: "Available", tags: ["Playful"] });
+    expect(screen.getByRole("button", { name: /adopt/i })).toBeEnabled();
+    expect(screen.queryByRole("link", { name: /apply to foster/i })).not.toBeInTheDocument();
+  });
+
+  it("offers Apply to Foster, naming the animal, for one that needs socialising", () => {
+    renderCardWithActions({ name: "Bolt", status: "Available", tags: ["Needs Socialising"] });
+    const foster = screen.getByRole("link", { name: /apply to foster/i });
+    expect(foster.getAttribute("href")).toContain(encodeURIComponent("foster Bolt"));
+    expect(screen.queryByRole("button", { name: /^adopt$/i })).not.toBeInTheDocument();
+  });
+
+  it("offers sponsorship, not foster, for an animal in rehabilitation", () => {
+    renderCardWithActions({ name: "Bolt", status: "In Rehabilitation", tags: ["Needs Socialising"] });
+    expect(screen.getByRole("button", { name: /sponsor me/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /apply to foster/i })).not.toBeInTheDocument();
+  });
+});

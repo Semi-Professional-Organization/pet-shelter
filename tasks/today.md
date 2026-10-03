@@ -25,6 +25,18 @@ foster** and branches from there. Decision: `tasks/decisions/2026-10-02-foster-u
       Standards section dropped from `/adoption` (vet protocol and free policy are already in the
       profile and step 3); home-suitability check moved into step 1, take-back safety net into step 3.
       Standards still renders on home.
+- [x] **Adopt / Foster filter (interim, from status):** `/pets` has a "Looking to: Adopt or Foster /
+      Adopt / Foster" filter (`?type=`); Apply to Adopt → `?type=adopt`, Apply to Foster → `?type=foster`.
+      Available → adopt; In Rehabilitation → foster (never adopted directly — Foster-to-Adopt,
+      faq-006). Rehab cards and profiles get a Foster button (WhatsApp until §2). Fixed the
+      duplicate "Available to Foster" status option and the Malay "Mengangkat Anak" (= adopt a child).
+- [x] **Corrected (user, 3 Oct):** foster animals are mainly shy/scared ones that need
+      socialising, not rehab cases. Foster = `Available` + tag **`Needs Socialising`**; rehab cards
+      back to Sponsor Me; foster copy rewritten. `tasks/decisions/2026-10-03-foster-means-socialising-not-rehab.md`
+- [ ] **Tag the animals that need socialising** in admin — until then `/pets?type=foster` is empty
+- [ ] **Ask the shelter:** can an animal that needs socialising also be adopted (interim: foster
+      only)? Does Foster-to-Adopt for rehab animals (faq-006, rehab profile panel) still exist?
+      Then replace the interim rule with a per-animal "open to: adopt | foster | both" (§2).
 - [ ] **Next flow (user's direction):** process info → application (adopt or foster) → choose the
       animal inside the application; pet pages keep "Apply" with the animal preselected. Needs a
       standalone `/apply` and the type field (§2). Open questions: one animal or several per

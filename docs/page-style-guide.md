@@ -65,7 +65,7 @@ text-foreground`; the only thing that changes between levels is size.
 
 | Role | Size classes | px (mobile → desktop) | Notes |
 |---|---|---|---|
-| **Page H1** (hero) | `text-3xl sm:text-5xl lg:text-6xl` | 30 → 48 → 60 | add `leading-[1.15]`; one per page |
+| **Page H1** (hero) | `text-3xl sm:text-5xl lg:text-6xl` | 30 → 48 → 60 | add `leading-[1.15]`; one per page — or `<SectionHeader as="h1">`, which applies it |
 | **Section H2** | `text-3xl sm:text-4xl lg:text-5xl` | 30 → 36 → 48 | via `SectionHeader`, never by hand |
 | **Editorial H3** | `text-2xl sm:text-3xl` | 24 → 30 | image/copy rows |
 | **Card title** | `text-2xl` (wide card) or `text-xl` (narrow card) | 24 / 20 | |
