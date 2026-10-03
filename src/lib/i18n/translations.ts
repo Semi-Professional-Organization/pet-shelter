@@ -111,6 +111,10 @@ export interface TranslationDictionary {
   pets: {
     title: string;
     subtitle: string;
+    titleAdopt: string;
+    subtitleAdopt: string;
+    titleFoster: string;
+    subtitleFoster: string;
     speciesFilter: string;
     genderFilter: string;
     ageFilter: string;
@@ -151,6 +155,7 @@ export interface TranslationDictionary {
     sanctuaryLocationHours: string;
     sanctuaryAddress: string;
     applyToAdopt: string;
+    applyToFoster: string;
     adoptionPending: string;
     underCareNotice: string;
     updatesTitle: string;
@@ -464,8 +469,12 @@ export const translations: Record<Language, TranslationDictionary> = {
       protocol4Desc: "We verify basic living suitability (landed housing vs high-rise pet guidelines, fenced perimeter safety, and household consensus) to ensure a safe, lasting match.",
     },
     pets: {
-      title: "Adoptable Animals",
-      subtitle: "Browse rescued dogs, cats, and kittens awaiting their forever homes.",
+      title: "Meet Our Animals",
+      subtitle: "Browse the rescued dogs and cats at our sanctuary.",
+      titleAdopt: "Animals to Adopt",
+      subtitleAdopt: "Rescued dogs and cats looking for a permanent home.",
+      titleFoster: "Animals to Foster",
+      subtitleFoster: "Rescued dogs and cats who are still building confidence around people. A foster home gives them the quiet, consistent socialisation they need before adoption.",
       speciesFilter: "Species",
       genderFilter: "Gender",
       ageFilter: "Age Group",
@@ -506,6 +515,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       sanctuaryLocationHours: "Sanctuary Location & Visiting Hours",
       sanctuaryAddress: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Open Tue–Sun: 10:00 AM – 5:00 PM",
       applyToAdopt: "Apply to Adopt",
+      applyToFoster: "Apply to Foster",
       adoptionPending: "Adoption Pending",
       underCareNotice:
         "Under veterinary care — not yet available for adoption. Sponsorship funds this animal's treatment.",
@@ -822,8 +832,12 @@ export const translations: Record<Language, TranslationDictionary> = {
       protocol4Desc: "Kami mengesahkan kesesuaian asas kediaman (garis panduan rumah bertanah vs bertingkat, pagar selamat, dan persetujuan seisi rumah) demi pemadanan kekal.",
     },
     pets: {
-      title: "Haiwan Sedia Diangkat Anak",
-      subtitle: "Semak senarai anjing, kucing, dan anak haiwan yang menanti keluarga penyayang.",
+      title: "Kenali Haiwan Kami",
+      subtitle: "Lihat anjing dan kucing reskue di santuari kami.",
+      titleAdopt: "Haiwan untuk Diadopsi",
+      subtitleAdopt: "Anjing dan kucing reskue yang mencari rumah kekal.",
+      titleFoster: "Haiwan untuk Diasuh",
+      subtitleFoster: "Anjing dan kucing reskue yang masih membina keyakinan dengan manusia. Rumah asuhan memberi mereka sosialisasi yang tenang dan konsisten sebelum diadopsi.",
       speciesFilter: "Spesis",
       genderFilter: "Jantina",
       ageFilter: "Kumpulan Umur",
@@ -863,7 +877,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       adultsOnly: "Dewasa Sahaja",
       sanctuaryLocationHours: "Lokasi Pusat Perlindungan & Waktu Lawatan",
       sanctuaryAddress: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Buka Sel–Ahad: 10:00 PG – 5:00 PTG",
-      applyToAdopt: "Mohon untuk Mengangkat Anak",
+      applyToAdopt: "Mohon untuk Adopsi",
+      applyToFoster: "Mohon untuk Asuh",
       adoptionPending: "Adopsi Sedang Diproses",
       underCareNotice:
         "Dalam rawatan veterinar — belum tersedia untuk adopsi. Tajaan membiayai rawatan haiwan ini.",

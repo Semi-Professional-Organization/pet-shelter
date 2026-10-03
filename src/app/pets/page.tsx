@@ -19,7 +19,7 @@ import { Loader2 } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Adoptable Dogs & Cats | Hope for Strays (Petaling Jaya)",
+  title: "Meet Our Animals — Adopt or Foster | Hope for Strays (Petaling Jaya)",
   description:
     "Browse rescue dogs and cats currently available for adoption at Hope for Strays shelter in Petaling Jaya, Selangor.",
 };

@@ -5,7 +5,7 @@ import { HomeProcessSection } from "@/components/layout/HomeSections";
 export const metadata: Metadata = {
   title: "Adopt or Foster | Hope for Strays UM",
   description:
-    "Adopt a rescue for life or foster one while it recovers — both are free and follow the same three steps at Hope for Strays UM: apply, meet the animal at the sanctuary, and welcome them home.",
+    "Adopt a rescue for life, or foster one that is still building confidence around people — both are free and follow the same three steps at Hope for Strays UM: apply, meet the animal at the sanctuary, and welcome them home.",
 };
 
 // Explain the process first, then choose and apply.

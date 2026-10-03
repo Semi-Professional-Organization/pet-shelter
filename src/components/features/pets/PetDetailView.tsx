@@ -7,6 +7,7 @@ import { AdoptionForm } from "@/components/features/adoptions/AdoptionForm";
 import { SponsorshipModal } from "./SponsorshipModal";
 import { MedicalTimeline } from "./MedicalTimeline";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   Heart,
@@ -32,7 +33,7 @@ import {
   Gift,
   Clock,
 } from "lucide-react";
-import { getRehabStageLabel, getRehabProgressPercent } from "@/lib/presentation/petStatusPresentation";
+import { getRehabStageLabel, getRehabProgressPercent, getPlacementOptions } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
 import { PetStatusIcon } from "./PetStatusIcon";
 import { usePetDetailViewController, PetDetailTab } from "@/hooks/usePetDetailViewController";
@@ -69,6 +70,7 @@ export function PetDetailView(props: PetDetailViewProps) {
   } = handlers;
 
   const isInRehabilitation = statusPresentation.isInRehabilitation;
+  const placement = getPlacementOptions(pet);
   const rehabStage = isInRehabilitation ? getRehabStageLabel(pet, isMs) : undefined;
   const rehabProgress = isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
   // Newest first, and never mutate the array the store handed us.
@@ -222,7 +224,27 @@ export function PetDetailView(props: PetDetailViewProps) {
             isInRehabilitation ? "sm:grid-cols-2" : "sm:grid-cols-3"
               }`}
             >
-              {!isInRehabilitation && (
+              {/* An animal that needs socialising is offered for foster instead of adoption
+                  (getPlacementOptions). Interim: a WhatsApp message until applications can record
+                  "foster". Animals under care get neither — sponsorship below. */}
+              {placement.foster && (
+                <a
+                  href={`https://wa.me/60123456789?text=${encodeURIComponent(
+                    `Hi Hope for Strays, I would like to foster ${pet.name}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants(),
+                    "w-full text-xs sm:text-sm font-bold uppercase tracking-wider gap-1.5 py-3 cursor-pointer rounded-xl"
+                  )}
+                >
+                  <Heart className="size-4" />
+                  {t("petDetail.applyToFoster", "Apply to Foster")}
+                </a>
+              )}
+
+              {!isInRehabilitation && !placement.foster && (
                 <Button
                 disabled={!isAvailable}
                 onClick={() => setIsAdoptionOpen(true)}

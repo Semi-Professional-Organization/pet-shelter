@@ -321,6 +321,60 @@ export function isPetTrack(value: string): value is PetTrack {
   return (PET_TRACK_SEQUENCE as string[]).includes(value);
 }
 
+/** What a visitor can apply to do with an animal. */
+export type PlacementType = "adopt" | "foster";
+
+export interface PlacementOptions {
+  adopt: boolean;
+  foster: boolean;
+}
+
+/**
+ * The tag staff put on an animal that needs a foster home to socialise — shy or nervous animals
+ * who must warm up to people. Matched case-insensitively, with either spelling.
+ */
+export const NEEDS_SOCIALISING_TAG = "Needs Socialising";
+
+function needsSocialising(tags: readonly string[] | undefined): boolean {
+  return (tags ?? []).some((t) => /^needs sociali[sz]ing$/i.test(t.trim()));
+}
+
+type PlacementFields = Pick<Pet, "status" | "tags">;
+
+/**
+ * Whether an animal is open to adoption, fostering, or neither.
+ *
+ * **Interim.** Fostering follows the adoption process
+ * (tasks/decisions/2026-10-02-foster-uses-the-adoption-process.md); the animals offered for
+ * foster are mainly shy or scared ones that need to socialise with people
+ * (tasks/decisions/2026-10-03-foster-means-socialising-not-rehab.md). Nothing in the data model
+ * records that, so until staff can set a per-animal "open to: adopt | foster | both":
+ *
+ * - tagged `Needs Socialising` (and not adopted or pending) → foster;
+ * - otherwise `Available` → adopt;
+ * - `In Rehabilitation`, `Pending`, `Adopted` → neither. An animal under care is never adopted
+ *   out directly; its card offers sponsorship.
+ *
+ * Open-ness reads `isAdoptable` from the status presentation rather than restating which
+ * statuses count, so the two cannot disagree about an Available animal.
+ */
+export function getPlacementOptions(pet: PlacementFields): PlacementOptions {
+  const open = getPetStatusPresentation(pet.status).isAdoptable;
+  const foster = open && needsSocialising(pet.tags);
+  return { adopt: open && !foster, foster };
+}
+
+/** The gallery's "Looking to" filter: `"all"`, `"adopt"` or `"foster"`. Unknown values match all. */
+export function matchesPlacementFilter(pet: PlacementFields, selectedPlacement: string): boolean {
+  if (!isPlacementType(selectedPlacement)) return true;
+  return getPlacementOptions(pet)[selectedPlacement];
+}
+
+/** Narrows a URL value to a placement, the same way `isPetTrack` guards `?track=`. */
+export function isPlacementType(value: string): value is PlacementType {
+  return value === "adopt" || value === "foster";
+}
+
 type RehabStageFields = Pick<Pet, "rehabStage" | "rehabStageMs">;
 
 /**

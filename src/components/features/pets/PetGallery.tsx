@@ -18,14 +18,15 @@ import { PetDetailDialog } from "./PetDetailDialog";
 import { AdoptionForm } from "@/components/features/adoptions/AdoptionForm";
 import { PetMatchQuiz } from "./PetMatchQuiz";
 import { SponsorshipModal } from "./SponsorshipModal";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { usePetGalleryController } from "@/hooks/usePetGalleryController";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { SectionHeader } from "@/components/layout/Section";
 import { AGE_BANDS, formatAgeBandRange } from "@/lib/domain/petAge";
 import { GENDER_VALUES } from "@/lib/validations/pet";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
-import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
+import { getPlacementOptions } from "@/lib/presentation/petStatusPresentation";
 
 /**
  * i18n keys for the lifecycle band names. The year range printed beside each name is derived
@@ -71,6 +72,7 @@ export function PetGallery({
     selectedSize,
     selectedStatus,
     selectedTrack,
+    selectedPlacement,
     activePetForDetail,
     isDetailOpen,
     activePetForAdoption,
@@ -87,6 +89,7 @@ export function PetGallery({
     setSelectedSize,
     setSelectedStatus,
     setSelectedTrack,
+    setSelectedPlacement,
     handleResetFilters,
     handleOpenDetail,
     handleOpenAdoption,
@@ -98,21 +101,33 @@ export function PetGallery({
     setActivePetForAdoption,
   } = handlers;
 
-  // The home page's featured row reads its heading from the dictionary rather than taking
-  // literals from `page.tsx`, a Server Component that can only ever render English.
-  const displayTitle =
-    title || (featuredOnly ? t("home.availableTitle") : t("pets.title", "Adoptable Animals in Selangor"));
-  const displaySubtitle =
-    subtitle ||
-    (featuredOnly
-      ? t("home.availableSubtitle")
-      : t("pets.subtitle", "Browse rescued dogs, cats, and kittens awaiting their forever homes in Petaling Jaya."));
+  // On /pets the gallery is the page, so its title is the H1 and follows the "Looking to" filter:
+  // arriving from Apply to Foster must not read "Adoptable Animals". The home page's featured row
+  // reads its heading from the dictionary rather than taking literals from `page.tsx`, a Server
+  // Component that can only ever render English, and stays a section h2.
+  const placementCopy = {
+    all: {
+      title: t("pets.title", "Meet Our Animals"),
+      subtitle: t("pets.subtitle", "Browse the rescued dogs and cats at our sanctuary."),
+    },
+    adopt: {
+      title: t("pets.titleAdopt", "Animals to Adopt"),
+      subtitle: t("pets.subtitleAdopt", "Rescued dogs and cats looking for a permanent home."),
+    },
+    foster: {
+      title: t("pets.titleFoster", "Animals to Foster"),
+      subtitle: t("pets.subtitleFoster", "Rescued dogs and cats who are still building confidence around people. A foster home gives them the quiet, consistent socialisation they need before adoption."),
+    },
+  }[selectedPlacement === "adopt" || selectedPlacement === "foster" ? selectedPlacement : "all"];
+  const isPageTitle = !title && !featuredOnly;
+  const displayTitle = title || (featuredOnly ? t("home.availableTitle") : placementCopy.title);
+  const displaySubtitle = subtitle || (featuredOnly ? t("home.availableSubtitle") : placementCopy.subtitle);
 
   return (
     <section className="w-full">
       {/* Header */}
       <div className={`flex flex-col sm:flex-row justify-between gap-4 ${featuredOnly ? "mb-12 sm:items-end" : "mb-6 sm:items-baseline"}`}>
-        <SectionHeader title={displayTitle} subtitle={displaySubtitle} />
+        <SectionHeader title={displayTitle} subtitle={displaySubtitle} as={isPageTitle ? "h1" : "h2"} />
 
         {/* Actions & Pet Counter */}
         {featuredOnly ? (
@@ -286,7 +301,23 @@ export function PetGallery({
           </div>
 
           {/* Secondary Dropdown Selects */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-3.5 pt-3 border-t border-border/60">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-3.5 pt-3 border-t border-border/60">
+            <div>
+              <label htmlFor="filter-placement" className="text-xs sm:text-sm font-semibold text-foreground block mb-1">
+                {isMs ? "Ingin" : "Looking to"}
+              </label>
+              <select
+                id="filter-placement"
+                value={selectedPlacement}
+                onChange={(e) => setSelectedPlacement(e.target.value)}
+                className="w-full bg-background border border-input px-3 py-2 text-sm text-foreground focus:outline-hidden focus:ring-2 focus:ring-foreground font-medium rounded-lg"
+              >
+                <option value="all">{isMs ? "Adopsi atau Asuh" : "Adopt or Foster"}</option>
+                <option value="adopt">{isMs ? "Adopsi" : "Adopt"}</option>
+                <option value="foster">{isMs ? "Asuh" : "Foster"}</option>
+              </select>
+            </div>
+
             <div>
               <label htmlFor="filter-gender" className="text-xs sm:text-sm font-semibold text-foreground block mb-1">
                 {t("pets.genderFilter", "Gender")}
@@ -366,9 +397,26 @@ export function PetGallery({
               </select>
             </div>
 
-            {/* Spans the full row beneath the selects; `sm` is four columns wide now that gender
-                joined age, size and status, so this follows rather than leaving a dangling cell. */}
-            <div className="col-span-2 sm:col-span-4 md:col-span-1 flex items-end min-w-0">
+            {/* Five selects and this button fill two rows of three at `sm`, and one row from `md`;
+                below `sm` it spans the full row beneath the selects. It follows the "Looking to"
+                filter. Foster has no form yet (applications cannot record "foster" until the type
+                field exists), so it is a WhatsApp message for now. */}
+            <div className="col-span-2 sm:col-span-1 flex items-end min-w-0">
+              {selectedPlacement === "foster" ? (
+                <a
+                  href={`https://wa.me/60123456789?text=${encodeURIComponent(
+                    "Hi Hope for Strays, I would like to apply to foster."
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "w-full min-w-0 whitespace-nowrap text-2xs sm:text-xs font-semibold px-3 py-2 focus-visible:ring-2 cursor-pointer"
+                  )}
+                >
+                  {t("petDetail.applyToFoster", "Apply to Foster")}
+                </a>
+              ) : (
               <Button
                 variant="outline"
                 size="sm"
@@ -394,8 +442,10 @@ export function PetGallery({
                   // adoptable — so the worst outcome is a rejected submission rather than an
                   // application against an animal who has gone home. The stale field itself is
                   // `tasks/open/adoption-form-keeps-a-stale-pet-id-when-it-opens-on-nobody.md`.
-                  const isAdoptable = (pet: (typeof pets)[number]) =>
-                    getPetStatusPresentation(pet.status).isAdoptable;
+                  //
+                  // "Adoptable" means open to adoption, so an animal offered only for foster (tagged
+                  // Needs Socialising) is never the one the form preselects.
+                  const isAdoptable = (pet: (typeof pets)[number]) => getPlacementOptions(pet).adopt;
                   setActivePetForAdoption(
                     filteredPets.find(isAdoptable) ?? pets.find(isAdoptable) ?? null
                   );
@@ -403,8 +453,9 @@ export function PetGallery({
                 }}
                 className="w-full min-w-0 whitespace-nowrap text-2xs sm:text-xs font-semibold px-3 py-2 focus-visible:ring-2 cursor-pointer"
               >
-                {t("common.apply", "Adoption Form")}
+                {t("petDetail.applyToAdopt", "Apply to Adopt")}
               </Button>
+              )}
             </div>
           </div>
         </div>

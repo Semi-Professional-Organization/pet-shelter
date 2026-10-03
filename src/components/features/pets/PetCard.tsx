@@ -5,10 +5,12 @@ import Image from "next/image";
 import { Info, Heart } from "lucide-react";
 import { Pet } from "@/types/pet";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   getPetStatusPresentation,
+  getPlacementOptions,
   getRehabStageLabel,
   getRehabProgressPercent,
 } from "@/lib/presentation/petStatusPresentation";
@@ -28,6 +30,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
   const { t, isMs } = useLanguage();
   const [imgSrc, setImgSrc] = useState(pet.image || FALLBACK_PET_IMAGE);
   const status = getPetStatusPresentation(pet.status);
+  const placement = getPlacementOptions(pet);
   const isAvailable = status.isAdoptable;
   // An animal who has gone home is not a support target: neither adoption nor sponsorship
   // applies. The card used to render a disabled button reading "Adopted" here — the dead
@@ -159,7 +162,9 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
             - Pending: an application is already in review. The button stays, disabled, showing
               the status. That *is* a dead button, deliberately: it reports where the animal is
               in the queue, and removing it would make Pending indistinguishable from Available
-              at a glance. Change it here if that call is ever revisited. */}
+              at a glance. Change it here if that call is ever revisited.
+            - Needs socialising: offered for foster (getPlacementOptions). Interim, a WhatsApp
+              message, because applications cannot record "foster" until the type field exists. */}
         {isAlumni ? null : status.isInRehabilitation ? (
           <Button
             size="sm"
@@ -168,6 +173,21 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
           >
             {t("common.sponsorMe", "Sponsor Me")}
           </Button>
+        ) : placement.foster ? (
+          <a
+            href={`https://wa.me/60123456789?text=${encodeURIComponent(
+              `Hi Hope for Strays, I would like to foster ${pet.name}.`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "w-full text-xs font-semibold uppercase tracking-wider px-5 py-2.5 focus-visible:ring-2 cursor-pointer rounded-xl"
+            )}
+          >
+            <Heart className="size-3.5" />
+            {t("petDetail.applyToFoster", "Apply to Foster")}
+          </a>
         ) : (
           <Button
             size="sm"

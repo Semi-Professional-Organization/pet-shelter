@@ -7,6 +7,8 @@ import {
   getRehabStageLabel,
   getRehabProgressPercent,
   matchesStatusFilter,
+  getPlacementOptions,
+  matchesPlacementFilter,
 } from "@/lib/presentation/petStatusPresentation";
 import { Pet, PetStatus } from "@/types/pet";
 import { PET_STATUS_VALUES } from "@/lib/validations/pet";
@@ -273,3 +275,43 @@ describe("DB PetStatus Enum Mappings", () => {
   });
 });
 
+
+describe("getPlacementOptions", () => {
+  const pet = (status: PetStatus, tags: string[] = []) => ({ status, tags });
+
+  it("opens available animals to adoption", () => {
+    expect(getPlacementOptions(pet("Available", ["Playful"]))).toEqual({ adopt: true, foster: false });
+  });
+
+  it("opens available animals that need socialising to fostering, in either spelling and case", () => {
+    expect(getPlacementOptions(pet("Available", ["Needs Socialising"]))).toEqual({ adopt: false, foster: true });
+    expect(getPlacementOptions(pet("Available", ["needs socializing"]))).toEqual({ adopt: false, foster: true });
+  });
+
+  it("opens animals in rehabilitation to neither, under either spelling", () => {
+    expect(getPlacementOptions(pet("In Rehabilitation"))).toEqual({ adopt: false, foster: false });
+    expect(getPlacementOptions(pet("Rehabilitation", ["Needs Socialising"]))).toEqual({ adopt: false, foster: false });
+  });
+
+  it("opens pending and adopted animals to neither, even when tagged", () => {
+    expect(getPlacementOptions(pet("Pending", ["Needs Socialising"]))).toEqual({ adopt: false, foster: false });
+    expect(getPlacementOptions(pet("Adopted"))).toEqual({ adopt: false, foster: false });
+  });
+});
+
+describe("matchesPlacementFilter", () => {
+  const pet = (status: PetStatus, tags: string[] = []) => ({ status, tags });
+
+  it("matches everything for all, and for an unknown value", () => {
+    expect(matchesPlacementFilter(pet("Pending"), "all")).toBe(true);
+    expect(matchesPlacementFilter(pet("Adopted"), "bogus")).toBe(true);
+  });
+
+  it("keeps only the animals open to the chosen placement", () => {
+    expect(matchesPlacementFilter(pet("Available"), "adopt")).toBe(true);
+    expect(matchesPlacementFilter(pet("Available"), "foster")).toBe(false);
+    expect(matchesPlacementFilter(pet("Available", ["Needs Socialising"]), "foster")).toBe(true);
+    expect(matchesPlacementFilter(pet("Available", ["Needs Socialising"]), "adopt")).toBe(false);
+    expect(matchesPlacementFilter(pet("In Rehabilitation"), "foster")).toBe(false);
+  });
+});
