@@ -52,6 +52,12 @@ foster** and branches from there. Decision: `tasks/decisions/2026-10-02-foster-u
 - [ ] Admin applications list + detail show and filter by type; tracking page shows it
 - [ ] Emails and status copy say "foster" where it applies
 
+## 3 Oct — Get Involved
+
+- [x] Sections are now **Volunteer · Corporate CSR & Collaboration · Partnerships** (user). Occasional
+      project days moved into Volunteer; group days + company sponsorship into Corporate CSR;
+      vets + universities stay in Partnerships. Navbar dropdown matches (`#corporate` again).
+
 ## Questions for the shelter
 
 - [ ] **Does a fosterer pick a specific animal, or does the shelter assign one?** Decides whether

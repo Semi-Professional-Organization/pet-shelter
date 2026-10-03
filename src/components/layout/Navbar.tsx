@@ -61,12 +61,12 @@ export function Navbar() {
       label: isMs ? "Sukarelawan" : "Volunteer",
     },
     {
-      href: "/get-involved#events",
-      label: isMs ? "Acara Sukarelawan" : "Volunteer Events",
+      href: "/get-involved#corporate",
+      label: isMs ? "CSR Korporat & Kolaborasi" : "Corporate CSR & Collaboration",
     },
     {
       href: "/get-involved#partnerships",
-      label: isMs ? "Rakan Kongsi" : "Partners",
+      label: isMs ? "Kerjasama" : "Partnerships",
     },
   ];
 

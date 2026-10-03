@@ -9,9 +9,9 @@ import { Section, SectionHeader } from "@/components/layout/Section";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Get Involved — Volunteer, Events & Partnerships | Hope for Strays UM",
+  title: "Get Involved — Volunteer, Corporate CSR & Partnerships | Hope for Strays UM",
   description:
-    "Help the cats and dogs at the Hope for Strays sanctuary: volunteer for routine cleaning and feeding in the cat or dog area, join an occasional volunteer event, or partner with us.",
+    "Help the cats and dogs at the Hope for Strays sanctuary: volunteer in the cat or dog area or at an occasional project day, bring your company or club for a CSR day, or partner with us as a clinic or university.",
 };
 
 /**
@@ -26,6 +26,7 @@ const cardTitle = "font-heading text-xl font-bold tracking-tight text-foreground
 const cardBody = "text-sm leading-relaxed text-muted-foreground";
 const iconTile = "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground";
 const innerTile = "space-y-1.5 rounded-xl border border-border bg-background p-4";
+const groupLabel = "text-2xs font-bold uppercase tracking-wider text-primary";
 const highlight = "flex items-start gap-2 text-sm font-medium text-foreground/90";
 // Not buttonVariants: its default fill would clash with the brand colour (page-style-guide §8.1).
 const whatsappButton =
@@ -62,34 +63,56 @@ export default async function GetInvolvedPage() {
             Get Involved
           </h1>
           <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Our cats and dogs are cared for by community hands. Help with routine shelter care, join an occasional volunteer event, or partner with us.
+            Our cats and dogs are cared for by community hands. Volunteer with us, bring your company or club for a CSR day, or partner with us.
           </p>
         </div>
       </Section>
 
-      {/* Routine volunteering — recurring shelter care. */}
+      {/* Volunteer — individuals: regular sessions, plus occasional project days. */}
       <Section id="volunteer" className="scroll-mt-24">
         <div className="space-y-10">
           <SectionHeader
             title="Volunteer"
-            subtitle="Regular sessions cleaning and feeding at our sanctuary. Choose the cat area, the dog area, or both."
+            subtitle="Help care for the cats and dogs at our sanctuary, through regular sessions or occasional project days."
           />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <Cat className="size-5" />
+          <div className="space-y-4">
+            <p className={groupLabel}>Regular sessions — cleaning and feeding; choose the cat area, the dog area, or both</p>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className={`${panel} flex flex-col gap-3`}>
+                <div className={iconTile}>
+                  <Cat className="size-5" />
+                </div>
+                <h3 className={cardTitle}>Cat Area</h3>
+                <p className={cardBody}>Clean litter, bedding and bowls, then prepare meals and refill water for the cats.</p>
               </div>
-              <h3 className={cardTitle}>Cat Area</h3>
-              <p className={cardBody}>Clean litter, bedding and bowls, then prepare meals and refill water for the cats.</p>
+              <div className={`${panel} flex flex-col gap-3`}>
+                <div className={iconTile}>
+                  <Dog className="size-5" />
+                </div>
+                <h3 className={cardTitle}>Dog Area</h3>
+                <p className={cardBody}>Clean kennels, bedding and bowls, then prepare meals and refill water for the dogs.</p>
+              </div>
             </div>
+          </div>
 
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <Dog className="size-5" />
+          <div className="space-y-4">
+            <p className={groupLabel}>Occasional events — project days, no routine commitment</p>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className={`${panel} flex flex-col gap-3`}>
+                <div className={iconTile}>
+                  <Paintbrush className="size-5" />
+                </div>
+                <h3 className={cardTitle}>Painting & Repairs</h3>
+                <p className={cardBody}>Repaint kennels and fences and fix up the sanctuary.</p>
               </div>
-              <h3 className={cardTitle}>Dog Area</h3>
-              <p className={cardBody}>Clean kennels, bedding and bowls, then prepare meals and refill water for the dogs.</p>
+              <div className={`${panel} flex flex-col gap-3`}>
+                <div className={iconTile}>
+                  <Hammer className="size-5" />
+                </div>
+                <h3 className={cardTitle}>Building Projects</h3>
+                <p className={cardBody}>Build dog playhouses and other things the animals need.</p>
+              </div>
             </div>
           </div>
 
@@ -117,7 +140,7 @@ export default async function GetInvolvedPage() {
               )}
 
               <WhatsAppLink
-                text="Hi Hope for Strays, I would like to volunteer for regular shelter shifts."
+                text="Hi Hope for Strays, I would like to volunteer."
                 label="WhatsApp Volunteer Coordinator"
                 testId="volunteer-whatsapp-cta"
               />
@@ -132,72 +155,22 @@ export default async function GetInvolvedPage() {
         </div>
       </Section>
 
-      {/* Occasional volunteering — one-off project days, open to individuals and groups. */}
-      <Section id="events" className="scroll-mt-24">
+      {/* Corporate CSR & Collaboration — organisations taking part as a group or as sponsors. */}
+      <Section id="corporate" className="scroll-mt-24">
         <div className="space-y-10">
           <SectionHeader
-            title="Volunteer Events"
-            subtitle="Occasional project days, not a routine commitment. Open to individuals and groups."
+            title="Corporate CSR & Collaboration"
+            subtitle="Companies, university clubs and other organisations can volunteer together as a group or sponsor our work."
           />
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <Paintbrush className="size-5" />
-              </div>
-              <h3 className={cardTitle}>Painting & Repairs</h3>
-              <p className={cardBody}>Repaint kennels and fences and fix up the sanctuary.</p>
-            </div>
-
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <Hammer className="size-5" />
-              </div>
-              <h3 className={cardTitle}>Building Projects</h3>
-              <p className={cardBody}>Build dog playhouses and other things the animals need.</p>
-            </div>
-
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className={`${panel} flex flex-col gap-3`}>
               <div className={iconTile}>
                 <Users className="size-5" />
               </div>
-              <h3 className={cardTitle}>Groups Welcome</h3>
-              <p className={cardBody}>Companies, university clubs and friends can join an event day together.</p>
+              <h3 className={cardTitle}>Group Volunteer Days</h3>
+              <p className={cardBody}>Bring your team for a project day at the sanctuary — painting, repairs and building for the animals.</p>
             </div>
-          </div>
-
-          <WhatsAppLink
-            text="Hi Hope for Strays, I would like to join an upcoming volunteer event."
-            label="Ask About Upcoming Events"
-          />
-        </div>
-      </Section>
-
-      {/* Partners — organisations, not individual volunteers. */}
-      <Section id="partnerships" className="scroll-mt-24">
-        <div className="space-y-10">
-          <SectionHeader
-            title="Partners"
-            subtitle="We work with veterinary clinics across Petaling Jaya, Subang Jaya and Kuala Lumpur, Universiti Malaya faculties and student societies, and companies."
-          />
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <Stethoscope className="size-5" />
-              </div>
-              <h3 className={cardTitle}>Veterinary Clinics</h3>
-              <p className={cardBody}>Subsidised spay/neuter slots and emergency trauma triage.</p>
-            </div>
-
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <ShieldCheck className="size-5" />
-              </div>
-              <h3 className={cardTitle}>Universities & Student Societies</h3>
-              <p className={cardBody}>Joint educational seminars, campus feeder registries, and research on urban stray coexistence.</p>
-            </div>
-
             <div className={`${panel} flex flex-col gap-3`}>
               <div className={iconTile}>
                 <Building2 className="size-5" />
@@ -210,6 +183,38 @@ export default async function GetInvolvedPage() {
                   Brand logo credited in the shelter bulletin
                 </p>
               </div>
+            </div>
+          </div>
+
+          <WhatsAppLink
+            text="Hi Hope for Strays, our organisation would like to collaborate on a CSR activity."
+            label="WhatsApp CSR Coordinator"
+          />
+        </div>
+      </Section>
+
+      {/* Partnerships — clinics and universities working with us on an ongoing basis. */}
+      <Section id="partnerships" className="scroll-mt-24">
+        <div className="space-y-10">
+          <SectionHeader
+            title="Partnerships"
+            subtitle="We work with veterinary clinics across Petaling Jaya, Subang Jaya and Kuala Lumpur, and with Universiti Malaya faculties and student societies."
+          />
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className={`${panel} flex flex-col gap-3`}>
+              <div className={iconTile}>
+                <Stethoscope className="size-5" />
+              </div>
+              <h3 className={cardTitle}>Veterinary Clinics</h3>
+              <p className={cardBody}>Subsidised spay/neuter slots and emergency trauma triage.</p>
+            </div>
+            <div className={`${panel} flex flex-col gap-3`}>
+              <div className={iconTile}>
+                <ShieldCheck className="size-5" />
+              </div>
+              <h3 className={cardTitle}>Universities & Student Societies</h3>
+              <p className={cardBody}>Joint educational seminars, campus feeder registries, and research on urban stray coexistence.</p>
             </div>
           </div>
 
