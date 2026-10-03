@@ -330,9 +330,10 @@ export function HomeQuickActionsSection() {
  * to the `en` dictionary, so a literal here could only ever be a third copy,
  * unreachable and free to drift.
  *
- * The heading and subtitle read from the dictionary too. They were
- * left inline at first, on the grounds that `home.howItWorksTitle`/`Subtitle`
- * hold different sentences rather than second copies — true, but it left half
+ * The heading reads from the dictionary too. It and the subtitle (since
+ * dropped) were left inline at first, on the grounds that
+ * `home.howItWorksTitle`/`Subtitle` held different sentences rather than
+ * second copies — true, but it left half
  * of one component translator-reachable and half not, which is the same
  * split-source defect one level down. Adopting the keys does change the
  * visible wording; this section had rendered nowhere since `1137d3e`, so there
@@ -351,7 +352,7 @@ export function HomeProcessSection() {
   return (
     <Section id="how-it-works" className="scroll-mt-24">
       <div className="space-y-10">
-        <SectionHeader title={t("home.howItWorksTitle")} subtitle={t("home.howItWorksSubtitle")} />
+        <SectionHeader title={t("home.howItWorksTitle")} />
 
         {/* A vertical timeline, read top to bottom: each step's number sits on a rail that joins it
             to the next, and the text runs full width beside it. */}

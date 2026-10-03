@@ -224,7 +224,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     renderWithLanguage(<HomeProcessSection />);
 
     expect(
-      screen.getByRole("heading", { name: "A careful match, step by step" })
+      screen.getByRole("heading", { name: "Application Steps" })
     ).toBeInTheDocument();
     expect(screen.getByText("Browse & Submit Application")).toBeInTheDocument();
     expect(screen.getByText("Meet & Socialize")).toBeInTheDocument();
@@ -248,7 +248,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     renderWithLanguage(<HomeProcessSection />, { language: "ms" });
 
     expect(
-      screen.getByRole("heading", { name: "Padanan yang teliti, langkah demi langkah" })
+      screen.getByRole("heading", { name: "Langkah Permohonan" })
     ).toBeInTheDocument();
     expect(screen.getByText("Semak & Hantar Permohonan")).toBeInTheDocument();
     expect(screen.getByText("Sesi Suai Kenal & Interaksi")).toBeInTheDocument();
@@ -259,7 +259,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText(/tanpa sebarang yuran adopsi komersial/)).toBeInTheDocument();
     expect(screen.queryByText(/yuran tersembunyi/)).not.toBeInTheDocument();
 
-    expect(screen.queryByText("A careful match, step by step")).not.toBeInTheDocument();
+    expect(screen.queryByText("Application Steps")).not.toBeInTheDocument();
     expect(screen.queryByText("Browse & Submit Application")).not.toBeInTheDocument();
     expect(screen.queryByText("Meet & Socialize")).not.toBeInTheDocument();
     expect(screen.queryByText("Finalize & Welcome Home")).not.toBeInTheDocument();
