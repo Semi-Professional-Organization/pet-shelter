@@ -92,7 +92,6 @@ export interface TranslationDictionary {
     viewAllPets: string;
     galleryLoading: string;
     howItWorksTitle: string;
-    howItWorksSubtitle: string;
     step1Title: string;
     step1Desc: string;
     step2Title: string;
@@ -448,8 +447,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       availableSubtitle: "Rescued dogs, cats and kittens waiting for a home right now.",
       viewAllPets: "View All Adoptable Pets",
       galleryLoading: "Loading rescue animals...",
-      howItWorksTitle: "A careful match, step by step",
-      howItWorksSubtitle: "Adopting and fostering follow the same three steps, so every rescue is matched with the right family.",
+      howItWorksTitle: "Application Steps",
       step1Title: "Browse & Submit Application",
       step1Desc: "Browse our dogs and cats online or visit our sanctuary, then submit a short application. We check basic home suitability — landed vs high-rise pet guidelines, safe fencing, and household agreement.",
       step2Title: "Meet & Socialize",
@@ -808,8 +806,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       availableSubtitle: "Anjing, kucing dan anak kucing reskue yang sedang menanti rumah baharu.",
       viewAllPets: "Lihat Semua Haiwan Sedia Diadopsi",
       galleryLoading: "Memuatkan haiwan reskue...",
-      howItWorksTitle: "Padanan yang teliti, langkah demi langkah",
-      howItWorksSubtitle: "Adopsi dan asuhan mengikut tiga langkah yang sama, supaya setiap haiwan reskue dipadankan dengan keluarga yang sesuai.",
+      howItWorksTitle: "Langkah Permohonan",
       step1Title: "Semak & Hantar Permohonan",
       step1Desc: "Lihat profil anjing & kucing reskue kami secara dalam talian atau kunjungi santuari kami. Hantar borang ringkas — kami menyemak kesesuaian asas kediaman anda (pagar selamat, garis panduan bangunan bertingkat, persetujuan isi rumah).",
       step2Title: "Sesi Suai Kenal & Interaksi",
