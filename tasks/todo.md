@@ -18,8 +18,11 @@ Record active multi-step work streams below.
 # An approval marks the id it asks for
 
 **Branch:** `worktree-pet-mirror-ordering` · opened 2026-09-22 · ROUTINE lane
-**Closes:** `tasks/open/a-public-post-can-reorder-the-pet-mirror.md` (filed by
-`worktree-adoption-submit-guards`, arriving on master with PR #93)
+**Closes:** `tasks/open/a-public-post-can-reorder-the-pet-mirror.md` — filed by
+`worktree-adoption-submit-guards`, landed on master with PR #93, deleted by the merge commit on
+this branch. It was deliberately left undeleted in #93: that PR does not fix the ordering, and
+closing a live defect's public issue with nothing on master behind it is worse than the
+duplication.
 
 ## Items
 
