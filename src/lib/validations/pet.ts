@@ -112,14 +112,31 @@ export const PET_UPDATE_CATEGORY_VALUES = [
 ] as const satisfies readonly NonNullable<PetUpdate["category"]>[];
 
 /**
- * A calendar day with no time component, stored as `YYYY-MM-DD`. The regex
- * pins the shape; `Date.parse` rejects impossible days such as `2026-02-30`,
- * which the regex alone would let through.
+ * A calendar day with no time component, stored as `YYYY-MM-DD`. The regex pins the shape; the
+ * round-trip rejects impossible days such as `2026-02-30`, which the regex alone lets through.
+ *
+ * This used to test `!Number.isNaN(Date.parse(value))` and claimed, in this comment, to reject
+ * exactly that case. It does not: `Date.parse("2026-02-30")` returns a number on V8, silently
+ * rolling the day forward to 2026-03-02, so the only thing it caught was an out-of-range *month*.
+ * Measured on Node 26.4.0, 2026-09-22. Reading the parsed date back and comparing all three
+ * components is what actually refuses a day that does not exist — a rolled-over date differs from
+ * the input in at least one of them.
+ *
+ * UTC throughout, because `YYYY-MM-DD` is parsed as UTC midnight; `getFullYear()` here would
+ * compare against a local-time reading of that instant and disagree west of Greenwich.
  */
 const isoDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format")
-  .refine((value) => !Number.isNaN(Date.parse(value)), "Date is not a real calendar day");
+  .refine((value) => {
+    const [year, month, day] = value.split("-").map(Number);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    return (
+      parsed.getUTCFullYear() === year &&
+      parsed.getUTCMonth() === month - 1 &&
+      parsed.getUTCDate() === day
+    );
+  }, "Date is not a real calendar day");
 
 /** One clinical event on a pet's medical history. */
 export const medicalTimelineEventSchema = z.object({
@@ -193,8 +210,37 @@ export const petBaseFormSchema = z.object({
   name: z.string().min(1, "Pet name is required").max(60, "Name is too long"),
   species: z.enum(SPECIES_VALUES),
   breed: z.string().min(1, "Breed is required"),
-  age: z.string().min(1, "Age description is required (e.g. '2 years')"),
-  ageCategory: z.enum(AGE_BANDS),
+
+  /**
+   * The animal's birthday, and the only age input there is.
+   *
+   * `age` prose and an `ageCategory` band used to be collected here and were then thrown away:
+   * `buildPetPersistencePayload` stored `intakeDate − age` and `mapDbPetToPet` recomputed both
+   * from that date, so a typed "2 years" drifted a year further from the truth every year and the
+   * chosen band was never read back at all (`tasks/open/pet-form-has-no-birth-date-field.md`).
+   * Collecting the birthday instead makes the stored value the one the operator actually saw, and
+   * leaves age and band derived everywhere, once, in `src/lib/domain/petAge.ts`.
+   *
+   * `birthDateIsEstimate` is the honesty flag: false only when someone knows the real date, which
+   * for a rescue is the exception. It defaults to true for that reason.
+   */
+  // Piped rather than plain `isoDateSchema` so that leaving the field blank says "Birth date is
+  // required" instead of "Date must be in YYYY-MM-DD format", which is what an empty string earns
+  // from the regex and is not what the operator did wrong.
+  birthDate: z.string().min(1, "Birth date is required").pipe(isoDateSchema),
+
+  /**
+   * Optional with NO `.default(true)`, deliberately.
+   *
+   * A default here is applied on every parse, so the key is always present in the output — and
+   * `updatePet` merges `{ ...existing, ...validated }`. A caller that simply did not mention the
+   * flag would therefore overwrite a stored `false` with `true`, silently demoting a birthday
+   * someone actually knew to a guess, which is the one thing this field exists to prevent.
+   * Measured, not theorised. Leaving it absent lets `existing` survive the spread; the two create
+   * paths apply `?? true` themselves, where defaulting to "estimated" is the honest choice.
+   */
+  birthDateIsEstimate: z.boolean().optional(),
+
   gender: z.enum(GENDER_VALUES),
   size: z.enum(SIZE_VALUES),
   weight: z.string().min(1, "Weight is required (e.g. '18 kg')"),
@@ -210,9 +256,7 @@ export const petBaseFormSchema = z.object({
 
   /// Dedicated donation QR for this animal's medical fund drive.
   customQrUrl: optionalQrImageUrl,
-  birthDate: z.string().optional(),
-  birthDateIsEstimate: z.boolean().optional().default(true),
-  
+
   // Medical
   vaccinated: z.boolean().default(true),
   microchipped: z.boolean().default(true),
@@ -261,6 +305,61 @@ export const petFormSchema = petBaseFormSchema.superRefine((data, ctx) => {
         message: `Duplicate '${field}' id '${id}' — history event ids must be unique`,
       });
     }
+  }
+
+  // An animal cannot have been born after it arrived. Worth pinning because the derivation this
+  // field replaced could not produce such a date — `intakeDate − age` is always on or before
+  // intake — so a typed birthday is the first way one can enter the system, and a future date
+  // renders as a plausible "1 month" rather than as an error.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(data.intakeDate) && data.birthDate > data.intakeDate) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["birthDate"],
+      message: `Birth date ${data.birthDate} is after the intake date ${data.intakeDate}`,
+    });
+  }
+
+  // An absolute bound as well, because the relative one above is skipped whenever `intakeDate` is
+  // malformed — it is only `z.string().min(4)`, so `"2026"` passes it and disables the check. On
+  // the action path a Server Action argument is untrusted input, and a birthday in 2099 would
+  // otherwise validate and render as a plausible "1 month", since `computeAgeInMonths` clamps a
+  // negative age to zero. That is the failure this rule exists to stop, so it must not depend on
+  // another field being well formed.
+  //
+  // `intakeDate` is deliberately NOT tightened to `isoDateSchema` here. Its stored values in
+  // production are unknown, and every edit to a pet re-validates the whole form, so a stricter
+  // rule would strand any record whose intake date is not already ISO — the same trap that made a
+  // pet uneditable when the birth-date `max` was bound flat to it.
+  //
+  // Compared against tomorrow in UTC, not today: no timezone on earth is more than 14 hours ahead
+  // of UTC, so a day of slack is what stops an animal born this morning in Kuala Lumpur being
+  // refused because UTC is still on yesterday's date.
+  const tomorrowUtc = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  if (data.birthDate > tomorrowUtc) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["birthDate"],
+      message: `Birth date ${data.birthDate} is in the future`,
+    });
+  }
+
+  // And a lower bound, because only half of the above was implemented at first. A mistyped year
+  // passed every other rule: `1899-07-04` satisfies the regex, the UTC round-trip, "not after
+  // intake" and "not in the future", and then renders as "127 years" on the public card and files
+  // the animal under `senior`. Measured: `0202-05-18` gives "1824 years". The data half of this
+  // same conversion already refuses exactly this — the expand migration rejects an age over 60
+  // years as "a typo or junk, not an animal" — so the form was the lenient end of a rule the SQL
+  // was enforcing. 60 years is well past any animal a shelter rehomes; the point is to catch a
+  // slipped digit, not to adjudicate longevity.
+  const earliestPlausible = new Date(Date.now() - 60 * 365.25 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  if (data.birthDate < earliestPlausible) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["birthDate"],
+      message: `Birth date ${data.birthDate} is more than 60 years ago`,
+    });
   }
 
   if (isRehabilitationStatus(data.status)) return;
