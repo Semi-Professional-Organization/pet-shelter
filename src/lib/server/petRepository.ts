@@ -184,25 +184,34 @@ export function findServerPetById(id: string): Pet | null {
  * The name fallback stays, but only for an application that carries **no id at
  * all** — the ones predating the `petId` column, where the name is the only
  * identifier there is. An id that was supplied and did not match resolves to
- * `null` rather than to a name match, because `petId` is unvalidated public
- * input and "the id you named does not exist, so here is someone with the same
- * name" is how the attack survives a fix that only reorders the two lookups.
+ * `null` rather than to a name match, because "the id you named does not exist,
+ * so here is someone with the same name" is how the attack survives a fix that
+ * only reorders the two lookups. PR #93 has since made `submitApplication`
+ * refuse an unknown id, so that input no longer reaches here; the rule stays
+ * next to the lookup that depends on it. See the body for what that costs.
  *
  * Replace-on-write: the mirror array is never mutated in place, so concurrent
  * readers never observe a partially-updated entry.
  */
 export function markCachedPetAdopted(petId: string, petName: string): Pet | null {
-  // An id that was given and does not match resolves to nothing. It must not fall through to
-  // the name: `petId` is unvalidated public input — `applicationFormSchema` asks only for a
-  // non-empty string — so a submission naming a pet that does not exist would otherwise be
-  // resolved by name against whatever the caller floated to the head of the mirror. The
-  // database update is keyed on the same id and matches 0 rows, so that path marks an animal
-  // adopted, and audits it, for an adoption Postgres never performed.
+  // An id that was given and does not match resolves to nothing, rather than falling through to
+  // the name. This is **defence in depth, and was not when it was written**: at that point
+  // `submitApplication` accepted any non-empty `petId` — `applicationFormSchema` asks only for
+  // `z.string().min(1)` and the check read `pet && pet.isArchived`, which skipped entirely when
+  // nothing matched — so a submission naming a pet that does not exist was resolved by name
+  // against whatever the caller had floated to the head of the mirror, while the transaction's
+  // `updateMany` matched 0 rows. PR #93 closed that caller: it trims, refuses `!pet || pet.id
+  // !== requestedPetId`, and stores `petId: pet.id` from the verified row. So the hostile input
+  // no longer arrives here — and this stays, because the guarantee belongs next to the lookup
+  // that depends on it rather than one caller away.
   //
-  // `findServerPetById` rather than a `===` comparison, because it is the lookup this file
-  // already uses and it normalises (`trim().toLowerCase()`). An exact match would miss a
-  // `petId` of `" pet-001 "`, which nothing on the submit path trims, and drop it into the
-  // name fallback — the same hole reopened without any forgery.
+  // `findServerPetById` rather than a `===` comparison, for consistency: it is the lookup this
+  // file already uses for an id, and re-implementing it with different matching is how two
+  // readers of the same identifier drift. Note the asymmetry it leaves — it normalises
+  // (`trim().toLowerCase()`) while the database update beside it is a Postgres `=` on the raw
+  // value, so a padded or miscased id would mark the mirror while updating no rows. Not
+  // reachable today: `AdoptionApplication.petId` carries an FK to `Pet.id`, so a stored id is an
+  // exact one.
   const requestedId = petId.trim();
   const target = requestedId
     ? findServerPetById(requestedId)

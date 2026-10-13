@@ -33,7 +33,7 @@ duplication.
       public path, and `markCachedPetAdopted("itest-bella-asked-for", "Bella")` returned
       `itest-bella-decoy`.
 - [x] Fix: try the id against the whole array before the name is tried at all. Three lines.
-- [x] `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`, 5 tests. `markCachedPetAdopted`
+- [x] `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`, 6 tests. `markCachedPetAdopted`
       had **no test referencing it at all** before this.
 - [x] Reverted a `trim()` that crept into the name comparison — widening how names match is a
       different question from which identifier wins.
@@ -61,10 +61,13 @@ entry the next hydrate repairs.
   lets a recently viewed animal survive — and it would not have fixed the defect, since two
   same-named animals with no id match are still resolved by position. Reasoned out in the
   decision entry rather than left implicit.
-- **The residual is stated rather than filed.** With an empty or unmatched `petId` and two
-  animals sharing a name, order still decides. Nothing distinguishes them, so no action closes it
-  short of refusing ambiguous name matches, which breaks the legacy applications the fallback
-  exists for.
+- **The residual is stated rather than filed**, and narrower than this list first claimed. With
+  **no** `petId` at all and two animals sharing a name, order still decides. An *unmatched*
+  supplied id no longer falls back at all — it returns null, pinned by
+  `approvalMarksTheAnimalItAsksFor.test.ts` — so saying "empty or unmatched" overstated it and
+  contradicted the decision entry, which is the file a later session trusts. No action closes
+  what is left short of refusing ambiguous name matches, which breaks the legacy applications
+  the fallback exists for.
 - **P2003 not touched.** The same session suggested `handlePersistenceError` treat Prisma's
   foreign-key violation like its unique violation — always rethrow — so an adoption application
   cannot be accepted, given a reference code, and then silently lost. The analysis is in their

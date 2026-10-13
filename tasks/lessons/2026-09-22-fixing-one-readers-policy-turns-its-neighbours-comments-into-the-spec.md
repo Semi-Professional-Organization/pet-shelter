@@ -63,6 +63,27 @@ symbol you name" does not fire on it. Nothing was named. The question it silentl
 **"who else reads this?"**, and the honest answer needed `grep serverPets`, which nobody ran —
 the claim was reasoned from what the reordering does to catalogue display, and generalised.
 
+## A fourth time, where the claim was true when it was written
+
+The follow-up fix carried a comment justifying itself with "`petId` is unvalidated public input"
+and "nothing on the submit path trims `petId`". Both were accurate the hour they were written.
+Then the sibling branch merged, and `submitApplication` began trimming the id and refusing one
+that matches no animal — so the comment described a threat that no longer arrives, and the next
+reader could reasonably conclude the guard is dead code and delete it.
+
+This one is not carelessness: no amount of checking at writing time would have caught it. The
+premise **expired**. What distinguishes it is that the claim was about a *different branch's*
+file, in a repo where several branches are in flight at once, and it stopped being true at a
+merge rather than at a keystroke.
+
+**Rule:** a cross-file premise has to be re-read at the merge, not only when written — if you
+merge a branch that touches a file your comments reason about, re-read those comments as part of
+resolving the merge. And when a guard's justification is "the caller lets hostile input through",
+say which caller and when, so a later reader can check whether it is still so; a justification
+that names its evidence can be re-verified, one that states a bare fact can only be believed or
+deleted. The guard itself stays either way — defence in depth is the right answer precisely
+because the caller's behaviour is someone else's to change.
+
 **Rule:** before calling a side effect on shared mutable state cosmetic, grep for every reader of
 that state and name them. A side effect is only as cosmetic as its least careful consumer, and the
 consumer that makes it serious is rarely the one you were thinking about. The same applies to

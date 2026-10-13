@@ -64,7 +64,7 @@ Reusing the lookup that already exists is also the cheaper rung of `AGENTS.md`'s
 **The name fallback stays** for applications predating the `petId` column, which arrive with an
 empty string; `atomicUpdateApplicationStatus` passes `currentApp.petId ?? ""` precisely for them.
 
-Pinned by `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`, five tests, including the
+Pinned by `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`, six tests, including the
 public reorder performed the way a visitor would and an arrangement assertion proving the reorder
 actually happened, so the test cannot pass because the attack silently failed to set up.
 
