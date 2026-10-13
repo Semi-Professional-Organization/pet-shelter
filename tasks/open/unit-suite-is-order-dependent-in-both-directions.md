@@ -83,6 +83,18 @@ files together, 17 for the integration one. So the one-failure-per-file shape th
 describes is not confined to the `unit` project, and the recommendation at the bottom applies to
 all three.
 
+**CI is green on the same commit, which narrows this to the local environment.** PR #103's run
+`38428838326` on `af0fc2c` — the exact tree that gave `65 failed` and then `4 failed` locally —
+passed every job: "Unit, integration & component tests" in 2m46s, plus strict-persistence,
+Playwright and static analysis. So whatever this is, it does not reproduce on a clean single-job
+runner, and the two local readings were both wrong about the code.
+
+That is the most useful measurement yet for narrowing it: it rules out the source, rules out
+anything in the committed tree, and points at the developer machine — concurrent sessions sharing
+one checkout, several vitest processes competing, and a shared `.vite` cache under
+`node_modules/`. It also means a red local run is weak evidence and a green CI run is the one to
+trust, which inverts the usual order.
+
 Load looks like a factor rather than the cause: the 65-failure run had a review sub-agent issuing
 its own `vitest` commands against the same working tree. That is worth separating from the
 order-dependence proper, because the two have different fixes — one is a scheduling bug, the other

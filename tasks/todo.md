@@ -62,8 +62,13 @@ against real PostgreSQL 18.4, not reasoned: its DDL produces objects identical t
 `prisma db push`, re-running it is a no-op, the enum rejects an out-of-vocabulary category, and on
 a database seeded with the index this branch later retired, a re-run clears it.
 
-**`npm run test:all` cannot be quoted as a single number, and this stream will not pretend
-otherwise.** Two runs of the same tree, nothing changed between them: `65 failed`, then
+**CI settled the test question: PR #103 is green on every job**, including "Unit, integration &
+component tests" (run `38428838326`, commit `af0fc2c`). That is the same tree that gave two
+different local answers, so the local readings were both wrong about the code — recorded against
+the order-dependence entry, which this stream also widened.
+
+**Locally, `npm run test:all` could not be quoted as a single number, and this stream did not
+pretend otherwise.** Two runs of the same tree, nothing changed between them: `65 failed`, then
 `4 failed | 1964 passed (1968)`. The second run's four were one test each in four unrelated
 non-bulletin files across two projects, and **all four pass in isolation**. That is
 `tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, which records the same shape on
