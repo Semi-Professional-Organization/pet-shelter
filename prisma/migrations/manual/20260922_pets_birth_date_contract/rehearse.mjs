@@ -149,6 +149,12 @@ async function applyExpandShape(db) {
     `ALTER TABLE "public"."pets" ALTER COLUMN "age" DROP NOT NULL;
      ALTER TABLE "public"."pets" ALTER COLUMN "ageCategory" DROP NOT NULL;`
   );
+  // The marker expand stamps on the column it creates, and the contract's discriminator. A shape
+  // that omitted it would be the hand-patch state, not the post-expand one — which is the whole
+  // distinction this harness has to keep straight.
+  await db.exec(
+    `COMMENT ON COLUMN "public"."pets"."birthDate" IS 'added by 20260922_pets_birth_date';`
+  );
 }
 
 const tryExec = async (db, sql) => {
@@ -222,6 +228,37 @@ if (HAS_EXPAND) {
   }
   await undo.close();
 
+  // The destructive path `/code-review max` found on 2026-10-14, pinned so it cannot return.
+  //
+  // Expand, contract, then expand's rollback — which the contract's own rollback header used to
+  // send the operator to — dropped `birthDate` while `age` was already archived and gone, leaving
+  // `pets` with no age information of any kind, no NOTICE, no row named, and expand unable to
+  // re-apply. Expand's rollback now refuses that state and names the contract's rollback as the
+  // thing to run first.
+  const postContract = await freshPreExpand(EXPANDABLE_ROWS);
+  await postContract.exec(EXPAND);
+  await postContract.exec(MIG);
+  const undoAfterContract = await tryExec(
+    postContract,
+    readFileSync(join(HERE, "..", "20260922_pets_birth_date", "rollback.sql"), "utf8")
+  );
+  check(
+    "expand's rollback refuses once the contract has archived and dropped `age`",
+    /already run|no age at all/.test(undoAfterContract),
+    undoAfterContract.slice(0, 180)
+  );
+  check(
+    "  ...and names the contract's rollback as the thing to run first",
+    /20260922_pets_birth_date_contract\/rollback\.sql/.test(undoAfterContract),
+    undoAfterContract.slice(0, 260)
+  );
+  const survived = byName(await cols(postContract, "pets"));
+  check(
+    "  ...leaving every birthDate intact rather than destroying it silently",
+    survived.has("birthDate") && survived.has("birthDateIsEstimate")
+  );
+  await postContract.close();
+
   // The other half of expand's contract, asserted here because the contract half depends on it:
   // a row expand cannot read is refused outright, so no unparseable prose ever reaches the drop.
   const refused = await freshPreExpand();
@@ -255,13 +292,48 @@ await patched.exec(
      ADD COLUMN "birthDateIsEstimate" BOOLEAN NOT NULL DEFAULT true;`
 );
 err = await tryExec(patched, MIG);
-check('refuses a hand-patched column ("age" still NOT NULL)', /still NOT NULL/.test(err), err.slice(0, 160));
+check("refuses a hand-patched column, which carries no marker", /carries no marker/.test(err), err.slice(0, 160));
 check(
   "  ...and the hint says how to recover rather than just refusing",
-  /expand migration to derive the dates properly/.test(err),
-  err.slice(0, 200)
+  /20260922_pets_birth_date\/migration\.sql/.test(err),
+  err.slice(0, 220)
 );
 check("  ...leaving age in place", byName(await cols(patched, "pets")).has("age"));
+
+// The defeat of the old discriminator, pinned so it cannot come back. An operator stops the read
+// storm by hand AND relaxes `age` so creates work, then runs expand, which no-ops on the column
+// but still relaxes and marks `age`. Nullability then says "expand ran" while every birthday is
+// the sentinel. Only the marker on `birthDate` tells the truth.
+const defeated = await freshPreExpand();
+await defeated.exec(
+  `ALTER TABLE "public"."pets"
+     ADD COLUMN "birthDate" TEXT NOT NULL DEFAULT '2024-01-01',
+     ADD COLUMN "birthDateIsEstimate" BOOLEAN NOT NULL DEFAULT true;
+   ALTER TABLE "public"."pets" ALTER COLUMN "age" DROP NOT NULL;
+   ALTER TABLE "public"."pets" ALTER COLUMN "ageCategory" DROP NOT NULL;`
+);
+err = await tryExec(defeated, MIG);
+check(
+  "refuses a hand-patch that also relaxed age, which the old nullability check accepted",
+  /carries no marker/.test(err),
+  err.slice(0, 160)
+);
+check("  ...leaving age in place", byName(await cols(defeated, "pets")).has("age"));
+await defeated.close();
+
+// Belt and braces: even with a forged marker, a table where every row holds the schema default is
+// placeholders rather than derived dates, and the count is now actually executed.
+const allSentinel = await freshPreExpand();
+await applyExpandShape(allSentinel);
+await allSentinel.exec(`UPDATE "public"."pets" SET "birthDate" = '2024-01-01';`);
+err = await tryExec(allSentinel, MIG);
+check(
+  "refuses when every row carries the '2024-01-01' schema default",
+  /schema default/.test(err),
+  err.slice(0, 160)
+);
+check("  ...leaving age in place", byName(await cols(allSentinel, "pets")).has("age"));
+await allSentinel.close();
 check(
   "  ...and every row still on the placeholder, unarchived",
   (await patched.query(`SELECT count(*)::int AS n FROM "public"."pets" WHERE "birthDate"='2024-01-01'`)).rows[0].n ===
@@ -354,7 +426,7 @@ check("re-applies cleanly", err === "", err.slice(0, 200));
 check("age dropped again", !byName(await cols(db, "pets")).has("age"));
 
 console.log("\n== 6. cleanup, then rollback refuses rather than inventing");
-await db.exec(CLEAN);
+check("cleanup.sql applies", (await tryExec(db, CLEAN)) === "");
 check(
   "cleanup dropped the archive",
   (await db.query(
@@ -368,7 +440,7 @@ check("and birthDate is still there", byName(await cols(db, "pets")).has("birthD
 
 console.log("\n== 7. settings and defaults");
 const settingsBefore = JSON.stringify(await cols(db, "shelter_settings"));
-await db.exec(SET_MIG);
+check("settings migration applies", (await tryExec(db, SET_MIG)) === "");
 const sc = byName(await cols(db, "shelter_settings"));
 check(
   "all seven shelter_settings columns added",
@@ -384,9 +456,9 @@ check(
   )).rows[0].column_default === null
 );
 const afterFirst = JSON.stringify(await cols(db, "shelter_settings"));
-await db.exec(SET_MIG);
+check("settings migration re-applies", (await tryExec(db, SET_MIG)) === "");
 check("re-runs as a no-op", JSON.stringify(await cols(db, "shelter_settings")) === afterFirst);
-await db.exec(SET_ROLL);
+check("settings rollback applies", (await tryExec(db, SET_ROLL)) === "");
 check("rollback removes the columns", JSON.stringify(await cols(db, "shelter_settings")) === settingsBefore);
 check(
   "rollback restores the updatedAt default",
@@ -399,9 +471,23 @@ check(
     .toUpperCase()
     .includes("CURRENT_TIMESTAMP")
 );
-await db.exec(SET_MIG);
+check("settings migration applies after rollback", (await tryExec(db, SET_MIG)) === "");
 check("applies again after rollback", JSON.stringify(await cols(db, "shelter_settings")) === afterFirst);
 await db.close();
 
-console.log(`\n=== ${pass} passed, ${fail} failed${HAS_EXPAND ? "" : " (expand not in tree; scenario 0 skipped)"}`);
+// A skip is not a pass. Scenario 0 holds the only checks that execute the real expand SQL and the
+// only regression test for the destructive rollback path, so losing it has to change the exit
+// code — otherwise renaming or moving the expand folder turns this harness green by subtraction.
+// The sibling harness makes the same case for the same reason.
+if (!HAS_EXPAND) {
+  console.log(
+    `\n=== ${pass} passed, ${fail} failed, SCENARIO 0 SKIPPED ===\n` +
+      `The expand migration was not found at ${EXPAND_PATH}.\n` +
+      `Everything that runs the real expand SQL — including the regression test for the\n` +
+      `expand-rollback-after-contract data loss — did not run. Exiting non-zero.`
+  );
+  process.exit(2);
+}
+
+console.log(`\n=== ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

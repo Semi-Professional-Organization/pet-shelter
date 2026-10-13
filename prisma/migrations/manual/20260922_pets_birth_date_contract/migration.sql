@@ -94,6 +94,9 @@ DECLARE
   has_age_category boolean;
   has_birth_date   boolean;
   age_is_nullable  boolean;
+  birth_is_expands boolean;
+  sentinel_count   bigint;
+  total_count      bigint;
   null_birth_dates bigint;
   archived_count   bigint;
   known_count      bigint;
@@ -125,18 +128,73 @@ BEGIN
                    'this file.';
   END IF;
 
-  -- The discriminator. Expand relaxes `age`; a hand-patched ADD COLUMN does not.
+  -- The discriminator: the marker expand stamps on the column it creates.
+  --
+  -- `COMMENT ON COLUMN "public"."pets"."birthDate" IS 'added by 20260922_pets_birth_date'` is
+  -- written by expand and cannot be produced by a hand `ALTER TABLE ... ADD COLUMN`, so it is
+  -- decisive about where these values came from. Expand's own rollback already keys off it before
+  -- dropping the column, for the same reason.
+  --
+  -- An earlier revision used `age`'s nullability instead, on the theory that expand relaxes it and
+  -- a hand-patch does not. `/code-review max` showed that is defeatable by following this repo's
+  -- own files in order: an operator stops the read storm with `ADD COLUMN birthDate ... DEFAULT
+  -- '2024-01-01'` plus `ALTER COLUMN age DROP NOT NULL` so creates work again, then runs expand,
+  -- which takes its `IF has_birth_date` no-op branch but still relaxes and marks `age` because that
+  -- block is "independent of the backfill". Both old signals then say "expand ran" while every
+  -- birthday is the sentinel — and the drop is irreversible. The marker is not satisfiable that
+  -- way, because expand only writes it on the branch that actually creates the column.
+  SELECT coalesce(col_description('"public"."pets"'::regclass, a.attnum), '')
+           LIKE 'added by 20260922_pets_birth_date%'
+    INTO birth_is_expands
+    FROM pg_attribute a
+   WHERE a.attrelid = '"public"."pets"'::regclass AND a.attname = 'birthDate';
+
+  IF birth_is_expands IS NOT TRUE THEN
+    RAISE EXCEPTION
+      'pets."birthDate" carries no marker from the expand migration, so these values were not derived from each animal''s age'
+      USING HINT =
+        'The column was most likely added by hand to stop the 42703 read storm, which means every '
+        'birthDate is the ''2024-01-01'' default. Dropping "age" now would make that permanent and '
+        'unrecoverable. Count them first: SELECT count(*) FILTER (WHERE "birthDate" = '
+        '''2024-01-01'') FROM pets; then drop both added columns, run '
+        'prisma/migrations/manual/20260922_pets_birth_date/migration.sql so the dates are derived '
+        'from the prose, and only then run this file.';
+  END IF;
+
+  -- Kept as a second, weaker signal. It cannot be the discriminator, but a table where expand
+  -- marked the column and yet left `age` NOT NULL is a state neither file produces, and stopping
+  -- is cheaper than guessing what happened.
   SELECT is_nullable = 'YES' INTO age_is_nullable
     FROM information_schema.columns
    WHERE table_schema='public' AND table_name='pets' AND column_name='age';
 
   IF has_age AND NOT age_is_nullable THEN
-    RAISE EXCEPTION '"birthDate" exists but "age" is still NOT NULL, so the expand migration did not run'
-      USING HINT = 'The column was most likely added by hand to stop the 42703 read storm, which '
-                   'means every birthDate is the ''2024-01-01'' default rather than a value derived '
-                   'from that animal''s age. Dropping "age" now would make that permanent. Check '
-                   'with: SELECT count(*) FILTER (WHERE "birthDate" = ''2024-01-01'') FROM pets; '
-                   'then null the column and run the expand migration to derive the dates properly.';
+    RAISE EXCEPTION
+      'pets."birthDate" is marked as expand''s, but "age" is still NOT NULL -- neither file leaves the table in that state'
+      USING HINT = 'Re-run prisma/migrations/manual/20260922_pets_birth_date/migration.sql, whose '
+                   'NOT NULL relaxation is idempotent, then run this file.';
+  END IF;
+
+  -- Actually run the sentinel count, rather than printing it in a hint and hoping. An earlier
+  -- revision put this query in a HINT on a refusal that the hand-patch path never reached, so the
+  -- one check capable of noticing "every birthday is the placeholder" was never executed on any
+  -- path. If every animal shares the schema default, that is the signature of a column filled in
+  -- by hand, whatever the markers say.
+  SELECT count(*) FILTER (WHERE "birthDate" = '2024-01-01'), count(*)
+    INTO sentinel_count, total_count
+    FROM "public"."pets";
+
+  IF total_count > 1 AND sentinel_count = total_count THEN
+    RAISE EXCEPTION
+      'all % pets rows carry birthDate ''2024-01-01'', the schema default -- these are placeholders, not derived birthdays', total_count
+      USING HINT = 'Dropping "age" now would destroy the only real record of these animals'' ages. '
+                   'Re-derive first with 20260922_pets_birth_date/migration.sql.';
+  END IF;
+
+  IF sentinel_count > 0 THEN
+    RAISE NOTICE
+      '% of % pets carry birthDate ''2024-01-01''. That is the schema default as well as a real date, so it is not conclusive -- check those rows against their "age" before continuing.',
+      sentinel_count, total_count;
   END IF;
 
   SELECT count(*) INTO null_birth_dates FROM "public"."pets" WHERE "birthDate" IS NULL;

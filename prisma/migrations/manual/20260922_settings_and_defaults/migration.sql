@@ -8,9 +8,27 @@
 -- destroys anything. Applying both, plus that folder's cleanup.sql, takes
 -- `npm run db:check-drift` to zero.
 --
--- Nothing here is urgent in the way the pet conversion is. These columns are all nullable or
--- defaulted, so the deployed client reads them as NULL and carries on; no write is failing on
--- their account. They are here so the drift has one answer rather than a remainder.
+-- **This is not inert, and an earlier version of this header said it was.** The claim was that the
+-- deployed client "reads them as NULL and carries on". It does not: `getServerSettingsAsync`
+-- (`src/lib/server/settingsRepository.ts:66`) runs `findUnique` with no `select`, so Postgres is
+-- asked for all seven of these columns on every settings read. While they are absent that read
+-- raises 42703, `handlePersistenceError(…, "read")` swallows it, and the repository returns the
+-- hard-coded `INITIAL_SETTINGS` fixture — the identical mechanism this branch documents for
+-- `pets`. So applying this file makes the read succeed, and the public site switches from the
+-- bundled fixture's shelter identity to whatever the production row holds: shelter name, phone,
+-- address, operating hours, announcement banner and the donation QR URLs.
+--
+-- That is a visible content change, and it is probably the change you want — the fixture is demo
+-- data — but it is not nothing, and it should not be applied in the belief that it is. **Read the
+-- row first:** `SELECT * FROM shelter_settings;`. If it holds placeholder or stale values, fix them
+-- in the same session, because the site starts serving them the moment this commits.
+--
+-- Note also that the three `DEFAULT` clauses backfill the existing singleton row with `'local'`,
+-- `'ap-southeast-1'` and the Resend sender rather than leaving it NULL, which is a weaker form of
+-- the same surprise. The values match `prisma/schema.prisma`, so they add no drift.
+--
+-- Found by `/code-review max`, 2026-10-14. Nothing here is urgent in the way the pet conversion
+-- is; it is here so the drift has one answer rather than a remainder.
 --
 -- Every `ADD COLUMN` is `IF NOT EXISTS` and every column is listed, not just the ones the
 -- 2026-09-18 measurement happened to print before its 160-character truncation. That is

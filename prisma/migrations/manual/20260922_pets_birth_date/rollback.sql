@@ -83,6 +83,37 @@ BEGIN
 
   LOCK TABLE "public"."pets" IN ACCESS EXCLUSIVE MODE;
 
+  -- Refuse the post-contract state outright, before anything else runs.
+  --
+  -- If `birthDate` is here and `age` is not, the contract half has already archived and dropped the
+  -- prose. Dropping `birthDate` now leaves every animal with NO age information of any kind: the
+  -- catalogue falls back to src/data/pets.json, and migration.sql can never be re-applied because
+  -- it has nothing left to derive from.
+  --
+  -- This is not hypothetical and it was the documented path. The contract's own rollback header
+  -- says "undoing the expand is 20260922_pets_birth_date/rollback.sql's job", so an operator
+  -- recovering from a bad conversion was being sent straight here. Reproduced on 2026-10-14 by
+  -- `/code-review max` and then by probe: expand, contract, then this file left `pets` carrying
+  -- none of age, ageCategory, birthDate or birthDateIsEstimate, raised no NOTICE, named no row, and
+  -- made migration.sql refuse. The stranded-row warning below could not fire, because it is gated
+  -- on `age` still existing.
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'pets' AND column_name = 'birthDate'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'pets' AND column_name = 'age'
+  ) THEN
+    RAISE EXCEPTION
+      'pets."age" is gone, so the contract half has already run; undoing expand now would leave every animal with no age at all'
+      USING HINT =
+        'Run prisma/migrations/manual/20260922_pets_birth_date_contract/rollback.sql first -- it '
+        'restores "age" and "ageCategory" verbatim from pets_age_archive_20260922 -- and only then '
+        'run this file. If that archive has already been dropped by its cleanup.sql then the prose '
+        'is gone for good and this file must not run: export "birthDate" first, because it is the '
+        'only record of these animals'' ages that still exists.';
+  END IF;
+
   -- Named before anything is dropped, because after the DROP there is nothing left to name them
   -- by. These are the rows that will have neither a birthday nor prose to derive one from, and
   -- each one of them will abort migration.sql until it is given an `age`.
@@ -117,13 +148,19 @@ BEGIN
     FROM pg_attribute a
    WHERE a.attrelid = '"public"."pets"'::regclass AND a.attname = 'birthDate';
 
+  -- RETURN, not ELSE. The NOT NULL restore below used to run even on this branch, because the
+  -- loop sat outside the IF/ELSE — so a file that had just announced "Nothing has been undone"
+  -- went on to re-tighten `age` to NOT NULL. The deployed release writes neither old column, so
+  -- that broke every pet creation with 23502 while telling the operator it had changed nothing.
+  -- Found by `/code-review max`, 2026-10-14. Now the message is literally true.
   IF mine IS NOT TRUE THEN
     RAISE NOTICE
-      'pets."birthDate" left in place: it carries no marker from 20260922_pets_birth_date, so this file did not create it and will not drop it. Nothing has been undone. Remove the columns by hand if that is really what you want, after exporting them.';
-  ELSE
-    ALTER TABLE "public"."pets" DROP COLUMN IF EXISTS "birthDate";
-    ALTER TABLE "public"."pets" DROP COLUMN IF EXISTS "birthDateIsEstimate";
+      'pets."birthDate" left in place: it carries no marker from 20260922_pets_birth_date, so this file did not create it and will not drop it. Nothing has been undone -- the NOT NULL restore is skipped with it, because re-tightening "age" against a release that never writes it would break every pet creation. Remove the columns by hand if that is really what you want, after exporting them.';
+    RETURN;
   END IF;
+
+  ALTER TABLE "public"."pets" DROP COLUMN IF EXISTS "birthDate";
+  ALTER TABLE "public"."pets" DROP COLUMN IF EXISTS "birthDateIsEstimate";
 
   FOREACH col IN ARRAY ARRAY['age', 'ageCategory'] LOOP
     CONTINUE WHEN NOT EXISTS (

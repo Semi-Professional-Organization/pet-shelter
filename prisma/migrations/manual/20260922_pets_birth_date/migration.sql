@@ -75,9 +75,16 @@
 --   For every row it writes, the stored birthDate is exactly what
 --   src/lib/domain/petAge.ts `approximateBirthDate(age, intakeDate)` computes.
 --
--- That is the property the contract migration depends on: it re-derives every row with the
--- app's own function and compares before it drops `age`, so a mismatch stops the drop instead
--- of discovering it afterwards. Two consequences follow, and both are deliberate.
+-- **Nothing downstream re-checks this, so the soak window is the check.** An earlier revision of
+-- the contract half did re-derive every row with the app's own function and compare before
+-- dropping `age`, and this paragraph used to promise that. It no longer does: carrying a second
+-- copy of the derivation meant two files owning one rule, and they had already drifted apart on
+-- month-end and leap-day rows, so the contract's copy was deleted. The contract now archives and
+-- drops without reading a single date. **A row this file reads differently from what the operator
+-- meant is therefore caught only by a human looking, between the two steps.** That is what the
+-- soak window is for; it is not optional, and the correction below is why it is being spelled out.
+--
+-- Two consequences follow from the invariant, and both are deliberate.
 --
 -- **Malay age words are refused, not translated.** `approximateBirthDate` matches only
 -- /(\d+)\s*y/ and /(\d+)\s*m/, so "2 tahun", "3 thn", "4 bulan" and "6 bln" match nothing

@@ -298,6 +298,16 @@ export async function updatePet(
     const updated: Pet = withDerivedAge({
       ...existing,
       ...validated,
+      // Assigned, not left to the spread. Dropping `.default(true)` from the schema stops an
+      // *absent* key clobbering a stored `false`, but zod keeps a key that is present and
+      // explicitly `undefined` — measured on zod 4.4.3: `parse({a: undefined})` yields an object
+      // where `'a' in out` is true. A Server Action argument is untrusted input, and `{...form,
+      // birthDateIsEstimate: maybeUndefined}` is the shape any spread produces, so the server
+      // needs the same fallback the client store already had. Without it a birthday someone
+      // verified silently goes back to "estimated", which is the one outcome this field exists to
+      // prevent.
+      birthDateIsEstimate:
+        validated.birthDateIsEstimate ?? existing.birthDateIsEstimate ?? true,
       // The submitted form is authoritative for rehabilitation progress: omitting the
       // fields clears them, so a cleared animal cannot keep a stale progress bar.
       rehabStage: validated.rehabStage,

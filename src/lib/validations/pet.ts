@@ -343,6 +343,25 @@ export const petFormSchema = petBaseFormSchema.superRefine((data, ctx) => {
     });
   }
 
+  // And a lower bound, because only half of the above was implemented at first. A mistyped year
+  // passed every other rule: `1899-07-04` satisfies the regex, the UTC round-trip, "not after
+  // intake" and "not in the future", and then renders as "127 years" on the public card and files
+  // the animal under `senior`. Measured: `0202-05-18` gives "1824 years". The data half of this
+  // same conversion already refuses exactly this — the expand migration rejects an age over 60
+  // years as "a typo or junk, not an animal" — so the form was the lenient end of a rule the SQL
+  // was enforcing. 60 years is well past any animal a shelter rehomes; the point is to catch a
+  // slipped digit, not to adjudicate longevity.
+  const earliestPlausible = new Date(Date.now() - 60 * 365.25 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  if (data.birthDate < earliestPlausible) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["birthDate"],
+      message: `Birth date ${data.birthDate} is more than 60 years ago`,
+    });
+  }
+
   if (isRehabilitationStatus(data.status)) return;
 
   for (const field of REHAB_FIELDS) {
