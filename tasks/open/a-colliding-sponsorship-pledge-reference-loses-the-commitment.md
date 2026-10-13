@@ -37,6 +37,25 @@ shared rather than copied: lift the predicate somewhere both ledgers already imp
 `donationLedger.ts`) and give `recordSponsorshipPledge` the same retry, leaving its foreign-key
 branch alone.
 
+## The error shape, measured — and a second reader that has it wrong
+
+Whoever writes this fix must not key on `meta.target`. On Prisma 7 with `@prisma/adapter-pg` a
+P2002 never carries it: the runtime builds the error as `{ driverAdapterError }`, and the violated
+columns sit at `meta.driverAdapterError.cause.constraint.fields`, parsed by the adapter from
+Postgres's `Key ("pledgeRef")=(...) already exists` detail line (so a mixed-case column arrives
+with its quotes on). Read on 2026-10-13 from `node_modules/@prisma/client/runtime/client.js` and
+`node_modules/@prisma/adapter-pg/dist/index.js`. `uniqueViolationColumns` in
+`src/lib/server/donationPledgeLedger.ts` reads both shapes and is the thing to lift and share.
+
+The gift lane's own predicate had this wrong for two commits — it discriminated on `meta.target`,
+so its column guard was dead code and its tests passed on a fabricated error object.
+
+**`isReferenceCodeCollision` in `src/actions/applications.ts` has the same mistake and is live.**
+It reads only `meta.target`, so on this stack it always sees an empty string, returns `false`, and
+`insertWithUniqueReferenceCode` never retries: a colliding adoption reference code surfaces as a
+write failure instead of being redrawn. Read from the source, not observed against a database —
+Tier 3b could not run here — so treat it as a strong belief and probe it first.
+
 ## Settles when
 
 A P2002 on `pet_sponsorships.pledgeRef` redraws the reference and keeps the commitment, with a

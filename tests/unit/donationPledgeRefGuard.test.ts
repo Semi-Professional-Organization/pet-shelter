@@ -243,3 +243,81 @@ describe("the collision predicate survives every shape the error arrives in", ()
     expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * The shape Prisma 7 with `@prisma/adapter-pg` actually raises.
+ *
+ * Every case above fabricates `meta.target`, which this client never sets: the
+ * runtime wraps the adapter's error as `{ driverAdapterError }` and the columns
+ * sit at `driverAdapterError.cause.constraint.fields`, parsed from Postgres's
+ * `Key ("pledgeRef")=(...) already exists` detail. A review found the predicate
+ * discriminating on the key that is never there, so its column guard was dead
+ * code and the suite was green on a fiction. These are the cases that would have
+ * failed.
+ */
+function adapterViolation(fields: string[] | undefined) {
+  return Object.assign(new Error("Unique constraint failed"), {
+    code: "P2002",
+    meta: {
+      modelName: "DonationPledge",
+      driverAdapterError: {
+        cause: {
+          kind: "UniqueConstraintViolation",
+          constraint: fields === undefined ? undefined : { fields },
+        },
+      },
+    },
+  });
+}
+
+describe("the collision predicate reads the driver adapter's own error shape", () => {
+  it("retries when the adapter names pledgeRef, quoted as Postgres prints it", async () => {
+    const { recordDonationPledge } = await import("@/lib/server/donationPledgeLedger");
+
+    prismaDouble.donationPledge.create
+      .mockRejectedValueOnce(adapterViolation(['"pledgeRef"']))
+      .mockImplementationOnce(async (args: { data: { pledgeRef: string } }) =>
+        pledgeRow(args.data.pledgeRef)
+      );
+
+    const record = await recordDonationPledge(DRAFT);
+
+    expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
+    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+  });
+
+  it("refuses to retry when the adapter names receiptNumber", async () => {
+    const { recordDonationPledge, DonationPledgeWriteError } = await import(
+      "@/lib/server/donationPledgeLedger"
+    );
+
+    // The guard that was dead code: on the real shape, a receiptNumber collision
+    // used to fall into the "no target" branch and be retried.
+    prismaDouble.donationPledge.create.mockRejectedValue(
+      adapterViolation(['"receiptNumber"'])
+    );
+
+    await expect(recordDonationPledge(DRAFT)).rejects.toBeInstanceOf(
+      DonationPledgeWriteError
+    );
+    expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries when the error names no column at all", async () => {
+    const { recordDonationPledge } = await import("@/lib/server/donationPledgeLedger");
+
+    // The adapter leaves `constraint` undefined when Postgres sends no detail
+    // line. The insert never sets receiptNumber, so the reference is the only
+    // unique this statement can violate, and refusing would lose the gift.
+    prismaDouble.donationPledge.create
+      .mockRejectedValueOnce(adapterViolation(undefined))
+      .mockImplementationOnce(async (args: { data: { pledgeRef: string } }) =>
+        pledgeRow(args.data.pledgeRef)
+      );
+
+    const record = await recordDonationPledge(DRAFT);
+
+    expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
+    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+  });
+});

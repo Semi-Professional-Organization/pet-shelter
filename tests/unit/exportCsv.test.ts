@@ -3,6 +3,7 @@ import { LHDN_TAX_DEDUCTIBLE_REF, STATUTORY_ROS_REGISTRATION_NO } from "@/lib/do
 import {
   formatCsvField,
   generateReceiptsCsvString,
+  resolveAuditAmountMYR,
   generateAuditLogsCsvString,
   generateApplicationsCsvString,
   generatePetsCsvString,
@@ -214,6 +215,11 @@ describe("Applications and Pets CSV Generators", () => {
  * here rather than on a document somebody files.
  */
 describe("a reconciled contribution's audit row exports every column it can fill", () => {
+  /** The "Amount (MYR)" cell of the first data row, exactly as written. */
+  function amountCell(csv: string): string {
+    return csv.split("\r\n")[1].split(",")[6];
+  }
+
   function reconciledSponsorship(details: Record<string, unknown>): AuditEntry {
     return {
       id: "audit-spn-1",
@@ -291,6 +297,60 @@ describe("a reconciled contribution's audit row exports every column it can fill
     ]);
 
     expect(csv).toContain('"HFS-DON-202609-0008"');
-    expect(csv).not.toContain('"0.00"');
+    // The cell itself, not merely the absence of one spelling of zero: "NaN",
+    // "undefined" and "0" would all have passed a `not.toContain('"0.00"')`.
+    expect(amountCell(csv)).toBe('""');
+  });
+
+  it("reads an amount stored as text, and prefers the exact sen when both are present", () => {
+    // Details round-trip through JSON, so a backfill can leave either key as a
+    // string. And a row carrying both must print the sen, which is the integer
+    // every ledger stores; `amountMYR` is a float derived from it.
+    expect(
+      amountCell(
+        generateReceiptsCsvString([
+          reconciledSponsorship({ receiptNumber: "HFS-DON-202609-0009", amountSen: "8000" }),
+        ])
+      )
+    ).toBe('"80.00"');
+
+    expect(
+      amountCell(
+        generateReceiptsCsvString([
+          reconciledSponsorship({
+            receiptNumber: "HFS-DON-202609-0010",
+            amountSen: 8000,
+            amountMYR: 79.99,
+          }),
+        ])
+      )
+    ).toBe('"80.00"');
+  });
+
+  it("does not let an empty or non-numeric amountMYR mask the sen beside it", () => {
+    for (const amountMYR of ["", "not a number", Number.NaN]) {
+      expect(
+        amountCell(
+          generateReceiptsCsvString([
+            reconciledSponsorship({
+              receiptNumber: "HFS-DON-202609-0011",
+              amountMYR,
+              amountSen: 8000,
+            }),
+          ])
+        )
+      ).toBe('"80.00"');
+    }
+  });
+});
+
+describe("resolveAuditAmountMYR is the one answer both readers share", () => {
+  it("resolves sen, then ringgit, then nothing", () => {
+    expect(resolveAuditAmountMYR({ amountSen: 12345 })).toBe(123.45);
+    expect(resolveAuditAmountMYR({ amountMYR: 50 })).toBe(50);
+    expect(resolveAuditAmountMYR({ amountMYR: "50" })).toBe(50);
+    expect(resolveAuditAmountMYR({})).toBeUndefined();
+    expect(resolveAuditAmountMYR({ amountMYR: "", amountSen: null })).toBeUndefined();
+    expect(resolveAuditAmountMYR({ amountMYR: Number.NaN })).toBeUndefined();
   });
 });

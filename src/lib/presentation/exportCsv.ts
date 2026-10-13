@@ -180,6 +180,37 @@ export function exportPetsToCsv(pets: Pet[], filenamePrefix = "hope-for-strays-p
   triggerCsvDownload(csvContent, `${filenamePrefix}-${timestamp}.csv`);
 }
 
+/** A finite number from a number or a numeric string; `undefined` otherwise. */
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * The ringgit amount an audit row's details record, or `undefined` if it holds none.
+ *
+ * One resolver for every reader of these rows. The CSV exporter and the audit
+ * viewer each used to read `details.amountMYR` on their own, and reconciled
+ * sponsorships have never carried that key in their history — so both showed
+ * nothing, and fixing the exporter alone left the two disagreeing about the same
+ * row on the same screen.
+ *
+ * `amountSen` first: it is the exact integer every ledger stores, and `amountMYR`
+ * is a float derived from it, so when a row carries both the sen is the one to
+ * trust. Numeric strings are accepted because the details round-trip through JSON
+ * and a backfill can leave either key as text. `""`, `NaN` and anything else
+ * resolve to `undefined` — which callers must render as *unknown*, never as zero.
+ */
+export function resolveAuditAmountMYR(details: Record<string, unknown>): number | undefined {
+  const sen = toFiniteNumber(details.amountSen);
+  if (sen !== undefined) return sen / 100;
+  return toFiniteNumber(details.amountMYR);
+}
+
 /**
  * Generates an RFC-4180 formatted CSV string of official donation receipts
  * tailored for Malaysian LHDN Section 44(6) tax reporting and internal accounting.
@@ -237,28 +268,13 @@ export function generateReceiptsCsvString(
         Boolean(d.receiptNumber);
 
       if (isDonation) {
-        // `amountMYR` first, then the exact sen every other reader stores.
+        // Resolved by `resolveAuditAmountMYR`, shared with the audit viewer.
         //
-        // Reconciled sponsorships have always carried `amountSen`/`amountDisplay`
-        // and never `amountMYR`, and this is the only amount key this exporter
-        // used to read — so those rows printed "0.00" on a document filed with
-        // LHDN, beside a real receipt number and a real supporter. Rows written
-        // before 2026-09-22 still carry only `amountSen`, and no change to what is
-        // written from now on can retrofit them, so the fallback is what makes the
-        // existing audit history exportable rather than merely the next row.
-        //
-        // An absent amount yields an empty cell, never `0.00`. The old default
-        // made "we do not know what this was" indistinguishable from "this was
-        // nothing", which on a tax return is the more dangerous of the two.
-        const rawAmount =
-          (d.amountMYR as number | string | undefined) ??
-          (typeof d.amountSen === "number" ? d.amountSen / 100 : undefined);
-        const formattedAmount =
-          rawAmount === undefined
-            ? ""
-            : typeof rawAmount === "number"
-              ? rawAmount.toFixed(2)
-              : String(rawAmount);
+        // An unresolvable amount yields an empty cell, never `0.00`. The old
+        // `?? 0` made "we do not know what this was" indistinguishable from "this
+        // was nothing", which on a tax return is the more dangerous of the two.
+        const amountMYR = resolveAuditAmountMYR(d);
+        const formattedAmount = amountMYR === undefined ? "" : amountMYR.toFixed(2);
 
         const formattedDate = entry.createdAt.includes("T")
           ? entry.createdAt.replace("T", " ").slice(0, 19)

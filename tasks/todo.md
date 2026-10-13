@@ -147,6 +147,25 @@ A third `/code-review high`, over the second fix commit, returned four more:
 4. A collision case was added to the Postgres suite, since that tier is the only place the *real*
    P2002 shape is observable — still unrun here.
 
+A fourth and a fifth round followed, each over the previous round's fix commit:
+
+- **Round four** found that the amount fix reached only rows written from then on: every
+  reconciled sponsorship already in audit history carries `amountSen` and no `amountMYR`, so they
+  still exported RM 0.00. The exporter now reads the sen, and an unknowable amount is an empty
+  cell rather than a claimed zero. It also filed two pre-existing defects as open entries — the
+  sponsorship lane's identical reference collision, and the two lanes disagreeing about an NRIC
+  in the audit row.
+- **Round five** found the collision predicate keyed on a field this client never sets. On Prisma
+  7 with `@prisma/adapter-pg` a P2002 has no `meta.target`; the columns are at
+  `meta.driverAdapterError.cause.constraint.fields`. So the `receiptNumber` guard was dead code
+  and its tests passed on a fabricated error. `uniqueViolationColumns` now reads the real shape,
+  with tests on it, one of which was confirmed to fail against the old code. The audit viewer and
+  the CSV exporter also now share one amount resolver, which prefers the exact sen.
+
+Not fixed from round five, and why: a receipted row whose amount cannot be resolved is still
+exported, with an empty amount cell and no operator notice. Dropping a receipted row from a tax
+export is worse than showing it incomplete, and a notice is a UI change to `useAuditLogController`.
+
 ### Deliberately not done
 
 - **No payment webhook.** The open entry offered it as the other fork. There is no processor
