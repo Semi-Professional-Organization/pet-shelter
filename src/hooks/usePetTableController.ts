@@ -5,6 +5,7 @@ import { Pet } from "@/types/pet";
 import { PetFormInput } from "@/lib/validations/pet";
 import type { PhotoNotificationOptions } from "@/actions/pets";
 import { usePetStore } from "@/lib/client/petStore";
+import { withDerivedAge } from "@/lib/domain/petAge";
 import { matchesAdminPetFilters, scopeByArchiveFilter } from "@/lib/presentation/adminPetFilters";
 import { buildPetStatusFilterOptions } from "@/lib/presentation/petStatusPresentation";
 import { exportPetsToCsv } from "@/lib/presentation/exportCsv";
@@ -96,7 +97,17 @@ export function usePetTableController(initialPets?: (Pet & { applicationCount?: 
       updatePet(editingPet.id, data);
       setLocalPets((prev) => {
         const base = prev || pets;
-        return base.map((p) => (p.id === editingPet.id ? { ...p, ...data } : p));
+        // `withDerivedAge`, not a bare spread. `data` is a `PetFormInput`, which used to carry
+        // `age` and `ageCategory` and so overwrote the row's copies; now it carries `birthDate`
+        // instead and neither of them, so a bare spread leaves last render's age beside the new
+        // birthday — "8 years" next to a 2025 birth date, until the page is reloaded. `localPets`
+        // shadows the correctly-derived store value for the rest of the session and nothing here
+        // calls `router.refresh()`, so the action's `revalidatePath` cannot replace it; the Age
+        // column sorts by it and the CSV export writes it. The create branch below already went
+        // through `withDerivedAge` via `addPet`.
+        return base.map((p) =>
+          p.id === editingPet.id ? withDerivedAge({ ...p, ...data }) : p
+        );
       });
 
       const rollback = (errorMessage: string) => {

@@ -22,7 +22,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, X, Loader2, Star, Eye, Send } from "lucide-react";
 import type { PhotoNotificationOptions } from "@/actions/pets";
-import { AGE_BANDS, formatAgeBandRange } from "@/lib/domain/petAge";
+import {
+  AGE_BANDS,
+  computeAgeCategory,
+  formatAgeBandRange,
+  formatAgeString,
+} from "@/lib/domain/petAge";
 
 /** Admin UI is English-only; the year range beside each name comes from the domain (PS-114). */
 const ADMIN_AGE_BAND_NAMES: Record<(typeof AGE_BANDS)[number], string> = {
@@ -66,8 +71,8 @@ export function PetFormDialog({
       name: "",
       species: "dog",
       breed: "",
-      age: "",
-      ageCategory: "adult",
+      birthDate: "",
+      birthDateIsEstimate: true,
       gender: "Male",
       size: "Medium",
       weight: "15 kg",
@@ -106,8 +111,10 @@ export function PetFormDialog({
         name: editingPet.name,
         species: editingPet.species,
         breed: editingPet.breed,
-        age: editingPet.age,
-        ageCategory: editingPet.ageCategory,
+        // `birthDate` is always present on a mapped pet — `mapDbPetToPet` derives one for legacy
+        // rows — so the field opens with the stored value rather than blank.
+        birthDate: editingPet.birthDate ?? "",
+        birthDateIsEstimate: editingPet.birthDateIsEstimate ?? true,
         gender: editingPet.gender,
         size: editingPet.size,
         weight: editingPet.weight,
@@ -152,8 +159,8 @@ export function PetFormDialog({
         name: "",
         species: "dog",
         breed: "",
-        age: "",
-        ageCategory: "adult",
+        birthDate: "",
+        birthDateIsEstimate: true,
         gender: "Male",
         size: "Medium",
         weight: "15 kg",
@@ -205,6 +212,45 @@ export function PetFormDialog({
   const statusField = register("status");
   const watchedStatus = watch("status");
   const isUnderRehabilitation = isRehabilitationStatus(watchedStatus);
+
+  const watchedBirthDate = watch("birthDate");
+  const watchedIntakeDate = watch("intakeDate");
+
+  /**
+   * The age and band the site will show for this animal, recomputed as the operator types.
+   *
+   * Shown rather than stored. `mapDbPetToPet` derives both from `birthDate` on every read, so
+   * anything stored here would only ever be a second opinion that goes stale — which is exactly
+   * how a typed "2 years" used to drift a year per year away from the displayed age.
+   */
+  /**
+   * Upper bound for the date picker: the intake date, except when the animal already carries a
+   * later one.
+   *
+   * Without that exception a row whose stored birthday is out of range — the shape that
+   * `@default("2024-01-01")` produces for anything that arrived before 2024 — is refused by the
+   * browser on `rangeOverflow` before the resolver ever runs, and a `rangeOverflow` never reaches
+   * `errors.birthDate`. The operator gets a native bubble and no in-page explanation.
+   *
+   * This does not make such a record savable as-is, and an earlier version of this comment
+   * claimed it did. `petFormSchema` still rejects `birthDate > intakeDate`, so the save is still
+   * blocked — but now by the schema, with the reason rendered under the field, and with the
+   * picker willing to show the offending date so it can be corrected in the same form. The gain
+   * is a legible refusal and a path to fix it, not permission to keep it.
+   */
+  const birthDateMax = useMemo(() => {
+    if (!watchedIntakeDate) return undefined;
+    const stored = editingPet?.birthDate;
+    return stored && stored > watchedIntakeDate ? stored : watchedIntakeDate;
+  }, [watchedIntakeDate, editingPet?.birthDate]);
+
+  const derivedAge = useMemo(() => {
+    if (!watchedBirthDate || !/^\d{4}-\d{2}-\d{2}$/.test(watchedBirthDate)) return null;
+    return {
+      age: formatAgeString(watchedBirthDate).en,
+      band: computeAgeCategory(watchedBirthDate),
+    };
+  }, [watchedBirthDate]);
 
   const allowedStatusOptions = useMemo(() => {
     if (editingPet?.status) {
@@ -310,23 +356,46 @@ export function PetFormDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="age" className="text-sm font-semibold">Age (Text) *</Label>
-                <Input id="age" placeholder="e.g. 2 years" className="text-sm py-2" {...register("age")} />
+                <Label htmlFor="birthDate" className="text-sm font-semibold">Birth Date *</Label>
+                <Input
+                  id="birthDate"
+                  type="date"
+                  max={birthDateMax}
+                  className="text-sm py-2"
+                  {...register("birthDate")}
+                />
+                {errors.birthDate && (
+                  <p className="text-xs text-destructive">{errors.birthDate.message}</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="ageCategory" className="text-sm font-semibold">Age Stage *</Label>
-                <select
-                  id="ageCategory"
-                  {...register("ageCategory")}
-                  className="w-full bg-background border border-input px-3 py-2 text-sm text-foreground"
+                <Label id="ageStageLabel" className="text-sm font-semibold">Age Stage</Label>
+                {/* Read-only on purpose. Both values are computed from the birth date by the
+                    domain, and the whole point of PS-114 was that a separately stored band and a
+                    separately typed age string went stale while the animal kept ageing.
+                    Not a form control, so the label above cannot use htmlFor; aria-labelledby is
+                    what stops a screen reader announcing the value with no name. */}
+                <div
+                  aria-labelledby="ageStageLabel"
+                  role="status"
+                  className="w-full border border-input bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
                 >
-                  {AGE_BANDS.map((band) => (
-                    <option key={band} value={band}>
-                      {`${ADMIN_AGE_BAND_NAMES[band]} (${formatAgeBandRange(band)})`}
-                    </option>
-                  ))}
-                </select>
+                  {derivedAge
+                    ? `${derivedAge.age} — ${ADMIN_AGE_BAND_NAMES[derivedAge.band]} (${formatAgeBandRange(derivedAge.band)})`
+                    : "Enter a birth date"}
+                </div>
+                <div className="flex items-center gap-2.5 pt-0.5">
+                  <input
+                    type="checkbox"
+                    id="birthDateIsEstimate"
+                    {...register("birthDateIsEstimate")}
+                    className="size-4.5 accent-foreground"
+                  />
+                  <Label htmlFor="birthDateIsEstimate" className="text-xs font-medium cursor-pointer">
+                    Estimated — exact date unknown
+                  </Label>
+                </div>
               </div>
 
               <div className="space-y-1.5">

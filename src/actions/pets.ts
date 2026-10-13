@@ -9,6 +9,7 @@ import {
 } from "@/lib/validations/pet";
 import { Pet } from "@/types/pet";
 import { normalizePetStatus } from "@/lib/domain/stateMachine";
+import { withDerivedAge } from "@/lib/domain/petAge";
 import { matchesPetSearch } from "@/lib/domain/petSearch";
 import { getVerifiedSession } from "@/lib/security/dal";
 import { AdminPrincipal, verifyAdminSession } from "@/lib/security/adminSession";
@@ -182,13 +183,17 @@ export async function createPet(
     const actor = await getAdminActorOrThrow();
     const validated = petFormSchema.parse(data);
 
-    const newPet: Pet = {
+    // `age` and `ageCategory` are derived, never submitted: the form now collects the birthday,
+    // and `withDerivedAge` is the single place either is computed from it.
+    const newPet: Pet = withDerivedAge({
       id: `pet-${Date.now()}`,
       name: validated.name,
       species: validated.species,
       breed: validated.breed,
-      age: validated.age,
-      ageCategory: validated.ageCategory,
+      birthDate: validated.birthDate,
+      // A new animal whose intake form said nothing about how the birthday was established is an
+      // estimate. The schema no longer defaults this, so the create path states it.
+      birthDateIsEstimate: validated.birthDateIsEstimate ?? true,
       gender: validated.gender,
       size: validated.size,
       weight: validated.weight,
@@ -221,7 +226,7 @@ export async function createPet(
         goodWithKids: validated.goodWithKids,
         energyLevel: validated.energyLevel,
       },
-    };
+    });
 
     await insertServerPet(newPet, actor);
 
@@ -287,9 +292,22 @@ export async function updatePet(
     const storedGallery = wantsNotification ? await getStoredGalleryImages(id) : null;
     const previousGallery = storedGallery ?? [...(existing.galleryImages || [])];
 
-    const updated: Pet = {
+    // Wrapped, not spread: `existing` still carries the `age` and `ageCategory` the previous read
+    // derived, and a submitted birthday must re-derive both rather than leave last read's prose in
+    // place. `withDerivedAge` recomputes them from whatever `birthDate` ends up on the object.
+    const updated: Pet = withDerivedAge({
       ...existing,
       ...validated,
+      // Assigned, not left to the spread. Dropping `.default(true)` from the schema stops an
+      // *absent* key clobbering a stored `false`, but zod keeps a key that is present and
+      // explicitly `undefined` — measured on zod 4.4.3: `parse({a: undefined})` yields an object
+      // where `'a' in out` is true. A Server Action argument is untrusted input, and `{...form,
+      // birthDateIsEstimate: maybeUndefined}` is the shape any spread produces, so the server
+      // needs the same fallback the client store already had. Without it a birthday someone
+      // verified silently goes back to "estimated", which is the one outcome this field exists to
+      // prevent.
+      birthDateIsEstimate:
+        validated.birthDateIsEstimate ?? existing.birthDateIsEstimate ?? true,
       // The submitted form is authoritative for rehabilitation progress: omitting the
       // fields clears them, so a cleared animal cannot keep a stale progress bar.
       rehabStage: validated.rehabStage,
@@ -316,7 +334,7 @@ export async function updatePet(
         goodWithKids: validated.goodWithKids,
         energyLevel: validated.energyLevel,
       },
-    };
+    });
 
     await updateServerPet(id, updated, actor);
 

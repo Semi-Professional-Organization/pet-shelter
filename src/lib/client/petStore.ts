@@ -55,13 +55,15 @@ export function usePetStore() {
 
   const addPet = useCallback(
     (input: PetFormInput): Pet => {
-      const newPet: Pet = {
+      // Derived here for the same reason the server action derives: the form submits a birthday,
+      // and storing prose alongside it would let the two disagree the moment the calendar moved.
+      const newPet: Pet = withDerivedAge({
         id: `pet-${Date.now()}`,
         name: input.name,
         species: input.species,
         breed: input.breed,
-        age: input.age,
-        ageCategory: input.ageCategory,
+        birthDate: input.birthDate,
+        birthDateIsEstimate: input.birthDateIsEstimate ?? true,
         gender: input.gender,
         size: input.size,
         weight: input.weight,
@@ -92,7 +94,7 @@ export function usePetStore() {
           goodWithKids: input.goodWithKids ?? true,
           energyLevel: input.energyLevel || "Moderate",
         },
-      };
+      });
 
       const updated = [newPet, ...pets];
       savePets(updated);
@@ -106,13 +108,15 @@ export function usePetStore() {
       const index = pets.findIndex((p) => p.id === id);
       if (index === -1) return null;
 
-      const updatedPet: Pet = {
+      const updatedPet: Pet = withDerivedAge({
         ...pets[index],
         name: input.name,
         species: input.species,
         breed: input.breed,
-        age: input.age,
-        ageCategory: input.ageCategory,
+        birthDate: input.birthDate,
+        // Falls back to what is stored, not to `true`: an edit that does not mention the flag must
+        // not demote a birthday someone knew. Only a genuinely new record defaults to "estimated".
+        birthDateIsEstimate: input.birthDateIsEstimate ?? pets[index].birthDateIsEstimate ?? true,
         gender: input.gender,
         size: input.size,
         weight: input.weight,
@@ -145,7 +149,7 @@ export function usePetStore() {
           goodWithKids: input.goodWithKids ?? true,
           energyLevel: input.energyLevel || "Moderate",
         },
-      };
+      });
 
       const updated = [...pets];
       updated[index] = updatedPet;
