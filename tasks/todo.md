@@ -127,6 +127,65 @@ other branch adversarially found two real defects in this one, because its edge-
   `db:check-drift` will report one statement. Said out loud rather than hidden.
 - **No e2e coverage added.** `e2e/pages/AdminPetsPage.ts` has no field fillers and the pet
   lifecycle spec never opens the form; building that out is its own task.
+# An approval marks the id it asks for
+
+**Branch:** `worktree-pet-mirror-ordering` · opened 2026-09-22 · ROUTINE lane
+**Closes:** `tasks/open/a-public-post-can-reorder-the-pet-mirror.md` — filed by
+`worktree-adoption-submit-guards`, landed on master with PR #93, deleted by the merge commit on
+this branch. It was deliberately left undeleted in #93: that PR does not fix the ordering, and
+closing a live defect's public issue with nothing on master behind it is worse than the
+duplication.
+
+## Items
+
+- [x] Ownership check before starting, because the defect was handed over rather than found here:
+      no open PR (#93, #94, #42) touches `petRepository.ts`, `applicationRepository.ts` or
+      `persistenceMode.ts`, and the filing session said explicitly it left the file alone.
+- [x] Reproduced before fixing. Two `Bella`s in the mirror, the decoy read once through the
+      public path, and `markCachedPetAdopted("itest-bella-asked-for", "Bella")` returned
+      `itest-bella-decoy`.
+- [x] Fix: try the id against the whole array before the name is tried at all. Three lines.
+- [x] `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`, 6 tests. `markCachedPetAdopted`
+      had **no test referencing it at all** before this.
+- [x] Reverted a `trim()` that crept into the name comparison — widening how names match is a
+      different question from which identifier wins.
+- [x] Corrected the "cosmetic" claim in the previous stream's decision entry, as a new dated
+      entry naming it rather than a rewrite.
+
+## Review
+
+**The defect was found by a reviewer on someone else's branch, reviewing my change.** That is the
+part worth recording. `tasks/open/pet-profile-falls-back-to-a-fixture-the-database-lacks.md` had
+called the mirror reordering cosmetic; I carried that judgement forward into the decision entry
+that settled it, unchecked, and it reached a public GitHub issue and a docstring. The adoption
+session then grepped for readers of `serverPets` and found one that turns the reordering into a
+wrong audit row.
+
+The audit row is what makes it serious, and I had not looked at the caller.
+`atomicUpdateApplicationStatus` writes the returned pet's id into
+`PET_STATUS_TRANSITION_ADOPTED`, so a wrong match is a permanent wrong record rather than a cache
+entry the next hydrate repairs.
+
+**Deliberately not done:**
+
+- **The read still reorders the mirror.** The open entry offered that as an alternative repair. It
+  is load-bearing — during an outage that array *is* the catalogue, and recency-first is what
+  lets a recently viewed animal survive — and it would not have fixed the defect, since two
+  same-named animals with no id match are still resolved by position. Reasoned out in the
+  decision entry rather than left implicit.
+- **The residual is stated rather than filed**, and narrower than this list first claimed. With
+  **no** `petId` at all and two animals sharing a name, order still decides. An *unmatched*
+  supplied id no longer falls back at all — it returns null, pinned by
+  `approvalMarksTheAnimalItAsksFor.test.ts` — so saying "empty or unmatched" overstated it and
+  contradicted the decision entry, which is the file a later session trusts. No action closes
+  what is left short of refusing ambiguous name matches, which breaks the legacy applications
+  the fallback exists for.
+- **P2003 not touched.** The same session suggested `handlePersistenceError` treat Prisma's
+  foreign-key violation like its unique violation — always rethrow — so an adoption application
+  cannot be accepted, given a reference code, and then silently lost. The analysis is in their
+  entry and my assessment went back to them; it is a change to *every* repository write, and
+  mixing it with a three-line cache fix would make both harder to review. It stays theirs.
+
 # Adoption submissions validate their target animal
 
 **Branch:** `worktree-adoption-submit-guards` · opened 2026-09-22 · base `8d36ace`
