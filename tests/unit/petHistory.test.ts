@@ -280,8 +280,10 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
     name: "Tuah",
     species: "dog" as const,
     breed: "Malaysian Local Mixed",
-    age: "1 year",
-    ageCategory: "young" as const,
+    // Was `age: "1 year"` plus a hand-picked band, until the form began collecting the birthday
+    // and deriving both. One year before this animal's intake date.
+    birthDate: "2025-06-02",
+    birthDateIsEstimate: true,
     gender: "Male" as const,
     size: "Medium" as const,
     weight: "14 kg",
