@@ -40,7 +40,8 @@ import {
   combineInterviewDateTime,
   splitInterviewDateTime,
 } from "@/lib/domain/applicationWorkflow";
-import { findServerPetById } from "@/lib/server/petRepository";
+import { findServerPetById, findServerPetByIdAsync } from "@/lib/server/petRepository";
+import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
 import {
   sendApplicationConfirmationEmail,
   sendStaffApplicationAlert,
@@ -104,15 +105,6 @@ export async function submitApplication(
   try {
     const validated = applicationFormSchema.parse(data);
 
-    // Verify target pet exists and is not archived
-    const pet = findServerPetById(validated.petId);
-    if (pet && pet.isArchived) {
-      return {
-        success: false,
-        error: "This animal is currently archived and is no longer accepting new adoption applications.",
-      };
-    }
-
     // 1. Rate limiting — two independent budgets, neither keyed on the other's input.
     // The address budget is the one that actually bounds an attacker; the email
     // budget bounds spam against one mailbox but is trivially bypassed by varying
@@ -132,14 +124,111 @@ export async function submitApplication(
       };
     }
 
-    // 2. Idempotency Wrapper
+    // 2. The target animal: it must exist, not be archived, and be adoptable.
+    //
+    // The first two lines are `getPetById`'s guard in `src/actions/pets.ts`, deliberately
+    // identical, and **that comment is the long form of both** — not restated here, so the two
+    // copies cannot drift into disagreeing explanations of the same three lines. This is the
+    // second site carrying it; a third wants `findVisiblePetById` in the repository instead.
+    //
+    // Placed after the rate limits on purpose. This is a database query on an unauthenticated
+    // POST; the mirror read it replaces was free, so leaving it above the budgets would hand
+    // an anonymous caller one `findUnique` per request with nothing bounding it.
+    //
+    // The exact-id comparison is **not** redundant, though what it covers narrowed when
+    // `findServerPetByIdAsync` began returning null after a successful empty read (#89). Where the
+    // database answers, a case-variant is now simply not found. Where it does not — no database
+    // configured, or a read that threw and was swallowed — the mirror still answers, and its
+    // lookup lowercases while Postgres does not, so `PET-001` resolves to fixture `pet-001`,
+    // Available and unarchived there. That is the one route left to this comparison, and it is
+    // load-bearing on it: deleting the comparison leaves the strict-mode suite entirely green.
+    // `tests/integration/adoptionSubmissionGuards.test.ts` covers it on the mirror route for
+    // exactly that reason.
+    //
+    // What none of this closes: on those same mirror routes the fixture answers under the very id
+    // posted, so the comparison cannot fire and `isArchived`/`status` are read off `pets.json`.
+    // The application is then written against an id the `Pet` table does not hold, the insert
+    // raises P2003, `insertServerApplication` swallows it, and the applicant is returned
+    // `success: true` with a reference code for a row that reached no database. So: checked
+    // against the database whenever the database answers, and silently fixture-backed when it
+    // cannot — `tasks/open/an-application-can-succeed-against-no-database-row.md`, alongside
+    // `tasks/open/an-outage-serves-and-bills-fixture-animals.md`, which is the same route costing
+    // the sponsorship path money.
+    const requestedPetId = validated.petId.trim();
+    const pet = await findServerPetByIdAsync(requestedPetId);
+    if (!pet || pet.id !== requestedPetId) {
+      // The comment above the old check said "verify target pet exists"; the code read
+      // `pet && pet.isArchived`, which skipped the check entirely when nothing matched, so any
+      // id the mirror did not hold — including one that exists nowhere — was accepted.
+      return {
+        success: false,
+        error: "We could not find that animal. Please choose one from the adoption gallery and try again.",
+      };
+    }
+    if (pet.isArchived) {
+      return {
+        success: false,
+        error: "This animal is currently archived and is no longer accepting new adoption applications.",
+      };
+    }
+    const presentation = getPetStatusPresentation(pet.status);
+    if (!presentation.isAdoptable) {
+      // `isAdoptable` rather than a status comparison here, so this agrees with the gallery's
+      // preselect and the detail page's button by construction. It is true for `Available`
+      // alone: `Pending` is a stage of the adoption track whose button already renders
+      // disabled, and that is the product call recorded in
+      // `tasks/decisions/2026-09-10-pending-is-a-stage-of-adoption-not-a-track.md`.
+      //
+      // This check is only as good as the status it is handed, and on the database route that is
+      // **fail-open, not fail-closed**. `getPetStatusPresentation` does fall back to the `pending`
+      // presentation for a value it does not know, but nothing unknown reaches it from a database
+      // read: `fromDbPetStatus` matches four exact, case-sensitive spellings and returns
+      // `"Available"` for everything else, so a column holding `adopted` or `ADOPTED` arrives here
+      // as Available and this guard lets it through — the animal it was written to refuse. That
+      // matters because the production branch has held `Pet.status` as text rather than the
+      // `PetStatus` enum. Not fixed here: the default lives in a mapper every pet read goes
+      // through, so changing it is a catalogue-wide behaviour change, not a line in this action.
+      // `tasks/open/an-unknown-pet-status-reads-as-available.md`.
+      return {
+        success: false,
+        error: `${pet.name} is not currently accepting adoption applications (${presentation.labelFallback}).`,
+      };
+    }
+
+    // 3. Idempotency Wrapper
     return await withIdempotency(idempotencyKey, async () => {
       const today = new Date().toISOString().split("T")[0];
 
       const draft: Omit<AdoptionApplicationRecord, "referenceCode"> = {
         id: `app-${Date.now()}`,
-        petId: validated.petId,
-        petName: validated.petName,
+        // The verified row's own id and name, not the request's. Both matter, and neither is
+        // cosmetic:
+        //
+        // `petId` — the guard above compares `validated.petId.trim()`, while this used to write
+        // the untrimmed string. `applicationFormSchema` does not trim, so a posted `" pet-001 "`
+        // passed every check and was then written with its whitespace into a column carrying a
+        // foreign key to `Pet.id`. Prisma raises P2003, `insertServerApplication` hands it to
+        // `handlePersistenceError(…, "write")`, and outside strict mode that swallows anything
+        // but P2002 — so the row never reached the database, survived only in the in-memory
+        // mirror until the next restart, and the applicant was still told `success: true` and
+        // given a reference code.
+        //
+        // `petName` — it was taken from the request while the resolved animal sat in scope, and
+        // two places downstream treat that name as identifying. `atomicUpdateApplicationStatus`
+        // auto-rejects other open applications matching on `petName` as well as `petId`, and
+        // `markCachedPetAdopted` marks the first pet matching *either* id or name. A submission
+        // naming a popular animal it was not for could therefore close that animal's real
+        // applications on approval, and flip the wrong pet to Adopted when it sorted earlier in
+        // the mirror.
+        // `petBreed` for the same reason, and it was not being written at all. The column's own
+        // comment in `prisma/schema.prisma` says "Snapshot of the pet's breed at application
+        // time. Same rationale as petName" — it exists so the record survives `petId` going null
+        // under `onDelete: SetNull`. Leaving it null meant the tracking portal's
+        // `pet?.breed || app.petBreed` was carried entirely by re-reading the live animal, and
+        // showed no breed at all once that animal was gone, which is the case the column is for.
+        petId: pet.id,
+        petName: pet.name,
+        petBreed: pet.breed,
         applicantName: validated.applicantName,
         email: validated.email,
         phone: validated.phone,

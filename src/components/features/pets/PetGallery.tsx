@@ -380,10 +380,12 @@ export function PetGallery({
                   // review's word, and the next review found this.
                   //
                   // ceiling: still `null` when *no* animal in the shelter is adoptable, which
-                  // reopens that stale-field path and lets `resolveDefaultPet` fall back to
-                  // `allPets[0]` whatever its status. The boundary that must refuse the result is
-                  // the server, and `submitApplication` checks no status yet:
-                  // `tasks/open/submit-application-checks-a-fixture-and-no-status.md`.
+                  // reopens that stale-field path. `resolveDefaultPet` no longer papers over it
+                  // with `allPets[0]` whatever its status, and `submitApplication` now refuses a
+                  // pet it cannot find, one that is archived, and one whose status is not
+                  // adoptable — so the worst outcome is a rejected submission rather than an
+                  // application against an animal who has gone home. The stale field itself is
+                  // `tasks/open/adoption-form-keeps-a-stale-pet-id-when-it-opens-on-nobody.md`.
                   const isAdoptable = (pet: (typeof pets)[number]) =>
                     getPetStatusPresentation(pet.status).isAdoptable;
                   setActivePetForAdoption(
