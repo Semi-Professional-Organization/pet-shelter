@@ -9,6 +9,7 @@ import {
   type DonationDraft,
   type DonationRecord,
 } from "@/lib/server/donationLedger";
+import { uniqueViolationOn } from "@/lib/server/uniqueViolation";
 import type { StatutoryIssuerIdentity } from "@/lib/domain/shelterIdentity";
 import type { SponsorshipTierId } from "@/types/sponsorship";
 import { formatMYR, Sen, senFromInteger } from "@/lib/domain/money";
@@ -208,73 +209,24 @@ export async function recordDonationPledge(
 }
 
 /**
- * The columns a unique violation names, or `[]` when the error does not say.
- *
- * Read from where this client actually puts them. On Prisma 7 with
- * `@prisma/adapter-pg` a P2002 carries **no** `meta.target`: the runtime builds
- * the error as `{ driverAdapterError }`, and the adapter parses the columns out of
- * Postgres's own `Key ("pledgeRef")=(...) already exists` detail into
- * `driverAdapterError.cause.constraint.fields`. Measured by reading
- * `node_modules/@prisma/client/runtime/client.js` and
- * `node_modules/@prisma/adapter-pg/dist/index.js` on 2026-10-13, after a review
- * found the earlier version of this guard discriminating on a key that is never
- * set — its column test was dead code, and its test passed on a fabricated shape.
- *
- * `meta.target` is still read, as an array or as an index name, because that is
- * what the query-engine clients before the driver adapters emitted and what a
- * future one may emit again. Postgres quotes a mixed-case identifier in the
- * detail line, so a field can arrive as `"pledgeRef"` with the quotes on; callers
- * match by substring for that reason.
- */
-function uniqueViolationColumns(meta: unknown): string[] {
-  if (typeof meta !== "object" || meta === null) return [];
-  const { target, driverAdapterError } = meta as {
-    target?: unknown;
-    driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } };
-  };
-
-  const fromAdapter = driverAdapterError?.cause?.constraint?.fields;
-  const raw = Array.isArray(fromAdapter)
-    ? fromAdapter
-    : Array.isArray(target)
-      ? target
-      : typeof target === "string"
-        ? [target]
-        : [];
-  return raw.filter((c): c is string => typeof c === "string");
-}
-
-/**
  * True when a failed `donationPledge.create` should be retried with a fresh
  * reference.
  *
- * Two rules, in this order:
+ * `uniqueViolationOn` gives three answers and this is what each means here:
  *
- * 1. **The error names its columns** — retry only if one of them is `pledgeRef`.
- *    The table's other unique is `receiptNumber`, and retrying *that* with a new
- *    reference would write a second row for money that already has a receipt.
- * 2. **The error names nothing** — retry. `createPledgeRow` never sets
- *    `receiptNumber`, so it inserts NULL, and Postgres unique indexes do not
- *    collide on NULL: a P2002 from that one statement can only be the reference.
- *    Refusing here would put back the silent hole this predicate exists to close,
- *    on the one path no local test tier reaches.
+ * - **names `pledgeRef`** — retry. That is the collision.
+ * - **names something else** — do not. The table's other unique is
+ *   `receiptNumber`, and retrying that with a new reference would write a second
+ *   row for money that already has a receipt.
+ * - **names nothing** — retry. `createPledgeRow` never sets `receiptNumber`, so it
+ *   inserts NULL, and Postgres unique indexes do not collide on NULL: a P2002 from
+ *   that one statement can only be the reference. Refusing would lose the gift.
  *
- * Rule 2 is only safe while rule 2's premise holds. **If this insert ever gains a
- * `receiptNumber`, or the table a third unique, rule 2 must go** — an unnamed
- * violation could then be any of them.
- *
- * Not gated on `meta.modelName`, unlike `isUniqueViolation` in `donationLedger.ts`,
- * which guards a retry around a transaction writing several tables. Here the
- * call site is the discriminator: this wraps one `create` and nothing else.
+ * The third rule is only safe while its premise holds. **If this insert ever gains
+ * a `receiptNumber`, or the table a third unique, treat "unnamed" as a refusal.**
  */
 function isPledgeRefCollision(err: unknown): boolean {
-  if (typeof err !== "object" || err === null) return false;
-  const { code, meta } = err as { code?: unknown; meta?: unknown };
-  if (code !== "P2002") return false;
-
-  const columns = uniqueViolationColumns(meta);
-  if (columns.length === 0) return true;
-  return columns.some((c) => c.includes("pledgeRef"));
+  return uniqueViolationOn(err, "pledgeRef") !== false;
 }
 
 /** The insert itself, so the collision retry can re-run it with a new reference. */

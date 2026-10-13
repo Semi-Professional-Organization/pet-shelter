@@ -14,9 +14,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  *
  * No other unit test could see it, because the memory branch asserts before the
  * transaction and every unit suite runs in memory mode. The Tier 3b probe would
- * have caught it, and could not run — see
- * `tasks/open/donation-pledges-table-is-unapplied-and-its-postgres-probe-unrun.md`.
- * This file is the cheap standing guard that does not need a server.
+ * have caught it, and had not yet been run when this was written; it has since,
+ * on 2026-10-13, and is green. This file remains the cheap standing guard that
+ * does not need a server.
  */
 
 const prismaDouble = vi.hoisted(() => ({
@@ -254,6 +254,11 @@ describe("the collision predicate survives every shape the error arrives in", ()
  * discriminating on the key that is never there, so its column guard was dead
  * code and the suite was green on a fiction. These are the cases that would have
  * failed.
+ *
+ * `adapterViolation` matches an error captured from a live server on 2026-10-13
+ * (quoted field, `modelName` present, no `target`); the capture itself is pinned
+ * in `tests/unit/uniqueViolation.test.ts` and re-observed against PostgreSQL in
+ * `tests/integration/db/uniqueViolation.postgres.test.ts`.
  */
 function adapterViolation(fields: string[] | undefined) {
   return Object.assign(new Error("Unique constraint failed"), {

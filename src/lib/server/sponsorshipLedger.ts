@@ -22,8 +22,10 @@ import {
   PetSponsorshipSummary,
   SponsorshipAggregateRow,
   SponsorshipStatus,
+  generatePledgeRef,
   summarizePetSponsorships,
 } from "@/lib/domain/petSponsorship";
+import { uniqueViolationOn } from "@/lib/server/uniqueViolation";
 
 /**
  * Repository for supporters' care commitments.
@@ -160,6 +162,32 @@ export async function recordSponsorshipPledge(
   try {
     return toRecord(await prisma.petSponsorship.create({ data }));
   } catch (err) {
+    // A reference collision is not a failed write, and must not be reported as an
+    // unconfirmed one. `pledgeRef` is a 6-digit random scoped to a UTC day on a
+    // unique column, so two supporters on a busy day can draw the same serial —
+    // roughly a 2% chance per day at ~200 pledges. Until 2026-10-13 that fell
+    // through to `SponsorshipWriteError`, which told the supporter the outcome was
+    // unknown and not to retry: the commitment was lost for want of a second draw.
+    //
+    // "unnamed" counts as a collision for the reason `donationPledgeLedger` gives:
+    // this insert never sets `receiptNumber`, so NULL cannot collide and the
+    // reference is the only unique the statement can violate. One redraw only; a
+    // second collision is not a coincidence.
+    if (uniqueViolationOn(err, "pledgeRef") !== false) {
+      try {
+        return toRecord(
+          await prisma.petSponsorship.create({
+            data: { ...data, pledgeRef: generatePledgeRef(when) },
+          })
+        );
+      } catch (retryErr) {
+        throw new SponsorshipWriteError(
+          "Could not record the sponsorship after a reference collision",
+          retryErr
+        );
+      }
+    }
+
     if (isForeignKeyViolation(err) && (draft.petId || draft.userId)) {
       try {
         // Both relations are optional and can disappear independently. Read the
