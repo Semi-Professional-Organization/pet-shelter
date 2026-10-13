@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import {
   BULLETIN_EMBED_HOSTS,
+  BULLETIN_EMBED_RULES,
   BULLETIN_IMAGE_HOSTS,
   isAllowedBulletinEmbedUrl,
   isAllowedBulletinImageUrl,
@@ -1253,7 +1254,6 @@ describe("corrections from the third review", () => {
     // The defect the round-2 fix left behind: truncating createdAt to a day
     // made every row compare equal in memory while Postgres ordered on
     // TIMESTAMP(3) — the two paths could not agree whatever the comments said.
-    prismaMock.bulletin.findMany.mockResolvedValue([]);
     const { listBulletinRecords } = await import("@/lib/server/bulletinRepository");
     prismaMock.bulletin.findMany.mockResolvedValue([
       dbRow({ id: "b1", createdAt: new Date("2026-09-22T14:30:45.123Z") }),
@@ -1305,5 +1305,61 @@ describe("corrections from the third review", () => {
     expect(normaliseBulletinCategory("clinic")).toBe("clinic");
     expect(isKnownBulletinCategory("not_a_real_category")).toBe(false);
     expect(isKnownBulletinCategory("clinic")).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Fourth review round                                                         */
+/* -------------------------------------------------------------------------- */
+
+describe("corrections from the fourth review", () => {
+  it("gives each fixture row a distinct instant, so the tiebreaker is live", async () => {
+    // Twice-wrong before: once truncated to a day, once a single shared epoch.
+    // Either way every fixture row compared equal and a tied publishedAt fell
+    // through to `id`, while the database broke the same tie on a real
+    // TIMESTAMP(3) — so one pair of notices could order differently depending
+    // on whether the database was reachable.
+    makeDatabaseUnreachable();
+    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+    const feed = await getPublicBulletins("all");
+
+    // Reach the instants through the fixture the repository clones.
+    const instants = (fixtureJson as { publishedAt: string }[]).map(
+      (r) => `${r.publishedAt}T00:00:00.000Z`
+    );
+    expect(new Set(instants).size).toBe(instants.length);
+
+    // And the rule still produces the documented order on that data.
+    expect(feed.map((b) => b.id)).toEqual([
+      "bulletin-001",
+      "bulletin-002",
+      "bulletin-003",
+      "bulletin-004",
+    ]);
+  });
+
+  it("freezes the lists that decide, not only the one that describes", () => {
+    // An earlier revision froze BULLETIN_EMBED_HOSTS — the advisory list used
+    // for message text — and left the two that gate the checks mutable, in a
+    // module that ships to the browser. The freeze was pointed at the one array
+    // where mutation could not change an answer.
+    expect(Object.isFrozen(BULLETIN_EMBED_HOSTS)).toBe(true);
+    expect(Object.isFrozen(BULLETIN_EMBED_RULES)).toBe(true);
+    expect(Object.isFrozen(BULLETIN_IMAGE_HOSTS)).toBe(true);
+  });
+
+  it("refuses a notice date decades away, which one slipped digit produces", () => {
+    // There is no `publishedAt <= now` predicate and the feed sorts DESC, while
+    // `/` and `/pets` show two notices. So 2062 for 2026 publishes at once,
+    // sorts above every real notice, and holds a slot for thirty-six years with
+    // nothing on screen explaining why newer notices stopped appearing.
+    const slipped = `${new Date().getUTCFullYear() + 36}-08-14`;
+    const res = bulletinFormSchema.safeParse(formInput({ publishedAt: slipped }));
+    expect(res.success).toBe(false);
+    expect(res.error?.issues.some((i) => i.path.includes("publishedAt"))).toBe(true);
+
+    // Post-dating is intended, so a plausible future date still passes.
+    const soon = `${new Date().getUTCFullYear() + 1}-08-14`;
+    expect(bulletinFormSchema.safeParse(formInput({ publishedAt: soon })).success).toBe(true);
   });
 });

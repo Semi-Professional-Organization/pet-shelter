@@ -67,6 +67,27 @@ had time. That is per-project config, it would bite any suite whose setup hook i
 load, and it is the first mechanism proposed here that would produce one failure in each of
 several unrelated files. Unverified against the unit project.
 
+**Observed in `components` and `integration` too, 2026-10-13.** The title says "unit suite"; it is
+wider than that. On the bulletins branch (`worktree-bulletins-76`, master merged at `e99ebf8`),
+with six other sessions running on the same machine:
+
+| Run | Result |
+|---|---|
+| `npm run test:all`, a review sub-agent running concurrently | `65 failed \| 1903 passed (1968)` |
+| `npm run test:all`, same tree, nothing else changed | `4 failed \| 1964 passed (1968)` |
+
+The second run's four were one test each in four unrelated files, two projects:
+`integration/softDeleteFiltering`, `components/home`, `components/PetCard`,
+`components/PetChooserCarousel`. **All four pass in isolation** — 25 passed for the three component
+files together, 17 for the integration one. So the one-failure-per-file shape this entry already
+describes is not confined to the `unit` project, and the recommendation at the bottom applies to
+all three.
+
+Load looks like a factor rather than the cause: the 65-failure run had a review sub-agent issuing
+its own `vitest` commands against the same working tree. That is worth separating from the
+order-dependence proper, because the two have different fixes — one is a scheduling bug, the other
+is concurrent processes sharing a checkout.
+
 **Why this is worth an entry rather than a shrug.** A suite that reports `1580 passed` under one
 schedule and 54 red under another gates nothing, and every session here runs `npm test` before
 closing. The honest reading of a green run today is "green, or not yet unlucky". It also costs

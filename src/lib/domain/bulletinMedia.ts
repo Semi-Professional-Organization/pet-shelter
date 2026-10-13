@@ -37,7 +37,7 @@
  * honest — see "Boundaries and duplication" in AGENTS.md, which asks for a
  * guard when two copies must agree.
  */
-export const BULLETIN_IMAGE_HOSTS = [
+export const BULLETIN_IMAGE_HOSTS = Object.freeze([
   "images.unsplash.com",
   "plus.unsplash.com",
   "img.youtube.com",
@@ -45,7 +45,7 @@ export const BULLETIN_IMAGE_HOSTS = [
   "**.supabase.co",
   "utfs.io",
   "res.cloudinary.com",
-] as const;
+] as const);
 
 /**
  * Hosts allowed in an `<iframe src>`.
@@ -55,24 +55,29 @@ export const BULLETIN_IMAGE_HOSTS = [
  * because it is what the shipped fixture uses and what staff should prefer — it
  * does not set tracking cookies on a visitor who never plays the video.
  */
-export const BULLETIN_EMBED_RULES = [
+export const BULLETIN_EMBED_RULES = Object.freeze([
   { host: "www.youtube-nocookie.com", prefix: "/embed/" },
   { host: "youtube-nocookie.com", prefix: "/embed/" },
   { host: "www.youtube.com", prefix: "/embed/" },
   { host: "youtube.com", prefix: "/embed/" },
   { host: "player.vimeo.com", prefix: "/video/" },
-] as const satisfies ReadonlyArray<{ host: string; prefix: string }>;
+] as const satisfies ReadonlyArray<{ host: string; prefix: string }>);
 
 /**
  * Host names only, for the messages that tell staff what is accepted.
  *
- * Frozen, not merely `readonly`. This module is imported by
- * `BulletinFormDialog`, a `"use client"` component, so the array ships to the
- * browser — and `readonly` is a compile-time annotation that erases to an
- * ordinary `Array`, which anything on the page can still `push` onto. That
- * would change what the form tells staff is allowed while the enforcing check
- * (`BULLETIN_EMBED_RULES`) stayed put: misleading rather than a bypass, but a
- * comment claiming a runtime guard should be backed by one.
+ * Every list in this module is frozen, not merely `readonly`. `readonly` is a
+ * compile-time annotation that erases to an ordinary `Array`, and
+ * `BulletinFormDialog` is a `"use client"` component, so this whole module —
+ * the rule objects included — ships in the browser bundle where page script
+ * could `push` onto it.
+ *
+ * An earlier revision froze only this list, which is the one that merely
+ * *describes* the policy. The two that *decide* it, `BULLETIN_EMBED_RULES` and
+ * `BULLETIN_IMAGE_HOSTS`, were left mutable — so the freeze landed where
+ * mutation could not change an answer and skipped the places where it could.
+ * The server re-parses and the read path re-checks, so that was never a bypass;
+ * it was a guard pointed at the wrong array.
  */
 export const BULLETIN_EMBED_HOSTS: readonly string[] = Object.freeze(
   BULLETIN_EMBED_RULES.map((r) => r.host)

@@ -42,16 +42,41 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
 - [x] `src/data/bulletins.json` reshaped; the `dQw4w9WgXcQ` embed removed from shipped content.
 - [x] Test suite: 114 cases, eight claims checked against mutants.
 - [x] Merge `origin/master` 4782ff2 (#88's AST guard) and re-run every gate.
-- [x] `/code-review`: fourteen findings, ten fixed, one declined with a reason, three were
-      documentation contradicting the code. Migration re-rehearsed after the index change.
+- [x] `/code-review`, **four rounds**, because each fix round is new code:
+      round 1 (whole diff) fourteen findings — ten fixed, one declined with a reason;
+      round 2 (the fix commit) thirteen, **two worse than what they replaced**;
+      round 3 (that fix) thirteen, one of them the tiebreaker still being dead;
+      round 4 (after merging #93) fourteen, of which five are master-side and already
+      filed by the session that wrote them. Migration re-rehearsed after every change
+      that touched its SQL.
+- [x] Seventeen mutants across rounds 1-3, all killed. Round 4's fixes carry tests too.
+- [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
+      branch had filed; the duplicate open entry was deleted rather than left to mirror a
+      second issue.
 
 ## Review
 
-**Verified.** `npm run check` clean (typecheck, lint 0 errors, docs:check OK). `npm run test:all`
-1911 passed across 116 files, on the tree with master merged. `npm run build` run in the worktree
-after `npm ci`, with throwaway secrets inline. The migration was rehearsed against real
-PostgreSQL 18.4, not reasoned: its DDL produces objects identical to `prisma db push`, re-running
-it is a no-op, and the enum rejects an out-of-vocabulary category.
+**Verified.** `npm run check` clean (typecheck, lint 0 errors, docs:check OK). `npm run build`
+run in the worktree after `npm ci`, with throwaway secrets inline. The migration was rehearsed
+against real PostgreSQL 18.4, not reasoned: its DDL produces objects identical to
+`prisma db push`, re-running it is a no-op, the enum rejects an out-of-vocabulary category, and on
+a database seeded with the index this branch later retired, a re-run clears it.
+
+**`npm run test:all` cannot be quoted as a single number, and this stream will not pretend
+otherwise.** Two runs of the same tree, nothing changed between them: `65 failed`, then
+`4 failed | 1964 passed (1968)`. The second run's four were one test each in four unrelated
+non-bulletin files across two projects, and **all four pass in isolation**. That is
+`tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, which records the same shape on
+plain `master` — and which this stream has now widened, because that entry describes the `unit`
+project and these failures were in `components` and `integration`. `tests/unit/bulletins.test.ts`
+is **126 passed** run on its own.
+
+**The reviews are the story of this branch.** Round 2 found that round 1's fix had made an
+ordering bug deterministic rather than fixing it. Round 3 found that round 2's fix for it was
+still dead. Round 4 found that round 3's fix was *also* still dead, for a third reason. One
+ordering rule, four attempts, each one claiming in a comment to have fixed it — which is the
+lesson `tasks/lessons/2026-10-13-a-comment-asserting-a-mechanism-is-a-claim-to-run.md` is about,
+and the strongest argument for the standing order in CLAUDE.md step 6 that this repo has produced.
 
 **The tests were checked against mutants, not trusted.** Dropping the `MANAGE_CONTENT` gate,
 returning `videoEmbedUrl` unfiltered, treating an empty result as an outage, and taking the byline

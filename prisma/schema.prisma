@@ -965,12 +965,16 @@ model Bulletin {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  /// Serves the public read's PREDICATE — `isPublished = true`, then
-  /// `targetPage IN (…)`. It does not serve the sort, and the claim that it
-  /// served "the whole query" was wrong: the feed orders by isPinned,
-  /// publishedAt, createdAt, id, and the last two are not in the index, so
-  /// Postgres sorts after filtering either way. Narrowing the rows before that
-  /// sort is the whole of its value, and that is worth one index.
+  /// Serves the PREDICATE of the two scoped public reads — `/` and `/pets`,
+  /// which pass `targetPage IN ('all', <page>)`. It does not serve the sort:
+  /// the feed orders by isPinned, publishedAt, createdAt, id, and the last two
+  /// are not in the index, so Postgres sorts after filtering either way.
+  ///
+  /// It does little for `/bulletins`, which calls `getPublicBulletins("all")`
+  /// and so leaves the predicate as `isPublished = true` alone — a column
+  /// defaulting to true that nearly every row satisfies, so the planner will
+  /// seq-scan there much as the admin list does. Two of the three reads is
+  /// still worth one index; claiming it narrowed all three was not true.
   @@index([isPublished, targetPage, isPinned, publishedAt])
   ///
   /// There is deliberately NO second index for the admin list. That list has no

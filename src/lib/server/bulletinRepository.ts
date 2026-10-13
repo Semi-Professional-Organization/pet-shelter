@@ -88,17 +88,29 @@ interface BulletinFixtureRow {
 }
 
 function freshBulletins(): BulletinRecord[] {
-  // A full ISO instant, matching what `mapDbBulletin` produces. These two are
-  // timestamps, not notice dates, and truncating them to a day made the
-  // `createdAt` tiebreaker structurally dead: every fixture row compared equal
-  // while Postgres was ordering on TIMESTAMP(3), so the two paths could not
-  // agree no matter what the comments claimed.
-  const epoch = new Date(0).toISOString();
-  return (structuredClone(initialBulletinsData) as BulletinFixtureRow[]).map((row) => ({
-    ...row,
-    createdAt: epoch,
-    updatedAt: epoch,
-  }));
+  /**
+   * Fixture timestamps are derived from the notice date, not from a shared
+   * constant.
+   *
+   * Two earlier revisions got this wrong in opposite directions. One truncated
+   * `createdAt` to `YYYY-MM-DD`; the next restored the full instant but still
+   * stamped every row with the same epoch. Both left the `createdAt` tiebreaker
+   * dead on this path — every row compared equal, so a tied `publishedAt` fell
+   * through to `id`, while the database broke the same tie on a real
+   * `TIMESTAMP(3)`. Two notices on one day could therefore order one way on the
+   * query path and the other way during an outage.
+   *
+   * The fixture has no real creation instant to carry: these rows are
+   * deploy-time content. Midnight UTC on the notice date is the honest stand-in
+   * — it is distinct wherever `publishedAt` is distinct, and it orders
+   * identically to it, so the rule produces a consistent answer on both paths.
+   * Where two fixture rows do share a day the tie falls to `id`, which is the
+   * best available and matches what the query does when its timestamps also tie.
+   */
+  return (structuredClone(initialBulletinsData) as BulletinFixtureRow[]).map((row) => {
+    const instant = `${row.publishedAt}T00:00:00.000Z`;
+    return { ...row, createdAt: instant, updatedAt: instant };
+  });
 }
 
 let serverBulletins: BulletinRecord[] = freshBulletins();

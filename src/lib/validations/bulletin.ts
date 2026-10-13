@@ -61,6 +61,19 @@ const optionalUrl = () =>
  * typed, which for a notice is the whole content. Round-tripping the parsed
  * value back to its parts is what catches it.
  */
+/**
+ * How far ahead a notice date may be.
+ *
+ * Post-dating is intended — a clinic is announced before it happens — so this
+ * is a sanity ceiling, not a "no future dates" rule. It exists because the feed
+ * has no `publishedAt <= now` predicate and sorts `publishedAt` DESC, while `/`
+ * and `/pets` show only two notices. So `2062-08-14`, one slipped digit from
+ * `2026-08-14`, publishes immediately, sorts above every real notice, and holds
+ * one of those two slots for thirty-six years with nothing on screen saying
+ * why newer notices stopped appearing.
+ */
+const MAX_YEARS_AHEAD = 5;
+
 function isRealCalendarDay(value: string): boolean {
   const [year, month, day] = value.split("-").map(Number);
   // Postgres has no year zero, so accepting it trades a clear "that date does
@@ -133,7 +146,16 @@ export const bulletinFormSchema = z
       .string()
       .trim()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD form")
-      .refine(isRealCalendarDay, { message: "That date does not exist" }),
+      .refine(isRealCalendarDay, { message: "That date does not exist" })
+      .refine(
+        (v) => Number(v.slice(0, 4)) <= new Date().getUTCFullYear() + MAX_YEARS_AHEAD,
+        {
+          message:
+            `That date is more than ${MAX_YEARS_AHEAD} years away — check the year. ` +
+            "A far-future notice sorts above every real one and holds a slot on the " +
+            "home page until it passes.",
+        }
+      ),
   })
   /**
    * A URL is required, and its host checked, only for the media type that will

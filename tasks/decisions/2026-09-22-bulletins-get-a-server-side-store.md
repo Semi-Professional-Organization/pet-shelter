@@ -171,3 +171,40 @@ path now share one exported declaration rather than two literals free to drift.
 **The standing order earned its place here.** Ten of the first round's findings were fixed in one
 commit, and that commit introduced two defects worse than several it repaired. Reviewing it caught
 them before they reached master. Twelve mutants across both rounds, all killed.
+
+## Rounds three and four, and the one rule that took four attempts
+
+Reviewing each fix round found defects in the previous one, every time.
+
+The feed's tie ordering is the whole story in miniature. Round 2 found the rule had no
+tiebreaker, so a limited feed showed a different pair on each regeneration. Its fix made the
+tiebreaker **ascending**, turning an intermittent bug into a permanent one — the newest notice of
+a tied day was always the one dropped. Round 3 found that; its fix truncated `createdAt` to a day
+"for consistency", so every row compared equal and the tiebreaker was dead again. Round 4 found
+*that*; the restored instant was real but every fixture row carried the same epoch, so it was
+still dead on the only path that runs it. The fixture now derives its instant from the notice
+date, which is distinct wherever the notice dates are.
+
+**Four commits, each claiming in a comment to have fixed one ordering rule.** That is what
+`tasks/lessons/2026-10-13-a-comment-asserting-a-mechanism-is-a-claim-to-run.md` is for, and it is
+the clearest evidence this repo has that CLAUDE.md step 6 — review the fix round too — is not
+ceremony.
+
+Round 4's other corrections worth recording as decisions rather than diff:
+
+- **The notice date now has an upper bound of five years.** Post-dating is intended, but the feed
+  has no `publishedAt <= now` predicate and sorts descending while `/` and `/pets` show two
+  notices. So `2062` for `2026` published instantly, sorted above everything real, and would have
+  held a home-page slot for thirty-six years with nothing on screen explaining why newer notices
+  stopped appearing. A ceiling, not a rule against future dates.
+- **All three enum selects in the editor handle a stored value this build does not carry**, not
+  just `category`. And the mechanism is stated correctly now: it buys a readable message, nothing
+  more — `zodResolver` is what refuses the write, and an earlier comment claiming the option
+  prevented data corruption was describing something `z.enum` already made unreachable.
+- **`Object.freeze` moved to the lists that decide.** It had been applied to the host list used
+  for message text and withheld from the two that gate the checks.
+
+Five of round 4's findings are in `master`'s adoption code, arriving here with the `#93` merge.
+They are not fixed on this branch — a correction to a public submission path does not belong in a
+PR about community notices — and they needed no entry from me: the session that wrote `#93` had
+already filed them.

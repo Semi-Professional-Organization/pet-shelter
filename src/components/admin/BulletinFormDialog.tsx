@@ -15,7 +15,6 @@ import {
 import {
   BULLETIN_CATEGORY_PRESENTATION,
   BULLETIN_TARGET_PAGE_LABELS,
-  isKnownBulletinCategory,
 } from "@/lib/presentation/bulletinPresentation";
 import { BULLETIN_EMBED_HOSTS, BULLETIN_IMAGE_HOSTS } from "@/lib/domain/bulletinMedia";
 import { BulletinRecord } from "@/types/bulletin";
@@ -87,6 +86,52 @@ function FieldError({ message }: { message?: string }) {
 }
 
 /**
+ * The stored value of an enum field that this build's option list does not
+ * carry, or `null`.
+ *
+ * **Typed against `string` on purpose.** Prisma types these columns as its
+ * generated enums, which is optimistic: the hand-run migration writes the
+ * column directly, and a rolling deploy can leave an older bundle reading a
+ * value a newer one wrote. An earlier revision narrowed `BulletinCategory`
+ * with a `value is BulletinCategory` predicate, which made the unknown branch
+ * `never` — the compiler believed it unreachable, so inverting the test or
+ * deleting the option typechecked identically and nothing was protected.
+ *
+ * What surfacing the value buys is a readable message, and only that. It is
+ * **not** an integrity guard: `useForm` runs `zodResolver(bulletinFormSchema)`
+ * and each field is a `z.enum`, so an unrecognised value fails validation and
+ * `onSave` is never reached either way. Without the option the browser sets
+ * `selectedIndex = -1`, so the editor sees a blank control and a raw
+ * `Invalid enum value`; with it they see what the row holds and why it cannot
+ * be saved. Do not read this as the thing stopping a bad write — the `z.enum`
+ * is, and removing that on the strength of this comment is the mistake
+ * `tasks/lessons/2026-09-22-fixing-one-readers-policy-turns-its-neighbours-comments-into-the-spec.md`
+ * describes.
+ */
+function unrecognisedValue(
+  stored: string | undefined,
+  known: readonly string[]
+): string | null {
+  if (stored === undefined) return null;
+  return known.includes(stored) ? null : stored;
+}
+
+/** The option shown for a stored value this build cannot offer. */
+function UnrecognisedOption({ value }: { value: string }) {
+  return <option value={value}>{value} — not recognised by this version</option>;
+}
+
+/** The note beneath such a select, naming the field. */
+function UnrecognisedNote({ field }: { field: string }) {
+  return (
+    <p className="text-xs text-muted-foreground mt-1">
+      This notice&apos;s {field} is a value this version does not know. Choose one
+      above to save — the stored value cannot be kept.
+    </p>
+  );
+}
+
+/**
  * Create/edit form for a community bulletin.
  *
  * Note what the form does NOT offer: a byline field. The author is taken from
@@ -151,21 +196,14 @@ export function BulletinFormDialog({
 
   const mediaType = watch("mediaType");
 
-  /**
-   * A stored category this build does not carry.
-   *
-   * Reachable from the hand-run migration or a rolling deploy. The `<select>`
-   * has no matching `<option>`, so the browser falls back to the first one —
-   * and saving would then rewrite the row's category to "announcement" with an
-   * audit entry recording it as intentional. Surfacing the value keeps the
-   * select on it and makes the save fail loudly at validation instead, which
-   * is the honest outcome: an editor is told, rather than quietly overwriting
-   * a category they never looked at.
-   */
-  const unknownCategory =
-    editingBulletin && !isKnownBulletinCategory(editingBulletin.category)
-      ? editingBulletin.category
-      : null;
+  // All three enum selects, not just `category`: they have the same shape, the
+  // same reachability and the same failure. See `unrecognisedValue`.
+  const unknownCategory = unrecognisedValue(editingBulletin?.category, BULLETIN_CATEGORIES);
+  const unknownTargetPage = unrecognisedValue(
+    editingBulletin?.targetPage,
+    BULLETIN_TARGET_PAGES
+  );
+  const unknownMediaType = unrecognisedValue(editingBulletin?.mediaType, BULLETIN_MEDIA_TYPES);
 
   const submit = handleSubmit(async (values) => {
     await onSave(values);
@@ -194,23 +232,14 @@ export function BulletinFormDialog({
                 {...register("category")}
                 className={selectClass}
               >
-                {unknownCategory && (
-                  <option value={unknownCategory}>
-                    {unknownCategory} — not recognised by this version
-                  </option>
-                )}
+                {unknownCategory && <UnrecognisedOption value={unknownCategory} />}
                 {BULLETIN_CATEGORIES.map((value) => (
                   <option key={value} value={value}>
                     {BULLETIN_CATEGORY_PRESENTATION[value].label}
                   </option>
                 ))}
               </select>
-              {unknownCategory && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  This notice uses a category this version does not know. Saving
-                  requires choosing one above — it will not be kept.
-                </p>
-              )}
+              {unknownCategory && <UnrecognisedNote field="category" />}
               <FieldError message={errors.category?.message} />
             </div>
 
@@ -221,12 +250,14 @@ export function BulletinFormDialog({
                 {...register("targetPage")}
                 className={selectClass}
               >
+                {unknownTargetPage && <UnrecognisedOption value={unknownTargetPage} />}
                 {BULLETIN_TARGET_PAGES.map((value) => (
                   <option key={value} value={value}>
                     {BULLETIN_TARGET_PAGE_LABELS[value]}
                   </option>
                 ))}
               </select>
+              {unknownTargetPage && <UnrecognisedNote field="target page" />}
               <FieldError message={errors.targetPage?.message} />
             </div>
 
@@ -266,12 +297,23 @@ export function BulletinFormDialog({
                 {...register("mediaType")}
                 className={selectClass}
               >
+                {unknownMediaType && <UnrecognisedOption value={unknownMediaType} />}
                 {BULLETIN_MEDIA_TYPES.map((value) => (
                   <option key={value} value={value}>
                     {MEDIA_TYPE_LABELS[value]}
                   </option>
                 ))}
               </select>
+              {unknownMediaType && (
+                <>
+                  <UnrecognisedNote field="media type" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Its stored media URLs stay hidden while the type is
+                    unrecognised, and the one that does not match the type you
+                    choose is cleared on save.
+                  </p>
+                </>
+              )}
               <FieldError message={errors.mediaType?.message} />
             </div>
 

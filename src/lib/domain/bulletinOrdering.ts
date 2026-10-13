@@ -7,16 +7,19 @@
  * somewhere a test can call with rows of its own choosing. Ties are the case
  * that matters, and the committed fixture has no two notices on one day.
  *
- * It must stay in step with the `orderBy` in `getPublicBulletins` and
- * `listBulletinRecords`. Where they disagree, an outage silently reorders the
- * feed — which is a worse failure than an outage, because nothing reports it.
- * `BULLETIN_FEED_ORDER_BY` below is the shared declaration; the repository
- * spreads it rather than writing its own literal.
+ * What has to stay in step with the `orderBy` in `getPublicBulletins` and
+ * `listBulletinRecords` is **the rule**, not the output: the two paths read
+ * different row sets, the database's rows and the committed fixture's. Where
+ * the *rule* diverges, an outage silently reorders the feed, which is a worse
+ * failure than the outage because nothing reports it.
+ * `BULLETIN_FEED_ORDER_BY` below is the shared declaration, and the repository
+ * spreads it rather than writing a second literal.
  *
  * `createdAt` is compared as a full ISO instant, which is what
- * `BulletinRecord` carries. An earlier revision truncated it to `YYYY-MM-DD`
- * for "consistency" with `publishedAt` and thereby made this tiebreaker dead:
- * every row compared equal here while Postgres ordered on `TIMESTAMP(3)`.
+ * `BulletinRecord` carries on both paths. Getting that wrong is what made this
+ * tiebreaker dead twice — once by truncating it to a day, once by stamping
+ * every fixture row with the same epoch. `freshBulletins` explains what the
+ * fixture carries now and why.
  */
 
 export interface BulletinOrderable {
