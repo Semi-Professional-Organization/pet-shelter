@@ -70,7 +70,22 @@ reported 30 failures that are not this branch's — every project passes alone a
 Prisma errors in `insertServerPet`, which this diff never touches. Whether `test:all` is green on
 master was not checked.
 
+- [x] `/code-review high` on the slimmed diff, 2026-10-13. Seven findings. Two of my own comments
+      had become false the moment the form was reverted — the `usePetTableController` fix claimed
+      both stores recompute age, and `petStore` on master writes the typed string verbatim, so
+      deriving only the rendered row made the table and `localStorage` disagree. Reverted it.
+- [x] The docstring naming the SQL transcriptions was wrong on both path and claim: the contract
+      half was renamed and does **no** date arithmetic. Only the expand file is a transcription.
+      Rewritten to name one file, on its branch, and to say the Malay vocabulary does not agree.
+- [x] Dismissed one finding by probe: `new Date("2026-02-30")` is valid in V8, so the pre-PS-114
+      check accepted it identically and returned the same string. No regression.
 ## Explicitly NOT done
+
+- **The `minggu` regex, the admin-save flag downgrade, and the Malay/SQL vocabulary gap.**
+  All three are recorded as ledger entries rather than fixed here: anchoring that regex moves the
+  arithmetic three implementations were aligned on, and the flag downgrade is PR #94s to land.
+  `tasks/open/malay-age-units-outpace-the-backfill.md`,
+  `tasks/open/every-admin-save-downgrades-an-exact-birthday.md`.
 
 - **The form.** Reverted to master in full — `PetFormDialog`, `actions/pets.ts`, `petStore.ts`,
   `validations/pet.ts` and the component test. PR #94 owns it. `tasks/open/pet-form-has-no-birth-date-field.md`

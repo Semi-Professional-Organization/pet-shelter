@@ -161,12 +161,21 @@ const AGE_MONTHS_PATTERN = /(\d+)\s*(?:m|mo|month|bln|bulan)/;
  * Approximates a birth date from an age string (e.g. "2 years", "4 months", "2 tahun") relative
  * to the intake date. Timezone-invariant UTC arithmetic.
  *
- * **This function is transcribed into SQL, and the transcriptions are the reason not to "fix"
- * the rollover below.** The production backfill that fills `pets.birthDate` from the old `age`
- * prose reimplements this arithmetic in Postgres —
- * `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` (expand) and
- * `20260922_pet_birth_date/migration.sql` (contract). A backfill's job is to store what the
- * application itself would have computed, so the three must agree case for case.
+ * **This function is transcribed into SQL, and that transcription is the reason not to "fix" the
+ * rollover below.** The production backfill that fills `pets.birthDate` from the old `age` prose
+ * reimplements this arithmetic in Postgres, in
+ * `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` on the unmerged branch
+ * `fix/pets-birth-date-production-migration`. A backfill's job is to store what the application
+ * itself would have computed, so the two have to agree case for case. (The *contract* half, on
+ * `worktree-pet-birth-date-migration`, only archives and drops the old columns — it does no date
+ * arithmetic, so it is not a third copy. Both paths are unmerged as of 2026-10-13; read them
+ * from their branches, and expect the folder names to differ by a word.)
+ *
+ * They do **not** agree on vocabulary. The Malay units below (`thn`, `tahun`, `bln`, `bulan`)
+ * have no counterpart in that SQL, which is English-only and needs a hand-run pre-pass to
+ * translate them, so "2 tahun" yields a birthday here and is refused there. That is sequencing
+ * debt, recorded in `tasks/open/malay-age-units-outpace-the-backfill.md`, not a licence to treat
+ * the arithmetic as independent.
  *
  * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
  * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is

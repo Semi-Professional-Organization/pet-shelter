@@ -207,9 +207,7 @@ function mapDbMedicalTimelineEvent(row: DbMedicalTimelineEventRecord): MedicalTi
  */
 export function mapDbPetToPet(p: DbPetRecord): Pet {
   const birthDate = deriveBirthDate(p);
-  const birthDateIsEstimate = p.birthDate
-    ? (p.birthDateIsEstimate !== undefined ? p.birthDateIsEstimate : true)
-    : true;
+  const birthDateIsEstimate = p.birthDateIsEstimate !== undefined ? p.birthDateIsEstimate : true;
   // Always derived, never read back from the row. `age`/`ageCategory` have not been columns
   // since 6108d82; preferring a stored value here only ever served stale fixture data (PS-114).
   const age = formatAgeString(birthDate).en;
@@ -265,6 +263,11 @@ export function mapDbPetToPet(p: DbPetRecord): Pet {
  */
 export function buildPetPersistencePayload(pet: Pet): PetPersistencePayload {
   const birthDate = deriveBirthDate(pet);
+  // Guarded on `pet.birthDate`, unlike the read mapper above. `Pet.birthDate` is optional, so a
+  // record can arrive with no birthday and `birthDateIsEstimate: false` — and `deriveBirthDate`
+  // will then approximate one from the age prose. Persisting `false` beside an approximated date
+  // claims the shelter knows a birthday it guessed. The read mapper needs no such guard: its
+  // `birthDate` is a non-nullable column, so it is never absent on a row that exists.
   const birthDateIsEstimate = pet.birthDate
     ? (pet.birthDateIsEstimate !== undefined ? pet.birthDateIsEstimate : true)
     : true;
