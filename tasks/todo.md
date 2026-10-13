@@ -505,6 +505,196 @@ elsewhere.
 
 Three of the five were, again, prose asserting something about code — the failure this stream
 already wrote a lesson about, found twice more after writing it.
+# `pets.age` → `birthDate`: the production migration — the other half of the schema drift
+
+**Branch:** `fix/pets-birth-date-production-migration` · opened 2026-09-22 · cut from
+`origin/master` 4782ff2, **not** from PR #42 — see "Deliberately not done" for why.
+
+- [x] Audit the brief before implementing it. Three of its four premises did not survive: see the
+      Review below.
+- [x] `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` — adds `birthDate` and
+      `birthDateIsEstimate`, backfills both from the prose `age` production still carries, and
+      relaxes the `age`/`ageCategory` NOT NULLs. Drops nothing.
+- [x] `rollback.sql` beside it — restores the previous shape exactly, because `age` is never
+      written to. Its header says plainly what it costs after go-live.
+- [x] `rehearse.mjs` beside it — 92 checks on a throwaway embedded PostgreSQL 18.4 created UTF8,
+      all passing,
+      7 of them driving master's own generated Prisma client. **Kept, unlike the
+      `20260917_status_enums` script**, so a reviewer can re-take the measurement.
+- [x] `tasks/decisions/2026-09-22-pets-birth-date-backfills-from-intake-date.md` — the backfill
+      rule, the expand/contract split, and the full check list.
+- [x] Drift entry updated with the 2026-09-22 measurement, and one earlier claim in it corrected.
+- [x] Six lessons: the lenient-parser trap, the superseded NOT NULLs, the stray-process sweep,
+      the regex that finds a number beside a unit rather than the number, the token list whose
+      one-letter alternative became a prefix match when it gained a second language, and the
+      check that asserts a literal and hides the crash it was written for.
+- [x] The `#46`/`#47` stream's one genuinely stale line: the enum migration is applied.
+- [ ] **Owner: apply `20260922_pets_birth_date/migration.sql` in the Neon SQL editor.** Run the
+      header's "before" query first — it names any row the file would refuse. Needs no merge.
+- [ ] Owner (one minute, worth doing first): open `/pets` on the live site. Exactly the ten
+      fixture animals at ids `pet-001`…`pet-010` confirms the catalogue is serving
+      `src/data/pets.json`; anything else means the read works and the drift wants re-reading.
+- [x] Later, its own file: drop `age`/`ageCategory` — the contract half. **Not written here on
+      purpose, and now owned by PR #94** (`worktree-pet-birth-date-migration`), which archives
+      `age`, `ageCategory` and `birthDateIsEstimate` before dropping and verifies this
+      branch's dates by re-derivation. Sequence: expand (here) → soak → contract (#94).
+- [ ] Owner: decide the soak length between applying this and applying #94's contract.
+
+## Review
+
+**The brief asked for two things. One was already done, and the other was bigger than described.**
+
+- **Item 2 was already fixed.** It asked to correct `tasks/todo.md:21-22`, where `#72`/`#73` were
+  said to be open. On master that line already reads "merged 2026-09-21" — the edit existed
+  uncommitted in the main checkout when this session started and has since been committed. It also
+  could not have been done where the brief said to do it: PR #42's branch predates the whole
+  `#46`/`#47` stream, and its `tasks/todo.md` ends at line 17. What *was* stale in that stream is
+  the enum-migration checkbox, ticked above.
+- **The migration is not a rename.** The drift statement bundles an add+backfill (reversible) with
+  a drop of `age`/`ageCategory` (not). Only the first half is data-preserving, so only the first
+  half is here. `db:check-drift` will still report one destructive `pets` statement afterwards, and
+  that is correct rather than a failure.
+- **Adding `birthDate` alone would have left writes broken.** `age`/`ageCategory` are NOT NULL with
+  no default in the schema production was built from, and the release writes neither, so pet
+  creation would still fail — as `Null constraint violation on the (not available)`, naming no
+  column. This is the part the brief's framing missed entirely, and check P7 exists to stop a later
+  reviewer deleting the two `DROP NOT NULL`s as tidying.
+- **The drift is very likely breaking reads right now, not just blocking a push.** Reproduced, not
+  reasoned: master's own client answers `The column pets.birthDate does not exist in the current
+  database.` against a production-shaped table, and `handlePersistenceError(…, "read")` swallows
+  that into the `pets.json` mirror. ASSERTED for production itself — the `/pets` probe above is
+  what would settle it, and nobody has run it.
+
+**Two defects the rehearsal found in this session's own first draft**, both fixed: `to_date` raises
+on `2024-02-31` rather than rolling it forward, so the validation built on a round-trip comparison
+aborted without naming the row; and a failing multi-statement file leaves the editor session in an
+aborted transaction, which the header now tells the reader to expect.
+
+**`/code-review` then found six more, every one real, and the green rehearsal had not caught any of
+them.** Worth recording because the rehearsal was thorough and still missed all six:
+
+1. **A fractional age was silently read as the wrong number.** `"1.5 years"` backfills as **5**
+   years — the patterns take the digit run beside the unit token, not the leading number. The
+   plausibility bound passed it, no notice fired, and the follow-up file is scheduled to drop the
+   `age` prose that would have revealed it. Now refused and named. Every rehearsal fixture had
+   been `"N years"` or `"N months"`, because that is what the repo's seed data holds — so the
+   fixtures tested the shapes that already exist, which is the set that never contained the bug.
+2. **The header's pre-check listed only two of the four refusals**, so a clean pre-check could
+   still be followed by an abort — defeating the one step the header calls unskippable. And the
+   check named "names every row the file would refuse" tested neither missing case.
+3. **The Malay-token equivalence claim was false**, and it was this session's own regression: the
+   token list came from PR #42's `approximateBirthDate` and the work was then re-based onto
+   master, whose version matches only `y` and `m`. Claim withdrawn, divergence named in both the
+   header and the decision entry; the wider tokens are kept on purpose.
+4. **Every disclosure was `RAISE NOTICE`**, which the Neon SQL editor is not documented to show —
+   so the clamping the decision entry calls "made visible" might not have been. The After section
+   now carries a query that reads the clamped rows out of the table.
+5. **The snapshot was taken before any exclusive lock**, so a row inserted in that window would
+   keep the `'2024-01-01'` default while the guard that exists to catch exactly that still passed.
+   `LOCK TABLE ... ACCESS EXCLUSIVE` now precedes the read.
+6. **The rehearsal reported any Prisma import failure as "no generated client" and exited 0**,
+   which would have dropped its seven strongest checks silently on any machine but this one. It
+   now reports the real error and a skip fails the run.
+
+**A second review, on those fixes, found six more — every one real again.** Per the 2026-09-08
+lesson that a fix round is unreviewed code written in a hurry, and it earned its keep:
+
+1. **`"3 minggu"` — Malay for three weeks — was stored as three months.** Widening the token list
+   to Malay turned the bare `m` alternative into a prefix match on any m-word; English
+   `"3 weeks"` had always been refused correctly. Tokens are now anchored to a word boundary.
+2. **`rollback.sql` could leave a column stricter than it found it.** Production's nullability is
+   never measured, so if `age` was already nullable, apply was a no-op while rollback still
+   restored NOT NULL — breaking pet creation in a state production was never in. The migration
+   now marks what it relaxes and the rollback restores only marked columns.
+3. **A rollback after go-live could make the migration inapplicable.** Post-migration pets have
+   `age IS NULL`; dropping `birthDate` strands them, and one stranded row aborts the whole table
+   on re-apply. Now named before the drop, with the `UPDATE` to undo it, and walked end to end by
+   checks G6–G8.
+4. **The advisory lock at the top of the file waited outside any timeout**, since the DO block's
+   `lock_timeout` had not been set yet. Bounded by a `SET LOCAL` before it.
+5. **The fraction guard scanned the whole string**, so `"2 years, 12.5 kg"` would have blocked the
+   entire table with advice that did not fit the row. Narrowed to a fraction adjacent to a unit.
+6. **`check("J3 …", true, …)`** — a summary line passing a literal `true`, so it printed `ok`
+   whatever the loop found. That is the exact defect the comment two lines above it describes in
+   an earlier revision of J1, reintroduced while fixing J1.
+
+**The suite is now mutation-tested, not merely green.** Removing the fractional guard from
+`migration.sql` fails C9, C10, C11 and J3, with J3 naming the row it let through. Finding 6 is the
+reason: a green suite says nothing until you have seen it go red for the right cause.
+
+One claim in that review did not survive checking, and is recorded as such: it held `"1½ years"`
+would read as 1 year. It does not — the vulgar fraction is not `[0-9]`, no unit pattern matches,
+and the row is refused as underivable. Check L3 pins it.
+
+**A third review, on the second round's fixes, found five more.** Ranges (`"3-4 years"` took 4 —
+the same defect as `1.5 years`, one separator away from the fix that had just landed); the
+pre-check sorting three of its four refusal verdicts *below* the accepted rows, so the one row
+needing attention sat under the scroll; the rehearsal database being WIN1252 rather than Neon's
+UTF8, which is the encoding the `\M` and `[[:space:]]` evidence depended on; the marker comment
+overwriting any comment already on the column; and `check("A3 …", true)` — a literal assertion,
+twice over, with no crash-safe teardown.
+
+Rewriting A3 immediately caught a regression introduced minutes earlier in that same round:
+`COMMENT ON COLUMN ... IS 'literal' || expr` is a syntax error. The old A3 would have crashed the
+run and shown a stack trace instead of a failing check.
+
+**Three review rounds, seventeen findings, every one real, and the rehearsal was green before
+each round.** That is the argument for the review step, and for mutation-testing a suite rather
+than trusting its colour.
+
+**A fourth review found seven more**, the top two being: every *spaced* range spelling
+(`"1 - 2 years"`, `"6 to 8 months"`, `"between 2 and 3 years"`) still slipped past the range guard
+the round before had just added, because it required the numbers to sit tight against the
+separator; and `rollback.sql` dropped `birthDate` even when `migration.sql` had added nothing,
+which would destroy birthdays this pair never wrote. Both fixed, with the columns now marked the
+same way the NOT NULLs are. It also caught that the Prisma checks drove a bare `findMany` rather
+than the `include: PET_INCLUDE` production sends — the harness now builds the three relation
+tables and drives the real query.
+
+**Four rounds, twenty-four findings, every one real. Three of the four found a defect in the
+previous round's fix.** The file is reviewed, not finished: see "Deliberately not done".
+
+The fix rounds are `00e75f4`, `75b44a4`, `b6cd717`, `77510c5` and the commit after them.
+
+**Then the session holding the contract half made contact, and two of this branch's answers were
+wrong.** PR #94 (`worktree-pet-birth-date-migration`) has the drop; this branch has the expand.
+They proposed expand → soak → contract and one arithmetic change, and the argument was better than
+the one it replaced: standardise on the app's roll-forward, not because either date is more
+correct — both are estimates differing by a day or three — but because roll-forward can be
+**checked by re-derivation against the app's own function**, and clamping can only be compared to
+constants typed by whoever wrote the SQL. Their contract re-derives every row and compares before
+dropping `age`, so a wrong date stops the drop.
+
+Taking that argument seriously forced a second reversal they had not asked for: this branch also
+read Malay age words, which the app does not, so a `"2 tahun"` row would have stored a value their
+re-derivation could never match — the whole table refused at contract time. Malay is now refused
+and named in the pre-check, with the normalisation `UPDATE` in the header for the owner to run
+knowingly. **Refusing more is safe; storing differently is not** — a refused row is never
+backfilled, so nothing downstream can disagree about it. That is also why the `minggu` anchoring
+stays even though the app has that bug.
+
+Settled in `tasks/decisions/2026-09-22-expand-stores-only-what-the-app-computes.md`, which
+supersedes choices 4 and 6 of the first decision entry. The invariant is now executable: **O2**
+asserts every stored date equals `approximateBirthDate`'s output across twelve shapes including
+both rollover cases, and **O1** pins the transcribed rule against `src/data/pets.json` so a
+drifted copy fails first. One of their factual points was already fixed here (the Malay/app
+equivalence claim, corrected in round 3) and I told them so rather than silently agreeing.
+
+**Deliberately not done:**
+- **Putting this on PR #42, as the brief asked.** Three reasons. That branch cannot host the
+  `todo.md` half at all (above). The migration shares no file with PR #42, so coupling a production
+  fix to a conflicted UI PR only delays it. And two other sessions were working PR #42 live while
+  this ran (`pr-42-birth-date` and `pet-birth-date-migration` worktrees) — merging master into it
+  from here would have collided with their conflict resolution. The two files cherry-pick cleanly
+  onto that branch later if it is still wanted there.
+- **Resolving PR #42's conflict** (`src/actions/pets.ts`, one file). That is the other session's
+  lane.
+- **Dropping `age`/`ageCategory`.** The contract half, above.
+- **Applying anything to production, or reading it.** Not permitted to this session, and the owner
+  applies migrations themselves.
+- **Reopening `tasks/archive/pets-json-fallback-reach-unverified.md`**, whose 2026-08-28
+  settlement cites a measurement that does not exist in any commit. Recorded inside the drift entry
+  instead of moving files another session may be holding.
 
 # Sponsor portal production activation — audit, run, close
 
@@ -592,7 +782,11 @@ already wrote a lesson about, found twice more after writing it.
       application; settled `tasks/decisions/2026-09-18-every-email-names-its-audit-entity.md`.
 - [x] Owner: runbook §4 or §5 in production, then merge #46 (merged 2026-09-21; the production
       steps are the owner's report, not observable from here).
-- [ ] Owner: apply the enum migration in the Neon SQL editor (needs no merge).
+- [x] Owner: apply the enum migration in the Neon SQL editor (needed no merge) — reported
+      done and confirmed 2026-09-18 by `db:check-drift` from the main checkout: the
+      `adoption_applications` conversion, both `CREATE TYPE`s and the three status indexes
+      all left the diff. Recorded in
+      `tasks/open/production-schema-has-drifted-ahead-of-master.md`, "Re-measured 2026-09-18".
 - [ ] Owner: decide on `SESSION_SECRET` rotation, now that the cookie-only actions are known.
 - [ ] Owner: decide how to correct the three 2026-09-14 test receipts (offsetting record).
 
