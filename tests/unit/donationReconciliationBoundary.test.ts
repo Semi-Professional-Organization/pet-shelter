@@ -334,6 +334,25 @@ describe("the audit trail says what actually happened", () => {
     expect((received?.details as Record<string, unknown>).pledgeRef).toBe(ref);
     expect(received?.actorEmail).toBe("coordinator@hopeforstrays.org");
   });
+
+  it("keeps the donor's NRIC on the receipt and out of the audit log", async () => {
+    const { reconcileDonationPledgeAction } = await import("@/actions/donations");
+    const { getAuditLogs } = await import("@/lib/domain/auditLog");
+    const { findDonationByReceiptNumber } = await import("@/lib/server/donationLedger");
+
+    const ref = await pledge({ taxIdOrIc: "920512-10-5432", wantsTaxReceipt: true });
+    const settled = await reconcileDonationPledgeAction(ref);
+
+    // On the statutory row, which is what the LHDN export reads...
+    const receipt = await findDonationByReceiptNumber(settled.receiptNumber!);
+    expect(receipt?.taxIdOrIc).toBe("920512-10-5432");
+
+    // ...and in neither audit row. An identifier in `AuditLog.metadata` is personal
+    // data stored a second time, and the sponsorship lane never copied it there.
+    for (const entry of getAuditLogs(20)) {
+      expect(JSON.stringify(entry.details ?? {})).not.toContain("920512-10-5432");
+    }
+  });
 });
 
 describe("the reconciliation boundary is guarded", () => {

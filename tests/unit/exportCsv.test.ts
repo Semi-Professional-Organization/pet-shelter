@@ -3,13 +3,13 @@ import { LHDN_TAX_DEDUCTIBLE_REF, STATUTORY_ROS_REGISTRATION_NO } from "@/lib/do
 import {
   formatCsvField,
   generateReceiptsCsvString,
-  resolveAuditAmountMYR,
   generateAuditLogsCsvString,
   generateApplicationsCsvString,
   generatePetsCsvString,
 } from "@/lib/presentation/exportCsv";
 import { DonationReceipt } from "@/types/sponsorship";
 import { AuditEntry } from "@/lib/domain/auditLog";
+import { isReceiptAuditRow, resolveAuditAmountMYR } from "@/lib/domain/receiptAuditRow";
 import { AdoptionApplicationRecord } from "@/types/application";
 import { Pet } from "@/types/pet";
 
@@ -215,9 +215,16 @@ describe("Applications and Pets CSV Generators", () => {
  * here rather than on a document somebody files.
  */
 describe("a reconciled contribution's audit row exports every column it can fill", () => {
-  /** The "Amount (MYR)" cell of the first data row, exactly as written. */
+  /**
+   * The "Amount (MYR)" cell of the first data row, exactly as written.
+   *
+   * Split on RFC-4180 fields, not on bare commas: every cell is quoted, and a
+   * donor name or tier containing a comma would otherwise shift the index and
+   * make the assertion read some other column.
+   */
   function amountCell(csv: string): string {
-    return csv.split("\r\n")[1].split(",")[6];
+    const cells = csv.split("\r\n")[1].match(/"(?:[^"]|"")*"/g) ?? [];
+    return cells[6];
   }
 
   function reconciledSponsorship(details: Record<string, unknown>): AuditEntry {
@@ -328,7 +335,7 @@ describe("a reconciled contribution's audit row exports every column it can fill
   });
 
   it("does not let an empty or non-numeric amountMYR mask the sen beside it", () => {
-    for (const amountMYR of ["", "not a number", Number.NaN]) {
+    for (const amountMYR of ["", "not a number", Number.NaN, "0x10", "1e3"]) {
       expect(
         amountCell(
           generateReceiptsCsvString([
@@ -344,7 +351,7 @@ describe("a reconciled contribution's audit row exports every column it can fill
   });
 });
 
-describe("resolveAuditAmountMYR is the one answer both readers share", () => {
+describe("resolveAuditAmountMYR is the one answer every reader shares", () => {
   it("resolves sen, then ringgit, then nothing", () => {
     expect(resolveAuditAmountMYR({ amountSen: 12345 })).toBe(123.45);
     expect(resolveAuditAmountMYR({ amountMYR: 50 })).toBe(50);
@@ -352,5 +359,57 @@ describe("resolveAuditAmountMYR is the one answer both readers share", () => {
     expect(resolveAuditAmountMYR({})).toBeUndefined();
     expect(resolveAuditAmountMYR({ amountMYR: "", amountSen: null })).toBeUndefined();
     expect(resolveAuditAmountMYR({ amountMYR: Number.NaN })).toBeUndefined();
+  });
+
+  it("does not let a zero, negative or fractional sen mask the ringgit beside it", () => {
+    // No receipt is issued for nothing, so a stored zero is a placeholder. Read
+    // as authoritative, `amountSen: 0` would turn a real RM 250 into RM 0.00 on
+    // the export — the claimed zero this resolver exists to prevent.
+    for (const amountSen of [0, "0", -500, 100.5]) {
+      expect(resolveAuditAmountMYR({ amountMYR: 250, amountSen })).toBe(250);
+    }
+    expect(resolveAuditAmountMYR({ amountSen: 0 })).toBeUndefined();
+  });
+
+  it("reads ringgit a person formatted, and refuses what merely parses", () => {
+    expect(resolveAuditAmountMYR({ amountMYR: "1,250.00" })).toBe(1250);
+    expect(resolveAuditAmountMYR({ amountMYR: "RM 250.00" })).toBe(250);
+    // `Number()` would call these 16 and 1000.
+    expect(resolveAuditAmountMYR({ amountMYR: "0x10" })).toBeUndefined();
+    expect(resolveAuditAmountMYR({ amountMYR: "1e3" })).toBeUndefined();
+  });
+});
+
+describe("isReceiptAuditRow is the one classifier every reader shares", () => {
+  const row = (over: Record<string, unknown>) => ({
+    action: "PET_UPDATED",
+    entity: "Pet",
+    details: {},
+    ...over,
+  });
+
+  it("admits the three shapes a receipt is written in", () => {
+    expect(isReceiptAuditRow(row({ action: "DONATION_RECEIVED" }))).toBe(true);
+    expect(isReceiptAuditRow(row({ entity: "DonationReceipt" }))).toBe(true);
+    expect(isReceiptAuditRow(row({ details: { receiptNumber: "HFS-DON-202609-0001" } }))).toBe(true);
+  });
+
+  it("does not call a row a receipt for carrying an empty receiptNumber key", () => {
+    // The viewer and the receipts tab used to test for the key's presence while
+    // the exporter tested its truthiness, so this row wore a donation badge on
+    // screen and was missing from the CSV exported from that same screen.
+    expect(isReceiptAuditRow(row({ details: { receiptNumber: null } }))).toBe(false);
+    expect(isReceiptAuditRow(row({ details: { receiptNumber: "" } }))).toBe(false);
+  });
+
+  it("keeps a pending pledge and a dismissal out of every receipt view", () => {
+    expect(
+      isReceiptAuditRow(
+        row({ action: "DONATION_PLEDGED", entity: "DonationPledge", details: { pledgeRef: "x" } })
+      )
+    ).toBe(false);
+    expect(
+      isReceiptAuditRow(row({ action: "DONATION_PLEDGE_REJECTED", entity: "DonationPledge" }))
+    ).toBe(false);
   });
 });

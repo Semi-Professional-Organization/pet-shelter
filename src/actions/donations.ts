@@ -443,7 +443,11 @@ export async function reconcileDonationPledgeAction(
       frequency: donation.frequency,
       paymentMethod: donation.paymentMethod,
       targetPetName: donation.targetPetName,
-      taxIdOrIc: donation.taxIdOrIc,
+      // No `taxIdOrIc`, on purpose, and the same as the sponsorship lane. The
+      // identifier is an NRIC; it lives on the `Donation` row, which is where the
+      // statutory export reads it, and copying it into `AuditLog.metadata` stores
+      // personal data a second time in a table with a different retention story.
+      // See `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
     },
   });
 

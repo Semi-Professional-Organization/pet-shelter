@@ -19,7 +19,11 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAuditLogController, AuditTabFilter } from "@/hooks/useAuditLogController";
-import { resolveAuditAmountMYR } from "@/lib/presentation/exportCsv";
+import {
+  auditDetails,
+  isReceiptAuditRow,
+  resolveAuditAmountMYR,
+} from "@/lib/domain/receiptAuditRow";
 
 export function AuditLogViewer() {
   const { state, handlers } = useAuditLogController();
@@ -178,12 +182,9 @@ export function AuditLogViewer() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredLogs.map((log) => {
-                  const isDonation =
-                    log.action === "DONATION_RECEIVED" ||
-                    log.entity === "DonationReceipt" ||
-                    Boolean(log.details && typeof log.details === "object" && "receiptNumber" in log.details);
+                  const isDonation = isReceiptAuditRow(log);
 
-                  const details = (log.details || {}) as Record<string, unknown>;
+                  const details = auditDetails(log);
                   const donationAmountMYR = resolveAuditAmountMYR(details);
 
                   return (

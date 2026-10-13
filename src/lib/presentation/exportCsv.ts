@@ -6,6 +6,12 @@ import {
   LHDN_TAX_DEDUCTIBLE_REF,
   STATUTORY_ROS_REGISTRATION_NO,
 } from "@/lib/domain/shelterIdentity";
+import {
+  auditDetails,
+  formatAmountCell,
+  isReceiptAuditRow,
+  resolveAuditAmountMYR,
+} from "@/lib/domain/receiptAuditRow";
 
 /**
  * Escapes a single CSV field following RFC-4180:
@@ -180,37 +186,6 @@ export function exportPetsToCsv(pets: Pet[], filenamePrefix = "hope-for-strays-p
   triggerCsvDownload(csvContent, `${filenamePrefix}-${timestamp}.csv`);
 }
 
-/** A finite number from a number or a numeric string; `undefined` otherwise. */
-function toFiniteNumber(value: unknown): number | undefined {
-  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-}
-
-/**
- * The ringgit amount an audit row's details record, or `undefined` if it holds none.
- *
- * One resolver for every reader of these rows. The CSV exporter and the audit
- * viewer each used to read `details.amountMYR` on their own, and reconciled
- * sponsorships have never carried that key in their history — so both showed
- * nothing, and fixing the exporter alone left the two disagreeing about the same
- * row on the same screen.
- *
- * `amountSen` first: it is the exact integer every ledger stores, and `amountMYR`
- * is a float derived from it, so when a row carries both the sen is the one to
- * trust. Numeric strings are accepted because the details round-trip through JSON
- * and a backfill can leave either key as text. `""`, `NaN` and anything else
- * resolve to `undefined` — which callers must render as *unknown*, never as zero.
- */
-export function resolveAuditAmountMYR(details: Record<string, unknown>): number | undefined {
-  const sen = toFiniteNumber(details.amountSen);
-  if (sen !== undefined) return sen / 100;
-  return toFiniteNumber(details.amountMYR);
-}
-
 /**
  * Generates an RFC-4180 formatted CSV string of official donation receipts
  * tailored for Malaysian LHDN Section 44(6) tax reporting and internal accounting.
@@ -240,8 +215,9 @@ export function generateReceiptsCsvString(
     if ("receiptNumber" in item && "donorName" in item) {
       // Standard DonationReceipt object
       const r = item as DonationReceipt;
-      const formattedAmount =
-        typeof r.amountMYR === "number" ? r.amountMYR.toFixed(2) : String(r.amountMYR);
+      // The same formatter as the audit-row branch below, so the two cannot print
+      // the same figure differently — or print `NaN` and `undefined` at all.
+      const formattedAmount = formatAmountCell(r.amountMYR);
 
       rows.push([
         r.receiptNumber,
@@ -261,20 +237,13 @@ export function generateReceiptsCsvString(
     } else if ("action" in item) {
       // AuditEntry representing a donation
       const entry = item as AuditEntry;
-      const d = (entry.details || {}) as Record<string, unknown>;
-      const isDonation =
-        entry.action === "DONATION_RECEIVED" ||
-        entry.entity === "DonationReceipt" ||
-        Boolean(d.receiptNumber);
+      const d = auditDetails(entry);
 
-      if (isDonation) {
-        // Resolved by `resolveAuditAmountMYR`, shared with the audit viewer.
-        //
-        // An unresolvable amount yields an empty cell, never `0.00`. The old
-        // `?? 0` made "we do not know what this was" indistinguishable from "this
-        // was nothing", which on a tax return is the more dangerous of the two.
-        const amountMYR = resolveAuditAmountMYR(d);
-        const formattedAmount = amountMYR === undefined ? "" : amountMYR.toFixed(2);
+      // Classified and priced by `src/lib/domain/receiptAuditRow.ts`, which the
+      // audit viewer and the receipts tab use too. An unresolvable amount is an
+      // empty cell, never `0.00`.
+      if (isReceiptAuditRow(entry)) {
+        const formattedAmount = formatAmountCell(resolveAuditAmountMYR(d));
 
         const formattedDate = entry.createdAt.includes("T")
           ? entry.createdAt.replace("T", " ").slice(0, 19)

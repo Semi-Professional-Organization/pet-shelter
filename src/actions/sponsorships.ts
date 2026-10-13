@@ -406,15 +406,10 @@ export async function reconcilePetSponsorshipAction(
       // it — which every other reader uses — left the money column reading zero on
       // a document filed with LHDN.
       //
-      // `taxIdOrIc` is absent here and present on the twin row in
-      // `src/actions/donations.ts`, which this file does not have the standing to
-      // change on its own. The consequence is visible in one document: in the
-      // fallback export a general donor's "Tax ID / IC / Passport" cell is filled
-      // and a sponsor's is blank, though both supplied one at checkout and both
-      // receipts carry it. Either answer is defensible — an NRIC in `AuditLog`
-      // metadata is PII spread, and a blank statutory column is a gap — but the
-      // two paths disagreeing is not. See
-      // `tasks/open/two-contribution-lanes-disagree-about-storing-an-nric.md`.
+      // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. It is
+      // an NRIC; it lives on the `Donation` row, where the statutory export reads
+      // it, and is not copied into `AuditLog.metadata`. See
+      // `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
       sponsorName: record.sponsorName,
       sponsorEmail: record.sponsorEmail,
       amountMYR: ringgitFromSen(record.amountSen),
