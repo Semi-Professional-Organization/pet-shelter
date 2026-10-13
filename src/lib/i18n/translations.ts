@@ -74,6 +74,8 @@ export interface TranslationDictionary {
     visitingHoursLabel: string;
     visitingHoursText: string;
     locationText: string;
+    tnrmHeadline: string;
+    imageAlt: string;
   };
   home: {
     bulletinsTitle: string;
@@ -82,6 +84,7 @@ export interface TranslationDictionary {
     availableSubtitle: string;
     viewAllPets: string;
     galleryLoading: string;
+    howItWorksEyebrow: string;
     howItWorksTitle: string;
     howItWorksSubtitle: string;
     step1Title: string;
@@ -445,6 +448,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       visitingHoursLabel: "Sanctuary Visiting Hours:",
       visitingHoursText: "Tuesday through Sunday, 10:00 AM – 5:00 PM. Walk-ins welcome.",
       locationText: "Petaling Jaya, Selangor",
+      tnrmHeadline: "Coexistence through TNRM & Education",
+      imageAlt: "Rescued shelter animals enjoying sanctuary grounds",
     },
     home: {
       bulletinsTitle: "Shelter Bulletins & Updates",
@@ -453,6 +458,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       availableSubtitle: "Health-checked, vaccinated, microchipped, and sterilized before rehoming.",
       viewAllPets: "View All Adoptable Pets",
       galleryLoading: "Loading rescue animals...",
+      howItWorksEyebrow: "Adoption Protocol",
       howItWorksTitle: "Our Transparent Adoption Journey",
       howItWorksSubtitle: "We ensure every rescue goes to a safe, committed home through a straightforward 3-step process with zero commercial adoption fees.",
       step1Title: "Browse & Submit Application",
@@ -819,6 +825,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       visitingHoursLabel: "Waktu Lawatan Pusat:",
       visitingHoursText: "Selasa hingga Ahad, 10:00 Pagi – 5:00 Petang. Lawatan terus dialu-alukan.",
       locationText: "Petaling Jaya, Selangor",
+      tnrmHeadline: "Kewujudan Bersama melalui TNRM & Pendidikan",
+      imageAlt: "Haiwan reskue menikmati kawasan santuari",
     },
     home: {
       bulletinsTitle: "Buletin & Pengumuman Pusat Perlindungan",
@@ -827,6 +835,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       availableSubtitle: "Telah diperiksa kesihatan, divaksin, dipasang cip mikro, dan dimandulkan sebelum adopsi.",
       viewAllPets: "Lihat Semua Haiwan Sedia Diadopsi",
       galleryLoading: "Memuatkan haiwan reskue...",
+      howItWorksEyebrow: "Protokol Adopsi Santuari",
       howItWorksTitle: "Proses Adopsi Telus & Mudah",
       howItWorksSubtitle: "Kami memastikan setiap haiwan diserahkan kepada keluarga yang selamat dan bertanggungjawab melalui 3 langkah mudah tanpa sebarang yuran komersial.",
       step1Title: "Semak & Hantar Permohonan",

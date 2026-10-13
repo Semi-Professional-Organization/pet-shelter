@@ -66,7 +66,18 @@ const ANCHORABLE_ELEMENTS = new Set([
   "h3",
 ]);
 
-const ID_ATTRIBUTE = /\bid=["']([A-Za-z0-9_-]+)["']/g;
+/**
+ * `id="…"` as its own attribute.
+ *
+ * The leading `[\s{]` matters: `\bid=` also matches the tail of
+ * `data-pet-id=` and `aria-labelledby`-style names, because `\b` sits between
+ * the hyphen and the `i`. `div` is anchorable, so
+ * `<div data-pet-id="luna">` would have registered `luna` as a scroll anchor
+ * that no browser can find, and a link to `/#luna` would have passed.
+ * `PetChooserCarousel.tsx` already renders `data-pet-id`; it escaped only
+ * because its value is an interpolation the capture rejects.
+ */
+const ID_ATTRIBUTE = /[\s{]id=["']([A-Za-z0-9_-]+)["']/g;
 const RENDERED_COMPONENT = /<([A-Z]\w*)/g;
 
 /**
@@ -87,12 +98,17 @@ function stripComments(text: string): string {
       // whose whole value is naming where the broken link sits must not
       // misname it by 33 lines, into a different component.
       .replace(/\/\*[\s\S]*?\*\//g, blank)
-      // A line comment counts only where the slashes open a token: at the
-      // start of a line, or after whitespace. That spares every `https://` in
-      // a JSX attribute, whose slashes follow a colon, while still blanking a
-      // mount someone commented out with `//` — which the block-comment pass
-      // alone let through, leaving the same hole it was written to close.
-      .replace(/(^|\s)\/\/[^\n]*/gm, (match, lead: string) => lead + blank(match.slice(lead.length)))
+      // A line comment counts only when the slashes OPEN the line, after
+      // nothing but indentation. That blanks a mount someone commented out
+      // with `//` — the hole the block-comment pass alone left — without
+      // needing to know whether a mid-line `//` is a comment, a `https://`,
+      // or text inside a string. An earlier version blanked from any
+      // whitespace-preceded `//`, which would have cut the rest of the line
+      // out of `<a title="Tue // Sun" href="/#ghost">` and dropped a broken
+      // link from the scan entirely: a false green in the one guard this
+      // branch relies on. A trailing comment after real code is left alone,
+      // which can only over-accept, never under-report.
+      .replace(/^([ \t]*)\/\/[^\n]*/gm, (match, indent: string) => indent + blank(match.slice(indent.length)))
   );
 }
 
@@ -180,10 +196,33 @@ function owningTag(body: string, idIndex: number): string {
   return /^<\s*([A-Za-z][\w.-]*)/.exec(body.slice(open, idIndex))?.[1] ?? "";
 }
 
-/** `""` -> `src/app/page.tsx`; `"get-involved"` -> `src/app/get-involved/page.tsx`. */
+/**
+ * `""` -> `src/app/page.tsx`; `"get-involved"` -> `src/app/get-involved/page.tsx`.
+ *
+ * A literal segment that matches no directory falls back to a dynamic one, so
+ * `/pets/luna#medical` resolves through `src/app/pets/[id]/page.tsx` instead of
+ * being reported broken against a page that serves it. That false red is the
+ * worst failure this guard has — see the note on `entriesForRoute`.
+ */
 function pageForRoute(route: string): string | null {
-  const file = join(APP, ...route.split("/").filter(Boolean), "page.tsx");
-  return existsSync(file) ? file : null;
+  let dir = APP;
+  for (const segment of route.split("/").filter(Boolean)) {
+    const literal = join(dir, segment);
+    if (existsSync(literal) && statSync(literal).isDirectory()) {
+      dir = literal;
+      continue;
+    }
+    const dynamic = readdirSync(dir).find(
+      (name) =>
+        name.startsWith("[") &&
+        name.endsWith("]") &&
+        statSync(join(dir, name)).isDirectory(),
+    );
+    if (!dynamic) return null;
+    dir = join(dir, dynamic);
+  }
+  const page = join(dir, "page.tsx");
+  return existsSync(page) ? page : null;
 }
 
 /**
@@ -198,29 +237,59 @@ function pageForRoute(route: string): string | null {
 function entriesForRoute(route: string): string[] {
   const page = pageForRoute(route);
   if (!page) return [];
-  const segments = route.split("/").filter(Boolean);
+  // Walk up from the resolved page rather than rebuilding the path from the
+  // route, so a dynamic segment's layouts are found too.
   const layouts: string[] = [];
-  for (let depth = 0; depth <= segments.length; depth += 1) {
-    const layout = join(APP, ...segments.slice(0, depth), "layout.tsx");
+  for (let dir = dirname(page); dir.startsWith(APP); dir = dirname(dir)) {
+    const layout = join(dir, "layout.tsx");
     if (existsSync(layout)) layouts.push(layout);
   }
   return [page, ...layouts];
 }
 
+/**
+ * Source text with comments blanked, read once per file.
+ *
+ * The walk enters `HomeSections.tsx` once per component it reaches, and
+ * `anchorLinks` reads the whole tree again afterwards. Unmemoized that was
+ * ~7.5s for four assertions in what is meant to be the fastest tier.
+ */
+const sourceCache = new Map<string, string>();
+function readStripped(file: string): string {
+  let text = sourceCache.get(file);
+  if (text === undefined) {
+    text = stripComments(readFileSync(file, "utf8"));
+    sourceCache.set(file, text);
+  }
+  return text;
+}
+
 /** Ids rendered by a route, walking down from each of its entry files. */
-function idsRenderedBy(entries: string | string[]): Set<string> {
+function idsRenderedBy(
+  entries: string | string[],
+  skipped?: Set<string>,
+): Set<string> {
   const roots = typeof entries === "string" ? [entries] : entries;
   const ids = new Set<string>();
   const seen = new Set<string>();
 
   function visit(file: string, source: string) {
-    const text = stripComments(readFileSync(file, "utf8"));
+    const text = readStripped(file);
     const imports = importMap(text, file);
     const blocks = componentBlocks(text);
     // An entry file is one component, so its whole text is its body.
     // Elsewhere, only the named component's block counts.
     const body = roots.includes(file) ? text : (blocks.get(source) ?? "");
-    if (!body) return;
+    if (!body) {
+      // The walk gave up here: `componentBlocks` only sees declarations at
+      // column 0 of the form `function Name` or `const Name =`, so a
+      // `memo(function Inner(){})` wrapper or a barrel re-export loses the
+      // whole subtree — and every id below it. Recorded so the failure says
+      // the parser stopped, rather than blaming the link. Without this the
+      // next person loosens the guard instead of fixing the parser.
+      skipped?.add(`${relative(ROOT, file).split(sep).join("/")}::${source}`);
+      return;
+    }
 
     for (const match of body.matchAll(ID_ATTRIBUTE)) {
       if (ANCHORABLE_ELEMENTS.has(owningTag(body, match.index!))) ids.add(match[1]);
@@ -264,7 +333,7 @@ interface AnchorLink {
 function anchorLinks(): AnchorLink[] {
   const found: AnchorLink[] = [];
   for (const file of sourceFiles()) {
-    stripComments(readFileSync(file, "utf8"))
+    readStripped(file)
       .split(/\r?\n/)
       .forEach((text, i) => {
         for (const [, path, id] of text.matchAll(
@@ -325,7 +394,7 @@ describe("in-app anchor links", () => {
           "    <main>",
           "      <Live />",
           "      {/* <Dead /> */}",
-          "      // <Dead />",
+          "      // <DeadToo />",
           "    </main>",
           "  );",
           "}",
@@ -335,10 +404,13 @@ describe("in-app anchor links", () => {
         join(fixtures, "sections.tsx"),
         [
           "export function Live() {",
-          '  return <section id="live-anchor" />;',
+          '  return <section id="live-anchor" data-pet-id="phantom-anchor" />;',
           "}",
           "export function Dead() {",
           '  return <section id="dead-anchor" />;',
+          "}",
+          "export function DeadToo() {",
+          '  return <section id="dead-too-anchor" />;',
           "}",
         ].join("\n"),
       );
@@ -347,9 +419,35 @@ describe("in-app anchor links", () => {
       expect(ids).toContain("live-anchor");
       // Commented out both ways a mount can be commented out.
       expect(ids).not.toContain("dead-anchor");
+      expect(ids).not.toContain("dead-too-anchor");
+      // `data-pet-id` is not an anchor. `\bid=` used to match its tail, which
+      // would register a scroll target no browser can find.
+      expect(ids).not.toContain("phantom-anchor");
     } finally {
       rmSync(fixtures, { recursive: true, force: true });
     }
+  });
+
+  it("keeps a link written after a mid-line double slash", () => {
+    // `<a title="Tue // Sun" href="/#ghost">` is one line. Blanking from any
+    // whitespace-preceded `//` cut the href out of it, so a broken link
+    // vanished from the scan — a false green in the guard the branch relies
+    // on. Only a line that *opens* with slashes is a comment.
+    const line = '<a title="Tue // Sun" href="/#ghost">x</a>';
+    expect(stripComments(line)).toContain("/#ghost");
+
+    // And the commented-out form is still blanked.
+    expect(stripComments("      // <Dead />")).not.toContain("Dead");
+  });
+
+  it("resolves a literal link into a dynamic route", () => {
+    // `src/app/pets/[id]/page.tsx` serves `/pets/luna`. Resolving by literal
+    // segments reported such a link broken against a page that serves it —
+    // the false red this file calls its worst failure mode.
+    expect(pageForRoute("pets/luna")).not.toBeNull();
+    expect(pageForRoute("pets/luna")!.split(sep).join("/")).toContain("pets/[id]/page.tsx");
+    // A route that genuinely does not exist still resolves to nothing.
+    expect(pageForRoute("no-such-route")).toBeNull();
   });
 
   it("reports the line the broken link is actually written on", () => {
@@ -374,10 +472,14 @@ describe("in-app anchor links", () => {
 
   it("points every in-app anchor link at an id that route renders", () => {
     const idsByRoute = new Map<string, Set<string> | null>();
+    const skipped = new Set<string>();
     const unresolved = anchorLinks().filter((link) => {
       if (!idsByRoute.has(link.route)) {
         const entries = entriesForRoute(link.route);
-        idsByRoute.set(link.route, entries.length ? idsRenderedBy(entries) : null);
+        idsByRoute.set(
+          link.route,
+          entries.length ? idsRenderedBy(entries, skipped) : null,
+        );
       }
       return !idsByRoute.get(link.route)?.has(link.id);
     });
@@ -386,9 +488,16 @@ describe("in-app anchor links", () => {
       .map(([route, ids]) => `/${route} -> ${ids ? [...ids].sort().join(", ") : "NO page.tsx"}`)
       .join("\n  ");
 
+    // A component the walk could not parse is reported alongside the links,
+    // because the two failures look identical from the outside and only one
+    // of them is the link's fault.
+    const parserGaps = skipped.size
+      ? `\n  walk stopped at (parser gap, not a broken link): ${[...skipped].sort().join(", ")}`
+      : "";
+
     expect(
       unresolved.map((u) => `${u.file}:${u.line} -> ${u.href}`),
-      `routes reached by an anchor link:\n  ${rendered}`,
+      `routes reached by an anchor link:\n  ${rendered}${parserGaps}`,
     ).toEqual([]);
   });
 });

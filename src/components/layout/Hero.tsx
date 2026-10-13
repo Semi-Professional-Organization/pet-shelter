@@ -128,7 +128,7 @@ export interface HeroProps {
 }
 
 export function Hero({ metrics }: HeroProps = {}) {
-  const { isMs } = useLanguage();
+  const { isMs, t } = useLanguage();
 
   const impactStats =
     metrics && metrics.length > 0 ? metrics : [...HOME_METRIC_BASELINE];
@@ -143,9 +143,7 @@ export function Hero({ metrics }: HeroProps = {}) {
 
             <div className="space-y-2">
               <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.15]">
-                {isMs
-                  ? "Kewujudan Bersama melalui TNRM & Pendidikan"
-                  : "Coexistence through TNRM & Education"}
+                {t("hero.tnrmHeadline")}
               </h1>
             </div>
 
@@ -215,11 +213,7 @@ export function Hero({ metrics }: HeroProps = {}) {
             <div className="relative aspect-4/3 w-full overflow-hidden border border-border bg-muted shadow-md rounded-3xl">
               <Image
                 src="https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1000&q=80"
-                alt={
-                  isMs
-                    ? "Haiwan reskue menikmati kawasan santuari"
-                    : "Rescued shelter animals enjoying sanctuary grounds"
-                }
+                alt={t("hero.imageAlt")}
                 fill
                 priority
                 className="object-cover"

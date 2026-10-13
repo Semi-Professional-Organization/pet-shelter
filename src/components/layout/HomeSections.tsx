@@ -19,6 +19,19 @@ import {
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { useLanguage } from "@/components/providers/LanguageProvider";
+import type { TranslationDictionary } from "@/lib/i18n/translations";
+
+/**
+ * A dot path into the `home` namespace, checked against the dictionary.
+ *
+ * `t()` takes a plain `string`, and its last resort is to return the path it
+ * was handed. So a key renamed in `translations.ts` type-checks clean, passes
+ * the key-parity test in `tests/unit/i18n.test.ts`, and renders the literal
+ * text `home.step1Title` to a visitor as a card heading. Annotating the keys
+ * makes that rename a compile error, the way `BulletinKey` already does for
+ * the `bulletins` namespace — the protection was added there and not here.
+ */
+type HomeKey = `home.${keyof TranslationDictionary["home"]}`;
 
 /**
  * The two strings `src/app/page.tsx` used to render itself.
@@ -320,31 +333,35 @@ export function HomeQuickActionsSection() {
  * falls through to the `en` dictionary, so a literal here could only ever be a
  * third copy, unreachable and free to drift.
  *
- * The heading, eyebrow and subtitle stay inline, like every other section in
- * this file. `home.howItWorksTitle`/`Subtitle` are not second copies of them:
- * they are different sentences, so adopting those keys would be a copy change
- * rather than a deduplication. They remain unused.
+ * The heading, eyebrow and subtitle read from the dictionary too. They were
+ * left inline at first, on the grounds that `home.howItWorksTitle`/`Subtitle`
+ * hold different sentences rather than second copies — true, but it left half
+ * of one component translator-reachable and half not, which is the same
+ * split-source defect one level down. Adopting the keys does change the
+ * visible wording; this section had rendered nowhere since `1137d3e`, so there
+ * was no shipped copy to preserve, and the dictionary's version names the
+ * three-step process the cards below actually show.
  */
 export function HomeProcessSection() {
-  const { isMs, t } = useLanguage();
+  const { t } = useLanguage();
 
-  const steps = [
+  const steps: { num: string; titleKey: HomeKey; descKey: HomeKey; icon: typeof FileText }[] = [
     {
       num: "01",
-      title: t("home.step1Title"),
-      description: t("home.step1Desc"),
+      titleKey: "home.step1Title",
+      descKey: "home.step1Desc",
       icon: FileText,
     },
     {
       num: "02",
-      title: t("home.step2Title"),
-      description: t("home.step2Desc"),
+      titleKey: "home.step2Title",
+      descKey: "home.step2Desc",
       icon: Users,
     },
     {
       num: "03",
-      title: t("home.step3Title"),
-      description: t("home.step3Desc"),
+      titleKey: "home.step3Title",
+      descKey: "home.step3Desc",
       icon: HomeIcon,
     },
   ];
@@ -354,15 +371,13 @@ export function HomeProcessSection() {
       <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
         <div className="max-w-2xl mb-10">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-            {isMs ? "Protokol Adopsi Santuari" : "Adoption Protocol"}
+            {t("home.howItWorksEyebrow")}
           </span>
           <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
-            {isMs ? "Bagaimana Proses Adopsi Berfungsi" : "How Adoption Works"}
+            {t("home.howItWorksTitle")}
           </h2>
           <p className="text-base text-muted-foreground mt-2 leading-relaxed">
-            {isMs
-              ? "Proses berstruktur kami memastikan padanan yang bertanggungjawab antara haiwan reskue dan keluarga di seluruh Lembah Klang."
-              : "Our structured adoption process ensures responsible matching between animals and families across Selangor and the Klang Valley."}
+            {t("home.howItWorksSubtitle")}
           </p>
         </div>
 
@@ -384,10 +399,10 @@ export function HomeProcessSection() {
                     </div>
                   </div>
                   <h3 className="font-heading text-lg font-bold tracking-tight text-foreground">
-                    {step.title}
+                    {t(step.titleKey)}
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {step.description}
+                    {t(step.descKey)}
                   </p>
                 </div>
               </div>

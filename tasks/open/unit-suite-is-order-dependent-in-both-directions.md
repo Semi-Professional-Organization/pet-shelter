@@ -73,6 +73,30 @@ closing. The honest reading of a green run today is "green, or not yet unlucky".
 real time: this was investigated twice from scratch, by two sessions, each as a suspected
 regression in an unrelated change.
 
+## The components tier does it too (observed 2026-10-14)
+
+Not only the unit project. Measured on a branch tree merged with `origin/master` at `e99ebf8`,
+nothing else running:
+
+- `npx vitest run --project components` → **`10 failed | 3 passed (13)`** · `12 failed (195)`.
+  One failure per file across ten unrelated files: `AdminLoginPage`, `AdoptionForm`,
+  `DonationDeepLink`, `DonationReceiptIntegrity`, `home`, `homeMalay`, `PetCard`,
+  `PetChooserCarousel`, `SponsorshipModal`, `usePetGalleryController`.
+- **The same ten files, re-run together: `10 passed (10)` · `168 passed (168)`.**
+
+Three of the twelve were `Hook timed out in 10000ms` against the harness `beforeEach`, which the
+unit project works around with `testTimeout: 20_000` — `hookTimeout` is a separate setting and is
+left at its 10s default in every project. That is a lead for the timeout-shaped subset, not for the
+assertion-shaped one.
+
+Same session, the unit project: `16 failed | 84 passed` with 17 failures, and `16 passed (16)` ·
+`369 passed (369)` for those same sixteen files alone. So the "fails only inside the full run"
+direction reproduces in both tiers.
+
+Consequence for the settle condition below: a fix verified only against `--project unit` is not
+enough, and `npm run test:all` — which runs all three projects in one invocation — is the most
+loaded schedule of all.
+
 **Settles when:** someone runs the two repros above — they need no setup and take under a minute
 each — decides whether these are one defect or two, and fixes them; then runs the full unit
 project three times *under load* and confirms the counts match. Until then, a green `npm test` in

@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { PetMatchQuiz } from "@/components/features/pets/PetMatchQuiz";
 import { SponsorshipModal } from "@/components/features/pets/SponsorshipModal";
 import { Hero } from "@/components/layout/Hero";
+import { Navbar } from "@/components/layout/Navbar";
 import { renderWithLanguage } from "./support/render";
 
 /**
@@ -35,7 +36,23 @@ vi.mock("@/components/features/pets/SponsorshipModal", () => ({
 }));
 
 describe("Hero dialog mounts", () => {
+  it("substitutes both dialog modules for a component that does mount them", () => {
+    // The positive control. Both assertions below are "was not called", which
+    // would pass just as well if the mock factory key were misspelled, the
+    // import specifier renamed, or the substitution not reaching the tree at
+    // all — the mocks would simply never run. `Navbar` mounts both dialogs,
+    // so if the wiring is live it must record them. Without this case, the
+    // Hero assertions are assumed rather than discriminating.
+    renderWithLanguage(<Navbar />);
+
+    expect(vi.mocked(PetMatchQuiz)).toHaveBeenCalled();
+    expect(vi.mocked(SponsorshipModal)).toHaveBeenCalled();
+  });
+
   it("renders neither the quiz nor the sponsorship dialog", () => {
+    vi.mocked(PetMatchQuiz).mockClear();
+    vi.mocked(SponsorshipModal).mockClear();
+
     renderWithLanguage(<Hero />);
 
     expect(vi.mocked(PetMatchQuiz)).not.toHaveBeenCalled();
