@@ -204,8 +204,8 @@ describe("Rehabilitation Status Lifecycle & Persistence", () => {
       name: "Tuah",
       species: "dog" as const,
       breed: "Malaysian Local Mixed",
-      age: "1 year",
-      ageCategory: "young" as const,
+      birthDate: "2025-06-02",
+      birthDateIsEstimate: true,
       gender: "Male" as const,
       size: "Medium" as const,
       weight: "14 kg",
@@ -258,6 +258,118 @@ describe("Rehabilitation Status Lifecycle & Persistence", () => {
       expect(petFormSchema.safeParse({ ...baseForm, rehabProgressPercent: -1 }).success).toBe(false);
       expect(petFormSchema.safeParse({ ...baseForm, rehabProgressPercent: 101 }).success).toBe(false);
       expect(petFormSchema.safeParse({ ...baseForm, rehabProgressPercent: 12.5 }).success).toBe(false);
+    });
+
+    // The form cannot reach these: `PetFormDialog` binds max={intakeDate} on the date input, so
+    // the browser's own constraint validation refuses the submit before the resolver runs. This
+    // rule guards the action layer, where a Server Action argument is untrusted input and the
+    // `max` attribute does not exist. Specified here because nothing else specifies it.
+    it("should reject a birth date after the intake date", () => {
+      const parsed = petFormSchema.safeParse({ ...baseForm, birthDate: "2026-08-01" });
+
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues).toContainEqual(
+          expect.objectContaining({
+            path: ["birthDate"],
+            message: "Birth date 2026-08-01 is after the intake date 2026-06-02",
+          })
+        );
+      }
+    });
+
+    it("should reject a birth date in the future even when intakeDate is unusable", () => {
+      // The relative rule above is skipped when intakeDate fails its shape test, and intakeDate is
+      // only `z.string().min(4)`. On the action path that leaves a Server Action argument free to
+      // carry a birthday in 2099, which renders as a plausible "1 month" because
+      // computeAgeInMonths clamps a negative age to zero. Found by review.
+      const parsed = petFormSchema.safeParse({
+        ...baseForm,
+        intakeDate: "2026",
+        birthDate: "2099-01-01",
+      });
+
+      expect(parsed.success).toBe(false);
+      if (!parsed.success) {
+        expect(parsed.error.issues).toContainEqual(
+          expect.objectContaining({
+            path: ["birthDate"],
+            message: "Birth date 2099-01-01 is in the future",
+          })
+        );
+      }
+    });
+
+    it("should accept a birth date of today, whatever the session's timezone", () => {
+      // The bound is tomorrow in UTC, not today, so an animal born this morning in Kuala Lumpur
+      // is not refused because UTC has not caught up.
+      const today = new Date().toISOString().slice(0, 10);
+      expect(
+        petFormSchema.safeParse({ ...baseForm, intakeDate: today, birthDate: today }).success
+      ).toBe(true);
+    });
+
+    it("should leave birthDateIsEstimate absent when the payload omits it", () => {
+      // `updatePet` merges `{ ...existing, ...validated }`. If the schema defaulted this field,
+      // the key would be present on every parse and a caller that merely did not mention the flag
+      // would overwrite a stored `false` with `true` — silently demoting a birthday someone
+      // actually knew to a guess, which is the one thing the field exists to prevent. Found on the
+      // neighbouring PR's code and confirmed here before the default was removed.
+      const withoutFlag: Record<string, unknown> = { ...baseForm };
+      delete withoutFlag.birthDateIsEstimate;
+      const parsed = petFormSchema.safeParse(withoutFlag);
+
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect("birthDateIsEstimate" in parsed.data).toBe(false);
+
+        const existing = { birthDateIsEstimate: false };
+        expect({ ...existing, ...parsed.data }.birthDateIsEstimate).toBe(false);
+      }
+    });
+
+    it("should keep an explicit birthDateIsEstimate of false", () => {
+      const parsed = petFormSchema.safeParse({ ...baseForm, birthDateIsEstimate: false });
+
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.birthDateIsEstimate).toBe(false);
+      }
+    });
+
+    it("should accept a birth date on the intake date itself", () => {
+      // An animal born the day it arrived is a real case — a litter surrendered at birth — so the
+      // boundary is inclusive, and pinning it stops a later `>=` from quietly refusing them.
+      expect(
+        petFormSchema.safeParse({ ...baseForm, birthDate: baseForm.intakeDate }).success
+      ).toBe(true);
+    });
+
+    it("should require the birth date to be a real calendar day", () => {
+      expect(petFormSchema.safeParse({ ...baseForm, birthDate: "2 years" }).success).toBe(false);
+      // The message matters: an empty field is a thing the operator has not done yet, not a
+      // malformed date, and the regex's "must be in YYYY-MM-DD format" reads as the latter.
+      const blank = petFormSchema.safeParse({ ...baseForm, birthDate: "" });
+      expect(blank.success).toBe(false);
+      if (!blank.success) {
+        expect(blank.error.issues).toContainEqual(
+          expect.objectContaining({ path: ["birthDate"], message: "Birth date is required" })
+        );
+      }
+      expect(petFormSchema.safeParse({ ...baseForm, birthDate: "2025-13-01" }).success).toBe(false);
+    });
+
+    it("should refuse a day that does not exist rather than rolling it forward", () => {
+      // `Date.parse("2025-02-30")` returns a number on V8 — it rolls to 2025-03-02 — so the
+      // previous `!Number.isNaN(Date.parse(...))` check accepted this and the stored birthday
+      // was two days off the one that was typed. Measured on Node 26.4.0.
+      expect(petFormSchema.safeParse({ ...baseForm, birthDate: "2025-02-30" }).success).toBe(false);
+      expect(petFormSchema.safeParse({ ...baseForm, birthDate: "2025-02-29" }).success).toBe(false);
+      expect(petFormSchema.safeParse({ ...baseForm, birthDate: "2025-04-31" }).success).toBe(false);
+
+      // The discriminator: a real leap day must still be accepted, or the fix is just stricter,
+      // not more correct.
+      expect(petFormSchema.safeParse({ ...baseForm, birthDate: "2024-02-29" }).success).toBe(true);
     });
 
     it("should reject rehabilitation details on a pet that is not under care", () => {
@@ -385,8 +497,8 @@ describe("Rehabilitation Status Lifecycle & Persistence", () => {
       name: "Tuah",
       species: "dog" as const,
       breed: "Malaysian Local Mixed",
-      age: "1 year",
-      ageCategory: "young" as const,
+      birthDate: "2025-06-02",
+      birthDateIsEstimate: true,
       gender: "Male" as const,
       size: "Medium" as const,
       weight: "14 kg",

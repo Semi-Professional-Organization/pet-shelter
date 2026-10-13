@@ -164,12 +164,13 @@ const AGE_MONTHS_PATTERN = /(\d+)\s*(?:m|mo|month|bln|bulan)/;
  * **This function is transcribed into SQL, and that transcription is the reason not to "fix" the
  * rollover below.** The production backfill that fills `pets.birthDate` from the old `age` prose
  * reimplements this arithmetic in Postgres, in
- * `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` on the unmerged branch
- * `fix/pets-birth-date-production-migration`. A backfill's job is to store what the application
- * itself would have computed, so the two have to agree case for case. (The *contract* half, on
- * `worktree-pet-birth-date-migration`, only archives and drops the old columns — it does no date
- * arithmetic, so it is not a third copy. Both paths are unmerged as of 2026-10-13; read them
- * from their branches, and expect the folder names to differ by a word.)
+ * `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` — the *expand* half, landed
+ * on master by #94. A backfill's job is to store what the application itself would have computed,
+ * so the two have to agree case for case. The *contract* half beside it,
+ * `20260922_pets_birth_date_contract/`, only archives and drops the old columns and contains no
+ * date arithmetic at all, so it is not a third copy — an earlier revision of it did carry its own
+ * backfill, the two disagreed on month-end and leap-day rows, and removing it was the fix. The
+ * two folder names differ by one word; check which you have open.
  *
  * They do **not** agree on vocabulary. The Malay units below (`thn`, `tahun`, `bln`, `bulan`)
  * have no counterpart in that SQL, which is English-only and needs a hand-run pre-pass to

@@ -4,10 +4,14 @@
 
 `approximateBirthDate` in `src/lib/domain/petAge.ts` reads Malay age units — `tahun`, `thn`,
 `bulan`, `bln` — so "2 tahun" yields a birthday. The SQL that backfills `pets.birthDate` from the
-old `age` prose (`prisma/migrations/manual/20260922_pets_birth_date/migration.sql`, on the
-unmerged branch `fix/pets-birth-date-production-migration`) matches English units only, and needs
-a hand-run `regexp_replace` pre-pass to translate the Malay ones. So the same row yields a real
-birthday in the application and `'unparseable age'` in the migration.
+old `age` prose (`prisma/migrations/manual/20260922_pets_birth_date/migration.sql`, on master
+since #94) matches English units only, and needs a hand-run `regexp_replace` pre-pass to
+translate the Malay ones. So the same row yields a real birthday in the application and
+`'unparseable age'` in the migration.
+
+**This is now live rather than prospective.** Both halves of the conversion are on master and
+awaiting an owner apply; the vocabulary gap is no longer a sequencing question between two open
+branches but a gap between shipped code and a migration someone is about to run.
 
 That file anticipates the order these land in, naming it "PR #42's to move: widening
 `approximateBirthDate` to read Malay, which would let this file widen with it". Nothing on the

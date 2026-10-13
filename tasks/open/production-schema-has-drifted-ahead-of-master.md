@@ -24,6 +24,16 @@
 > index, alongside the sponsor and donation tables. Raw output, now kept rather than paraphrased:
 > `tasks/decisions/2026-09-16-sponsor-portal-activation-applies-nothing-to-production.md`.
 
+> **2026-09-22: the remaining pet drift is losing reads, not just blocking a push.** The deployed
+> client asks for `pets.birthDate` on every catalogue read, production has no such column, and the
+> failure is swallowed — so the public pet list is being served from `src/data/pets.json`, not from
+> the database. Same shape as the application-insert finding below, one table over. See "The pet
+> catalogue is being served from the fixture" at the end of this file. The migration that fixes it
+> now exists as an expand/contract pair, rehearsed, unapplied:
+> `prisma/migrations/manual/20260922_pets_birth_date/` (expand, on
+> `fix/pets-birth-date-production-migration`) then
+> `prisma/migrations/manual/20260922_pets_birth_date_contract/` (archive and drop).
+
 `npm run db:push` resolves through `prisma.config.ts` → `resolveDatabaseUrl()` → `.env.local`,
 which holds `NEON_BRANCH=production`. Unlike the seed, **push has no local-only guard**:
 `prisma/env.ts` protects `db:seed` with `assertSeedTargetIsLocal`, and nothing protects push.
@@ -156,7 +166,17 @@ optional: master's generated client already depends on them.
   applications local e2e submitted on 2026-09-14 (13:34–16:01 UTC; `app-1789392875319`,
   `app-1789392933730`, `app-1789400500650`, `app-1789401656866`) each have an
   `APPLICATION_SUBMITTED` audit row, none is in `adoption_applications`, and no deletion of any of
-  them was audited. Donations and pet archive/restore from the same runs did persist.
+  them was audited. Donations from the same runs did persist.
+
+  **Correction, 2026-09-22.** This line previously also claimed pet archive/restore persisted. It
+  did not establish that. The export it rests on covered `audit_logs`, `donations` and
+  `adoption_applications` only — not `pets`
+  (`tasks/decisions/2026-09-16-neon-verifies-under-strict-tls.md:12-19`) — so the three
+  `PET_ARCHIVED` and three `PET_RESTORED` rows are audit rows, and
+  `src/lib/server/petRepository.ts:226-247` writes the audit row whether or not the
+  `prisma.pet.update` before it succeeded. That is the same shape this very section calls silent
+  loss for applications. Donations is supported; pets was not, and is now believed false for the
+  reason in the 2026-09-22 section below.
 
 So if the Vercel deployment uses this branch, real adoption applications, approve/reject decisions,
 status filters in the admin list, and pet status changes are failing behind a success screen. If it
@@ -184,6 +204,13 @@ Either a single reviewed migration reconciles the two remaining conversions with
 (`USING` cast for `ApplicationStatus`, backfill before `pets.birthDate`), or the repo adopts
 `prisma migrate` with a migrations directory so the reconciliation is recorded rather than
 re-derived each time.
+
+**As of 2026-09-22 the only thing left is the applying.** The `ApplicationStatus` cast was applied
+by the owner on 2026-09-18. The `pets.birthDate` backfill and the additive remainder are written
+and rehearsed (see the two sections above); nothing further can be authored from here, because an
+agent cannot reach the database. This entry settles when the owner has run both files and
+`npm run db:check-drift` from the main checkout reports zero destructive and zero additive
+statements — which, per the note above, requires `cleanup.sql` as well as the two migrations.
 
 **Until then, treat `npm run db:push` as destructive against production.** The safe loop is
 `migrate diff` → read the SQL → apply only what you intended with `prisma db execute` — the apply
@@ -213,3 +240,117 @@ Against 2026-09-16's 3 destructive and 6 additive statements, the following are 
 The `pets` statement is truncated at 160 characters, so whether `pets.status` still converts
 inside it is not answered by this run. The indexes on `pets(…status…)` being present suggests it
 does not. The `pets.age` → `birthDate` migration and the `shelter_settings` columns remain.
+
+## 2026-09-22: the `pets` half now has a migration, rehearsed, not applied
+
+`prisma/migrations/manual/20260922_pets_birth_date/` (with `rollback.sql` and the `rehearse.mjs`
+that produced its checks) adds `birthDate` and `birthDateIsEstimate`, backfills them from the
+prose `age` production still carries, and relaxes the `age`/`ageCategory` NOT NULLs. Ninety-two
+checks on a throwaway embedded PostgreSQL 18.4, all passing. **It has not touched production; the
+owner applies it in the Neon SQL editor, following the file's header.** Rationale and the full
+check list: `tasks/decisions/2026-09-22-pets-birth-date-backfills-from-intake-date.md`.
+
+**It does not close this entry.** The file deliberately does not drop `age`/`ageCategory` — that
+half destroys the only record of what staff typed and cannot be rolled back — so after it is
+applied, `db:check-drift` will still report one destructive statement for `pets`. That is correct.
+The drop is the contract half of an expand/contract pair and gets its own file once this one is
+applied and the catalogue is confirmed serving real rows.
+
+### This drift is not only blocking a push; it is very likely breaking reads now
+
+Established here, and stronger than the 2026-09-16 enum finding because it was reproduced rather
+than reasoned. Master's own generated client, run against a throwaway `pets` carrying the shape
+this entry measures production to have, answers:
+
+    prisma.pet.findMany()   ->  The column `pets.birthDate` does not exist in the current database.
+    prisma.pet.create(...)  ->  The column `birthDate of relation pets` does not exist ...
+
+`src/lib/server/petRepository.ts:65` runs `findMany` with `include` and **no `select`**, so every
+scalar is requested, `birthDate` included. `handlePersistenceError(…, "read")` swallows the
+failure — `src/lib/persistenceMode.ts:67-81` rethrows only `P2002` or under `STRICT_PERSISTENCE`,
+and its warn is gated on `NODE_ENV === "development"` — and returns `serverPets`, which
+`petRepository.ts:38-44` initialises from `src/data/pets.json`.
+
+So if the deployed build carries this schema, the public catalogue has been answering from the ten
+bundled demo animals since **2026-08-28** (`6108d82`, which swapped the columns), silently, and
+every admin pet edit has been failing behind the same swallow.
+
+**ASSERTED, not observed** — the chain is reproduced locally, the production end of it is not. The
+cheap probe nobody has run, and the one worth running before applying anything: **open `/pets` on
+the live site.** Exactly the ten fixture animals at fixture ids (`pet-001` … `pet-010`) confirms
+the fallback. Anything else means the read works and the measurement above wants re-reading first.
+
+### A second failure the add alone would not fix
+
+`age` and `ageCategory` were declared `String` — NOT NULL, no default — in the schema production
+was built from (`6108d82^`), and the running release writes neither. Adding `birthDate` alone
+restores every read and leaves every `prisma.pet.create` failing, reported by Prisma as `Null
+constraint violation on the (not available)`, naming no column. The migration relaxes both.
+Whether production's copies are still NOT NULL is **not measured**: a `migrate diff` `DROP` clause
+does not report nullability.
+
+### Related entries that this makes suspect
+
+- `tasks/archive/pets-json-fallback-reach-unverified.md` was settled 2026-08-28 as "verified that
+  production Neon DB runs populated with live pets". That phrase appears in exactly one commit,
+  `eaca046` (2026-09-14), a 35-file docs move whose message cites test runs and no database
+  observation. It cites no measurement and is contradicted by three `migrate diff` runs. Treat it
+  as unsettled until the `/pets` probe above is taken.
+- `tasks/open/pets-json-fallback-empty-means-outage.md` was narrowed on 2026-09-22 by #89 and its
+  pet half is settled: an empty result is now an answer, and the reader falls back only on a
+  thrown error. That is what makes the missing column the live trigger rather than a hypothetical
+  one — under today's code the *only* way the catalogue serves fixtures is a throw, and a column
+  the client selects and the database lacks is exactly that.
+
+**Corroborated independently on 2026-09-22 by #89's own review**, which opened
+`tasks/open/an-outage-serves-and-bills-fixture-animals.md`: `handlePersistenceError` rethrows only
+under `STRICT_PERSISTENCE`, and that flag is set in `package.json`'s `test:integration` script and
+`vitest.config.mts` and nowhere a deployment sets it. That entry reaches the same conclusion about
+the swallow from the by-id path, and adds what it costs — a sponsorship pledge recorded against a
+fixture animal. It is also marked ASSERTED for the same reason this section is: nobody has
+provoked the outage against a running instance. Two sessions reasoning to the same place from
+different code paths is not a measurement, and the `/pets` probe above is still the thing that
+would settle it.
+
+## The contract half now exists too, so the whole sequence is authored (2026-10-13)
+
+The section above says the drop "gets its own file once this one is applied and the catalogue is
+confirmed serving real rows". That file now exists:
+`prisma/migrations/manual/20260922_pets_birth_date_contract/`. Both halves and the additive
+remainder are on one branch, rehearsed, **not applied** — agents are denied production access and
+`npx prisma migrate*`/`db execute*`. The owner applies them in the Neon SQL editor, in this order:
+
+1. **Expand** — `prisma/migrations/manual/20260922_pets_birth_date/migration.sql`. Adds
+   `birthDate` / `birthDateIsEstimate`, backfills every row from that row's own intake date and age
+   prose, and relaxes the `age` / `ageCategory` NOT NULLs. **This is the step that stops the
+   outage**, and it destroys nothing.
+2. **Soak.** Read the derived birthdays against the prose that produced them, in production, while
+   both still exist — and take the `/pets` probe the section above asks for, which is what turns
+   this entry's ASSERTED outage into a measurement either way:
+
+       SELECT "id","name","age","ageCategory","intakeDate","birthDate" FROM pets ORDER BY "birthDate";
+
+   Nothing after step 1 is urgent. This window is the only chance anyone gets to compare a derived
+   birthday against the prose it came from, with both in front of them, on real rows.
+3. **Contract** — `prisma/migrations/manual/20260922_pets_birth_date_contract/migration.sql`.
+   Copies `age`, `ageCategory`, `birthDate` and `birthDateIsEstimate` to
+   `pets_age_archive_20260922`, then drops the two old columns. It derives nothing: the expand half
+   owns that rule alone. It refuses outright if expand has not run, which it tells from `age` still
+   being NOT NULL rather than by re-deriving anything. `rollback.sql` and `cleanup.sql` sit beside
+   it.
+4. `prisma/migrations/manual/20260922_settings_and_defaults/migration.sql` — the seven
+   `shelter_settings` email and storage columns, and the `notification_preferences.updatedAt`
+   `DROP DEFAULT`. The remainder; nothing here is urgent.
+
+Rationale, the rejected alternatives and the rehearsal record:
+`tasks/decisions/2026-09-22-the-pet-birth-date-conversion-splits-into-expand-and-contract.md`. It
+supersedes `tasks/decisions/2026-09-22-pet-birth-date-backfill-derives-from-intake-and-age.md`
+(a single file that did both halves, removed before merge) and sits alongside the expand half's own
+`2026-09-22-pets-birth-date-backfills-from-intake-date.md` and
+`2026-09-22-expand-stores-only-what-the-app-computes.md`.
+
+**Expect drift to read one statement, not zero, immediately after step 3.** The archive table is
+not declared in `prisma/schema.prisma`, so `db:check-drift` will offer
+`DROP TABLE "pets_age_archive_20260922"`. That is the price of a rollback that can restore the
+original prose. `cleanup.sql` drops it and takes drift to zero — and is the point at which the
+conversion stops being reversible, so it goes last and only after the archive has been read.
