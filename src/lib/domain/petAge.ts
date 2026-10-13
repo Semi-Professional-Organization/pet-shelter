@@ -150,12 +150,25 @@ export function deriveBirthDate(pet: { birthDate?: string; age?: string; intakeD
 }
 
 /**
- * The age units this module understands, English and Malay. Named constants rather than literals
- * inside `approximateBirthDate` so the two branches below are visibly one vocabulary. Both are
- * applied to an already-lowercased string, so neither needs the `i` flag.
+ * The age units this module understands, English and Malay. Applied to an already-lowercased
+ * string, so none needs the `i` flag.
+ *
+ * **Every unit ends at a word boundary, and every abbreviation is listed explicitly.** Those two
+ * properties are one decision, not two. A bare `m` with no boundary matches the *m* of `minggu`
+ * — Malay for *weeks* — and read "3 minggu" as three months, ten weeks early, for exactly the
+ * operators the Malay vocabulary was added to serve. But adding the boundary alone is a worse
+ * bug: `\b` after a bare `m` or `y` rejects any abbreviation that continues with letters, so
+ * `2 mth`, `2 mths`, `3 mnth` and `5 yo` all stop parsing and fall silently through to the
+ * intake date. Measured, both ways. The boundary is only safe because `mths?`, `mnths?`, `mos?`
+ * and `yo` are spelled out beside the bare forms.
+ *
+ * `mnths?` is here and is deliberately *not* in the backfill SQL's list: the app has always read
+ * `3 mnth` via the bare `m`, and dropping it to match the migration would trade a wrong date for
+ * a silent fall-through.
  */
-const AGE_YEARS_PATTERN = /(\d+)\s*(?:y|yr|year|thn|tahun)/;
-const AGE_MONTHS_PATTERN = /(\d+)\s*(?:m|mo|month|bln|bulan)/;
+const AGE_YEARS_PATTERN = /(\d+)\s*(?:years?|yrs?|yo|tahun|thn|y)\b/;
+const AGE_MONTHS_PATTERN = /(\d+)\s*(?:months?|mths?|mnths?|mos?|bulan|bln|m)\b/;
+const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 
 /**
  * Approximates a birth date from an age string (e.g. "2 years", "4 months", "2 tahun") relative
@@ -172,11 +185,14 @@ const AGE_MONTHS_PATTERN = /(\d+)\s*(?:m|mo|month|bln|bulan)/;
  * backfill, the two disagreed on month-end and leap-day rows, and removing it was the fix. The
  * two folder names differ by one word; check which you have open.
  *
- * They do **not** agree on vocabulary. The Malay units below (`thn`, `tahun`, `bln`, `bulan`)
- * have no counterpart in that SQL, which is English-only and needs a hand-run pre-pass to
- * translate them, so "2 tahun" yields a birthday here and is refused there. That is sequencing
- * debt, recorded in `tasks/open/malay-age-units-outpace-the-backfill.md`, not a licence to treat
- * the arithmetic as independent.
+ * They agree on the arithmetic and **not** on the vocabulary, deliberately. The SQL reads English
+ * years and months only; this function also reads Malay (`tahun`, `thn`, `bulan`, `bln`,
+ * `minggu`, `mggu`) and weeks in either language. So "2 tahun" or "3 minggu" yields a birthday
+ * here and is *refused and named* there, which fails closed: the backfill stops on the row rather
+ * than storing a different date from the one the app would compute. The migration's own header
+ * claims it reads "only in the spellings the app itself reads" — true when written, wider now on
+ * this side. Recorded in `tasks/open/malay-age-units-outpace-the-backfill.md`; not a licence to
+ * treat the arithmetic as independent.
  *
  * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
  * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
@@ -210,6 +226,16 @@ export function approximateBirthDate(
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
     const d = new Date(Date.UTC(parts.year, parts.month - months, parts.day));
+    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+  }
+
+  // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
+  // "1 year 6 months" reads the year. Day arithmetic rather than a month or year offset, so the
+  // month-end rollover above cannot arise here — `Date.UTC` normalises a negative day exactly.
+  const weekMatch = norm.match(AGE_WEEKS_PATTERN);
+  if (weekMatch) {
+    const weeks = parseInt(weekMatch[1], 10);
+    const d = new Date(Date.UTC(parts.year, parts.month, parts.day - weeks * 7));
     return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
   }
 
