@@ -325,3 +325,48 @@ describe("Section 44(6) relief is opt-in", () => {
     });
   });
 });
+
+/**
+ * The form publishes two ways to pay — a DuitNow QR and the shelter's Maybank
+ * account — and until 2026-10-13 recorded `duitnow_qr` for both. The value is
+ * copied onto the Section 44(6) receipt and shown to the coordinator as the rail
+ * to match against the bank statement, so a bank-transfer donor's receipt and
+ * queue row both named the wrong one.
+ */
+describe("the donor says which rail they used", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
+  });
+
+  it("records DuitNow QR when the donor changes nothing", async () => {
+    renderWidget();
+    await submitAGift();
+
+    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ paymentMethod: "duitnow_qr" });
+  });
+
+  it("records a bank transfer when the donor selects it", async () => {
+    renderWidget();
+    const user = setupUser();
+    await user.click(screen.getByRole("radio", { name: /direct bank transfer/i }));
+    await submitAGift();
+
+    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ paymentMethod: "online_banking" });
+  });
+
+  it("shows which rail is selected, and only one at a time", async () => {
+    renderWidget();
+    const user = setupUser();
+    const qr = screen.getByRole("radio", { name: /duitnow qr/i });
+    const bank = screen.getByRole("radio", { name: /direct bank transfer/i });
+
+    expect(qr).toBeChecked();
+    expect(bank).not.toBeChecked();
+
+    await user.click(bank);
+
+    expect(bank).toBeChecked();
+    expect(qr).not.toBeChecked();
+  });
+});

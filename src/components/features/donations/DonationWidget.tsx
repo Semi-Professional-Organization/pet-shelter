@@ -113,6 +113,15 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const [wantsTaxReceipt, setWantsTaxReceipt] = useState(false);
   const [notes, setNotes] = useState("");
   const [copiedBank, setCopiedBank] = useState(false);
+  // What the donor says they are paying with. Until 2026-10-13 this form sent
+  // `duitnow_qr` for every gift while publishing the Maybank account beside the
+  // QR, so a bank-transfer donor was recorded on the wrong rail — on their receipt,
+  // and in the coordinator's queue, where it is the hint for which line of the
+  // bank statement to match. It is still a self-report; the statement is the
+  // authority. But it should at least be the donor's answer and not ours.
+  const [paymentMethod, setPaymentMethod] = useState<"duitnow_qr" | "online_banking">(
+    "duitnow_qr"
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // A pledge, never a receipt. `useSponsorshipStore.saveDonationReceipt` is
@@ -158,6 +167,10 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText("514012345678");
       setCopiedBank(true);
+      // Copying the account number is the clearest signal a donor gives that they
+      // are about to pay by transfer. The control below shows the change, and they
+      // can switch it back.
+      setPaymentMethod("online_banking");
       setTimeout(() => setCopiedBank(false), 2500);
     }
   };
@@ -214,7 +227,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
       // than stored, because a tax number the donor withdrew is not ours to keep.
       taxIdOrIc: wantsTaxReceipt ? taxIdOrIc.trim() || undefined : undefined,
       notes: notes.trim() || undefined,
-      paymentMethod: "duitnow_qr" as const,
+      paymentMethod,
     };
 
     try {
@@ -241,6 +254,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
   const handleReset = () => {
     setCompletedPledge(null);
+    setPaymentMethod("duitnow_qr");
     setSelectedPet(null);
     setTargetPetName("");
     setDonorName("");
@@ -677,6 +691,43 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 </strong>
               </span>
             </div>
+          </div>
+        </div>
+
+        {/*
+          Asked, not assumed. Both rails are on screen above, so the form cannot
+          know which one the donor used unless they say.
+        */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border pt-4">
+          <span id="donation-rail-label" className="text-xs font-bold text-foreground">
+            {isMs ? "Bagaimana anda membayar?" : "How are you paying?"}
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby="donation-rail-label"
+            className="inline-flex p-1 bg-muted rounded-lg border border-border"
+          >
+            {(
+              [
+                ["duitnow_qr", "DuitNow QR"],
+                ["online_banking", isMs ? "Pindahan Bank Terus" : "Direct Bank Transfer"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={paymentMethod === value}
+                onClick={() => setPaymentMethod(value)}
+                className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer ${
+                  paymentMethod === value
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
