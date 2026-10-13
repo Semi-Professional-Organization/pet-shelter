@@ -47,7 +47,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/bulletins" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.bulletins", "Shelter Updates & Bulletins")}
+                  {t("nav.bulletins")}
                 </Link>
               </li>
               <li>

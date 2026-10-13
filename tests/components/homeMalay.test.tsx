@@ -103,8 +103,8 @@ describe("BulletinFeed on the Malay site", () => {
     seedBulletins([bulletin()]);
     renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
 
-    expect(screen.getByText("Buletin & Pengumuman Pusat Perlindungan")).toBeInTheDocument();
-    expect(screen.queryByText("Shelter Bulletins & Updates")).not.toBeInTheDocument();
+    expect(screen.getByText("Buletin Terkini")).toBeInTheDocument();
+    expect(screen.queryByText("Latest Bulletins")).not.toBeInTheDocument();
     // The literal `page.tsx` used to pass in, which bypassed the key entirely.
     expect(screen.queryByText("Latest news and updates")).not.toBeInTheDocument();
   });
@@ -116,14 +116,14 @@ describe("BulletinFeed on the Malay site", () => {
     {
       titleKey: "bulletins.allNoticesTitle",
       props: { targetPage: "all" } as const,
-      malay: "Semua Notis Komuniti",
-      english: "All Community Notices",
+      malay: "Semua Buletin",
+      english: "All Bulletins",
     },
     {
       titleKey: "bulletins.petsFeedTitle",
       props: { targetPage: "pets", compact: true, maxItems: 2 } as const,
-      malay: "Notis Adopsi & Kemas Kini Klinik",
-      english: "Adoption Notices & Clinic Updates",
+      malay: "Buletin Adopsi & Klinik",
+      english: "Adoption & Clinic Bulletins",
     },
   ] as const;
 
@@ -268,7 +268,7 @@ describe("the home page's English is unchanged", () => {
     seedBulletins([bulletin({ category: "clinic", isPinned: true })]);
     renderWithLanguage(<BulletinFeed targetPage="home" />);
 
-    expect(screen.getByText("Shelter Bulletins & Updates")).toBeInTheDocument();
+    expect(screen.getByText("Latest Bulletins")).toBeInTheDocument();
     expect(screen.getByText("Clinic / Vaccine")).toBeInTheDocument();
     expect(screen.getByText("Pinned")).toBeInTheDocument();
     expect(screen.queryByText("Disemat")).not.toBeInTheDocument();

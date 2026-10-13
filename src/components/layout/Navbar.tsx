@@ -34,7 +34,7 @@ import {
 
 export function Navbar() {
   const pathname = usePathname();
-  const { isMs } = useLanguage();
+  const { isMs, t } = useLanguage();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isSponsorshipOpen, setIsSponsorshipOpen] = useState(false);
@@ -391,7 +391,7 @@ export function Navbar() {
                       onClick={() => setIsMobileOpen(false)}
                       className="block text-sm font-bold py-2 hover:text-primary transition-colors"
                     >
-                      📰 {isMs ? "Berita & Buletin" : "Updates & News"}
+                      📰 {t("nav.bulletins")}
                     </Link>
                   </div>
 

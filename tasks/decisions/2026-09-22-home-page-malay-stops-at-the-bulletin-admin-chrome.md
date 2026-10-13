@@ -29,21 +29,46 @@ different copy ("Adopt a dog or cat from your local shelter.") and is asserted o
 
 ## Which wording was kept, and why
 
-Both unused keys the entry named are now used, with **the dictionary's wording, not the page's**:
+Both unused keys the entry named are now used, rather than the literals the page held. For
+`home.viewAllPets` the dictionary's wording stands — "View All Adoptable Pets" /
+"Lihat Semua Haiwan Sedia Diadopsi", where the page said "View All Animals" — because it already
+carried human-authored Malay and is the more accurate label for a link to `/pets`.
 
-- `home.bulletinsTitle` — "Shelter Bulletins & Updates" / "Buletin & Pengumuman Pusat
-  Perlindungan". The page said "Latest news and updates".
-- `home.viewAllPets` — "View All Adoptable Pets" / "Lihat Semua Haiwan Sedia Diadopsi". The page
-  said "View All Animals".
+`home.bulletinsTitle` was first kept at the dictionary's "Shelter Bulletins & Updates", on the
+same reasoning. **That was superseded on 2026-10-14 by a copy-uniformity pass** (see below), and it
+is now "Latest Bulletins" / "Buletin Terkini".
 
-Three reasons, in order of weight. The dictionary values already carry a human-authored Malay
-string; keeping the page's wording would have meant commissioning new Malay for a phrase nobody
-reviewed. `BulletinFeed`'s own default prop was already "Shelter Bulletins & Updates", so the page
-was the only place disagreeing — this makes `/` agree with `/bulletins` and with the component.
-And "View All Adoptable Pets" is the more accurate label for a link to `/pets`.
+## One noun for the bulletin feature (2026-10-14)
 
-**This is a visible English copy change on `/`**, and it is the easiest thing here to reverse: edit
-the two values in `src/lib/i18n/translations.ts` and the Malay follows.
+Translating `BulletinFeed` surfaced that this one feature answered to **seven** English names, four
+of them built from the same shuffled words — Shelter, Bulletins, Updates, News, Community, Notices:
+
+| Where | Was | Now |
+|---|---|---|
+| nav + footer link (`nav.bulletins`) | "Updates & News" | "Shelter Bulletins" |
+| `/bulletins` `<h1>` (`bulletins.title`) | "Shelter Bulletins & News" | "Shelter Bulletins" |
+| `/bulletins` feed `<h2>` (`bulletins.allNoticesTitle`) | "All Community Notices" | "All Bulletins" |
+| `/` feed `<h2>` (`home.bulletinsTitle`) | "Shelter Bulletins & Updates" | "Latest Bulletins" |
+| `/pets` feed `<h2>` (`bulletins.petsFeedTitle`) | "Adoption Notices & Clinic Updates" | "Adoption & Clinic Bulletins" |
+
+**The rule, derived from the site rather than invented:** one noun for the feature, the scope in the
+qualifier, Title Case. Title Case is what four of the five `<h2>`s on `/` already use
+("Our Work", "Our Animal Welfare & Sanctuary Standards", "Our Transparent Adoption Journey"); the
+eyebrow above each heading is `uppercase` in CSS, so its source casing is not a visible choice.
+There is no copy convention written down anywhere in `docs/` — this is the first time one has been
+stated, and it is stated as what the markup already did.
+
+Two true duplicates went with it. `Navbar`'s mobile link hardcoded "Updates & News" inline, the
+same string `nav.bulletins` holds for the footer; it reads the key now. And `Footer` passed
+"Shelter Updates & Bulletins" as an unreachable `t()` fallback — an eighth variant that could never
+render, and could drift from the key forever without anyone noticing.
+
+`bulletins.badge` ("Community & Rescue Bulletins") is a ninth variant and is deliberately left: it
+has no reader at all, so it is an orphan-key problem rather than a copy problem, and it belongs to
+`tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`.
+
+**These are visible English copy changes**, and they remain the easiest thing here to reverse: the
+five values above live in `src/lib/i18n/translations.ts`, and the Malay follows each one.
 
 One string deliberately did **not** reuse its nearest key. The entry suggested `common.loading`
 ("Loading…" / "Memuatkan…") for the gallery's "Loading rescue animals…". Using it would have
