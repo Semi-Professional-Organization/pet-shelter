@@ -159,64 +159,73 @@ export async function recordSponsorshipPledge(
     createdAt: when,
   };
 
-  try {
-    return toRecord(await prisma.petSponsorship.create({ data }));
-  } catch (err) {
-    // A reference collision is not a failed write, and must not be reported as an
-    // unconfirmed one. `pledgeRef` is a 6-digit random scoped to a UTC day on a
-    // unique column, so two supporters on a busy day can draw the same serial —
-    // roughly a 2% chance per day at ~200 pledges. Until 2026-10-13 that fell
-    // through to `SponsorshipWriteError`, which told the supporter the outcome was
-    // unknown and not to retry: the commitment was lost for want of a second draw.
-    //
-    // "unnamed" counts as a collision for the reason `donationPledgeLedger` gives:
-    // this insert never sets `receiptNumber`, so NULL cannot collide and the
-    // reference is the only unique the statement can violate. One redraw only; a
-    // second collision is not a coincidence.
-    if (uniqueViolationOn(err, "pledgeRef") !== false) {
-      try {
-        return toRecord(
-          await prisma.petSponsorship.create({
-            data: { ...data, pledgeRef: generatePledgeRef(when) },
-          })
-        );
-      } catch (retryErr) {
-        throw new SponsorshipWriteError(
-          "Could not record the sponsorship after a reference collision",
-          retryErr
-        );
+  // Two independent recoveries, each allowed once, in whichever order Postgres
+  // raises them. They used to be two separate `if` blocks, each ending in a throw,
+  // so they could not follow one another: a pledge that both collided on its
+  // reference *and* named a relation that had since vanished was lost whichever
+  // error came first, because the second recovery never got its turn.
+  let attempt = data;
+  let redrawn = false;
+  let relationsChecked = false;
+
+  for (;;) {
+    try {
+      return toRecord(await prisma.petSponsorship.create({ data: attempt }));
+    } catch (err) {
+      // A reference collision is not a failed write, and must not be reported as
+      // an unconfirmed one. `pledgeRef` is a 6-digit random scoped to a UTC day on
+      // a unique column, so two supporters on a busy day can draw the same serial
+      // — roughly a 2% chance per day at ~200 pledges. Until 2026-10-13 that told
+      // the supporter the outcome was unknown and not to retry: the commitment was
+      // lost for want of a second draw.
+      //
+      // "unnamed" counts as a collision for the reason `donationPledgeLedger`
+      // gives: this insert never sets `receiptNumber`, so NULL cannot collide and
+      // the reference is the only unique the statement can violate. One redraw; a
+      // second collision is not a coincidence.
+      if (!redrawn && uniqueViolationOn(err, "pledgeRef") !== false) {
+        redrawn = true;
+        // Logged because the rate above is an estimate nobody has measured.
+        console.warn("[Sponsorship Ledger] Pledge reference collided; redrawing once.");
+        attempt = { ...attempt, pledgeRef: generatePledgeRef(when) };
+        continue;
       }
-    }
 
-    if (isForeignKeyViolation(err) && (draft.petId || draft.userId)) {
-      try {
-        // Both relations are optional and can disappear independently. Read the
-        // referents after the failed insert instead of assuming every P2003 names
-        // the pet: an account can be deleted between checkout identity resolution
-        // and this write. Only the missing relation is cleared, so a fixture pet
-        // does not discard a valid sponsor link (or vice versa).
-        const [pet, sponsor] = await Promise.all([
-          draft.petId
-            ? prisma.pet.findUnique({ where: { id: draft.petId }, select: { id: true } })
-            : null,
-          draft.userId
-            ? prisma.sponsor.findUnique({ where: { id: draft.userId }, select: { id: true } })
-            : null,
-        ]);
-        const retryData = {
-          ...data,
-          petId: pet ? draft.petId : null,
-          userId: sponsor ? draft.userId : null,
-        };
-
-        if (retryData.petId !== data.petId || retryData.userId !== data.userId) {
-          return toRecord(await prisma.petSponsorship.create({ data: retryData }));
+      if (!relationsChecked && isForeignKeyViolation(err) && (attempt.petId || attempt.userId)) {
+        relationsChecked = true;
+        let pet: { id: string } | null;
+        let sponsor: { id: string } | null;
+        try {
+          // Both relations are optional and can disappear independently. Read the
+          // referents after the failed insert instead of assuming every P2003
+          // names the pet: an account can be deleted between checkout identity
+          // resolution and this write. Only the missing relation is cleared, so a
+          // fixture pet does not discard a valid sponsor link (or vice versa).
+          [pet, sponsor] = await Promise.all([
+            attempt.petId
+              ? prisma.pet.findUnique({ where: { id: attempt.petId }, select: { id: true } })
+              : null,
+            attempt.userId
+              ? prisma.sponsor.findUnique({ where: { id: attempt.userId }, select: { id: true } })
+              : null,
+          ]);
+        } catch (lookupErr) {
+          throw new SponsorshipWriteError("Could not record the sponsorship", lookupErr);
         }
-      } catch (retryError) {
-        throw new SponsorshipWriteError("Could not record the sponsorship", retryError);
+
+        const next = {
+          ...attempt,
+          petId: pet ? attempt.petId : null,
+          userId: sponsor ? attempt.userId : null,
+        };
+        if (next.petId !== attempt.petId || next.userId !== attempt.userId) {
+          attempt = next;
+          continue;
+        }
       }
+
+      throw new SponsorshipWriteError("Could not record the sponsorship", err);
     }
-    throw new SponsorshipWriteError("Could not record the sponsorship", err);
   }
 }
 

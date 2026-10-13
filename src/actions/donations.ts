@@ -191,11 +191,12 @@ export async function submitDonationPledgeAction(
     }
 
     // 4. Audit trail. `DONATION_PLEDGED`, not `DONATION_RECEIVED`: the money has
-    //    not been received. The distinction is not cosmetic — `useAuditLogController`
-    //    and `exportCsv` both classify an entry as a donation receipt when its
-    //    action is `DONATION_RECEIVED`, its entity is `DonationReceipt`, *or* its
-    //    details carry a `receiptNumber`. This entry trips none of the three, which
-    //    is what keeps an unreconciled gift out of the LHDN CSV fallback.
+    //    not been received. The distinction is not cosmetic — `isReceiptAuditRow`
+    //    in `src/lib/domain/receiptAuditRow.ts`, which every receipt view shares,
+    //    classifies an entry as a receipt when its action is `DONATION_RECEIVED`,
+    //    its entity is `DonationReceipt`, *or* its details carry a non-empty
+    //    `receiptNumber`. This entry trips none of the three, which is what keeps
+    //    an unreconciled gift out of the LHDN CSV fallback.
     recordAuditLog({
       actorId: "donor_public",
       actorEmail: record.donorEmail,

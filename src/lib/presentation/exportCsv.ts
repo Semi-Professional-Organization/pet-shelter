@@ -215,9 +215,16 @@ export function generateReceiptsCsvString(
     if ("receiptNumber" in item && "donorName" in item) {
       // Standard DonationReceipt object
       const r = item as DonationReceipt;
-      // The same formatter as the audit-row branch below, so the two cannot print
-      // the same figure differently — or print `NaN` and `undefined` at all.
-      const formattedAmount = formatAmountCell(r.amountMYR);
+      // A ledger receipt's amount is a number the ledger computed, so any finite
+      // one is printed as it stands — including a zero or a negative, which is
+      // what an offsetting correction would look like, and which must be visible
+      // on the filed document rather than blanked. Only a value that is not a
+      // finite number goes through the stricter reader the audit-row branch uses,
+      // so the two cannot print `NaN` or `undefined`.
+      const formattedAmount =
+        typeof r.amountMYR === "number" && Number.isFinite(r.amountMYR)
+          ? r.amountMYR.toFixed(2)
+          : formatAmountCell(r.amountMYR);
 
       rows.push([
         r.receiptNumber,

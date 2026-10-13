@@ -985,11 +985,12 @@ export interface DonationPledgeEmailInput {
  * will otherwise assume this is one, and file it.
  *
  * Its audit entity is `DonationPledge`, and its details carry no `receiptNumber`.
- * Three readers — `useAuditLogController`, `AuditLogViewer` and `exportCsv` —
- * classify an audit row as a donation receipt on the action `DONATION_RECEIVED`,
- * the entity `DonationReceipt`, or the mere presence of a `receiptNumber` key. An
- * acknowledgement that tripped any of them would put an unpaid gift back into the
- * LHDN CSV fallback, which is the defect this whole change removes.
+ * `isReceiptAuditRow` in `src/lib/domain/receiptAuditRow.ts` — the one classifier
+ * the receipts tab, the audit viewer and the CSV fallback share — calls a row a
+ * receipt on the action `DONATION_RECEIVED`, the entity `DonationReceipt`, or a
+ * non-empty `receiptNumber`. An acknowledgement that tripped any of them would put
+ * an unpaid gift back into the LHDN CSV fallback, which is the defect this whole
+ * change removes.
  */
 export async function sendDonationPledgeEmail(
   pledge: DonationPledgeEmailInput

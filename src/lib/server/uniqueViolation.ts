@@ -40,30 +40,47 @@ interface AdapterCause {
   constraint?: { fields?: unknown; index?: unknown };
 }
 
-/** Every name the error offers for the violated constraint: columns and index names. */
-function namesFrom(meta: unknown): string[] {
-  if (typeof meta !== "object" || meta === null) return [];
+/** What the error offers: the columns it names, and the constraint names it names. */
+interface ViolationNames {
+  columns: string[];
+  constraints: string[];
+}
+
+const strings = (values: unknown[]): string[] =>
+  values.filter((v): v is string => typeof v === "string" && v.length > 0);
+
+/** Postgres prints a mixed-case identifier with its double quotes on. */
+const unquote = (name: string): string => name.replace(/^"(.*)"$/, "$1");
+
+function namesFrom(meta: unknown): ViolationNames {
+  const names: ViolationNames = { columns: [], constraints: [] };
+  if (typeof meta !== "object" || meta === null) return names;
+
   const { target, driverAdapterError } = meta as {
     target?: unknown;
     driverAdapterError?: { cause?: AdapterCause };
   };
   const cause = driverAdapterError?.cause;
-  const names: unknown[] = [];
 
-  if (Array.isArray(cause?.constraint?.fields)) names.push(...cause.constraint.fields);
-  if (typeof cause?.constraint?.index === "string") names.push(cause.constraint.index);
+  if (Array.isArray(cause?.constraint?.fields)) {
+    names.columns.push(...strings(cause.constraint.fields).map(unquote));
+  }
+  if (typeof cause?.constraint?.index === "string") {
+    names.constraints.push(cause.constraint.index);
+  }
 
   // `... violates unique constraint "donation_pledges_pledgeRef_key"`.
   if (typeof cause?.originalMessage === "string") {
     const named = /unique constraint "([^"]+)"/.exec(cause.originalMessage)?.[1];
-    if (named) names.push(named);
+    if (named) names.constraints.push(named);
   }
 
-  // The pre-adapter shape, kept because a future client may emit it again.
-  if (Array.isArray(target)) names.push(...target);
-  else if (typeof target === "string") names.push(target);
+  // The pre-adapter shape, kept because a future client may emit it again: an
+  // array of column names, or the index name as one string.
+  if (Array.isArray(target)) names.columns.push(...strings(target).map(unquote));
+  else if (typeof target === "string" && target.length > 0) names.constraints.push(target);
 
-  return names.filter((n): n is string => typeof n === "string" && n.length > 0);
+  return names;
 }
 
 /**
@@ -78,13 +95,27 @@ function namesFrom(meta: unknown): string[] {
  * only unique its statement could violate may treat `"unnamed"` as a hit; one that
  * cannot must treat it as a miss. Folding it into a boolean here is exactly how the
  * earlier predicates ended up either never retrying or retrying everything.
+ *
+ * Matching is exact, not by substring. A column must *equal* `column` once its
+ * quotes are off, and a constraint name must be Prisma's `<table>_<column>_key`
+ * for a single-column unique. A substring test would read `originalPledgeRef` as
+ * `pledgeRef`, or `petId` as `id`, and a caller would then retry a collision on
+ * the wrong constraint — the duplicate-row hazard the `false` answer exists for.
+ *
+ * ceiling: a compound unique (`@@unique([a, b])`, index `<table>_a_b_key`) is
+ * matched by column only when the adapter lists its fields. Identified by index
+ * name alone it reads as `false` for `a`. No caller asks about one today.
  */
 export function uniqueViolationOn(err: unknown, column: string): boolean | "unnamed" {
   if (typeof err !== "object" || err === null) return false;
   const { code, meta } = err as { code?: unknown; meta?: unknown };
   if (code !== "P2002") return false;
 
-  const names = namesFrom(meta);
-  if (names.length === 0) return "unnamed";
-  return names.some((name) => name.includes(column));
+  const { columns, constraints } = namesFrom(meta);
+  if (columns.length === 0 && constraints.length === 0) return "unnamed";
+
+  return (
+    columns.includes(column) ||
+    constraints.some((name) => name === column || name.endsWith(`_${column}_key`))
+  );
 }

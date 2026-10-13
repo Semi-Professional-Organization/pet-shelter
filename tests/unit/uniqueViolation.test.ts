@@ -105,4 +105,25 @@ describe("uniqueViolationOn", () => {
     ).toBe(true);
     expect(uniqueViolationOn(p2002({ target: ["receiptNumber"] }), "pledgeRef")).toBe(false);
   });
+
+  it("matches a column exactly, not by substring", () => {
+    // A substring test would read `originalPledgeRef` as `pledgeRef` and `petId`
+    // as `id`, and a caller would retry a collision on the wrong constraint.
+    const fields = (f: string[]) =>
+      p2002({ driverAdapterError: { cause: { constraint: { fields: f } } } });
+
+    expect(uniqueViolationOn(fields(['"originalPledgeRef"']), "pledgeRef")).toBe(false);
+    expect(uniqueViolationOn(fields(['"petId"']), "id")).toBe(false);
+    expect(uniqueViolationOn(fields(["email"]), "email")).toBe(true);
+
+    const index = (name: string) =>
+      p2002({ driverAdapterError: { cause: { constraint: { index: name } } } });
+
+    expect(uniqueViolationOn(index("t_originalPledgeRef_key"), "pledgeRef")).toBe(false);
+    // The table name contains the column string; the constraint is on another.
+    expect(uniqueViolationOn(index("pledgeRef_archive_receiptNumber_key"), "pledgeRef")).toBe(
+      false
+    );
+    expect(uniqueViolationOn(index("donation_pledges_pledgeRef_key"), "pledgeRef")).toBe(true);
+  });
 });

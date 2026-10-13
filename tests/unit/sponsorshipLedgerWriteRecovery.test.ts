@@ -182,3 +182,96 @@ describe("persistent sponsorship write recovery", () => {
     ).rejects.toBe(uncertainty);
   });
 });
+
+/**
+ * The reference collision, and its composition with the foreign-key recovery.
+ *
+ * `COLLISION` is the `code` and `meta` of a real duplicate insert into
+ * `pet_sponsorships`, captured against PostgreSQL 18 on 2026-10-13 and re-observed
+ * in `tests/integration/db/uniqueViolation.postgres.test.ts`. The memory branch of
+ * `recordSponsorshipPledge` returns before any of this, so without these cases the
+ * retry would be covered only by the tier that needs a server.
+ */
+describe("a colliding sponsorship pledge reference", () => {
+  const COLLISION = Object.assign(new Error("Unique constraint failed"), {
+    code: "P2002",
+    meta: {
+      modelName: "PetSponsorship",
+      driverAdapterError: {
+        name: "DriverAdapterError",
+        cause: {
+          originalCode: "23505",
+          originalMessage:
+            'duplicate key value violates unique constraint "pet_sponsorships_pledgeRef_key"',
+          kind: "UniqueConstraintViolation",
+          constraint: { fields: ['"pledgeRef"'] },
+        },
+      },
+    },
+  });
+  const FOREIGN_KEY = Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" });
+  const echo = async (args: { data: Record<string, unknown> }) => ({ ...storedRow, ...args.data });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    doubles.findPet.mockResolvedValue({ id: "pet-live" });
+    doubles.findSponsor.mockResolvedValue({ id: "sponsor-deleted" });
+  });
+
+  it("is redrawn once and the commitment kept", async () => {
+    doubles.create.mockRejectedValueOnce(COLLISION).mockImplementationOnce(echo);
+    const { recordSponsorshipPledge } = await import("@/lib/server/sponsorshipLedger");
+
+    const record = await recordSponsorshipPledge(draft);
+
+    expect(doubles.create).toHaveBeenCalledTimes(2);
+    expect(record.pledgeRef).not.toBe(draft.pledgeRef);
+    expect(record.pledgeRef).toMatch(/^HFS-PLG-\d{8}-\d{6}$/);
+    // Only the reference changed; the relations were not touched on the way.
+    expect(record.petId).toBe(draft.petId);
+  });
+
+  it("propagates a second collision rather than looping", async () => {
+    doubles.create.mockRejectedValue(COLLISION);
+    const { recordSponsorshipPledge, SponsorshipWriteError } = await import(
+      "@/lib/server/sponsorshipLedger"
+    );
+
+    await expect(recordSponsorshipPledge(draft)).rejects.toBeInstanceOf(SponsorshipWriteError);
+    expect(doubles.create).toHaveBeenCalledTimes(2);
+  });
+
+  it("can be followed by the foreign-key recovery", async () => {
+    // The two recoveries used to be separate branches that each ended in a throw,
+    // so a pledge needing both was lost whichever error Postgres raised first.
+    doubles.findSponsor.mockResolvedValue(null);
+    doubles.create
+      .mockRejectedValueOnce(COLLISION)
+      .mockRejectedValueOnce(FOREIGN_KEY)
+      .mockImplementationOnce(echo);
+    const { recordSponsorshipPledge } = await import("@/lib/server/sponsorshipLedger");
+
+    const record = await recordSponsorshipPledge(draft);
+
+    expect(doubles.create).toHaveBeenCalledTimes(3);
+    expect(record.pledgeRef).not.toBe(draft.pledgeRef);
+    expect(record.userId).toBeNull();
+    expect(record.petId).toBe(draft.petId);
+  });
+
+  it("can follow the foreign-key recovery", async () => {
+    doubles.findSponsor.mockResolvedValue(null);
+    doubles.create
+      .mockRejectedValueOnce(FOREIGN_KEY)
+      .mockRejectedValueOnce(COLLISION)
+      .mockImplementationOnce(echo);
+    const { recordSponsorshipPledge } = await import("@/lib/server/sponsorshipLedger");
+
+    const record = await recordSponsorshipPledge(draft);
+
+    expect(doubles.create).toHaveBeenCalledTimes(3);
+    expect(record.pledgeRef).not.toBe(draft.pledgeRef);
+    expect(record.userId).toBeNull();
+  });
+});

@@ -193,6 +193,8 @@ export async function recordDonationPledge(
     // *and* tells them not to retry. A fresh reference and one retry fixes it,
     // and a second collision is not a coincidence, so it propagates.
     if (isPledgeRefCollision(err)) {
+      // Logged because the collision rate above is an estimate nobody has measured.
+      console.warn("[Donation Pledge] Pledge reference collided; redrawing once.");
       try {
         return toRecord(await createPledgeRow(draft, generateGiftRef(when), when));
       } catch (retryErr) {

@@ -167,10 +167,6 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     if (typeof navigator !== "undefined" && navigator.clipboard) {
       navigator.clipboard.writeText("514012345678");
       setCopiedBank(true);
-      // Copying the account number is the clearest signal a donor gives that they
-      // are about to pay by transfer. The control below shows the change, and they
-      // can switch it back.
-      setPaymentMethod("online_banking");
       setTimeout(() => setCopiedBank(false), 2500);
     }
   };
@@ -630,6 +626,13 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           {/* DuitNow QR — shared with the pet sponsorship modal */}
           <DonationQrPanel
             className="md:col-span-5"
+            // The panel's channel switcher is a second place to say how you are
+            // paying. Its choice moves the control below, which is the one value
+            // submitted — the bank's QR is a bank transfer; DuitNow and the TNG
+            // wallet are both QR payments.
+            onChannelChange={(channel) =>
+              setPaymentMethod(channel === "bank" ? "online_banking" : "duitnow_qr")
+            }
             instructions={t(
               "donations.duitNowInstructions",
               "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app."
@@ -696,40 +699,53 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
         {/*
           Asked, not assumed. Both rails are on screen above, so the form cannot
-          know which one the donor used unless they say.
+          know which one the donor used unless they say. Native radios, the same
+          control the sponsorship modal uses for the same question, so arrow keys
+          and a single tab stop come from the platform.
         */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border pt-4">
-          <span id="donation-rail-label" className="text-xs font-bold text-foreground">
+        <fieldset className="border-t border-border pt-4 space-y-2">
+          <legend className="text-xs font-bold text-foreground">
             {isMs ? "Bagaimana anda membayar?" : "How are you paying?"}
-          </span>
-          <div
-            role="radiogroup"
-            aria-labelledby="donation-rail-label"
-            className="inline-flex p-1 bg-muted rounded-lg border border-border"
-          >
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {(
               [
-                ["duitnow_qr", "DuitNow QR"],
-                ["online_banking", isMs ? "Pindahan Bank Terus" : "Direct Bank Transfer"],
+                [
+                  "duitnow_qr",
+                  "DuitNow QR",
+                  isMs ? "Imbas dengan aplikasi perbankan Malaysia." : "Scan with a Malaysian banking app.",
+                ],
+                [
+                  "online_banking",
+                  isMs ? "Pindahan Bank Terus" : "Direct Bank Transfer",
+                  isMs ? "Pindahkan terus ke akaun Maybank di atas." : "Transfer to the Maybank account above.",
+                ],
               ] as const
-            ).map(([value, label]) => (
-              <button
+            ).map(([value, label, hint]) => (
+              <label
                 key={value}
-                type="button"
-                role="radio"
-                aria-checked={paymentMethod === value}
-                onClick={() => setPaymentMethod(value)}
-                className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all cursor-pointer ${
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-xs transition-colors ${
                   paymentMethod === value
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border bg-card text-muted-foreground"
                 }`}
               >
-                {label}
-              </button>
+                <input
+                  type="radio"
+                  name="donationPaymentMethod"
+                  value={value}
+                  checked={paymentMethod === value}
+                  onChange={() => setPaymentMethod(value)}
+                  className="mt-0.5 size-4 accent-primary"
+                />
+                <span>
+                  <strong className="block text-foreground">{label}</strong>
+                  {hint}
+                </span>
+              </label>
             ))}
           </div>
-        </div>
+        </fieldset>
       </div>
 
       {/* 5. Official Donor Dossier Form */}

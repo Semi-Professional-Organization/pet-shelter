@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 
 vi.mock("@/actions/donations", () => ({ submitDonationPledgeAction: vi.fn() }));
 vi.mock("@/actions/pets", () => ({
@@ -353,6 +353,38 @@ describe("the donor says which rail they used", () => {
     await submitAGift();
 
     expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ paymentMethod: "online_banking" });
+  });
+
+  it("does not change the donor's answer when they copy the account number", async () => {
+    // Copying is not paying. An earlier version flipped the rail on copy, which
+    // overwrote an explicit choice with a guess and pointed the coordinator at the
+    // wrong line of the statement for anyone who copied the number and then scanned.
+    renderWidget();
+    // `setupUser` installs its own clipboard on `navigator`, so the copy handler's
+    // `navigator.clipboard` branch runs here as it does in a browser.
+    const user = setupUser();
+
+    await user.click(screen.getByRole("button", { name: /copy bank account/i }));
+
+    expect(screen.getByRole("radio", { name: /duitnow qr/i })).toBeChecked();
+    await submitAGift();
+    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ paymentMethod: "duitnow_qr" });
+  });
+
+  it("offers the choice as one native radio group", () => {
+    renderWidget();
+    // Scoped to this question: the form has another radio group further up.
+    const radios = within(
+      screen.getByRole("group", { name: /how are you paying/i }),
+    ).getAllByRole("radio");
+
+    // Native inputs sharing a name: the platform supplies the single tab stop and
+    // the arrow keys, which a pair of `role="radio"` buttons did not.
+    expect(radios).toHaveLength(2);
+    for (const radio of radios) {
+      expect(radio.tagName).toBe("INPUT");
+      expect(radio).toHaveAttribute("name", "donationPaymentMethod");
+    }
   });
 
   it("shows which rail is selected, and only one at a time", async () => {

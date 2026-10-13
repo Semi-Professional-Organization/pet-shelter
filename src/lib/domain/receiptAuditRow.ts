@@ -73,12 +73,18 @@ function ringgitFrom(value: unknown): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-/** A positive whole number of sen from a number or a digit string, or `undefined`. */
+/**
+ * A positive whole number of sen from a number or from text, or `undefined`.
+ *
+ * Text may carry a zero fraction — `"12345.0"`, `"12345.00"` — because that is
+ * how a whole number comes back from some JSON and decimal round-trips. It is
+ * still a whole number of sen. `"12345.5"` is not, and is refused.
+ */
 function senFrom(value: unknown): number | undefined {
   const n =
     typeof value === "number"
       ? value
-      : typeof value === "string" && /^\d+$/.test(value.trim())
+      : typeof value === "string" && /^\d+(\.0+)?$/.test(value.trim())
         ? Number(value.trim())
         : undefined;
   return n !== undefined && Number.isSafeInteger(n) && n > 0 ? n : undefined;
