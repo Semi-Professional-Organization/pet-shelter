@@ -1313,29 +1313,22 @@ describe("corrections from the third review", () => {
 /* -------------------------------------------------------------------------- */
 
 describe("corrections from the fourth review", () => {
-  it("gives each fixture row a distinct instant, so the tiebreaker is live", async () => {
-    // Twice-wrong before: once truncated to a day, once a single shared epoch.
-    // Either way every fixture row compared equal and a tied publishedAt fell
-    // through to `id`, while the database broke the same tie on a real
-    // TIMESTAMP(3) — so one pair of notices could order differently depending
-    // on whether the database was reachable.
-    makeDatabaseUnreachable();
-    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
-    const feed = await getPublicBulletins("all");
-
-    // Reach the instants through the fixture the repository clones.
-    const instants = (fixtureJson as { publishedAt: string }[]).map(
-      (r) => `${r.publishedAt}T00:00:00.000Z`
-    );
-    expect(new Set(instants).size).toBe(instants.length);
-
-    // And the rule still produces the documented order on that data.
-    expect(feed.map((b) => b.id)).toEqual([
-      "bulletin-001",
-      "bulletin-002",
-      "bulletin-003",
-      "bulletin-004",
-    ]);
+  it("has distinct notice dates, which is what makes the derived instant work", () => {
+    // Honest about what this pins and what it cannot.
+    //
+    // `freshBulletins` derives each fixture row's `createdAt` from its notice
+    // date, so the tiebreaker is only live while those dates are distinct. That
+    // premise is what this asserts. It does NOT observe the repository's
+    // derivation: the fixture path returns `Bulletin`, which carries no
+    // `createdAt`, and the admin reader has no fixture fallback, so the value is
+    // unreachable through any public API. Add a second notice on an existing
+    // date and this test fails — which is the signal to give the fixture
+    // explicit instants rather than deriving them.
+    //
+    // The rule itself is exercised directly against `sortBulletinsForFeed`
+    // above, with rows carrying distinct instants on one shared day.
+    const dates = (fixtureJson as { publishedAt: string }[]).map((r) => r.publishedAt);
+    expect(new Set(dates).size).toBe(dates.length);
   });
 
   it("freezes the lists that decide, not only the one that describes", () => {
