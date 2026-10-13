@@ -112,12 +112,24 @@ const cols = async (db, table) =>
   )).rows;
 const byName = (cs) => new Map(cs.map((c) => [c.column_name, c]));
 
-async function freshPreExpand() {
+async function freshPreExpand(rows = ROWS) {
   const db = new PGlite();
   await db.exec(PROD_SCHEMA);
-  for (const r of ROWS) await insertPreExpand(db, r);
+  for (const r of rows) await insertPreExpand(db, r);
   return db;
 }
+
+/**
+ * The rows the real expand will accept.
+ *
+ * `p-prose` carries `age = 'about two'`, which expand **refuses** rather than guessing at — its
+ * author's rule is "refusing more is safe, storing differently is not", so a row it cannot read is
+ * never backfilled and the contract never sees one. Scenario 0 therefore seeds without it; the
+ * contract-shape scenarios keep it, because there the birth date is supplied directly and the
+ * contract does not care how it was arrived at. Discovered by running the real expand here, which
+ * is the whole reason scenario 0 exists.
+ */
+const EXPANDABLE_ROWS = ROWS.filter(([id]) => id !== "p-prose");
 
 /** The shape expand leaves behind: both columns present, backfilled, and `age` relaxed. */
 async function applyExpandShape(db) {
@@ -159,18 +171,71 @@ console.log(
     : "\n== 0. NOTE: ../20260922_pets_birth_date/migration.sql is not in this tree (it lives on its\n        own branch until that merges), so the post-expand SHAPE is built here instead. The\n        contract derives nothing, so its behaviour does not depend on expand's arithmetic."
 );
 if (HAS_EXPAND) {
-  const seq = await freshPreExpand();
-  const expandErr = await tryExec(seq, readFileSync(EXPAND_PATH, "utf8"));
+  const EXPAND = readFileSync(EXPAND_PATH, "utf8");
+
+  const seq = await freshPreExpand(EXPANDABLE_ROWS);
+  const expandErr = await tryExec(seq, EXPAND);
   check("the real expand applies", expandErr === "", expandErr.slice(0, 200));
   if (!expandErr) {
     const c = byName(await cols(seq, "pets"));
     check("expand leaves age nullable, which is the signal the contract reads", c.get("age")?.is_nullable === "YES");
+    const derived = new Map(
+      (await seq.query(`SELECT "id","birthDate" FROM "public"."pets"`)).rows.map((r) => [r.id, r.birthDate])
+    );
     const contractErr = await tryExec(seq, MIG);
     check("the contract then applies on top of it", contractErr === "", contractErr.slice(0, 200));
     const after = byName(await cols(seq, "pets"));
     check("and the old columns are gone", !after.has("age") && !after.has("ageCategory"));
+    const arch = await seq.query(
+      `SELECT "id","age","derivedBirthDate" FROM "public"."pets_age_archive_20260922"`
+    );
+    check(
+      "the archive holds expand's own dates, unaltered",
+      arch.rows.length === EXPANDABLE_ROWS.length &&
+        arch.rows.every((a) => a.derivedBirthDate === derived.get(a.id)),
+      `${arch.rows.length} rows`
+    );
+    check(
+      "and the prose expand read is preserved for the rollback",
+      arch.rows.every((a) => typeof a.age === "string" && a.age.length > 0)
+    );
   }
   await seq.close();
+
+  // Expand's own rollback, exercised here because this branch merges it and its undo had not been
+  // run from this side. Expand's harness needs `embedded-postgres`, a large optional download;
+  // pglite runs the same SQL. This is a courtesy check of a neighbour's file, not a substitute for
+  // its own 92-check harness.
+  const undo = await freshPreExpand(EXPANDABLE_ROWS);
+  await undo.exec(EXPAND);
+  const undoErr = await tryExec(undo, readFileSync(join(HERE, "..", "20260922_pets_birth_date", "rollback.sql"), "utf8"));
+  check("expand's own rollback applies", undoErr === "", undoErr.slice(0, 200));
+  if (!undoErr) {
+    const u = byName(await cols(undo, "pets"));
+    check("  ...removing birthDate", !u.has("birthDate") && !u.has("birthDateIsEstimate"));
+    check("  ...and re-tightening age to NOT NULL", u.get("age")?.is_nullable === "NO");
+    check(
+      "  ...with every age string still intact",
+      (await undo.query(`SELECT count(*)::int AS n FROM "public"."pets" WHERE "age" IS NOT NULL`)).rows[0].n ===
+        EXPANDABLE_ROWS.length
+    );
+  }
+  await undo.close();
+
+  // The other half of expand's contract, asserted here because the contract half depends on it:
+  // a row expand cannot read is refused outright, so no unparseable prose ever reaches the drop.
+  const refused = await freshPreExpand();
+  const refusedErr = await tryExec(refused, EXPAND);
+  check(
+    "expand refuses prose it cannot read, rather than guessing",
+    /cannot be derived/.test(refusedErr) && /p-prose/.test(refusedErr),
+    refusedErr.slice(0, 160)
+  );
+  check(
+    "  ...leaving the table untouched, so the contract never sees such a row",
+    !byName(await cols(refused, "pets")).has("birthDate")
+  );
+  await refused.close();
 }
 
 console.log("\n== 1. the contract refuses every state where dropping would destroy something");

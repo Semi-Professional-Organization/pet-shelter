@@ -151,19 +151,52 @@ that merely did not mention it. Probed before believing it, fixed by dropping th
 pinned by a test asserting the key is *absent* from the parse output — which is the mechanism, not
 the symptom.
 
-## What was deliberately not done
+## What was deliberately not done, as of 2026-09-22
 
 - **Expand was not modified from here.** Both changes in it — roll-forward, and refusing Malay
   tokens rather than reading them — were made by that session after the two points were raised
-  with them directly. Their branch is final at `b40a7d7`; that session has ended, so any further
-  change to it is an owner task.
+  with them directly. Their branch ended at `5ca7492` — `b40a7d7` plus two documentation commits,
+  one of which records the clamp risk from the app side; that session has ended.
 - **`approximateBirthDate`'s "minggu" bug was not fixed.** `/(\d+)\s*m/` prefix-matches the Malay
   for *weeks*, so the function reads "3 minggu" as three months. Expand refuses such rows, so no
   production row can carry one. Filed as
   `tasks/open/approximate-birth-date-reads-minggu-as-months.md` rather than fixed here: that regex
   is now the referent three separate implementations have agreed on, and moving it belongs in a
   deliberate change, not a ride-along on a migration branch.
-- **The two branches were not merged into one.** Expand keeps its own rehearsal, which is stronger
-  than this one in the places it overlaps: it asserts at the Prisma level that `findMany` fails
-  42703 before and succeeds after, and it tests a real held lock.
+## 2026-10-13: the two halves ship together after all
+
+The original intent was to leave expand on its own branch with its own rehearsal, which is what
+that session preferred. Three weeks later that turned out not to be possible: **expand had no pull
+request and its session had ended**, so it could never land on its own. Merging the contract alone
+would have put a migration on `master` whose refusal hint points at
+`prisma/migrations/manual/20260922_pets_birth_date/migration.sql` — a path that would not exist —
+and left the drift entry's step 1 naming a missing file.
+
+So `fix/pets-birth-date-production-migration` (tip `5ca7492`, nine commits) is merged into this
+branch and both halves land on PR #94 together. Their commits and authorship are preserved through
+the merge; nothing of theirs was rewritten or re-authored. Their two decision entries
+(`2026-09-22-pets-birth-date-backfills-from-intake-date.md`,
+`2026-09-22-expand-stores-only-what-the-app-computes.md`) and their eight lessons come with it.
+
+**One real benefit.** With both folders in the same tree, the contract's `rehearse.mjs` scenario 0
+stops being a fallback shape and runs the actual sequence: the real expand, then the contract on
+top. That immediately caught something — a fixture row with `age = 'about two'`, which expand
+**refuses** rather than guessing at. The harness was feeding expand a row it will never accept. Now
+asserted in both directions: expand refuses unreadable prose and leaves the table untouched, so the
+contract can never be handed such a row. That is their "refusing more is safe, storing differently
+is not" principle, executable instead of quoted.
+
+**Expand's own `rollback.sql` is now exercised too**, which it was not from this side before. Its
+harness needs `embedded-postgres`, a large optional download, so it was run on pglite instead:
+expand → rollback removes both new columns, re-tightens `age` to NOT NULL, and keeps every age
+string. A courtesy check of a neighbour's file, not a replacement for its own 92-check harness,
+which was not re-run here.
+
+Contract rehearsal: **49 checks, 0 failures**, with scenario 0 live.
+
+## What was deliberately not done, as of 2026-10-13
+
+- **Expand's 92-check harness was not re-run.** It requires `npm i --no-save embedded-postgres`,
+  a large binary install into a `node_modules` shared with other sessions' worktrees. Expand's
+  behaviour was instead verified independently here, on pglite, against the real file.
 - **Nothing was applied.** Agents are denied production access and `npx prisma migrate*`.
