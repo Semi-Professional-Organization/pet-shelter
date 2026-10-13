@@ -113,14 +113,13 @@ filed, which is a worse statutory defect than a late date. A correct fix needs t
 the bank statement and a shelter policy for gifts that straddle a tax year. Marked as a `ceiling:`
 on `settleDonationPledge`.
 
-**A coordinator now sees, and the receipt now states, a payment rail the donor never chose.**
-`/donate` hardcodes `paymentMethod: "duitnow_qr"` while the same screen also publishes the
-shelter's Maybank corporate account, so a donor who pays by direct transfer is recorded as having
-used DuitNow QR. That predates this change — the value went straight onto the receipt before — but
-this change gives it a second consumer: the reconciliation queue renders it as the rail to match
-against the bank statement. Left alone here because fixing it means adding a rail selector to the
-public form, which is its own change; recorded in
-`tasks/open/donate-form-records-a-payment-rail-the-donor-never-chose.md`.
+**The payment rail was a self-report the form never asked for — fixed 2026-10-13.** `/donate`
+hardcoded `paymentMethod: "duitnow_qr"` while the same screen published the shelter's Maybank
+account, so a bank-transfer donor was recorded on the wrong rail. That predated this change, but
+this change gave the value a second consumer: the reconciliation queue shows it as the rail to
+match against the bank statement. The form now asks, defaults to DuitNow QR, and switches to
+bank transfer when the donor copies the account number. It is still the donor's word; the
+statement is the authority.
 
 ## What would reverse this
 

@@ -68,13 +68,14 @@ as the deferred option.
 pre-existing and in a file this branch never touched. `docs:check` and the layer graph both OK.
 `build` succeeded with throwaway secrets inline, after `npm ci` in the worktree.
 
-**The one gate that could not run: `npm run test:db`.** Docker will not start on this machine
-(`unable to get image 'postgres:16-alpine': failed to connect to the docker API at
-npipe:////./pipe/dockerDesktopLinuxEngine`), so Tier 3b never executed and
-`tests/integration/db/donationPledgeLedger.postgres.test.ts` is new, typechecked, and **never
-run**. It is the only coverage of the row-lock guard, the serial rolling back with a loser's
-transaction, and the unique index behind them. Recorded as
-`tasks/open/donation-pledges-table-is-unapplied-and-its-postgres-probe-unrun.md` with the command.
+**`npm run test:db` could not run on 2026-09-22 and did run on 2026-10-13.** Docker still will
+not start here, but `tasks/lessons/2026-09-14-a-missing-docker-is-not-a-missing-database-tier.md`
+already named the second route and this stream had not read it: `embedded-postgres` in the job
+scratch directory, on the credentials `docker-compose.yml` uses. Tier 3b: **5 files / 42 tests
+green**, including the three-way settle race, the dismissal transaction, and both reference
+collisions against a real P2002. `migration.sql` and `rollback.sql` were rehearsed on the same
+server — 7 checks, and the hand-written table is identical in columns and indexes to the one
+`prisma db push` builds from the schema.
 
 **A transient local Postgres made an earlier run look far worse than it was.** Midway through the
 session a native server was listening on `localhost:5432`; `src/lib/server/prisma.ts` falls back to
@@ -166,6 +167,29 @@ Not fixed from round five, and why: a receipted row whose amount cannot be resol
 exported, with an empty amount cell and no operator notice. Dropping a receipted row from a tax
 export is worse than showing it incomplete, and a notice is a UI change to `useAuditLogController`.
 
+**Round six, 2026-10-13/14** closed the review of round five and three filed follow-ups:
+
+- **One reader for "which unique did this hit".** Round five's fixture was still transcribed from
+  `node_modules`. The error was captured from a live server instead, and
+  `src/lib/server/uniqueViolation.ts` now serves all three call sites. It returns `true`, `false`
+  or `"unnamed"`, because the third is a different fact and each caller must decide what it may
+  do with it.
+- **The sponsorship lane's collision retry exists now**, and `isReferenceCodeCollision` in
+  `applications.ts` — which read `meta.target` and so never retried — reads the real shape.
+- **The audit-row rules moved to `src/lib/domain/receiptAuditRow.ts`.** One classifier and one
+  amount resolver for the receipts tab, the viewer badge and the CSV fallback, which had been
+  testing key *presence* in two places and *truthiness* in the third. A zero, negative or
+  fractional `amountSen` is "no answer", so it can no longer mask a real `amountMYR`.
+- **`/donate` asks which rail the donor used.**
+- **An NRIC is no longer copied into the audit log** by either lane; see the 2026-10-13 decision.
+
+**A second environmental trap, worth knowing.** Stopping the embedded server's Node wrapper left
+one orphaned `postgres.exe` holding port 5432: it accepted connections and never answered. The
+global `beforeEach` then timed out at 10 s in whichever file a worker opened first, so *different*
+pure-logic suites failed on each run. That is distinct from the leftover-rows failure above, and
+from plain contention — nine other sessions' Postgres processes were running, and the suite needed
+`--maxWorkers=3` to go green (102 files / 1635 tests) even with the port closed.
+
 ### Deliberately not done
 
 - **No payment webhook.** The open entry offered it as the other fork. There is no processor
@@ -185,6 +209,9 @@ export is worse than showing it incomplete, and a notice is a UI change to `useA
   orphaned that one token. The repo's own guard polices `@layer components`, not `@theme` tokens,
   and the rest of the `receipt-*` family is still in use by the sponsor certificate; pulling one
   token out of a coherent family is churn into the design system for ~40 bytes.
+- **Year-end receipt dating is still a `ceiling:`.** A gift sent on 30 December and confirmed on
+  2 January is receipted in January. Back-dating would grow a month's gapless series after it was
+  filed. The fix needs the bank statement's value date and a shelter policy, not a default.
 - **`useSponsorshipStore.saveDonationReceipt` now has no caller.** Left in place: it is the client
   receipt store, and the right fix is a portal receipt view, not deleting the store on the way past.
 - **The idempotency `ceiling:` is inherited, not closed.** A same-actor retry after a lost commit
