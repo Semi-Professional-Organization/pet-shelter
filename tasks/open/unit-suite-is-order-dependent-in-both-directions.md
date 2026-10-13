@@ -116,10 +116,18 @@ passed every job: "Unit, integration & component tests" in 2m46s, plus strict-pe
 Playwright and static analysis. So whatever this is, it does not reproduce on a clean single-job
 runner, and the two local readings were both wrong about the code.
 
-That is the most useful measurement yet for narrowing it: it rules out the source, rules out
-anything in the committed tree, and points at the developer machine — concurrent sessions sharing
-one checkout, several vitest processes competing, and a shared `.vite` cache under
-`node_modules/`. It also means a red local run is weak evidence and a green CI run is the one to
+It rules out the source and anything in the committed tree, and points at the developer machine:
+concurrent sessions sharing one checkout, several vitest processes competing, a shared `.vite`
+cache under `node_modules/`.
+
+**It also corroborates the `hookTimeout` mechanism proposed above**, and was measured before that
+entry was read, so the two are independent. A hook that times out under load is exactly what would
+pass on a single-job runner with a cold cache and fail on a laptop running seven sessions — and it
+predicts the one-failure-per-file shape, which is what both of these local runs produced. If the
+hook timeout is raised, this pair is the cheap regression check: the same commit must stay green on
+CI and stop varying locally.
+
+Practical consequence meanwhile: a red local run is weak evidence and a green CI run is the one to
 trust, which inverts the usual order.
 
 Load looks like a factor rather than the cause: the 65-failure run had a review sub-agent issuing
