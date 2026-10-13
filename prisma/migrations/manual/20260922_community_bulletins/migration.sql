@@ -1,5 +1,14 @@
 -- Community bulletins: three enums, the `bulletins` table, one index.
 --
+-- WHERE TO RUN IT FROM. `.env.local` is gitignored, so it does not exist in a
+-- worktree: `resolveDatabaseUrl()` then falls back to `LOCAL_DATABASE_URL` and
+-- the script targets localhost. That is safe but silent — it prints `(local)`
+-- and applies nothing to the hosted branch. To apply this for real, run it from
+-- the MAIN checkout, where `.env.local` lives, and check that the `Target:`
+-- line says `(remote)` and names the branch you mean before trusting it.
+-- `npm run db:migrate:bulletins:local` pins localhost deliberately, for a
+-- rehearsal.
+--
 -- Applied with `npm run db:migrate:bulletins`, which runs this file and then
 -- INSERTS src/data/bulletins.json, leaving any row that already exists alone —
 -- a re-run cannot revert a notice staff have edited. Written by hand rather than

@@ -23,6 +23,14 @@
  * database-touching script shares, so this cannot end up talking to a different
  * database than `db:push` or `db:check-drift`.
  *
+ * **Run it from the main checkout, not a worktree.** `.env.local` is gitignored
+ * and therefore absent from a worktree, so the resolver falls back to
+ * `LOCAL_DATABASE_URL` and this targets localhost — safely, but silently, and
+ * it applies nothing to the hosted branch. The `Target:` line is the check:
+ * `(remote)` means it is about to touch a hosted database, `(local)` means it
+ * is not. `npm run db:migrate:bulletins:local` pins localhost deliberately for
+ * a rehearsal.
+ *
  * Prints the table list before and after so the blast radius is visible.
  */
 import fs from "node:fs";
