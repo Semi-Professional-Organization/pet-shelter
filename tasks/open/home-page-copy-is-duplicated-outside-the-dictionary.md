@@ -34,25 +34,29 @@ pillars `HomeOurWorkSection` names, which is a content decision and not a dedupl
 inline, so the two English strings remain identical by coincidence rather than by source.
 
 **The navbar and the footer label the same links differently.** The footer reads `nav.*` keys; the
-navbar inlines its own pairs. On 2026-10-14, every link both of them carry except `/sponsors`
-disagreed with the key the footer uses — five links, in Malay for all five and in English for four
-(`/donate`'s desktop English matches). Navbar labels are listed desktop first, then mobile where it
-differs:
+navbar mostly inlines its own pairs. Measured on 2026-10-14 by listing every `href` literal in
+`Navbar.tsx` and `Footer.tsx` with `grep` and intersecting the two lists: they share **seven**.
+Two match, because the navbar reads the same key — `/sponsors` (`nav.sponsorWall`) and
+`/bulletins` (`nav.bulletins`). **Five drift.** Every navbar label for each is listed:
 
-| Link | Navbar (en / ms) | Footer key (en / ms) |
+| Link | Navbar labels (en / ms) | Footer key (en / ms) |
 |---|---|---|
-| `/pets` | "Meet Our Animals" / "Haiwan Kami", "Lihat Haiwan Reskue", "Haiwan Reskue Kami" | `nav.adoptablePets`: "Adoptable Pets" / "Haiwan Angkat" |
+| `/pets` | top bar "Meet Our Animals" / "Haiwan Kami"; Adoption menu "Meet Our Animals" / "Lihat Haiwan Reskue"; CTA "Adopt" / "Adopsi"; mobile "Meet Our Animals" / "Haiwan Reskue Kami"; mobile CTA "Browse All Animals" / "Semua Haiwan" | `nav.adoptablePets`: "Adoptable Pets" / "Haiwan Angkat" |
 | `/#how-it-works` | "Adoption Process & Criteria" / "Proses & Syarat Adopsi" | `nav.adoptionProcess`: "Adoption Process" / "Proses Adopsi" |
-| `/applications/track` | "Track Application Status" / "Semak Status Permohonan"; mobile "Track Application" | `nav.trackApplication`: "Track Application" / "Semak Permohonan" |
+| `/applications/track` | menu "Track Application Status" / "Semak Status Permohonan"; mobile "Track Application" / "Semak Status Permohonan" | `nav.trackApplication`: "Track Application" / "Semak Permohonan" |
 | `/get-involved#volunteer` | "Volunteer & Field Shifts" / "Sukarelawan Santuari & TNRM" | `nav.volunteerFoster`: "Volunteer & Foster" / "Sukarelawan & Asuhan" |
-| `/donate` | "Donate & Sponsor" / "Taja & Sumbang"; mobile "… (LHDN)" | `nav.donate`: "Donate & Sponsor" / "Derma & Penajaan" |
+| `/donate` | top bar "Donate & Sponsor" / "Taja & Sumbang"; mobile "Donate & Sponsor (LHDN)" / "Taja & Sumbang (LHDN)" | `nav.donate`: "Donate & Sponsor" / "Derma & Penajaan" |
 
-The navbar does not even agree with itself: on `/pets` and `/applications/track` its mobile menu
-and desktop menu use different words. Found by comparing each navbar `href` that the footer also
-links; a first count of three missed two, so treat this as measured once, not as exhaustive. `nav.sponsorWall` was the one link fixed, because the
-footer's copy of it was a fallback for a key that did not exist; it is pinned in both languages by
-`tests/components/navbar.test.tsx`. Picking the wording for the other three is a copy decision, and
-fixing them one at a time with a one-off test each is the special-casing this entry argues against.
+Every Malay navbar label above differs from its key. In English, two navbar labels match the key —
+`/donate`'s top bar and `/applications/track`'s mobile entry — and the rest differ. A link counts
+as drifting here when any of its labels differs. The navbar also disagrees with itself: `/pets`
+alone carries five wordings.
+
+`nav.sponsorWall` was the one link fixed in PR #104, because the footer's copy of it was a fallback
+for a key that did not exist; both halves are pinned in both languages, by
+`tests/components/navbar.test.tsx` and `tests/components/footer.test.tsx`. Picking the wording for
+the five is a copy decision, and fixing them one at a time with a one-off test each is the
+special-casing this entry argues against.
 
 **Keys with no reader.** Counted on 2026-10-14 by searching `src` for each key as a quoted literal:
 

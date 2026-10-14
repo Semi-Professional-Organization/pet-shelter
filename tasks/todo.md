@@ -1838,6 +1838,22 @@ Each of these was the same shape: a fix applied to the case in front of it and n
 was the lesson the review loop kept teaching, so it is written down —
 `tasks/lessons/2026-10-14-a-fix-for-one-half-of-a-pair-must-be-checked-against-the-other.md`.
 
+## Round ten — reviewing round nine's fix
+
+Reviewed `6a92009` and `72a0fd3`. The code is correct: the footer test fails on an inline English
+label, as claimed, and the `importMap` change is safe. The ledger rewrite was wrong again, in the
+commit that wrote the lesson against exactly this. The rewrite claimed to have enumerated every
+`href`, but the enumeration was done from memory. It missed `/bulletins`, a seventh shared link,
+which matches. It left "the other three" one paragraph below a table of five. It listed three of the
+five labels the navbar gives `/pets`, and its English summary named one partial match out of two.
+Round nine's row 1 above repeats that summary and is superseded here.
+
+Fixed by doing what the lesson says: `grep` every `href` literal in both files, intersect the lists,
+and read each label at its line. Seven shared, two match (`/sponsors`, `/bulletins`), five drift;
+every navbar label for each is in the table. Round ten's findings were ledger text only, and this
+fix changes no code, so no round eleven was run on it. **That is a stated gap:** the corrected table
+has been checked only by the grep it came from.
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:
