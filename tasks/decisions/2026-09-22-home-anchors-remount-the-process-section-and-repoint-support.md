@@ -57,10 +57,13 @@ sebarang yuran adopsi komersial", and the test asserts that wording and the abse
 ones. Choosing where a string lives is not choosing what it says; each copy has to be read against
 what the organisation actually states, and against what its admin screens allow.
 
-**Left for the owner:** the navbar still promises a "100% free adoption guide" and the standards
-section is headed "100% Free Adoption Policy", while the same configurable fees exist. Every seeded
-fee is "Free" today, so nothing contradicts on screen. Whether the policy is "free" or "no
-commercial fee" is the organisation's decision, not this change's.
+**Left for the owner:** the site promises free adoption, unqualified, in eleven places — including
+pillar 3 of this same page, the adoption form's submit button and three applicant emails — while
+the same configurable fees exist. Every seeded fee is "Free" today, so nothing contradicts on
+screen. Whether the policy is "free" or "no commercial fee" is the shelter's decision, not this
+change's; the full inventory is
+`tasks/open/the-site-promises-free-adoption-while-fees-are-configurable.md`. (An earlier version of
+this paragraph named only two of the eleven.)
 
 Two more things the remount exposed, both invisible while the anchor went nowhere:
 

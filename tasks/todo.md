@@ -1708,9 +1708,6 @@ what the PR claimed:
   guard-log timing in a log that carries no session id. A controlled count on 2026-10-14 — 140 lines
   before one call, 140 after — showed the hook wrote nothing at all for this session. Corrected and
   retitled; also a lesson.
-- One `homeMalay` run on 2026-10-14 reported a single failure whose error was not captured, because
-  its output had been filtered to the summary line. Three runs immediately after were green. It is
-  recorded as unexplained rather than attributed to the flake.
 
 ## Round five — reviewing round four's own fix
 
@@ -1736,13 +1733,38 @@ once already. Twelve findings; the code ones were each probed red against what t
   index, and a new test pins the TNRM link to `/faq` by heading rather than position.
 - Each file is now parsed once by the guard, not twice.
 
+## Round six — reviewing round five's fix
+
+Eleven findings. Two were confirmed by the reviewer's own probe, and both were in code written to
+close the round before:
+
+- **The backstop dropped real comments.** It checked each range against a snapshot that still held
+  ranges it had already discarded, so a fake range found inside a JSDoc — dropped, correctly — then
+  took down a real `{/* <Dead /> */}` that started inside it: a commented-out mount counted as
+  rendered. It is now a sweep against surviving ranges only, which also replaces an unmarked O(n²)
+  scan with a linear one.
+- **The JSDoc test could not fail with the JSDoc skip removed.** After the fix, the skip and the
+  backstop are each sufficient alone, so no outcome test can pin either separately. The outcome is
+  pinned by the reviewer's exact cascade case, and the sweep by a direct test; probing each layer
+  broken alone, then both, gave one failure and then two.
+- `useLanguage`'s no-provider path had no test at all, though the previous round claimed to have
+  fixed it. `Footer` rendered with plain `render` now pins the registration line; probed red
+  against the old fallback.
+- `nav.sponsorWall` stopped being a missing key: the navbar already shipped Malay for the same
+  link inline. Seventeen remain.
+- The "left for the owner" list of free-adoption claims named two of eleven. The full inventory is
+  now its own open entry, because it is a live policy question rather than part of a decision.
+
+Not fixed, and marked: the typed `t` cannot require params for keys with placeholders, because the
+dictionary's values are typed as `string`. Recorded with a `ceiling:` comment and its upgrade path.
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:
 
 - `npm run check` — 0 errors, 12 pre-existing warnings, one fewer than at the base.
-- `npx vitest run --project unit` — 100 files, **1612 tests**; 0 assertion errors, 0 timeouts.
-- `npx vitest run --project components` — 15 files, **210 tests**; 0 assertion errors, 0 timeouts.
+- `npx vitest run --project unit` — 100 files, **1614 tests**; 0 assertion errors, 0 timeouts.
+- `npx vitest run --project components` — 15 files, **212 tests**; 0 assertion errors, 0 timeouts.
 - `npm run test:integration` — 9 files, **92 tests**.
 - `npm run build` — compiled; `/` and `/bulletins` both still `○ (Static)`.
 
@@ -1751,9 +1773,9 @@ Both full tiers were green on this run and timeout-red on others; that is
 point, not a fix. Each new suite was run against the unfixed code first and observed failing, and
 every repair to the guard was re-probed by breaking it again afterwards.
 
-Two gaps in the record, stated so nobody infers more than happened. \`f7dd5b2\`'s commit trailer
+Two gaps in the record, stated so nobody infers more than happened. `f7dd5b2`'s commit trailer
 named only a subset of the component suite and no unit run, for a change to the dictionary; the
 parity test was run afterwards and passes, so the gap is in the record rather than the code. And
-one \`homeMalay\` run on 2026-10-14 reported a single failure whose error was not captured, because
+one `homeMalay` run on 2026-10-14 reported a single failure whose error was not captured, because
 its output had been filtered to the summary line; three runs immediately after were green, and it
 is recorded as unexplained rather than attributed to the flake.
