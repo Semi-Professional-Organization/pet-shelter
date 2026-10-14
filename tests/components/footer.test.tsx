@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 
 import { Footer } from "@/components/layout/Footer";
 import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
+import { translations } from "@/lib/i18n/translations";
 import { renderWithLanguage } from "./support/render";
 
 /**
@@ -52,17 +53,19 @@ describe("Footer", () => {
     expect(screen.queryByText(/^nav\./)).not.toBeInTheDocument();
   });
 
-  it("translates the sponsor wall link the way the navbar already did", () => {
+  it.each(["en", "ms"] as const)("reads nav.sponsorWall for the sponsor wall link in %s", (language) => {
     // `nav.sponsorWall` was missing from both dictionaries while the navbar
     // carried "Dinding Penaja Awam" inline for the same `/sponsors` link. One
     // key, read by both, so the Malay site no longer shows the same link in two
-    // languages on one page.
-    renderWithLanguage(<Footer />, { language: "ms" });
-    expect(screen.getByRole("link", { name: "Dinding Penaja Awam" })).toHaveAttribute(
-      "href",
-      "/sponsors",
-    );
-    expect(screen.queryByText("Public Sponsor Wall")).not.toBeInTheDocument();
+    // languages on one page. Compared against the dictionary in both languages,
+    // as `navbar.test.tsx` does for the other half: a Malay-only literal let an
+    // inline English label drift unseen.
+    const other = language === "en" ? "ms" : "en";
+    renderWithLanguage(<Footer />, { language });
+    expect(
+      screen.getByRole("link", { name: translations[language].nav.sponsorWall }),
+    ).toHaveAttribute("href", "/sponsors");
+    expect(screen.queryByText(translations[other].nav.sponsorWall)).not.toBeInTheDocument();
   });
 
   it("fills in the registration number when rendered with no provider at all", () => {

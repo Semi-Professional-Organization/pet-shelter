@@ -240,7 +240,7 @@ interface ImportTarget {
  * which pressures the next person to loosen the guard instead of the parser.
  * Recording the *exported* name is what lets an alias resolve.
  */
-function importMap(fromFile: string, entry = parsed(fromFile)): Map<string, ImportTarget> {
+function importMap(fromFile: string, entry: ParsedFile): Map<string, ImportTarget> {
   if (entry.imports) return entry.imports;
 
   const map = new Map<string, ImportTarget>();
