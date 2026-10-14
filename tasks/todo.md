@@ -1800,6 +1800,28 @@ the round claimed and recorded.
 | 13 | `visit` looked up the same cache entry three times | Fixed; the now-unused `readStripped` went with it |
 | 14 | `decisions/` entries rewritten in place, against `tasks/README.md` | **Answered, not changed.** These entries exist only on this unmerged branch; nothing has been decided until it merges, and revising a draft is not reversing a record. The README states no exception for drafts. Whether it should is the owner's call |
 
+## Round eight — reviewing round seven's fix
+
+Reviewed `4744020` alone. No correctness bug in the code. It confirmed that deleting the JSDoc skip
+was safe (eight edge cases, identical output). Ten findings were about tests and claims, all
+confirmed by reading the cited lines:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The navbar test works around a real defect: hover opens the desktop menu, click toggles it shut | **Recorded, not fixed:** `tasks/open/desktop-nav-menus-close-on-the-click-that-hover-opened.md`. A site-wide menu behaviour change, and keyboard users depend on the toggle |
+| 2 | The navbar test checked a literal, so English drift passed | Fixed: both languages compared against `translations[lang].nav.sponsorWall`. Probed: an inline `"Sponsor Wall"` now fails the `en` case |
+| 3 | A test comment still described two layers after the skip was deleted | Fixed |
+| 4 | The navbar and footer label three other links differently | **Recorded, not fixed:** added to `tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`. Choosing wording is a copy decision |
+| 5 | The provider doc still kept a missing-key count by hand | Fixed: the count is gone, the doc points at the ledger entry |
+| 6 | The leftover-`{name}` upgrade path was oversold | Fixed: the ceiling now states its limits (rendered keys only, test-only, misfires on braces in a value) |
+| 7 | `importMap` re-read the cache entry `visit` already held | Fixed: `visit` passes the entry |
+| 8 | The JSX-text ceiling's sizes were off by about ten times | Fixed: the measured figures (about 400 nodes, at most 42 ranges) |
+| 9 | A `length > 0` assertion that could never fail | Deleted; `getAllByRole` is the presence check |
+| 10 | A navbar test living in the footer file | Moved to `tests/components/navbar.test.tsx` |
+
+Round eight found no correctness defect and nothing that changes what the PR claims. Its own fixes
+are still new code, so round nine reviews them.
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:

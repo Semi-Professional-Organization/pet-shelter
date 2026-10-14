@@ -33,6 +33,22 @@ pillars `HomeOurWorkSection` names, which is a content decision and not a dedupl
 2026-10-14 the hero's copy is a dictionary key, `hero.tnrmHeadline`; the navbar's tagline is still
 inline, so the two English strings remain identical by coincidence rather than by source.
 
+**The navbar and the footer label the same links differently.** The footer reads `nav.*` keys; the
+navbar inlines its own pairs, and on 2026-10-14 three of them disagreed with the key the footer uses
+— in English as well as Malay:
+
+| Link | Navbar (en / ms) | Footer key (en / ms) |
+|---|---|---|
+| `/donate` | "Donate & Sponsor" / "Taja & Sumbang" | `nav.donate`: "Donate & Sponsor" / "Derma & Penajaan" |
+| `/applications/track` | "Track Application Status" / "Semak Status Permohonan" | `nav.trackApplication`: "Track Application" / "Semak Permohonan" |
+| `/pets` | "Meet Our Animals" / "Haiwan Kami", "Lihat Haiwan Reskue" | `nav.adoptablePets`: "Adoptable Pets" / "Haiwan Angkat" |
+
+The navbar does not even agree with itself: its mobile menu says "Track Application" where the
+desktop menu says "Track Application Status". `nav.sponsorWall` was the one link fixed, because the
+footer's copy of it was a fallback for a key that did not exist; it is pinned in both languages by
+`tests/components/navbar.test.tsx`. Picking the wording for the other three is a copy decision, and
+fixing them one at a time with a one-off test each is the special-casing this entry argues against.
+
 **Keys with no reader.** Counted on 2026-10-14 by searching `src` for each key as a quoted literal:
 
 - `home.*` — **13 of 25** have no reader: `bulletinsSubtitle`, `availableTitle`,
