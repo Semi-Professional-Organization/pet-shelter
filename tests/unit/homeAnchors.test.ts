@@ -104,14 +104,21 @@ const RENDERED_COMPONENT = /<([A-Z]\w*)/g;
  * splits on newlines afterwards; deleting them shifted every reported line
  * number by the comment lines above it.
  */
-function stripComments(text: string, fileName = "fragment.tsx"): string {
-  const source = ts.createSourceFile(
+function parseSource(fileName: string, text: string): ts.SourceFile {
+  return ts.createSourceFile(
     fileName,
     text,
     ts.ScriptTarget.Latest,
     /* setParentNodes */ true,
     fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
+}
+
+function stripComments(
+  text: string,
+  fileName = "fragment.tsx",
+  source: ts.SourceFile = parseSource(fileName, text),
+): string {
 
   const ranges = new Map<number, number>();
   const jsxText: [number, number][] = [];
@@ -119,6 +126,12 @@ function stripComments(text: string, fileName = "fragment.tsx"): string {
     for (const range of found ?? []) ranges.set(range.pos, range.end);
   };
   const visit = (node: ts.Node) => {
+    // A JSDoc block is already collected whole, as leading trivia of the
+    // declaration it documents. Descending into its tag nodes asks the
+    // context-free scanner about positions *inside* the doc, where it reads
+    // `@param x // note` as a line comment running to end of line — past the
+    // closing `*/`, blanking the code after a one-line doc.
+    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
     if (ts.isJsxText(node)) jsxText.push([node.pos, node.end]);
     collect(ts.getLeadingCommentRanges(text, node.getFullStart()));
     collect(ts.getTrailingCommentRanges(text, node.getEnd()));
@@ -135,6 +148,14 @@ function stripComments(text: string, fileName = "fragment.tsx"): string {
   // tree knows where JSX text is; that is the point of using it.
   for (const [pos] of [...ranges]) {
     if (jsxText.some(([start, end]) => pos >= start && pos < end)) ranges.delete(pos);
+  }
+
+  // Backstop for the same class of error: a real comment cannot start inside
+  // another real comment, so any range that does was found by scanning from a
+  // position that was already trivia. Drop it rather than let it overrun.
+  const sorted = [...ranges].sort(([a], [b]) => a - b);
+  for (const [pos] of sorted) {
+    if (sorted.some(([p, e]) => p < pos && pos < e)) ranges.delete(pos);
   }
 
   // Code units, not code points: TypeScript reports UTF-16 offsets, and
@@ -198,13 +219,7 @@ function importMap(fromFile: string): Map<string, ImportTarget> {
   if (cached) return cached;
 
   const map = new Map<string, ImportTarget>();
-  const source = ts.createSourceFile(
-    fromFile,
-    readStripped(fromFile),
-    ts.ScriptTarget.Latest,
-    /* setParentNodes */ false,
-    fromFile.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
+  const { source } = parsed(fromFile);
 
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
@@ -215,8 +230,11 @@ function importMap(fromFile: string): Map<string, ImportTarget> {
     if (!file) continue;
 
     if (clause.name) {
-      const exportName = defaultExportName(file);
-      if (exportName) map.set(clause.name.text, { file, exportName });
+      // Unresolvable shapes map to the sentinel "default", which no block has,
+      // so the walk records `file::default` as a parser gap instead of
+      // dropping the subtree in silence — the old regex mapped every default
+      // import, and an earlier AST version quietly narrowed that.
+      map.set(clause.name.text, { file, exportName: defaultExportName(file) ?? "default" });
     }
     if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
       for (const element of clause.namedBindings.elements) {
@@ -232,9 +250,28 @@ function importMap(fromFile: string): Map<string, ImportTarget> {
   return map;
 }
 
-/** The declared name of a file's `export default function`, if it has one. */
+/**
+ * The component name behind a file's default export, if one can be named:
+ * `export default function Name`, `export default Name`, or a wrapper such as
+ * `export default memo(Name)`. Anything else — an anonymous function, an
+ * inline arrow — returns null, and the caller records a parser gap.
+ */
 function defaultExportName(file: string): string | null {
-  return /^export\s+default\s+(?:async\s+)?function\s+([A-Z]\w*)/m.exec(readStripped(file))?.[1] ?? null;
+  for (const statement of parsed(file).source.statements) {
+    if (ts.isFunctionDeclaration(statement)) {
+      const isDefault = statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword);
+      if (isDefault) return statement.name?.text ?? null;
+    }
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+      const e = statement.expression;
+      if (ts.isIdentifier(e)) return e.text;
+      if (ts.isCallExpression(e) && e.arguments.length > 0 && ts.isIdentifier(e.arguments[0])) {
+        return e.arguments[0].text;
+      }
+      return null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -317,20 +354,28 @@ function entriesForRoute(route: string): string[] {
 }
 
 /**
- * Source text with comments blanked, read once per file.
+ * Each file, read and parsed once: the tree, and the text with comments blanked.
  *
  * The walk enters `HomeSections.tsx` once per component it reaches, and
- * `anchorLinks` reads the whole tree again afterwards. Unmemoized that was
- * ~7.5s for four assertions in what is meant to be the fastest tier.
+ * `anchorLinks` reads the tree again afterwards; unmemoized that was ~7.5s for
+ * four assertions in what is meant to be the fastest tier. An intermediate
+ * version cached the text but parsed every file twice — once to find its
+ * comments and again, from the stripped text, to read its imports. Comments do
+ * not change a file's statements, so one tree serves both.
  */
-const sourceCache = new Map<string, string>();
-function readStripped(file: string): string {
-  let text = sourceCache.get(file);
-  if (text === undefined) {
-    text = stripComments(readFileSync(file, "utf8"), file);
-    sourceCache.set(file, text);
+const parsedCache = new Map<string, { text: string; source: ts.SourceFile }>();
+function parsed(file: string, raw?: string): { text: string; source: ts.SourceFile } {
+  let entry = parsedCache.get(file);
+  if (!entry) {
+    const original = raw ?? readFileSync(file, "utf8");
+    const source = parseSource(file, original);
+    entry = { text: stripComments(original, file, source), source };
+    parsedCache.set(file, entry);
   }
-  return text;
+  return entry;
+}
+function readStripped(file: string): string {
+  return parsed(file).text;
 }
 
 /** Ids rendered by a route, walking down from each of its entry files. */
@@ -408,8 +453,10 @@ function anchorLinks(): AnchorLink[] {
     // Cheap pre-filter on the raw text. A file with no candidate before its
     // comments are removed cannot have one after, and only three of ~245
     // source files have any — parsing the rest cost six seconds for nothing.
-    if (!readFileSync(file, "utf8").match(ANCHOR_LINK)) continue;
-    readStripped(file)
+    const raw = readFileSync(file, "utf8");
+    if (!raw.match(ANCHOR_LINK)) continue;
+    parsed(file, raw)
+      .text
       .split(/\r?\n/)
       .forEach((text, i) => {
         for (const [, path, id] of text.matchAll(ANCHOR_LINK)) {
@@ -464,6 +511,9 @@ describe("in-app anchor links", () => {
         [
           'import Layout, { Live, Dead, DeadToo, Text, Upload } from "./sections";',
           'import { Original as Renamed } from "./sections";',
+          'import Panel from "./panel";',
+          'import Card from "./card";',
+          'import Anonymous from "./anonymous";',
           "export default function Page() {",
           "  return (",
           "    <main>",
@@ -476,6 +526,9 @@ describe("in-app anchor links", () => {
           "      }",
           "      // <Text />",
           "      <Upload />",
+          "      <Panel />",
+          "      <Card />",
+          "      <Anonymous />",
           "    </main>",
           "  );",
           "}",
@@ -520,7 +573,30 @@ describe("in-app anchor links", () => {
         ].join("\n"),
       );
 
-      const ids = idsRenderedBy(page);
+      // Default exports in the shapes React code actually uses. Only
+      // `export default function Name` resolved in an earlier AST version, and
+      // the others were dropped with no record that the walk had given up.
+      writeFileSync(
+        join(fixtures, "panel.tsx"),
+        ['function Panel() {', '  return <section id="default-identifier-anchor" />;', "}", "export default Panel;"].join("\n"),
+      );
+      writeFileSync(
+        join(fixtures, "card.tsx"),
+        [
+          'import { memo } from "react";',
+          "function Card() {",
+          '  return <section id="default-memo-anchor" />;',
+          "}",
+          "export default memo(Card);",
+        ].join("\n"),
+      );
+      writeFileSync(
+        join(fixtures, "anonymous.tsx"),
+        ['export default () => <section id="anonymous-anchor" />;'].join("\n"),
+      );
+
+      const skipped = new Set<string>();
+      const ids = idsRenderedBy(page, skipped);
       expect(ids).toContain("live-anchor");
 
       // Both ways a mount is really commented out in JSX.
@@ -546,21 +622,49 @@ describe("in-app anchor links", () => {
       // `data-pet-id` is not an anchor. `\bid=` used to match its tail, which
       // would register a scroll target no browser can find.
       expect(ids).not.toContain("phantom-anchor");
+
+      // `export default Panel` and `export default memo(Card)` both resolve.
+      expect(ids).toContain("default-identifier-anchor");
+      expect(ids).toContain("default-memo-anchor");
+
+      // An anonymous default cannot be named, so its id is not found — but the
+      // walk must SAY so, rather than let a working link be reported broken
+      // with nothing pointing at the parser.
+      expect(ids).not.toContain("anonymous-anchor");
+      expect([...skipped].some((gap) => gap.endsWith("anonymous.tsx::default"))).toBe(true);
     } finally {
       rmSync(fixtures, { recursive: true, force: true });
     }
   });
 
   it("keeps a link written after a mid-line double slash", () => {
-    // `<a title="Tue // Sun" href="/#ghost">` is one line. Blanking from any
-    // whitespace-preceded `//` cut the href out of it, so a broken link
-    // vanished from the scan — a false green in the guard the branch relies
-    // on. Only a line that *opens* with slashes is a comment.
+    // `<a title="Tue // Sun" href="/#ghost">` is one line. A regex version
+    // blanked from any whitespace-preceded `//` and cut the href out of it, so
+    // a broken link vanished from the scan — a false green in the guard the
+    // branch relies on. The parser knows `"Tue // Sun"` is a string; it does
+    // blank a real trailing comment after code, which the regex did not.
     const line = '<a title="Tue // Sun" href="/#ghost">x</a>';
     expect(stripComments(line)).toContain("/#ghost");
 
     // And the commented-out form is still blanked.
     expect(stripComments("      // <Dead />")).not.toContain("Dead");
+  });
+
+  it("does not let a // inside a JSDoc blank the code after it", () => {
+    // TypeScript parses `/** … */` on a declaration into JSDoc nodes, and the
+    // context-free comment scanner, asked about positions inside one, reads
+    // `// note` as a line comment running to end of line — past the `*/`.
+    // A one-line doc followed by code lost the code: a broken link there left
+    // the scan (false green), and a mount there counted as unrendered (false
+    // red). Found by review, after the parser had replaced three regexes.
+    //
+    // Asserted on `stripComments` directly, deliberately. The walk-level cases
+    // above already prove the walk calls it; this pins what it returns.
+    for (const tag of ["@param x", "{@link Foo}", "@see Foo", "@type {string}", "@returns x"]) {
+      const line = `/** ${tag} // note */ export function F(x) { return <a href="/#ghost2">x</a>; }`;
+      expect(stripComments(line), tag).toContain('href="/#ghost2"');
+      expect(stripComments(line), tag).not.toContain("note");
+    }
   });
 
   it("resolves a literal link into a dynamic route", () => {

@@ -56,9 +56,19 @@ fallback**; "the fallback is unreachable" is true per key, not per file.
 
 Fixing all 38 inside a home-page PR would have meant authoring Malay for most of an application
 form. Instead the home-page branch added `useTypedTranslation()` to `LanguageProvider`, which
-returns `t` restricted to `TranslationKey`, and moved only the components it owned onto it. A
-probe confirmed the effect: renaming `hero.tnrmHeadline` in the dictionary is now a compile error at
-`Hero.tsx`, where before it would have rendered the literal path as the page's `<h1>`.
+returns `{ t, isMs }` with `t` restricted to `TranslationKey` (and accepting interpolation
+params), and moved the components it touched onto it — `Hero`, `HomeSections`, `BulletinFeed`,
+`BulletinsPageIntro`, `Navbar` and `Footer`. A probe confirmed the effect: renaming
+`hero.tnrmHeadline` in the dictionary is now a compile error at `Hero.tsx`, where before it would
+have rendered the literal path as the page's `<h1>`.
+
+`Footer` is the instructive one. Its seventeen other keys are now compile-checked; the two in the
+table above still go through an untyped handle, named `untypedT` and commented as this defect, and
+they are the only untyped calls left in any file the branch touched.
+
+The no-provider fallback inside `useLanguage` was also a second, diverged copy of `t`: it returned a
+fallback string *ahead of* the dictionary and never interpolated, so `Footer` rendered outside a
+provider printed "ROS Reg: {regNo}". Both paths now call one `translate()` function.
 
 **Settles when:** the eighteen keys are added to both dictionaries — with Malay a person has
 reviewed, since several sit on legally meaningful form fields — or their call sites are changed to

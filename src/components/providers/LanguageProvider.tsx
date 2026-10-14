@@ -39,6 +39,66 @@ function getServerSnapshot(): Language | null {
   return null;
 }
 
+/**
+ * Resolves a dictionary path for a language: the active dictionary, then
+ * English, then the caller's fallback text, then the path itself; then fills
+ * `{name}` placeholders from `params`.
+ *
+ * One implementation for both `t`s. The provider's and the no-provider
+ * fallback in `useLanguage` used to be separate copies, and they had
+ * diverged: outside a provider a fallback string was returned *ahead of* the
+ * dictionary — the reverse of the real `t` — and params were never
+ * interpolated, so `Footer` rendered without a provider printed
+ * "ROS Reg: {regNo}" in place of the shelter's registration number.
+ */
+function translate(
+  language: Language,
+  path: string,
+  fallbackOrParams?: string | Record<string, string | number>,
+  params?: Record<string, string | number>,
+): string {
+  let fallbackText = "";
+  let interpolationParams: Record<string, string | number> | undefined = undefined;
+
+  if (typeof fallbackOrParams === "string") {
+    fallbackText = fallbackOrParams;
+    interpolationParams = params;
+  } else if (typeof fallbackOrParams === "object") {
+    interpolationParams = fallbackOrParams;
+  }
+
+  const dict = translations[language] || translations.en;
+  const fallbackDict = translations.en;
+
+  const keys = path.split(".");
+  let current: unknown = dict;
+  let currentFallback: unknown = fallbackDict;
+
+  for (const k of keys) {
+    if (current && typeof current === "object" && k in current) {
+      current = (current as Record<string, unknown>)[k];
+    } else {
+      current = undefined;
+    }
+
+    if (currentFallback && typeof currentFallback === "object" && k in currentFallback) {
+      currentFallback = (currentFallback as Record<string, unknown>)[k];
+    } else {
+      currentFallback = undefined;
+    }
+  }
+
+  let result = typeof current === "string" ? current : typeof currentFallback === "string" ? currentFallback : fallbackText || path;
+
+  if (interpolationParams) {
+    Object.entries(interpolationParams).forEach(([paramKey, paramVal]) => {
+      result = result.replace(new RegExp(`{${paramKey}}`, "g"), String(paramVal));
+    });
+  }
+
+  return result;
+}
+
 export function LanguageProvider({
   children,
   defaultLanguage = "en",
@@ -79,48 +139,7 @@ export function LanguageProvider({
       path: string,
       fallbackOrParams?: string | Record<string, string | number>,
       params?: Record<string, string | number>
-    ): string => {
-      let fallbackText = "";
-      let interpolationParams: Record<string, string | number> | undefined = undefined;
-
-      if (typeof fallbackOrParams === "string") {
-        fallbackText = fallbackOrParams;
-        interpolationParams = params;
-      } else if (typeof fallbackOrParams === "object") {
-        interpolationParams = fallbackOrParams;
-      }
-
-      const dict = translations[language] || translations.en;
-      const fallbackDict = translations.en;
-
-      const keys = path.split(".");
-      let current: unknown = dict;
-      let currentFallback: unknown = fallbackDict;
-
-      for (const k of keys) {
-        if (current && typeof current === "object" && k in current) {
-          current = (current as Record<string, unknown>)[k];
-        } else {
-          current = undefined;
-        }
-
-        if (currentFallback && typeof currentFallback === "object" && k in currentFallback) {
-          currentFallback = (currentFallback as Record<string, unknown>)[k];
-        } else {
-          currentFallback = undefined;
-        }
-      }
-
-      let result = typeof current === "string" ? current : typeof currentFallback === "string" ? currentFallback : fallbackText || path;
-
-      if (interpolationParams) {
-        Object.entries(interpolationParams).forEach(([paramKey, paramVal]) => {
-          result = result.replace(new RegExp(`{${paramKey}}`, "g"), String(paramVal));
-        });
-      }
-
-      return result;
-    },
+    ): string => translate(language, path, fallbackOrParams, params),
     [language]
   );
 
@@ -151,19 +170,7 @@ export function useLanguage(): LanguageContextValue {
     return {
       language: fallbackLang,
       setLanguage: () => {},
-      t: (path: string, fallbackOrParams?: string | Record<string, string | number>) => {
-        if (typeof fallbackOrParams === "string") return fallbackOrParams;
-        const keys = path.split(".");
-        let cur: unknown = dict;
-        for (const k of keys) {
-          if (cur && typeof cur === "object" && k in cur) {
-            cur = (cur as Record<string, unknown>)[k];
-          } else {
-            return path;
-          }
-        }
-        return typeof cur === "string" ? cur : path;
-      },
+      t: (path, fallbackOrParams, params) => translate(fallbackLang, path, fallbackOrParams, params),
       dictionary: dict,
       isMs: false,
     };
@@ -187,7 +194,18 @@ export function useLanguage(): LanguageContextValue {
  * move to this hook one at a time; once nothing still needs the untyped form,
  * `t` itself should take `TranslationKey` and this hook should go.
  */
-export function useTypedTranslation(): (key: TranslationKey) => string {
-  const { t } = useLanguage();
-  return useCallback((key: TranslationKey) => t(key), [t]);
+export function useTypedTranslation(): {
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
+  isMs: boolean;
+} {
+  // Returns `isMs` too, so a component reads the context once rather than
+  // calling `useLanguage()` again beside this. Params pass through, so a key
+  // with `{placeholders}` — `footer.rosReg` — can use the typed form.
+  const { t, isMs } = useLanguage();
+  const typed = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>) =>
+      params ? t(key, params) : t(key),
+    [t],
+  );
+  return { t: typed, isMs };
 }

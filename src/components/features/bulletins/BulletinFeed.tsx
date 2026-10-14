@@ -70,7 +70,7 @@ export function BulletinFeed({
   maxItems,
   compact = false,
 }: BulletinFeedProps) {
-  const t = useTypedTranslation();
+  const { t } = useTypedTranslation();
   const {
     bulletins,
     isAdminMode,

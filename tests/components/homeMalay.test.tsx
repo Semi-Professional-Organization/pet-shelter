@@ -4,6 +4,7 @@ import { screen } from "@testing-library/react";
 import { Hero } from "@/components/layout/Hero";
 import {
   HomeGalleryLoading,
+  HomeOurWorkSection,
   HomeProcessSection,
   HomeViewAllPetsLink,
 } from "@/components/layout/HomeSections";
@@ -230,14 +231,19 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText("Browse & Submit Application")).toBeInTheDocument();
     expect(screen.getByText("Meet & Socialize")).toBeInTheDocument();
     expect(screen.getByText("Finalize & Welcome Home")).toBeInTheDocument();
-    // Step 3 must state the fee policy. An earlier version of this test pinned
-    // the dictionary's "no hidden fees" and asserted "zero adoption fees" was
-    // ABSENT — locking in wording that implies visible fees, on a page whose
-    // own standards section, directly below, says "100% Free Adoption Policy".
-    // The dictionary was the right home for this copy and the wrong source of
-    // it: choosing where a string lives is not choosing what it says.
-    expect(screen.getByText(/zero adoption fees/)).toBeInTheDocument();
+    // Step 3 states the fee policy in the organisation's own qualified words.
+    //
+    // Two wrong versions came first. The dictionary said "no hidden fees",
+    // which implies visible ones — and this test once pinned that by asserting
+    // the alternative was absent. The fix then said "zero adoption fees", which
+    // over-promises: fees are admin-configurable (`adoptionFeeDog`,
+    // `adoptionFeeCat`, per-pet `adoptionFee`), and a pet page shows any value
+    // that is not "Free". The site's careful copy — this section's own subtitle
+    // and the standards section below — says "commercial adoption fees", and
+    // that qualifier is what leaves room for a cost-recovery fee.
+    expect(screen.getByText(/no commercial adoption fees/)).toBeInTheDocument();
     expect(screen.queryByText(/no hidden fees/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/zero adoption fees/)).not.toBeInTheDocument();
   });
 
   it("renders the three steps in Malay, with no English left behind", () => {
@@ -250,9 +256,10 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText("Semak & Hantar Permohonan")).toBeInTheDocument();
     expect(screen.getByText("Sesi Suai Kenal & Interaksi")).toBeInTheDocument();
     expect(screen.getByText("Tandatangan Perjanjian & Bawa Pulang")).toBeInTheDocument();
-    // The same fee-policy pin, in Malay: "tanpa sebarang yuran adopsi" (no
-    // adoption fee at all), not "yuran tersembunyi" (no *hidden* fee).
-    expect(screen.getByText(/tanpa sebarang yuran adopsi/)).toBeInTheDocument();
+    // The same pin in Malay, using the standards section's own phrase:
+    // "yuran adopsi komersial" (commercial adoption fee), not
+    // "yuran tersembunyi" (hidden fee).
+    expect(screen.getByText(/tanpa sebarang yuran adopsi komersial/)).toBeInTheDocument();
     expect(screen.queryByText(/yuran tersembunyi/)).not.toBeInTheDocument();
 
     expect(screen.queryByText("Our Transparent Adoption Journey")).not.toBeInTheDocument();
@@ -267,6 +274,32 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
   it("declares the id three links in the nav and footer point at", () => {
     const { container } = renderWithLanguage(<HomeProcessSection />);
     expect(container.querySelector("section#how-it-works")).not.toBeNull();
+  });
+});
+
+describe("HomeOurWorkSection pillar links", () => {
+  /**
+   * The "Learn More" under a pillar, found from the pillar's own heading.
+   *
+   * Not by position: choosing the link by array index is exactly how the TNRM
+   * card came to point at the adoption steps, and a test that indexed the
+   * links would pass straight through the same mistake.
+   */
+  function learnMoreFor(title: string): string | null {
+    let el: HTMLElement | null = screen.getByRole("heading", { name: title });
+    while (el && !el.querySelector("a")) el = el.parentElement;
+    return el?.querySelector("a")?.getAttribute("href") ?? null;
+  }
+
+  it("sends each pillar's Learn More to the page about that pillar", () => {
+    renderWithLanguage(<HomeOurWorkSection />);
+
+    // TNRM is trap-neuter-return-manage, not adoption. It pointed at
+    // `/#how-it-works` — the adoption steps — until that anchor was restored
+    // and the mismatch became visible. `/faq` is the page that explains TNRM.
+    expect(learnMoreFor("TNRM (Trap-Neuter-Return-Manage)")).toBe("/faq");
+    expect(learnMoreFor("Education & Coexistence")).toBe("/get-involved");
+    expect(learnMoreFor("Sanctuary & Rehabilitation")).toBe("/needs");
   });
 });
 

@@ -5,10 +5,15 @@ import Link from "next/link";
 import { PawPrint, MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/providers/ThemeToggle";
 import { LanguageToggle } from "@/components/providers/LanguageToggle";
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
 
 export function Footer() {
-  const { t, isMs } = useLanguage();
+  const { t, isMs } = useTypedTranslation();
+  // Untyped, for the two links whose keys exist in no dictionary. Their
+  // English fallback is the only text they have, so they cannot use the typed
+  // `t` until the keys are added — tasks/open/translation-keys-the-dictionary-does-not-have.md.
+  // Every other key in this file is now checked at compile time.
+  const { t: untypedT } = useLanguage();
 
   return (
     <footer className="border-t border-border bg-frame-footer text-foreground">
@@ -72,12 +77,12 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/sponsors" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.sponsorWall", "Public Sponsor Wall")}
+                  {untypedT("nav.sponsorWall", "Public Sponsor Wall")}
                 </Link>
               </li>
               <li>
                 <Link href="/sponsor/dashboard" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.sponsorPortal", "Sponsor Portal")}
+                  {untypedT("nav.sponsorPortal", "Sponsor Portal")}
                 </Link>
               </li>
             </ul>

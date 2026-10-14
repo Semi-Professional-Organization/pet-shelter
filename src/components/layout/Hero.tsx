@@ -13,7 +13,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
+import { useTypedTranslation } from "@/components/providers/LanguageProvider";
 import {
   formatFigureFrame,
   HOME_METRIC_BASELINE,
@@ -128,8 +128,7 @@ export interface HeroProps {
 }
 
 export function Hero({ metrics }: HeroProps = {}) {
-  const { isMs } = useLanguage();
-  const t = useTypedTranslation();
+  const { isMs, t } = useTypedTranslation();
 
   const impactStats =
     metrics && metrics.length > 0 ? metrics : [...HOME_METRIC_BASELINE];

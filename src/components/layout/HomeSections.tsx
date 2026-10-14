@@ -43,7 +43,7 @@ import type { TranslationKey } from "@/lib/i18n/translations";
  * tracked in `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`.
  */
 export function HomeGalleryLoading() {
-  const t = useTypedTranslation();
+  const { t } = useTypedTranslation();
 
   return (
     <div className="flex items-center justify-center py-20 text-muted-foreground">
@@ -54,7 +54,7 @@ export function HomeGalleryLoading() {
 }
 
 export function HomeViewAllPetsLink() {
-  const t = useTypedTranslation();
+  const { t } = useTypedTranslation();
 
   return (
     <div className="flex justify-center pt-6">
@@ -84,6 +84,11 @@ export function HomeOurWorkSection() {
   const pillars = [
     {
       icon: Scissors,
+      // `/faq` explains TNRM ("Answers on TNRM and community animals"); its
+      // category is internal state, so the page is as deep as a link can go.
+      // This used to be `/#how-it-works`, the three-step *adoption* journey —
+      // harmless while that anchor rendered nowhere, misleading once restored.
+      href: "/faq",
       tagEn: "Pillar 1: Population Control",
       tagMs: "Teras 1: Kawalan Populasi",
       titleEn: "TNRM (Trap-Neuter-Return-Manage)",
@@ -107,6 +112,7 @@ export function HomeOurWorkSection() {
     },
     {
       icon: GraduationCap,
+      href: "/get-involved",
       tagEn: "Pillar 2: Community Coexistence",
       tagMs: "Teras 2: Kewujudan Bersama",
       titleEn: "Education & Coexistence",
@@ -130,6 +136,7 @@ export function HomeOurWorkSection() {
     },
     {
       icon: Stethoscope,
+      href: "/needs",
       tagEn: "Pillar 3: Clinical Care",
       tagMs: "Teras 3: Rawatan Klinikal",
       titleEn: "Sanctuary & Rehabilitation",
@@ -211,13 +218,11 @@ export function HomeOurWorkSection() {
 
                 <div className="pt-4 border-t border-border/60">
                   <Link
-                    // Pillar 0 is TNRM. It used to point at `/#how-it-works`,
-                    // which is the three-step *adoption* journey — harmless
-                    // while that anchor rendered nowhere, misleading once it
-                    // was restored. `/faq` is the page that explains TNRM
-                    // ("Answers on TNRM and community animals"); its category
-                    // is internal state, so the page is as deep as a link goes.
-                    href={idx === 0 ? "/faq" : idx === 1 ? "/get-involved" : "/needs"}
+                    // From the pillar itself, not its position. Choosing by
+                    // array index is how the TNRM card came to point at the
+                    // adoption steps: reorder the array and every link after
+                    // the change would silently point somewhere else.
+                    href={pillar.href}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
                   >
                     <span>{isMs ? "Ketahui Lebih Lanjut" : "Learn More"}</span>
@@ -317,14 +322,22 @@ export function HomeQuickActionsSection() {
  *
  * The copy comes from `home.step*` rather than inline ternaries. Those keys
  * exist in both locales and had no reader: `1137d3e` unmounted this section,
- * and the two copies then drifted apart unobserved — the dictionary says
+ * and the two copies then drifted apart unobserved — the dictionary said
  * "Semak & Hantar Permohonan" where this file said "Pilih Haiwan & Hantar
- * Permohonan", and "no hidden fees" where this file said "zero adoption fees".
- * AGENTS.md, "Boundaries and duplication": once two copies have diverged, that
- * is the defect. The dictionary wins, because it is the copy a translator can
- * actually reach. No English fallback is passed to `t()` — the provider already
- * falls through to the `en` dictionary, so a literal here could only ever be a
- * third copy, unreachable and free to drift.
+ * Permohonan". AGENTS.md, "Boundaries and duplication": once two copies have
+ * diverged, that is the defect. The copy *lives* in the dictionary, because
+ * that is where a translator can reach it.
+ *
+ * Where it lives did not decide what it says. Step 3 is the case that proved
+ * it: the dictionary's "no hidden fees" implied visible fees, and the inline
+ * "zero adoption fees" over-promised, since fees are admin-configurable. It now
+ * says "no commercial adoption fees" — the qualified claim this section's own
+ * subtitle and the standards section below already make. Each string was read
+ * against what the organisation states, not settled by which file held it.
+ *
+ * No English fallback is passed to `t()` — the provider already falls through
+ * to the `en` dictionary, so a literal here could only ever be a third copy,
+ * unreachable and free to drift.
  *
  * The heading, eyebrow and subtitle read from the dictionary too. They were
  * left inline at first, on the grounds that `home.howItWorksTitle`/`Subtitle`
@@ -336,7 +349,7 @@ export function HomeQuickActionsSection() {
  * three-step process the cards below actually show.
  */
 export function HomeProcessSection() {
-  const t = useTypedTranslation();
+  const { t } = useTypedTranslation();
 
   const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey; icon: typeof FileText }[] = [
     {
