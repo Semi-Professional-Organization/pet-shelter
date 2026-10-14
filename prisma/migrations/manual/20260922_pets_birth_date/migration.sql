@@ -73,18 +73,31 @@
 -- **This file reads a strict subset of what the app reads, and that is deliberate.** Since #42
 -- (2026-10-14) `approximateBirthDate` also reads weeks in both languages (`weeks`, `wks`,
 -- `minggu`, `mggu` -- "3 minggu" is three weeks, not three months), Malay years and months
--- (`tahun`, `thn`, `bulan`, `bln`), `mnth` and `yo`. None of those is transcribed here; every one
--- is refused, and the refusal names the row. That is containment in the safe direction: for any
--- string this file does read, it stores exactly what the app computes, and for any it does not,
--- it stops and asks rather than storing something different. An earlier version of this line
--- said these were "the spellings the app itself reads", which was true until #42 widened the
--- app and stopped being true the moment it merged.
+-- (`tahun`, `thn`, `bulan`, `bln`), `mnth` and `yo`. None of those is transcribed here. A string
+-- whose ONLY unit is one of them is refused and the refusal names the row.
 --
--- The comparison that keeps this honest lives in
--- `20260922_pets_birth_date_contract/rehearse.mjs`, scenario 0: it runs this file's SQL against
--- the REAL `approximateBirthDate`, imported rather than copied, on every spelling above and the
--- four rollover cases, in any timezone; and it asserts that each app-only spelling is read by the
--- app and refused here. This file's own `rehearse.mjs` compares against `appRule`, a hand copy
+-- **A string that MIXES one of them with an English unit is not refused, and is stored
+-- differently from what the app computes.** `1 tahun 6 months`: the app tries years first, reads
+-- `tahun`, and stops at one year; this file does not read `tahun`, skips it, finds `6 months`, and
+-- stores six months. No error, no NOTICE. Measured 2026-10-14 against the real
+-- `approximateBirthDate`: three of five mixed strings disagree. #42 opened this by teaching the app
+-- Malay; before it, the app also skipped `tahun` and agreed with this file. **Run the pre-flight
+-- in `tasks/open/malay-age-units-outpace-the-backfill.md` before applying this file** -- if it
+-- returns no rows, the divergence cannot occur on that database. The repair, not yet made, is to
+-- refuse any string containing an app-only unit anywhere, in both this file's refusal set and the
+-- pre-check query below, together.
+--
+-- An earlier version of this paragraph claimed the opposite -- that every string this file does
+-- not read is refused -- and before that, that it read "the spellings the app itself reads". Both
+-- were asserted, not measured.
+--
+-- The comparison against the app lives in `20260922_pets_birth_date_contract/rehearse.mjs`,
+-- scenario 0, run with `npx tsx`. It runs this file's SQL against the REAL `approximateBirthDate`,
+-- imported rather than copied, on every spelling above, the four rollover cases and a compound, in
+-- any timezone; it asserts that each single-unit app-only spelling is read by the app and refused
+-- here; and it pins the three mixed-string divergences above at their exact values as a known
+-- defect, so they cannot widen or change unnoticed. It is not wired into `npm test` or CI — it runs
+-- when someone runs it. This file's own `rehearse.mjs` compares against `appRule`, a hand copy
 -- that has drifted from the function on both timezone and vocabulary since #42 -- see
 -- `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
 --

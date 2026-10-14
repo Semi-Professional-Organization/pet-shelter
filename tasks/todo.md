@@ -35,8 +35,17 @@ Record active multi-step work streams below.
       the backfill.
 - [x] Correct the expand header, which still said it read "the spellings the app itself reads".
       Comment-only, verified three ways, because the harness parses part of that header.
-- [x] Settle `malay-age-units-outpace-the-backfill.md` into `decisions/`; fix the source comment
-      that cited it.
+- [x] ~~Settle `malay-age-units-outpace-the-backfill.md` into `decisions/`.~~ **Withdrawn.**
+      `/code-review medium` measured `1 tahun 6 months` stored as six months by the backfill while
+      the app reads one year, silently — the exact case the decision said could not happen. #42
+      opened it, and this session merged #42 having checked single-unit spellings only. The entry
+      is restored with the measured table at the top and a pre-flight query, tested on pglite
+      against thirteen strings, for the owner to run before applying expand. The decision never
+      reached master.
+- [x] Harness revised from the same review: mixed strings pinned as a known defect at exact values;
+      single-unit refusals asserted by message and row id rather than "any error"; app readings
+      asserted by exact date rather than "differs from intake"; the bare `y`/`mo`/`m` and no-space
+      `5y` forms added; a clear failure under plain `node`. 80/80.
 
 ## Review
 
@@ -47,9 +56,17 @@ reason. Fixing it needs `embedded-postgres`, which this session did not install 
 suggested repair in the entry is to retire O1/O2 there and point at the new check, not to correct
 the copy.
 
+**Not done, also deliberately: the mixed-string defect is not fixed.** The repair belongs in the
+expand SQL's refusal set and its header pre-check query together, and its own harness — whose J1
+check asserts the two agree — could not be run. It is pinned, documented in the migration header
+and in `petAge.ts`, and guarded at the human level by the pre-flight. It should be fixed before the
+owner applies expand, or the pre-flight must return no rows.
+
 **What was wrong in this session, briefly:** it asserted that #42 closed the timezone entry without
-checking what the rehearsal actually compares against, and earlier gave a spec built on master's
-state while the branch had moved past it. Both corrected by the #42 session, which measured.
+checking what the rehearsal compares against; gave a spec built on master while the branch had moved
+past it; merged #42 having verified single-unit spellings but not combinations; and then wrote a
+decision asserting containment that a `medium` review disproved in one probe. Four claims, none
+measured on the inputs that broke them.
 
 # Pet form birth date — critique PR #42, then yield it to PR #94
 

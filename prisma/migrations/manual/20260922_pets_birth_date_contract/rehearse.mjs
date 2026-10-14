@@ -291,9 +291,22 @@ if (HAS_EXPAND) {
   //
   // This harness already runs the real expand SQL and already runs under tsx, so it can import the
   // real function — which is the one repair that closes both halves. Nothing here is a copy.
-  const { approximateBirthDate } = await import(
-    new URL("../../../../src/lib/domain/petAge.ts", import.meta.url).href
-  );
+  // Fail clearly under plain `node`. The neighbouring expand harness IS run with `node`, so the two
+  // are easy to mix up, and an unguarded .ts import throws ERR_UNKNOWN_FILE_EXTENSION mid-scenario
+  // and silently skips every contract check after it.
+  let approximateBirthDate;
+  try {
+    ({ approximateBirthDate } = await import(
+      new URL("../../../../src/lib/domain/petAge.ts", import.meta.url).href
+    ));
+  } catch (err) {
+    console.log(
+      `\n  FAIL cannot import src/lib/domain/petAge.ts -- ${String(err?.message ?? err).split("\n")[0]}\n` +
+        `       Run this harness with tsx, not node:\n` +
+        `         npx tsx prisma/migrations/manual/20260922_pets_birth_date_contract/rehearse.mjs`
+    );
+    process.exit(2);
+  }
 
   // Every unit spelling expand's header says it reads, plus the four rollover cases its own
   // rehearsal pins, plus a compound. If the real function ever changes on any of these, this fails.
@@ -315,6 +328,12 @@ if (HAS_EXPAND) {
     // pets.json pet-008: the row that derived 2026-03-01 at UTC+8 and 2026-03-04 in
     // America/New_York under the old local-time setters. The timezone entry asks for it by name.
     ["a-pet008", "5 months", "2026-08-01"],
+    // The bare single-letter forms and the no-space form. These are where the word-boundary
+    // semantics on each side matter most, and the first version of this corpus left them out.
+    ["a-bare-y", "2 y", "2026-06-12"],
+    ["a-bare-mo", "3 mo", "2026-06-12"],
+    ["a-bare-m", "4 m", "2026-06-12"],
+    ["a-nospace", "5y", "2026-06-12"],
   ];
   const agreed = new PGlite();
   await agreed.exec(PROD_SCHEMA);
@@ -340,31 +359,64 @@ if (HAS_EXPAND) {
   }
   await agreed.close();
 
-  // Containment, made executable rather than left as prose. After #42 the app reads strings the
-  // backfill deliberately refuses. That is safe ONLY in this direction — a refused row is named and
-  // stops the backfill, it is never stored differently — so both halves are asserted: the app reads
-  // it, and expand refuses it. If someone teaches expand one of these without matching the app,
-  // or teaches the app one without anyone noticing expand refuses it, this is where it shows.
+  // Containment, for strings whose ONLY unit is one the app reads and the backfill does not. Here
+  // the asymmetry is safe: the backfill refuses and names the row. Both halves are asserted with
+  // exact values — the app's reading by its expected date, not merely "differs from intake", so a
+  // regression to reading "3 minggu" as three months would fail; and the backfill's refusal by its
+  // own message and the row id, not "any error at all", so an unrelated syntax error cannot pass
+  // for a deliberate refusal.
+  const intake = "2026-06-12";
   const APP_ONLY = [
-    ["3 minggu", "weeks, Malay"],
-    ["3 weeks", "weeks"],
-    ["3 wks", "weeks"],
-    ["2 tahun", "years, Malay"],
-    ["4 bulan", "months, Malay"],
-    ["3 mnth", "a month abbreviation expand does not list"],
-    ["5 yo", "a year abbreviation expand does not list"],
+    ["3 minggu", "weeks, Malay", "2026-05-22"],
+    ["3 weeks", "weeks", "2026-05-22"],
+    ["3 wks", "weeks", "2026-05-22"],
+    ["2 tahun", "years, Malay", "2024-06-12"],
+    ["4 bulan", "months, Malay", "2026-02-12"],
+    ["3 mnth", "a month abbreviation the backfill does not list", "2026-03-12"],
+    ["5 yo", "a year abbreviation the backfill does not list", "2021-06-12"],
   ];
-  for (const [age, why] of APP_ONLY) {
-    const intake = "2026-06-12";
-    check(
-      `the app reads "${age}" (${why})`,
-      approximateBirthDate(age, intake).birthDate !== intake
-    );
+  for (const [age, why, expected] of APP_ONLY) {
+    const got = approximateBirthDate(age, intake).birthDate;
+    check(`the app reads "${age}" as ${expected} (${why})`, got === expected, `got ${got}`);
     const one = new PGlite();
     await one.exec(PROD_SCHEMA);
-    await insertPreExpand(one, ["only", age, "adult", intake]);
+    await insertPreExpand(one, ["app-only-row", age, "adult", intake]);
     const oneErr = await tryExec(one, EXPAND);
-    check(`  ...and expand refuses it rather than storing a different date`, oneErr !== "", "expand accepted it");
+    check(
+      `  ...and the backfill refuses it, naming the row`,
+      /cannot be derived/.test(oneErr) && /app-only-row/.test(oneErr),
+      oneErr ? oneErr.split("\n")[0].slice(0, 160) : "the backfill accepted it"
+    );
+    await one.close();
+  }
+
+  // KNOWN DEFECT, pinned exactly. See tasks/open/malay-age-units-outpace-the-backfill.md.
+  //
+  // A string that MIXES an app-only unit with an English one is not refused: the app reads the
+  // Malay year first and stops, the backfill skips it and reads the English month, and the two
+  // store different dates with no error. #42 opened this. It is pinned here at its exact current
+  // values rather than asserted as refused, so the harness stays green while the defect is known
+  // and recorded — and fails the moment anything about it changes. If one of these starts failing
+  // because the backfill now REFUSES it, the defect is fixed: move the string into APP_ONLY above.
+  const KNOWN_DIVERGENT = [
+    ["1 tahun 6 months", "2025-06-12", "2025-12-12"],
+    ["2 tahun, approx 6 mos", "2024-06-12", "2025-12-12"],
+    ["1 tahun (18 months)", "2025-06-12", "2024-12-12"],
+  ];
+  for (const [age, appWant, sqlWant] of KNOWN_DIVERGENT) {
+    const one = new PGlite();
+    await one.exec(PROD_SCHEMA);
+    await insertPreExpand(one, ["mixed-row", age, "adult", intake]);
+    const oneErr = await tryExec(one, EXPAND);
+    const stored = oneErr
+      ? "REFUSED"
+      : (await one.query(`SELECT "birthDate" FROM "public"."pets"`)).rows[0].birthDate;
+    const app = approximateBirthDate(age, intake).birthDate;
+    check(
+      `KNOWN DEFECT "${age}": app ${appWant}, backfill stores ${sqlWant} (open entry; fixed = move to APP_ONLY)`,
+      app === appWant && stored === sqlWant,
+      `app=${app} backfill=${stored}`
+    );
     await one.close();
   }
 }

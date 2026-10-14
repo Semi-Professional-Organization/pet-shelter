@@ -189,11 +189,14 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
  * years and months only; this function also reads Malay (`tahun`, `thn`, `bulan`, `bln`,
  * `minggu`, `mggu`) and weeks in either language. So "2 tahun" or "3 minggu" yields a birthday
  * here and is *refused and named* there, which fails closed: the backfill stops on the row rather
- * than storing a different date from the one the app would compute. That asymmetry is deliberate
- * and recorded in `tasks/decisions/2026-10-14-the-backfill-refuses-what-it-does-not-transcribe.md`,
- * and the migration's header now says so. It is not a licence to treat the arithmetic as
- * independent: `20260922_pets_birth_date_contract/rehearse.mjs` imports this function and fails
- * if the backfill ever stores a date it would not compute.
+ * than storing a different date from the one the app would compute — for a string whose only unit
+ * is one the backfill does not read. **A string mixing such a unit with an English one is NOT
+ * refused**: "1 tahun 6 months" is one year here and six months in the backfill, silently. That
+ * defect is open in `tasks/open/malay-age-units-outpace-the-backfill.md`, with a pre-flight query
+ * to run before the backfill is applied. It is not a licence to treat the arithmetic as
+ * independent: `20260922_pets_birth_date_contract/rehearse.mjs` imports this function and compares
+ * it against the backfill's SQL — but only when someone runs it with `npx tsx`; it is not part of
+ * `npm test` or CI, so changing this function does not, on its own, run that comparison.
  *
  * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
  * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
