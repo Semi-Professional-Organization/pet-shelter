@@ -225,19 +225,25 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
      * spellings one at a time and found these seven survived: a mutant dropping all of them passed
      * the suite 27/27. Each line below is here to kill exactly one of those mutants.
      */
-    it("reads every accepted spelling, not just the common ones", () => {
-      const intake = "2026-06-12";
+    // One case per spelling rather than one block, so a dropped spelling is reported by name. A
+    // single `it` stops at its first failing `expect`, which would hide every later mutant behind
+    // the first. Still a hand-kept list: a spelling *added* to a pattern goes untested until a row
+    // is added here. Making that structural means exporting the vocabulary from `petAge.ts` and
+    // feeding both the patterns and this table from it — deferred while PR #113 edits that file.
+    it.each([
       // Malay singles — the vocabulary the docstring is about, with no direct assertion until now.
-      expect(approximateBirthDate("2 tahun", intake).birthDate).toBe("2024-06-12");
-      expect(approximateBirthDate("3 thn", intake).birthDate).toBe("2023-06-12");
-      expect(approximateBirthDate("6 bln", intake).birthDate).toBe("2025-12-12");
+      ["2 tahun", "2024-06-12"],
+      ["3 thn", "2023-06-12"],
+      ["6 bln", "2025-12-12"],
       // The bare one-letter month, which the boundary makes easy to lose.
-      expect(approximateBirthDate("3 m", intake).birthDate).toBe("2026-03-12");
+      ["3 m", "2026-03-12"],
       // Singular forms whose plurals are pinned above, so `s?` cannot quietly become `s`.
-      expect(approximateBirthDate("1 yr", intake).birthDate).toBe("2025-06-12");
-      expect(approximateBirthDate("1 week", intake).birthDate).toBe("2026-06-05");
+      ["1 yr", "2025-06-12"],
+      ["1 week", "2026-06-05"],
       // And the plural of the misspelling the app has always read via the bare `m`.
-      expect(approximateBirthDate("3 mnths", intake).birthDate).toBe("2026-03-12");
+      ["3 mnths", "2026-03-12"],
+    ])("reads the accepted spelling %j", (input, expected) => {
+      expect(approximateBirthDate(input, "2026-06-12").birthDate).toBe(expected);
     });
 
     it("lets the largest unit win in a compound age", () => {
