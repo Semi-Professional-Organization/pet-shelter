@@ -101,6 +101,36 @@ closing. The honest reading of a green run today is "green, or not yet unlucky".
 real time: this was investigated twice from scratch, by two sessions, each as a suspected
 regression in an unrelated change.
 
+**One named mechanism, added 2026-09-22 by a third session investigating the same thing a third
+time.** `tasks/open/unit-tests-write-to-whatever-is-on-localhost-5432.md` identifies a cause that
+is specific, reproducible on demand, and produces failures of exactly this shape: with no
+`DATABASE_URL`, `createPrismaClient` falls back to a hardcoded `localhost:5432` string and
+`insertServerPet` writes to the database *before* the mirror regardless of what
+`isDatabasePersistent()` says. So the unit tier's offline behaviour depends on nothing listening
+on that port — and on a machine running several agents, something often is. Port open: six
+`Unique constraint failed on the fields: (id)` failures in `petCatalog`. Port closed, same commit:
+green. That is not the whole of this entry — it does not explain the authorization failures in
+runs 2 and 3, or the `hookTimeout` shape — but it is one real cause, and it is testable in seconds
+(`Get-NetTCPConnection -LocalPort 5432`) before anyone re-derives the rest.
+
+**A fourth angle on the hook timeout, and a discriminator worth having (2026-10-14).** A session on
+PR #42 ran the full unit project and got `17 failed | 1576 passed` across 15 files, then `1 failed`
+on a re-run minutes later with nothing changed. Across the whole output: **zero `AssertionError`s**,
+with `Error: Hook timed out in 10000ms` as the only failure mode. The casualties included
+pure-arithmetic tests — "computes exact months between dates" cannot take eleven seconds from code.
+Their run-to-run variance tracked how many agent sessions were compiling at the time.
+
+That gives a cheap triage rule for anyone who hits this: **grep the output for `AssertionError`
+first.** None means contention, and the file list is noise. One or more means read those, and only
+those. Used on this branch the same day: a run of 7 failures contained exactly one
+`AssertionError`, which was a real defect in a lesson file's `**Learned:**` line; the other six were
+hook timeouts in files the diff never touched.
+
+The same session also withdrew an earlier guess that a `30 failed` run came from `test:all` running
+the integration project without `STRICT_PERSISTENCE`; the stack they saw was a Prisma error inside
+`insertServerPet` from `tests/unit/pets/petCatalog.test.ts`, which the `localhost:5432` mechanism
+above explains and names. Their guess should not be cited.
+
 ## A third category, found 2026-10-13: a test that fails locally and passes in CI
 
 `tests/integration/rbacAuthorization.test.ts` → "rejects an anonymous caller" is **not**
@@ -133,11 +163,25 @@ different tree and day, and the isolation repro behaves exactly as it does for t
 - **The same ten files, re-run together: `10 passed (10)` · `168 passed (168)`.**
 - Unit, same tree: `16 failed | 84 passed`; **those sixteen files alone: `369 passed (369)`.**
 
-Three of the twelve component failures were `Hook timed out in 10000ms`, matching the mechanism
-named for run 7 — so job 1 below should set `hookTimeout` for the components project too, not only
-unit. Worth noting for whoever takes that job: `npm run test:all` runs all three projects in a
-single invocation, which is the most loaded schedule this repo has, and it is the command the
-close-out asks for.
+**Every one of run 8's 29 failures was a timeout, and not one was an assertion.** Applying the
+`AssertionError` triage rule above to the captured output:
+
+| Tier | Failures | `AssertionError` | `Hook timed out in 10000ms` | `Test timed out in 20000ms` |
+|---|---|---|---|---|
+| unit | 17 | 0 | 17 — one shared block, `tests/setup/nextMocks.ts:284` | 0 |
+| components | 12 | 0 | 10 — one shared block | 2 |
+
+Read the counts off the *test* list, not the error blocks: Vitest prints identical failures once,
+beneath every test that hit them, so `grep -c "timed out"` counts blocks. An earlier version of this
+section made exactly that mistake and reported "three of the twelve component failures" as hook
+timeouts, which understated the mechanism's reach and wrongly implied an assertion-shaped remainder.
+There is no remainder in this run.
+
+Two consequences for job 1 below. Setting `hookTimeout` for the components project would clear 10
+of its 12, not all of them: the other two are test *bodies* overrunning the 20s `testTimeout`
+under the same load, so the fix there is load, not a setting. And `npm run test:all` runs all three
+projects in one invocation — the most loaded schedule this repo has, and the command the close-out
+asks for.
 
 **Settles when:** all three are addressed, and they are probably three jobs rather than one:
 
