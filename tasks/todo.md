@@ -64,6 +64,21 @@ Record active multi-step work streams below.
       entry's comparison was meaningless; the rewritten date-rules entry named the wrong failure
       and dropped a real risk. Each probed, all ten fixed or recorded.
 
+- [x] **A third and a fourth review, each probed before acting.** The third found the F5 premise
+      false and the rename mistaken; the fourth re-ran every parser claim and citation in the
+      rewritten entries and found them all correct — the probe-first method held where it was used.
+      Its findings were the places still reasoned rather than run: the drift entry called the
+      liveness log unconditional (the script exits before it on an unparseable payload, and both
+      logs share `tmpdir()`, so a moved temp directory would freeze both), the Malay decimals were
+      said to be refused "as fractional" (they are refused for having no unit), and the
+      born-at-the-shelter query needed the expand migration first and missed three of the four
+      rules a stored birthday can fail.
+- [x] **Found that the SQL emulator had been broken all along.** The Bash tool collapses a doubled
+      backslash in command text, so `\s` reached Node as a plain `s` and matched the letter. Its
+      verdicts for inputs with a space were computed on the wrong pattern; most happened to be
+      right. Rebuilt with the backslash from its character code and self-tested; only the English
+      decimals changed. A lesson and a memory note record it.
+
 ## Corrections to the stream below
 
 `Pet form birth date — critique PR #42, then yield it to PR #94` is left exactly as written. These
@@ -141,7 +156,12 @@ function on `master` before being filed, rather than copied from the review.
   origin/master` for the commit."*
 - **The structural half of F11.** The seven spellings are pinned, but a spelling *added* to a
   pattern still goes untested until someone adds a row. Making that impossible means exporting the
-  vocabulary from `petAge.ts` and feeding both the patterns and the test from it.
+  vocabulary from `petAge.ts` and feeding both the patterns and the test from it. Relatedly, the
+  mutation sweep covered spellings only: removing the trailing `\b` from the years or weeks pattern
+  still leaves the suite green. Deliberately **not** pinned. The only inputs that tell those
+  boundaries apart are ones like `2 yrsold`, which fall through to intake *because* of #42's
+  regression — so a test that kills that mutant would assert the regression as correct. The months
+  boundary is pinned, since `3 minggu` is the case it exists for.
 - **The `tasks/todo.md` conflict with #113.** Both branches prepend a stream at the same anchor, so
   whichever merges second conflicts and loses its CI run until resolved. Inherent to this file's
   one-append-point design (its own header says so); resolved by keeping both streams.

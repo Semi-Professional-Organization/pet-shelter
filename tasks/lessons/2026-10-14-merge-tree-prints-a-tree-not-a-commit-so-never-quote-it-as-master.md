@@ -37,6 +37,6 @@ nowhere else. Before writing any hash into a commit message, ledger entry or mes
 session, run `git cat-file -t <hash>` and check it says `commit` — and if the text says the hash is
 where something *landed*, also `git merge-base --is-ancestor <hash> origin/master`, which a squash
 merge fails. Cite the squash, and keep branch hashes for when the branch history is the point.
-Claim another PR will do something only as a conditional, with its state as of writing. More generally, check a claim
-about `master` against `git show origin/master:<path>` at the moment of writing — not against the
-working tree, which is your branch and not theirs.
+Claim another PR will do something only as a conditional, with its state as of writing. More
+generally, check a claim about `master` against `git show origin/master:<path>` at the moment of
+writing — not against the working tree, which is your branch and not theirs.

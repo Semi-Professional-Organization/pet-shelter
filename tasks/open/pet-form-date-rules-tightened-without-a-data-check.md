@@ -49,12 +49,24 @@ was briefly renamed on the mistaken belief that the name was the title.
 **Settles when:** a maintainer decides what an animal born at the shelter records as its intake
 date — most likely its own birth date, the day it entered the shelter's care, which keeps the rule
 and needs only a line of operator help — and someone with production access confirms no stored row
-already violates the rule:
+is already stranded.
 
-    SELECT count(*) FROM pets
-     WHERE "intakeDate" ~ '^\d{4}-\d{2}-\d{2}$'
-       AND "birthDate" > "intakeDate";
+**Run it after the expand migration, not before.** Production's `pets` table has no `birthDate`
+column until `20260922_pets_birth_date` is applied, so before then this fails with `42703 column
+"birthDate" does not exist`.
 
-That covers both sources at once — a `2024-01-01` default on an animal taken in before 2024, and a
-birthday corrected by hand after its intake — where counting only the default would miss the
-second. The `intakeDate` filter matches the rule, which skips any intake that is not ISO.
+A row is stranded by *any* of the four rules the form applies to `birthDate` on every full save, not
+only the one this entry is about — so the check covers all four:
+
+    SELECT id, "birthDate", "intakeDate" FROM pets
+     WHERE "birthDate" !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+        OR ("intakeDate" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND "birthDate" > "intakeDate")
+        OR "birthDate" > to_char(now() + interval '1 day', 'YYYY-MM-DD')
+        OR "birthDate" < to_char(now() - interval '60 years', 'YYYY-MM-DD');
+
+The four lines are, in order, the form's ISO-date shape, birthday-after-intake, the future bound and
+the sixty-year bound (`src/lib/validations/pet.ts`, around lines 230, 314, 338 and 354). That catches
+a `2024-01-01` default on an animal taken in before 2024, a birthday corrected by hand after its
+intake, and a malformed or implausible value typed into the console. **One gap:** the shape test
+cannot see an impossible day such as `2024-02-30`, which `isoDateSchema` rejects but this regex
+admits; checking that needs a cast, run row by row so one bad value does not abort the query.

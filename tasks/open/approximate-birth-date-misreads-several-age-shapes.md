@@ -5,7 +5,9 @@
 Every result below comes from running the real function — `master` at `187593c`, and the pre-#42
 version extracted from `18c533e` — with intake `2026-06-12`, under `TZ=UTC`. The backfill verdicts
 come from the patterns in `prisma/migrations/manual/20260922_pets_birth_date/migration.sql`,
-emulated with Postgres's `\M` taken as "next character is not alphanumeric or `_`".
+emulated with Postgres's `\M` taken as "next character is not alphanumeric or `_`"; the verdicts for
+`2y3m`, `5yrs8mths`, `1y6m`, `1y2w` and `6 mons` were also run against a real Postgres (pglite)
+and agree.
 
 **Where it reaches today.** Since #94 the pet form collects a birthday directly, so this function
 runs only for a record with no `birthDate`: chiefly a pet saved to browser `localStorage` before
@@ -50,8 +52,11 @@ from reading as months.
   reads as `5 tahun`, five years; `0,75 tahun` reads as seventy-five; `1.5 bulan` as five months.
   These Malay cases are new in #42, which added the units: before it they fell through to intake.
   **The English cases are not new** — `0.5 years` reads as five years and `1.5 months` as five
-  months both before #42 and on `master`. The backfill refuses all of them as fractional. The trap
-  is already a lesson: `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
+  months both before #42 and on `master`. The backfill refuses all of them, but not for one reason:
+  the English ones as fractional, and the Malay ones because its fractional check lists English
+  units only, so `0,5 tahun` matches no unit and is refused as underivable instead. A maintainer
+  reproducing these on Postgres will see the "cannot be derived" exception for the Malay cases,
+  not the "fractional" one. The trap is already a lesson: `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
 
 - **An unbounded count crashes it.** `15000000 weeks` throws `RangeError: Invalid time value`;
   `12345678 wks` returns `-234583-03-21`. A cap mirroring the backfill's sixty years / 720 months
@@ -62,9 +67,11 @@ from reading as months.
   returns `true`; an explicitly `undefined` flag collapses the result to `never`. Fix:
   `Omit<T, 'birthDate' | 'birthDateIsEstimate' | 'age' | 'ageCategory'> & { … }`.
 
-- **Three copies of the estimate rule disagree** on `birthDate: ''`, which satisfies `NOT NULL`:
-  `withDerivedAge` and `buildPetPersistencePayload` return `true`, `mapDbPetToPet` returns `false`.
-  Latent — no writer produces `''` today. The clean fix has `deriveBirthDate` return
+- **Three copies of the estimate rule disagree** on a row with `birthDate: ''` — which satisfies
+  `NOT NULL` — **and a stored `birthDateIsEstimate: false`**. Then `withDerivedAge` and
+  `buildPetPersistencePayload` return `true` while `mapDbPetToPet` returns the stored `false`. With
+  the flag at its default of `true`, all three agree, so a regression test must store `false` to
+  see it. Latent — no writer produces `''` today. The clean fix has `deriveBirthDate` return
   `{ birthDate, isEstimate }` and uses it at all three sites.
 
 ## Not yet checked
