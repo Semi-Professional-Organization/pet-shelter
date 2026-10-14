@@ -34,7 +34,7 @@ id exists anywhere else in `src`**. The candidates were checked:
 
 `HomeProcessSection` holds the three-step journey in both languages, is styled as a home section
 (`border-t`, `max-w-7xl`), and its id is the one the navbar's "Adoption Process & Criteria" and the
-footer's "Adoption Process & Fees" already name. Restoring it costs an import and a line. It goes back in its original slot — between the `#adopt`
+footer's "Adoption Process" already name. Restoring it costs an import and a line. It goes back in its original slot — between the `#adopt`
 gallery and `HomeStandardsSection` — which is where `1137d3e` removed it from.
 
 **Remounting it also had to repair it.** Its step copy was inline ternaries duplicating
@@ -45,13 +45,22 @@ Mounting a section is publishing its copy, so the divergence had to be settled f
 moved into the dictionary, because that is the copy a translator can reach — and the heading,
 eyebrow and subtitle followed on 2026-10-14, so no half of the component is unreachable.
 
-**But "the dictionary wins" picked the right home and, once, the wrong words.** Step 3's dictionary
-text said "no hidden fees" — which implies visible ones — on a page whose standards section,
-directly below, says "100% Free Adoption Policy". The inline English it replaced, "zero adoption
-fees", was the correct one, and for three days the test pinned the wrong wording by asserting the
-right one was absent. Step 3 now says "zero adoption fees" / "tanpa sebarang yuran adopsi" in both
-languages, and the test asserts the policy rather than the source. Choosing where a string lives is
-not choosing what it says; each copy has to be read against what the organisation actually states.
+**But "the dictionary wins" picked the right home and, twice, the wrong words.** Step 3's
+dictionary text said "no hidden fees", which implies visible ones; for three days the test pinned
+that by asserting the alternative was absent. The first fix swapped in the replaced inline wording,
+"zero adoption fees" — which over-promises, because fees are admin-configurable
+(`adoptionFeeDog`, `adoptionFeeCat`, and a per-pet `adoptionFee` that a pet page shows whenever it
+is not "Free"). The site's own careful copy says **"commercial** adoption fees": this section's
+subtitle ("zero commercial adoption fees") and the standards section below ("We do not sell animals
+or charge commercial adoption fees"). Step 3 now says "with no commercial adoption fees" / "tanpa
+sebarang yuran adopsi komersial", and the test asserts that wording and the absence of both earlier
+ones. Choosing where a string lives is not choosing what it says; each copy has to be read against
+what the organisation actually states, and against what its admin screens allow.
+
+**Left for the owner:** the navbar still promises a "100% free adoption guide" and the standards
+section is headed "100% Free Adoption Policy", while the same configurable fees exist. Every seeded
+fee is "Free" today, so nothing contradicts on screen. Whether the policy is "free" or "no
+commercial fee" is the organisation's decision, not this change's.
 
 Two more things the remount exposed, both invisible while the anchor went nowhere:
 
@@ -127,9 +136,34 @@ than it reads:
   defect the guard exists to catch, passing silently. Block comments are now stripped first.
   Verified by probe: commenting out `<HomeProcessSection />` makes `#how-it-works` unresolved and
   names the links that break — three at the time, two since the TNRM pillar moved to `/faq`. Three commented-out JSX blocks already exist in this tree, so
-  the stripping is load-bearing rather than theoretical. Line comments are deliberately left alone —
-  a double slash occurs inside every `https://` URL in a JSX attribute.
+  the stripping is load-bearing rather than theoretical. Comments are now found by TypeScript's
+  parser rather than by pattern, after each of three regex versions was found to have a hole; see
+  "The guard's comment handling" below.
 
 Its remaining ceiling is in the file: it does not evaluate conditionals, so it over-accepts. It
 also only counts ids on landmark elements, so an anchor added to a `<span>` is reported unresolved —
 move it to a `<div>` or `<section>`, or widen the allowlist.
+
+## The guard's comment handling
+
+The guard must ignore commented-out code, or a mount someone commented out still counts as
+rendered — the defect it exists to catch. Getting that right took five attempts, and the history is
+the reason the current form looks as it does:
+
+1. A regex deleting `/* … */` shifted every reported line number, by 33 in one case.
+2. Blanking from any whitespace-preceded `//` cut the `href` out of `<a title="Tue // Sun">`.
+3. Restricting `//` to line starts let a `/*` inside `accept="image/*"` open a fake comment that
+   swallowed real code up to the next `*/`.
+4. TypeScript's parser replaced the regex — a quote-skipping scanner would have broken on every
+   apostrophe in JSX text. It found comments correctly, and showed that inside JSX children
+   `// <X />` is text and renders. But walking into JSDoc tag nodes asked the context-free comment
+   scanner about positions *inside* a doc block, where `@param x // note` read as a line comment
+   running past the `*/` and blanked the code after a one-line doc.
+5. JSDoc nodes are now skipped — the doc block is already collected whole as leading trivia of its
+   declaration — and any range that starts inside another range is discarded as a backstop.
+
+Each repair was probed red against the version it replaced. Imports are read from the same parsed
+tree: `import A, { B }` keeps both, `{ A as B }` resolves to the exported name, and a default
+export written as `export default Name` or `export default memo(Name)` resolves too. A default
+that cannot be named is recorded as a parser gap in the failure message instead of silently
+dropping its subtree. Each file is parsed once and cached.

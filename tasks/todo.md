@@ -1712,22 +1712,48 @@ what the PR claimed:
   its output had been filtered to the summary line. Three runs immediately after were green. It is
   recorded as unexplained rather than attributed to the flake.
 
+## Round five — reviewing round four's own fix
+
+Run because round four's fix commit was new code, which is the rule this stream records breaking
+once already. Twelve findings; the code ones were each probed red against what they replaced.
+
+- **The parser-based comment stripper had a hole of its own.** Walking into JSDoc tag nodes asked
+  the context-free scanner about positions inside a doc block, where `@param x // note` read as a
+  line comment running past `*/`. A one-line doc followed by code lost the code. JSDoc nodes are now
+  skipped, with a backstop that drops any range starting inside another.
+- **Default imports narrowed silently.** Only `export default function Name` resolved; `export
+  default Panel` and `export default memo(Card)` were dropped with no record. They resolve now, and
+  an unnamable default is reported as a parser gap.
+- **Step 3's wording was wrong a second time.** "Zero adoption fees" over-promised: fees are
+  admin-configurable, and a pet page shows any non-"Free" value. It now says "no commercial adoption
+  fees", the qualified claim this section's own subtitle already makes. Whether the organisation's
+  policy is "free" or "no commercial fee" is left for the owner and recorded in the decision.
+- **The no-provider `t` was a diverged second copy** that put a fallback ahead of the dictionary and
+  never interpolated. Both paths now share one `translate()`.
+- `useTypedTranslation()` returns `{ t, isMs }` and passes params, so `Footer` moved onto it: its
+  seventeen other keys are compile-checked, and its two missing keys are the only untyped calls left
+  in any file this branch touched. Pillar links travel with their pillars instead of being chosen by
+  index, and a new test pins the TNRM link to `/faq` by heading rather than position.
+- Each file is now parsed once by the guard, not twice.
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:
 
 - `npm run check` — 0 errors, 12 pre-existing warnings, one fewer than at the base.
-- `npx vitest run --project unit` — 100 files, **1611 tests**, 0 assertion errors, 0 timeouts.
-- `npx vitest run --project components` — 15 files, **209 tests**, 0 assertion errors, 0 timeouts.
+- `npx vitest run --project unit` — 100 files, **1612 tests**; 0 assertion errors, 0 timeouts.
+- `npx vitest run --project components` — 15 files, **210 tests**; 0 assertion errors, 0 timeouts.
 - `npm run test:integration` — 9 files, **92 tests**.
 - `npm run build` — compiled; `/` and `/bulletins` both still `○ (Static)`.
 
-The full unit and component tiers were green on this run and red (timeouts only) on others; that is
+Both full tiers were green on this run and timeout-red on others; that is
 `tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, and one green run is a data
-point, not a fix. `f7dd5b2`'s commit trailer recorded only a subset of the component suite and no
-unit run for a dictionary change; the parity test was run afterwards and passes, so the gap is in
-the record, not the code.
+point, not a fix. Each new suite was run against the unfixed code first and observed failing, and
+every repair to the guard was re-probed by breaking it again afterwards.
 
-Each new suite was run against the unfixed code first and observed failing — 1 of 1 for `#77`,
-both cases naming all four broken links for `#80`, 12 of the then-17 for `#78` — and every repair
-to the guard was re-probed by breaking it again afterwards.
+Two gaps in the record, stated so nobody infers more than happened. \`f7dd5b2\`'s commit trailer
+named only a subset of the component suite and no unit run, for a change to the dictionary; the
+parity test was run afterwards and passes, so the gap is in the record rather than the code. And
+one \`homeMalay\` run on 2026-10-14 reported a single failure whose error was not captured, because
+its output had been filtered to the summary line; three runs immediately after were green, and it
+is recorded as unexplained rather than attributed to the flake.
