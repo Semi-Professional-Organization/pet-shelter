@@ -250,6 +250,109 @@ This round's commit has not been reviewed.
 
 
 
+
+# Pet form birth date — critique PR #42, then yield it to PR #94
+
+**Branch:** `feat/pet-form-birth-date` · PR #42 · picked up 2026-09-22
+**Lesson:** `tasks/lessons/2026-09-22-three-copies-of-one-date-calculation-disagreed-across-three-branches.md`
+
+## Items
+
+- [x] Audit first. PR #42 was eight days stale, `CONFLICTING`, and the entry it claimed to settle
+      was still on master. Merged `origin/master` three times across the session (63 commits); the
+      only source conflict was an import block in `src/actions/pets.ts`.
+- [x] Critique. `handleBirthDateChange` never cleared `birthDateIsEstimate`, which defaults to
+      `true`, so every date picked from the calendar was filed as a guess — and because
+      `handleAgeChange` only spares *exact* birthdays, the next keystroke in the Age field
+      replaced the chosen day with `intakeDate` minus the typed age.
+- [x] First component test for `PetFormDialog`; the dialog had none. Each case watched failing
+      against the historical component, aliased in under a throwaway config.
+- [x] `/code-review high`. Ten findings, each probed. Five fixed, including one the first critique
+      missed: `withDerivedAge` reads age *as of now* while the dialog computed the birthday *as of
+      intake*, so "3 years" on a pet taken in three years ago saved as six.
+- [x] **Discovered PR #94 was building the same thing**, and a third branch a second migration.
+      Three branches, two migrations one letter apart in folder name, and no PR on one of them.
+- [x] Told the #94 session, with the one correction that mattered: its "#42 is 166 files and
+      −13,546 lines, cannot be merged as-is" was measured against the pre-merge tip. The honest
+      figure was 17 files, +1048/−72, mergeable and green.
+- [x] Yielded the form to #94. Its read-only age and band is the better design and it answers an
+      open entry this session had already filed about the Age Stage select.
+- [x] Sent #94 the `updatePet` estimate-flag defect. It had it, confirmed it by probe, and fixed
+      it — a stored `false` was being overwritten with `true` by `{...existing, ...validated}`,
+      because a zod `.default(true)` puts the key on every parse.
+- [x] Dropped this branch's month-end clamp after the expand session finalised on roll-forward
+      and ended. Pinned the rollover with tests instead.
+
+- [x] #94 merged as `18c533e`. Merged master, resolved the `tasks/todo.md` stream collision, and
+      deleted `every-admin-save-downgrades-an-exact-birthday.md` — verified first that
+      `petBaseFormSchema` on master now reads `birthDateIsEstimate: z.boolean().optional()` with no
+      `.default(true)`, so the bug that entry named is fixed rather than assumed to be.
+- [x] Caught a data-losing resolution before #94 merged. #102 had rewritten
+      `unit-suite-is-order-dependent-in-both-directions.md` to 135 lines while #94 added 12 lines of
+      its own to the same entry, so taking the newer version — the obvious call — would have deleted
+      the other session's named mechanism. Relayed rather than resolved; it was their prose.
+- [x] Corrected my own stale prose a second time: #94 merging put both migrations on master, so the
+      docstring and ledger entry calling them "unmerged" were wrong within minutes of being right.
+- [x] `src/hooks/usePetTableController.ts` is no longer this branch's. #94 took the optimistic-row
+      fix, because the stale row was a regression its own diff introduced and leaving it here meant
+      master carrying a visible regression between the two merges. Nothing of mine conflicted,
+      because the change had already been reverted.
+- [x] Filed `the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`: expand's rehearsal
+      compares its SQL against a hand transcription of `approximateBirthDate` that uses local-time
+      setters, so it disagrees at negative UTC offsets and would read as a broken migration.
+## Review
+
+The brief was "continue implementing". Most of the value turned out to be in not implementing:
+the form work was duplicated by a session that had gone further, and the most useful things this
+branch produced were a defect report for someone else's PR and a set of tests holding a rule that
+three branches had quietly disagreed about.
+
+The clamp is the part worth explaining. `approximateBirthDate` rolls a month-end day forward —
+31 March less a month is 3 March. This branch fixed it, which was right in isolation and wrong in
+context: two SQL transcriptions of that function back the production backfill, and a backfill
+must store what the application would itself compute. By the time the disagreement surfaced, the
+expand migration had been finalised on roll-forward and its session had ended, so the cheap move
+was to converge on the status quo and make it checkable. The rollover is now asserted by tests
+that say in their own comment that they are expected to fail on an "improvement", and the
+docstring names both SQL files. The four cases the expand session rehearsed against embedded
+Postgres are the four the unit suite now pins.
+
+Gates on the final tree: `npm run check` (typecheck, lint, docs:check) 0 errors; unit, components
+and integration green; `npm run build` compiled. Earlier in the session `npm run test:all`
+reported 30 failures that are not this branch's — every project passes alone and the failures are
+Prisma errors in `insertServerPet`, which this diff never touches. Whether `test:all` is green on
+master was not checked.
+
+- [x] `/code-review high` on the slimmed diff, 2026-10-13. Seven findings. Two of my own comments
+      had become false the moment the form was reverted — the `usePetTableController` fix claimed
+      both stores recompute age, and `petStore` on master writes the typed string verbatim, so
+      deriving only the rendered row made the table and `localStorage` disagree. Reverted it.
+- [x] The docstring naming the SQL transcriptions was wrong on both path and claim: the contract
+      half was renamed and does **no** date arithmetic. Only the expand file is a transcription.
+      Rewritten to name one file, on its branch, and to say the Malay vocabulary does not agree.
+- [x] Dismissed one finding by probe: `new Date("2026-02-30")` is valid in V8, so the pre-PS-114
+      check accepted it identically and returned the same string. No regression.
+## Explicitly NOT done
+
+- **The `minggu` regex, the admin-save flag downgrade, and the Malay/SQL vocabulary gap.**
+  All three are recorded as ledger entries rather than fixed here: anchoring that regex moves the
+  arithmetic three implementations were aligned on, and the flag downgrade is PR #94s to land.
+  `tasks/open/malay-age-units-outpace-the-backfill.md`,
+  `tasks/open/every-admin-save-downgrades-an-exact-birthday.md`.
+
+- **The form.** Reverted to master in full — `PetFormDialog`, `actions/pets.ts`, `petStore.ts`,
+  `validations/pet.ts` and the component test. PR #94 owns it. `tasks/open/pet-form-has-no-birth-date-field.md`
+  is restored here because this branch no longer settles it; #94 deletes it.
+- **`tests/unit/petBirthDate.test.ts` deleted rather than kept.** Its `createPet`/`updatePet`
+  cases assume `age`/`ageCategory` are still in the form schema, which #94 removes. Offered to
+  that session case by case instead of left here to rot.
+- **No migration.** Two already exist. This branch touches neither.
+- **`hasAgeUnit` dropped.** It existed only to serve the dialog's age→birthday derivation, which
+  #94 removes; keeping it would have shipped an exported function with no caller.
+- **`/(\d+)\s*m/` matching "3 minggu" (Malay for *weeks*) as three months.** Real, found by the
+  expand session, refused at the migration so no production row carries it — but still wrong on
+  the fixture path. Left alone deliberately: anchoring that regex changes the very referent all
+  three implementations just agreed on, and it deserves its own change, not a ride-along.
 # Pet birth date — production conversion and the form that feeds it
 
 **Branch:** `worktree-pet-birth-date-migration` · opened 2026-09-22

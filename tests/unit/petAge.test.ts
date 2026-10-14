@@ -149,5 +149,87 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(birthDate).toBe("2026-03-22");
       expect(isEstimate).toBe(true);
     });
+
+    /**
+     * These three pin the month-end rollover rather than correcting it, and they are expected to
+     * fail if someone "fixes" it. Two SQL transcriptions of `approximateBirthDate` — the expand
+     * and contract halves of the `pets.birthDate` backfill — build their dates to match this
+     * function exactly, because a backfill must store what the application itself would compute.
+     * Postgres `make_interval` would clamp, so both files deliberately do not use it.
+     *
+     * On 2026-09-22 three branches held three versions of this arithmetic and no two agreed; the
+     * divergence was invisible because nothing anywhere asserted the awkward cases. That is what
+     * these tests are for. Changing the behaviour means changing all three together —
+     * `tasks/lessons/2026-09-22-three-copies-of-one-date-calculation-disagreed-across-three-branches.md`.
+     */
+    it("rolls a month-end day forward rather than clamping it", () => {
+      // 31 March less one month has no 31st to land on, and `Date.UTC(2026, 1, 31)` is 3 March.
+      expect(approximateBirthDate("1 month", "2026-03-31").birthDate).toBe("2026-03-03");
+      expect(approximateBirthDate("1 month", "2026-05-31").birthDate).toBe("2026-05-01");
+    });
+
+    it("rolls a leap day forward rather than clamping it", () => {
+      // `Date.UTC(2023, 1, 29)` is 1 March 2023. The only year-case that moves at all.
+      expect(approximateBirthDate("1 year", "2024-02-29").birthDate).toBe("2023-03-01");
+    });
+
+    it("leaves a day that exists in the target month alone", () => {
+      // Most dates: the rollover is reached only when the day overflows its target month.
+      expect(approximateBirthDate("1 month", "2026-03-15").birthDate).toBe("2026-02-15");
+      expect(approximateBirthDate("1 year", "2023-02-28").birthDate).toBe("2022-02-28");
+      expect(approximateBirthDate("18 months", "2026-06-12").birthDate).toBe("2024-12-12");
+    });
+
+    /**
+     * Weeks, and the abbreviations that make the word boundary safe.
+     *
+     * `3 minggu` is Malay for three weeks and used to read as three *months*, because a bare `m`
+     * with no boundary matches the m of minggu — ten weeks early, for exactly the operators the
+     * Malay vocabulary serves. Adding the boundary alone is a worse bug: it rejects every short
+     * month form that continues with letters. Both halves are pinned here, because fixing one
+     * and breaking the other passes a narrow test table.
+     */
+    it("reads weeks in both languages", () => {
+      expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).toBe("2026-05-22");
+      expect(approximateBirthDate("2 mggu", "2026-06-12").birthDate).toBe("2026-05-29");
+      expect(approximateBirthDate("3 weeks", "2026-06-12").birthDate).toBe("2026-05-22");
+      expect(approximateBirthDate("3 wks", "2026-06-12").birthDate).toBe("2026-05-22");
+      expect(approximateBirthDate("3 wk", "2026-06-12").birthDate).toBe("2026-05-22");
+    });
+
+    it("does not read a Malay week as a month", () => {
+      // The defect itself, named by the value it used to produce.
+      expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).not.toBe("2026-03-12");
+    });
+
+    it("still reads every short month and year form", () => {
+      // These four are what a bare `\b` after `m`/`y` silently destroys. If this test fails, the
+      // unit list lost an abbreviation and those ages now fall through to the intake date.
+      expect(approximateBirthDate("2 mth", "2026-06-12").birthDate).toBe("2026-04-12");
+      expect(approximateBirthDate("2 mths", "2026-06-12").birthDate).toBe("2026-04-12");
+      expect(approximateBirthDate("3 mnth", "2026-06-12").birthDate).toBe("2026-03-12");
+      expect(approximateBirthDate("5 yo", "2026-06-12").birthDate).toBe("2021-06-12");
+      // And the forms that already worked, so the curated list cannot quietly shrink.
+      expect(approximateBirthDate("6 mo", "2026-06-12").birthDate).toBe("2025-12-12");
+      expect(approximateBirthDate("4 mos", "2026-06-12").birthDate).toBe("2026-02-12");
+      expect(approximateBirthDate("3 yrs", "2026-06-12").birthDate).toBe("2023-06-12");
+      expect(approximateBirthDate("1 y/o", "2026-06-12").birthDate).toBe("2025-06-12");
+    });
+
+    it("lets the largest unit win in a compound age", () => {
+      // Weeks are matched last for this reason: a month plus weeks is a month, the way a year
+      // plus months is a year.
+      expect(approximateBirthDate("1 bulan 2 minggu", "2026-06-12").birthDate).toBe("2026-05-12");
+      expect(approximateBirthDate("1 year 6 months", "2026-06-12").birthDate).toBe("2025-06-12");
+    });
+
+    it("costs a leap-day animal its band on its own first birthday", () => {
+      // The known, accepted price of the rule above, asserted so it is a decision on record
+      // rather than a surprise: rolling to 1 March makes the animal 11 months old a year after
+      // it was born, and `AGE_BAND_MIN_MONTHS.young` is 12 — so it still reads as a puppy.
+      const born = approximateBirthDate("1 year", "2024-02-29").birthDate;
+      expect(computeAgeInMonths(born, "2024-02-29")).toBe(11);
+      expect(computeAgeCategory(born, "2024-02-29")).toBe("puppy_kitten");
+    });
   });
 });

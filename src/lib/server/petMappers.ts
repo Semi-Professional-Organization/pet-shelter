@@ -263,7 +263,14 @@ export function mapDbPetToPet(p: DbPetRecord): Pet {
  */
 export function buildPetPersistencePayload(pet: Pet): PetPersistencePayload {
   const birthDate = deriveBirthDate(pet);
-  const birthDateIsEstimate = pet.birthDateIsEstimate !== undefined ? pet.birthDateIsEstimate : true;
+  // Guarded on `pet.birthDate`, unlike the read mapper above. `Pet.birthDate` is optional, so a
+  // record can arrive with no birthday and `birthDateIsEstimate: false` — and `deriveBirthDate`
+  // will then approximate one from the age prose. Persisting `false` beside an approximated date
+  // claims the shelter knows a birthday it guessed. The read mapper needs no such guard: its
+  // `birthDate` is a non-nullable column, so it is never absent on a row that exists.
+  const birthDateIsEstimate = pet.birthDate
+    ? (pet.birthDateIsEstimate !== undefined ? pet.birthDateIsEstimate : true)
+    : true;
 
   return {
     name: pet.name,
