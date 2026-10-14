@@ -188,9 +188,9 @@ export function useLanguage(): LanguageContextValue {
  *
  * Why a second hook rather than typing `t` itself: typing `t` was tried and
  * produced 38 errors in nine files when measured. Twenty were dynamic keys
- * that need threading through as `TranslationKey`; eighteen were keys that
- * exist in neither dictionary, and so render English on the Malay site — one
- * has since been added, and seventeen remain. See
+ * that need threading through as `TranslationKey`; the rest were keys that
+ * exist in neither dictionary, and so render English on the Malay site. The
+ * live list, not a count to keep in step here, is
  * `tasks/open/translation-keys-the-dictionary-does-not-have.md`. Components
  * move to this hook one at a time; once nothing still needs the untyped form,
  * `t` itself should take `TranslationKey` and this hook should go.
@@ -207,10 +207,12 @@ export function useTypedTranslation(): {
   // no params type-checks and renders "ROS Reg: {regNo}". Requiring params for
   // exactly the keys that contain a placeholder needs the dictionary's values
   // visible to the type system, and `TranslationDictionary` types them as
-  // `string`. Two upgrade paths. The cheaper one works at the mechanism and
-  // needs no type change: have `translate()` detect a `{name}` still present
-  // after interpolation, and throw under test — that covers every key and
-  // both `t` paths in one place. The thorough one is to declare the
+  // `string`. Two upgrade paths. The cheaper one needs no type change: have
+  // `translate()` detect a `{name}` still present after interpolation and
+  // throw under test. It covers both `t` paths in one place, but only for
+  // keys some test renders, does nothing in production, and would misfire on
+  // a param value that itself contains braces — a net, not a proof. The
+  // thorough one is to declare the
   // dictionaries `as const satisfies TranslationDictionary` and derive a
   // placeholder map from the values, making the omission a compile error.
   const { t, isMs } = useLanguage();

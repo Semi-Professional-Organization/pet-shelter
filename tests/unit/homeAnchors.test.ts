@@ -171,8 +171,9 @@ function stripComments(
   // element — but in JSX children that is text, and the element renders. So a
   // "comment" that starts inside a JsxText node is discarded. Only the parsed
   // tree knows where JSX text is; that is the point of using it.
-  // ceiling: comment ranges × JsxText nodes, pairwise. The largest file a
-  // route reaches has a few hundred of each, so this is milliseconds; if it
+  // ceiling: comment ranges × JsxText nodes, pairwise. Measured on 2026-10-14,
+  // the worst file had about 400 JsxText nodes against at most 42 ranges —
+  // some 15,000 comparisons, so milliseconds; if it
   // ever is not, sort both by start and sweep them together as `nestedRanges`
   // does.
   for (const [pos] of [...ranges]) {
@@ -239,8 +240,7 @@ interface ImportTarget {
  * which pressures the next person to loosen the guard instead of the parser.
  * Recording the *exported* name is what lets an alias resolve.
  */
-function importMap(fromFile: string): Map<string, ImportTarget> {
-  const entry = parsed(fromFile);
+function importMap(fromFile: string, entry = parsed(fromFile)): Map<string, ImportTarget> {
   if (entry.imports) return entry.imports;
 
   const map = new Map<string, ImportTarget>();
@@ -420,7 +420,7 @@ function idsRenderedBy(
     // blocks for this file.
     const entry = parsed(file);
     const text = entry.text;
-    const imports = importMap(file);
+    const imports = importMap(file, entry);
     const blocks = (entry.blocks ??= componentBlocks(text));
     // An entry file is one component, so its whole text is its body.
     // Elsewhere, only the named component's block counts.
@@ -701,10 +701,9 @@ describe("in-app anchor links", () => {
   it("still blanks a real comment that follows a one-line JSDoc", () => {
     // The case review found after the backstop was added: a fake range from
     // inside the doc must be dropped WITHOUT taking the real `{/* <Dead /> */}`
-    // down with it. Two independent layers prevent this — the JSDoc skip in
-    // `stripComments`, and `nestedRanges` checking only surviving ranges — and
-    // after the fix either alone is sufficient, so this outcome cannot fail
-    // unless both are broken. The next case pins the sweep on its own.
+    // down with it. `nestedRanges` checking only surviving ranges is what
+    // prevents it — the only layer, since the JSDoc skip that once also did was
+    // deleted as redundant. The next case pins the sweep on its own.
     const line =
       "/** @param x // note */ export function F() { return <main>{/* <Dead /> */}<Live /></main>; }";
     const stripped = stripComments(line);
