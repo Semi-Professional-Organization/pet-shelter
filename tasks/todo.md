@@ -65,9 +65,11 @@ Record active multi-step work streams below.
 - [x] **Caught the editor decoding `\uXXXX` into literal characters** in the production SQL,
       including a BOM inside a regex. Rewritten with `String.fromCharCode(92)`, as auto-memory
       already warned; the migration now contains no non-ASCII byte.
-- [x] From the #42 session's review of #42: fixed F12 (a `6d32df9` "master" ref that is a git
-      *tree*, in a public entry), F10 (a `petAge.ts` sentence saying both SQL files do date
-      arithmetic) and F13 (refused list now names `5 yo`, `5yo`, `mnths`). Agreed a split: they
+- [x] From the #42 session's review of #42: fixed F10 (a `petAge.ts` sentence saying both SQL
+      files do date arithmetic) and F13 (refused list now names `5 yo`, `5yo`, `mnths`). **F12 —
+      a `6d32df9` "master" ref in a public entry that is a git *tree*, not a commit — handed back
+      to that session**, which asked to own it: the line also needs rewriting now #42 has merged,
+      and two sessions editing one line of a public entry is how it gets a conflict. Agreed a split: they
       take the app-side parsing fixes; F5 and F6 must land together with the SQL, because fixing
       the app alone would open new silent divergences.
 
