@@ -205,8 +205,9 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
  * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
  * 2026-03-03, not 2026-02-28. Clamping reads better and keeps the anniversary in the intended
  * month, and it was briefly implemented here — but Postgres `make_interval` clamps while
- * JavaScript rolls, so both SQL files build the date with `make_date(y, m, 1) + (day - 1)` to
- * match *this* function. Changing the behaviour here silently changes what a migrated row should
+ * JavaScript rolls, so the expand migration builds the date with `make_date(y, m, 1) + (day - 1)`
+ * to match *this* function. (The contract migration beside it does no date arithmetic at all, so
+ * there is one SQL copy of this rule, not two.) Changing the behaviour here silently changes what a migrated row should
  * have contained. The cost of the rollover is bounded and understood: it biases an animal a few
  * days younger, and only a row sitting within a day or two of exactly 12, 36 or 96 months lands
  * in a different `AGE_BAND_MIN_MONTHS` band as a result. Every value it produces carries

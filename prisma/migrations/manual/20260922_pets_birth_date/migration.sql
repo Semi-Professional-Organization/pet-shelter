@@ -99,7 +99,7 @@
 -- imported rather than copied, on every spelling above, the four rollover cases and a compound, in
 -- any timezone; it asserts that each single-unit app-only spelling is read by the app and refused
 -- here; and it pins the three mixed-string divergences above at their exact values as a known
--- defect, so they cannot widen or change unnoticed. It is not wired into `npm test` or CI — it runs
+-- defect, so they cannot widen or change unnoticed. It is not wired into `npm test` or CI -- it runs
 -- when someone runs it. This file's own `rehearse.mjs` compares against `appRule`, a hand copy
 -- that has drifted from the function on both timezone and vocabulary since #42 -- see
 -- `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
@@ -220,6 +220,7 @@
 --                                     + interval '1 month' - interval '1 day')) THEN 'bad intakeDate'
 --            WHEN lower(coalesce("age",''))
 --                 ~ '[0-9]+[[:space:]]*(tahun|thn|bulan|bln|minggu|mggu|weeks|week|wks|wk|mnths|mnth|yo)\M'
+--              OR coalesce("age",'') ~ '[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]'
 --                 THEN 'unparseable age'
 --            WHEN lower(coalesce("age",''))
 --                 ~ '[0-9][^0-9]{1,5}[0-9]+[[:space:]]*(years|year|yrs|yr|y|months|month|mths|mth|mos|mo|m)\M'
@@ -251,10 +252,12 @@
 --   unparseable age   no number-and-unit the rule recognises; rewrite as "2 years", "4 months"
 --
 -- **Read the `age` column itself, not only the verdict.** The rule reads a number and a unit; it
--- cannot read a qualifier around them. "less than 1 year" is taken as exactly 1 year, "2 bulan
--- setengah" as exactly 2 months, "about 3 years" as exactly 3. Each is an estimate stored as an
--- estimate, so none is refused -- but if a row's prose hedges in a direction that matters to
--- someone who knows the animal, this listing is the last chance to say so in whole units.
+-- cannot read a qualifier around them. "less than 1 year" is taken as exactly 1 year, "nearly 2
+-- years" as exactly 2, "about 3 years" as exactly 3. Each is an estimate stored as an estimate, so
+-- none is refused -- but if a row's prose hedges in a direction that matters to someone who knows
+-- the animal, this listing is the last chance to say so in whole units. (An earlier version gave
+-- "2 bulan setengah" as an example read as 2 months. It is refused: any age containing a Malay
+-- unit is, since b40a7d7, and it appears in this listing as `unparseable age`.)
 --
 -- Keep the output. After the follow-up file drops `age`, it is the only record of what it held.
 --
@@ -270,11 +273,13 @@
 --    ORDER BY column_name;
 --
 -- **Everything this file tells you, it tells you through RAISE NOTICE** -- the row count it
--- backfilled, the rows whose date was clamped to a month end, and the "already migrated, nothing
+-- backfilled, the rows whose date rolled past a short month, and the "already migrated, nothing
 -- rewritten" line. A psql session prints those; the Neon SQL editor is not documented to, so
 -- assume you will not see them and read the answers out of the table instead. The count is the
--- first query above. The clamped rows, which are the only ones whose backfilled date is not what
--- the app's own arithmetic would have produced, are these:
+-- first query above. The rolled rows -- which ARE what the app's own arithmetic computes, and are
+-- listed only because a reader may not expect a birthday in the month after the one subtracted
+-- to -- are these. (An earlier version called them "clamped to a month end" and "the only ones
+-- whose date is not what the app would have produced"; that described the rule before b40a7d7.)
 --
 --   SELECT "id", "name", "age", "intakeDate", "birthDate"
 --     FROM "public"."pets"
@@ -464,8 +469,27 @@ BEGIN
                  -- six months while the app reads one year: a different birthday, no error. #42
                  -- taught the app these units; this keeps the backfill to "store what the app
                  -- computes, or refuse". Checked first, so it wins over an English unit later on.
+                 --
+                 -- And any Unicode whitespace, for the same reason in a different costume. JS `\s`
+                 -- matches a non-breaking space; Postgres `[[:space:]]` does not, under UTF8. So
+                 -- "1<NBSP>year 6 months" -- what pasting from Word or a web page produces -- is
+                 -- one year to the app and, without this, six months here: the year is invisible
+                 -- to this file and the month is not. Whitespace only, not every non-ASCII
+                 -- character: an en-dash range or a vulgar fraction must still reach the
+                 -- fractional check below and be refused under that name.
+                 --
+                 -- ceiling: a deny list, kept by hand beside petAge.ts's AGE_*_PATTERNs, so a unit
+                 -- added there and not here reopens the silent divergence, and nothing in `npm test`
+                 -- or CI compares them -- only contract/rehearse.mjs scenario 0, run by hand. It
+                 -- over-refuses by design ("3 minggu 2 months" agreed by luck and is now refused).
+                 -- It does not cover a non-ASCII LETTER glued to a unit, e.g. tahun followed by an n-tilde,
+                 -- where JS `\b` and Postgres `\M` disagree on word boundaries. Upgrade path: a
+                 -- vitest test that extracts both alternations and asserts the app's vocabulary is
+                 -- a subset of this file's accept list plus this deny list, run in CI.
                  WHEN lower(coalesce(p."age", ''))
                         ~ '[0-9]+[[:space:]]*(tahun|thn|bulan|bln|minggu|mggu|weeks|week|wks|wk|mnths|mnth|yo)\M'
+                      OR coalesce(p."age", '')
+                        ~ '[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]'
                    THEN NULL
                  WHEN lower(coalesce(p."age", '')) ~ '[0-9]+[[:space:]]*(years|year|yrs|yr|y)\M'
                    THEN 'years'

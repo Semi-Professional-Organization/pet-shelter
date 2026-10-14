@@ -56,6 +56,20 @@ Record active multi-step work streams below.
 - [x] Corrected five stale claims in expand's header the review found, all made false by #42 or
       b40a7d7: the app's Malay behaviour, O2's coverage, "ninety-two checks", the month-end
       direction, and the contract "re-deriving".
+- [x] `/code-review high` found the same divergence through **whitespace**: JS `\s` matches a
+      no-break space, Postgres `[[:space:]]` does not, so `1<NBSP>year 6 months` was one year to
+      the app and six months to the SQL. The refusal now also covers Unicode whitespace — and
+      deliberately not all non-ASCII, after reading the bytes of every non-ASCII fixture in
+      expand's harness showed M1 expects en/em-dash ranges refused *as fractional*. Mutation-tested.
+      93/93.
+- [x] **Caught the editor decoding `\uXXXX` into literal characters** in the production SQL,
+      including a BOM inside a regex. Rewritten with `String.fromCharCode(92)`, as auto-memory
+      already warned; the migration now contains no non-ASCII byte.
+- [x] From the #42 session's review of #42: fixed F12 (a `6d32df9` "master" ref that is a git
+      *tree*, in a public entry), F10 (a `petAge.ts` sentence saying both SQL files do date
+      arithmetic) and F13 (refused list now names `5 yo`, `5yo`, `mnths`). Agreed a split: they
+      take the app-side parsing fixes; F5 and F6 must land together with the SQL, because fixing
+      the app alone would open new silent divergences.
 
 ## Review
 

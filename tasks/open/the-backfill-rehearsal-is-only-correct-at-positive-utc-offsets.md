@@ -23,8 +23,11 @@ east of UTC.
 ## Landing PR #42 does not close this, and makes the copy drift twice
 
 PR #42 makes the real `approximateBirthDate` timezone-invariant — it parses `YYYY-MM-DD` into
-calendar parts and builds dates with `Date.UTC`, where `master` at `6d32df9` still uses
-`d.setFullYear(...)` / `d.setMonth(...)` at lines 161 and 169. All four rollover values the
+calendar parts and builds dates with `Date.UTC`, where `master` before #42 (`18c533e`) used
+`d.setFullYear(...)` / `d.setMonth(...)` at lines 161 and 169. (This sentence previously named
+`6d32df9` as master; that is a git *tree* object — the output of a `git merge-tree --write-tree`
+dry run — not a commit, and it was passed between two sessions as a ref without either checking
+`git cat-file -t`.) All four rollover values the
 rehearsal pins are preserved by that change, forward roll included, and the five tests in
 `tests/unit/petAge.test.ts` pin them from the TypeScript side.
 

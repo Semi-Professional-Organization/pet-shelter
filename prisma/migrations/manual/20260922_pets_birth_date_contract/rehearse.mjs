@@ -366,7 +366,14 @@ if (HAS_EXPAND) {
   // own message and the row id, not "any error at all", so an unrelated syntax error cannot pass
   // for a deliberate refusal.
   const intake = "2026-06-12";
+  // Built from code points, never typed as escapes: the editor that wrote this file decodes `\u`
+  // sequences into the literal character, which once put an invisible BOM into a regex here.
+  const NBSP = String.fromCharCode(0xa0); //  no-break space: what pasting from Word produces
+  const NNBSP = String.fromCharCode(0x202f); // narrow no-break space
   const APP_ONLY = [
+    // JS `\s` matches a no-break space and Postgres `[[:space:]]` does not, so the app reads this
+    // as a year and the backfill cannot see the unit at all. Refused, not guessed.
+    ["1" + NBSP + "year", "a unit after a no-break space", "2025-06-12"],
     ["3 minggu", "weeks, Malay", "2026-05-22"],
     ["3 weeks", "weeks", "2026-05-22"],
     ["3 wks", "weeks", "2026-05-22"],
@@ -411,6 +418,12 @@ if (HAS_EXPAND) {
     "2 thn 1 year",
     "3 minggu 2 months",
     "2 years 3 weeks",
+    // Found by a `high` review after the Malay fix: the same divergence through whitespace. The app
+    // reads the year (JS `\s`); without the whitespace clause the backfill skipped it and stored
+    // the English month. Measured: app 2025-06-12, backfill 2025-12-12, no error.
+    "1" + NBSP + "year 6 months",
+    "1" + NBSP + "tahun 6 months",
+    "2" + NNBSP + "yo 3 months",
   ];
   for (const age of MIXED) {
     const one = new PGlite();
@@ -464,14 +477,26 @@ if (HAS_EXPAND) {
       wrong.map(([id, , , want]) => `${id}: want ${want}, got ${verdict[id]}`).join(" | ")
     );
 
+    // Each refusing verdict is matched to the file's OWN message for it, plus the row id, rather than
+    // "any error at all" — so an unrelated failure (a typo in a regex, a schema mismatch) cannot pass
+    // for a deliberate refusal. `bad intakeDate` and `unparseable age` share one RAISE in the file.
+    const MESSAGE = {
+      "unparseable age": /cannot be derived/,
+      "bad intakeDate": /cannot be derived/,
+      "implausible age": /not a plausible/,
+      "fractional age": /fractional/,
+    };
     const disagree = [];
     for (const [id, age, intakeDate, want] of J) {
       const db1 = new PGlite();
       await db1.exec(PROD_SCHEMA);
       await insertPreExpand(db1, [id, age, "adult", intakeDate]);
-      const failed = (await tryExec(db1, EXPAND)) !== "";
-      if ((want.startsWith("ok:") ? !failed : failed) === false) {
-        disagree.push(`${id} (${want}): ${failed ? "refused" : "accepted"}`);
+      const err = await tryExec(db1, EXPAND);
+      const ok = want.startsWith("ok:")
+        ? err === ""
+        : err !== "" && MESSAGE[want]?.test(err) && err.includes(id);
+      if (!ok) {
+        disagree.push(`${id} (${want}): ${err ? err.split("\n")[0].slice(0, 70) : "accepted"}`);
       }
       await db1.close();
     }
