@@ -199,6 +199,26 @@ matched by substring and now matches exactly; and a ledger receipt's zero or neg
 printed rather than blanked, since that is what an offsetting correction looks like. Tier 3b was
 re-run against a live server after these changes.
 
+**Round eight, 2026-10-14**, the review of round seven, found ten; seven are fixed, three are
+not. CI would also have failed: the Playwright golden path asserted an `HFS-DON` e-receipt on
+submission — it pinned the defect this branch removes. It now asserts the pledge and the absence
+of a receipt, and passes locally against a dev server with no database (5/5). Rewriting it
+surfaced four public claims that a receipt is "generated instantly", on `/donate`, `/get-involved`
+and in the FAQ fixture, now corrected; the production FAQ row is database data and needs an edit
+in `/admin/faqs` at deploy time.
+
+Fixed: the QR switcher sync was withdrawn and `/donate` shows only the DuitNow code, as the
+modal does; `uniqueViolationOn` decides by the column list whenever there is one and reads an
+index name inside a legacy `target` array; a negative ledger amount is exported as a number so a
+spreadsheet SUM counts it; a double sponsorship collision has its own error message; and a
+decimal string under `amountSen` is refused, because `"250.00"` is likelier misfiled ringgit than
+250 sen. Not fixed: the foreign-key recovery is spent even when its lookup finds both referents
+(pre-existing behaviour, not a regression); the two ledgers still implement the redraw in
+different shapes (two copies; AGENTS.md waits for a third); and the suffix fallback for constraint
+names, now marked as a `ceiling:`.
+
+This round's commit has not been reviewed.
+
 ### Deliberately not done
 
 - **No payment webhook.** The open entry offered it as the other fork. There is no processor

@@ -117,9 +117,20 @@ on `settleDonationPledge`.
 hardcoded `paymentMethod: "duitnow_qr"` while the same screen published the shelter's Maybank
 account, so a bank-transfer donor was recorded on the wrong rail. That predated this change, but
 this change gave the value a second consumer: the reconciliation queue shows it as the rail to
-match against the bank statement. The form now asks, defaults to DuitNow QR, and switches to
-bank transfer when the donor copies the account number. It is still the donor's word; the
-statement is the authority.
+match against the bank statement. The form now asks, with native radios defaulting to DuitNow
+QR. It is still the donor's word; the statement is the authority.
+
+Two earlier attempts at keeping that answer honest were withdrawn in review. Flipping the rail
+when the donor copied the account number overwrote an explicit answer with a guess. Moving the
+rail whenever the QR panel's channel tab was clicked was one-way and click-only, so a form reset
+or a channel an admin removed left the two disagreeing — and a Touch 'n Go payment had no value
+to be recorded as in any case.
+
+**So `/donate` now shows only the DuitNow QR code, even when the shelter has uploaded Touch 'n Go
+and bank QR images.** That is the call the sponsorship modal had already made, for the same
+reason: the rail question is the one source of truth. It is a visible change on the public page,
+and reversible — offering the other codes again needs a payment-method value for each on the
+pledge, the receipt and the coordinator's queue, not a tab.
 
 ## What would reverse this
 

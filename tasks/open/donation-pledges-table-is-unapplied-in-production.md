@@ -51,6 +51,13 @@ The first returns `donation_pledges`. The second must still show the append-only
 (`O`); this migration does not touch it. Then `npm run db:check-drift` from the main checkout
 should no longer list the table as additive.
 
+## One production-data edit to make at the same time
+
+The FAQ answer "Is my donation tax-deductible in Malaysia, and how do I receive an official
+e-Receipt?" promised a receipt "generated instantly". The committed fixture `src/data/faqs.json`
+is corrected, but production serves FAQs from its database, which the fixture only seeded. Edit
+that answer in `/admin/faqs` when the code ships, or the live FAQ will contradict the donate page.
+
 ## Settles when
 
 The table exists on production, confirmed by the two queries above, before the code that needs

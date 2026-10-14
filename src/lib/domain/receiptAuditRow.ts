@@ -74,17 +74,20 @@ function ringgitFrom(value: unknown): number | undefined {
 }
 
 /**
- * A positive whole number of sen from a number or from text, or `undefined`.
+ * A positive whole number of sen from a number or a string of digits, or `undefined`.
  *
- * Text may carry a zero fraction — `"12345.0"`, `"12345.00"` — because that is
- * how a whole number comes back from some JSON and decimal round-trips. It is
- * still a whole number of sen. `"12345.5"` is not, and is refused.
+ * Digits only, for text. `"12345.00"` is refused on purpose even though it parses
+ * to a whole number: the same characters are how a *ringgit* figure looks, and a
+ * backfill that stored `"250.00"` under `amountSen` would otherwise be read as
+ * 250 sen and — because sen wins — print RM 2.50 over a correct `amountMYR: 250`
+ * beside it. An ambiguous string falls through to `amountMYR` or to nothing. On a
+ * tax export a blank cell is a question; a confident wrong figure is an answer.
  */
 function senFrom(value: unknown): number | undefined {
   const n =
     typeof value === "number"
       ? value
-      : typeof value === "string" && /^\d+(\.0+)?$/.test(value.trim())
+      : typeof value === "string" && /^\d+$/.test(value.trim())
         ? Number(value.trim())
         : undefined;
   return n !== undefined && Number.isSafeInteger(n) && n > 0 ? n : undefined;

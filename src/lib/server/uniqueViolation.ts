@@ -25,7 +25,8 @@
  *                 constraint: { fields: ['"pledgeRef"'] } } } } }
  *
  * Three things follow. There is no `target`. The field keeps the double quotes
- * Postgres prints around a mixed-case identifier, so matching is by substring.
+ * Postgres prints around a mixed-case identifier, so they are stripped before an
+ * exact comparison.
  * And the constraint's own name is in `originalMessage`, which is a second,
  * independent source when the adapter could not parse a detail line — it leaves
  * `constraint` undefined in that case.
@@ -75,10 +76,14 @@ function namesFrom(meta: unknown): ViolationNames {
     if (named) names.constraints.push(named);
   }
 
-  // The pre-adapter shape, kept because a future client may emit it again: an
-  // array of column names, or the index name as one string.
-  if (Array.isArray(target)) names.columns.push(...strings(target).map(unquote));
-  else if (typeof target === "string" && target.length > 0) names.constraints.push(target);
+  // The pre-adapter shape, kept because a future client may emit it again. An
+  // entry is usually a column name, but some paths put the index name in the
+  // array instead, so an entry shaped like one is filed as a constraint.
+  const legacy = Array.isArray(target) ? strings(target) : strings([target]);
+  for (const entry of legacy) {
+    if (entry.endsWith("_key")) names.constraints.push(entry);
+    else names.columns.push(unquote(entry));
+  }
 
   return names;
 }
@@ -96,15 +101,17 @@ function namesFrom(meta: unknown): ViolationNames {
  * cannot must treat it as a miss. Folding it into a boolean here is exactly how the
  * earlier predicates ended up either never retrying or retrying everything.
  *
- * Matching is exact, not by substring. A column must *equal* `column` once its
- * quotes are off, and a constraint name must be Prisma's `<table>_<column>_key`
- * for a single-column unique. A substring test would read `originalPledgeRef` as
- * `pledgeRef`, or `petId` as `id`, and a caller would then retry a collision on
- * the wrong constraint — the duplicate-row hazard the `false` answer exists for.
+ * A column list, when the error carries one, is the whole answer, and it is
+ * compared exactly: a field must *equal* `column` once its quotes are off, so
+ * `originalPledgeRef` is not `pledgeRef` and `petId` is not `id`.
  *
- * ceiling: a compound unique (`@@unique([a, b])`, index `<table>_a_b_key`) is
- * matched by column only when the adapter lists its fields. Identified by index
- * name alone it reads as `false` for `a`. No caller asks about one today.
+ * ceiling: only when there is no column list does this fall back to constraint
+ * names, and there it can only match by the `_<column>_key` suffix, because the
+ * table name is not known here. A compound unique ending in the column asked
+ * about (`t_petId_pledgeRef_key` for `pledgeRef`) therefore reads as `true` on
+ * that path. On this stack the adapter always supplies the column list, so the
+ * fallback is not reached; a caller on a client that does not must pass the full
+ * constraint name it expects instead of trusting the suffix.
  */
 export function uniqueViolationOn(err: unknown, column: string): boolean | "unnamed" {
   if (typeof err !== "object" || err === null) return false;
@@ -114,8 +121,6 @@ export function uniqueViolationOn(err: unknown, column: string): boolean | "unna
   const { columns, constraints } = namesFrom(meta);
   if (columns.length === 0 && constraints.length === 0) return "unnamed";
 
-  return (
-    columns.includes(column) ||
-    constraints.some((name) => name === column || name.endsWith(`_${column}_key`))
-  );
+  if (columns.length > 0) return columns.includes(column);
+  return constraints.some((name) => name === column || name.endsWith(`_${column}_key`));
 }

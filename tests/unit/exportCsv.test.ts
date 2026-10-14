@@ -372,9 +372,10 @@ describe("a ledger receipt's amount is printed as the ledger computed it", () =>
     // What an offsetting correction would look like. Blanking it would hide the
     // one row an accountant most needs to see.
     expect(cell(generateReceiptsCsvString([receipt(0)]))).toBe('"0.00"');
-    // Still there, with the leading apostrophe `formatCsvField` puts on any cell
-    // starting with `-` so a spreadsheet does not evaluate it as a formula.
-    expect(cell(generateReceiptsCsvString([receipt(-50)]))).toBe("\"'-50.00\"");
+    // A number, not text: as a string it would get the apostrophe `formatCsvField`
+    // puts on anything starting with `-`, and a spreadsheet's SUM would skip it.
+    expect(cell(generateReceiptsCsvString([receipt(-50)]))).toBe('"-50"');
+    expect(cell(generateReceiptsCsvString([receipt(-12.345)]))).toBe('"-12.35"');
     expect(cell(generateReceiptsCsvString([receipt(80)]))).toBe('"80.00"');
   });
 
@@ -404,11 +405,12 @@ describe("resolveAuditAmountMYR is the one answer every reader shares", () => {
     expect(resolveAuditAmountMYR({ amountSen: 0 })).toBeUndefined();
   });
 
-  it("reads a whole number of sen written with a zero fraction, and no other fraction", () => {
-    // How a whole number comes back from some JSON and decimal round-trips.
-    expect(resolveAuditAmountMYR({ amountSen: "12345.0" })).toBe(123.45);
-    expect(resolveAuditAmountMYR({ amountSen: "12345.00", amountMYR: 1 })).toBe(123.45);
-    expect(resolveAuditAmountMYR({ amountSen: "12345.5" })).toBeUndefined();
+  it("does not read a decimal string as sen, because it looks like ringgit", () => {
+    // `"250.00"` under `amountSen` is far likelier a misfiled ringgit figure than
+    // 250 sen. Read as sen it would print RM 2.50 over the correct value beside it.
+    expect(resolveAuditAmountMYR({ amountSen: "250.00", amountMYR: 250 })).toBe(250);
+    expect(resolveAuditAmountMYR({ amountSen: "12345.0" })).toBeUndefined();
+    expect(resolveAuditAmountMYR({ amountSen: "12345" })).toBe(123.45);
   });
 
   it("reads ringgit a person formatted, and refuses what merely parses", () => {

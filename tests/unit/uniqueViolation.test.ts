@@ -126,4 +126,41 @@ describe("uniqueViolationOn", () => {
     );
     expect(uniqueViolationOn(index("donation_pledges_pledgeRef_key"), "pledgeRef")).toBe(true);
   });
+
+  it("lets a column list overrule a constraint name that merely ends the same way", () => {
+    // A compound unique whose index name ends in the column asked about. The
+    // adapter lists the fields, so the answer comes from them and is exact.
+    const err = p2002({
+      driverAdapterError: {
+        cause: {
+          originalMessage:
+            'duplicate key value violates unique constraint "pet_sponsorships_petId_pledgeRef_key"',
+          constraint: { fields: ['"petId"', '"pledgeRef"'] },
+        },
+      },
+    });
+    expect(uniqueViolationOn(err, "pledgeRef")).toBe(true);
+    expect(uniqueViolationOn(err, "receiptNumber")).toBe(false);
+
+    const other = p2002({
+      driverAdapterError: {
+        cause: {
+          originalMessage:
+            'duplicate key value violates unique constraint "archive_pledgeRef_key"',
+          constraint: { fields: ['"originalPledgeRef"'] },
+        },
+      },
+    });
+    // The name ends `_pledgeRef_key`; the column it is actually on is not `pledgeRef`.
+    expect(uniqueViolationOn(other, "pledgeRef")).toBe(false);
+  });
+
+  it("reads an index name that arrives inside the legacy target array", () => {
+    expect(
+      uniqueViolationOn(p2002({ target: ["donation_pledges_pledgeRef_key"] }), "pledgeRef")
+    ).toBe(true);
+    expect(
+      uniqueViolationOn(p2002({ target: ["donation_pledges_receiptNumber_key"] }), "pledgeRef")
+    ).toBe(false);
+  });
 });

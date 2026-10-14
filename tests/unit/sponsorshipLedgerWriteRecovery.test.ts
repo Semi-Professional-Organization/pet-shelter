@@ -238,7 +238,10 @@ describe("a colliding sponsorship pledge reference", () => {
       "@/lib/server/sponsorshipLedger"
     );
 
-    await expect(recordSponsorshipPledge(draft)).rejects.toBeInstanceOf(SponsorshipWriteError);
+    const attempt = recordSponsorshipPledge(draft);
+    await expect(attempt).rejects.toBeInstanceOf(SponsorshipWriteError);
+    // Named, so a log can tell a double collision from any other failed write.
+    await expect(attempt).rejects.toThrow(/after a reference collision/);
     expect(doubles.create).toHaveBeenCalledTimes(2);
   });
 

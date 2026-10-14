@@ -224,7 +224,15 @@ export async function recordSponsorshipPledge(
         }
       }
 
-      throw new SponsorshipWriteError("Could not record the sponsorship", err);
+      // Named, so a log can tell a double collision from any other failed write —
+      // the wording `donationPledgeLedger` uses for the same event.
+      const secondCollision = redrawn && uniqueViolationOn(err, "pledgeRef") !== false;
+      throw new SponsorshipWriteError(
+        secondCollision
+          ? "Could not record the sponsorship after a reference collision"
+          : "Could not record the sponsorship",
+        err
+      );
     }
   }
 }

@@ -41,14 +41,6 @@ interface DonationQrPanelProps extends DonationQrSources {
    * saved rather than what is already live.
    */
   configOverride?: ShelterQrConfigLike;
-  /**
-   * Told when the donor picks a channel on the switcher.
-   *
-   * A form that records how the donor paid must hear this. The switcher is a
-   * second place to make that choice, and a payload that cannot see it records
-   * the wrong rail for anyone who used it.
-   */
-  onChannelChange?: (channel: QrChannel) => void;
 }
 
 /**
@@ -158,10 +150,7 @@ export function DonationQrPanel(props: DonationQrPanelProps) {
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                onClick={() => {
-                  setSelected(option);
-                  props.onChannelChange?.(option);
-                }}
+                onClick={() => setSelected(option)}
                 style={
                   isActive
                     ? {

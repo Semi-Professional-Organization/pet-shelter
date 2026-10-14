@@ -216,14 +216,18 @@ export function generateReceiptsCsvString(
       // Standard DonationReceipt object
       const r = item as DonationReceipt;
       // A ledger receipt's amount is a number the ledger computed, so any finite
-      // one is printed as it stands — including a zero or a negative, which is
-      // what an offsetting correction would look like, and which must be visible
-      // on the filed document rather than blanked. Only a value that is not a
-      // finite number goes through the stricter reader the audit-row branch uses,
-      // so the two cannot print `NaN` or `undefined`.
-      const formattedAmount =
+      // one is printed — including a zero or a negative, which is what an
+      // offsetting correction would look like and must be visible on the filed
+      // document. A negative is emitted as a *number*, not as text: `formatCsvField`
+      // prefixes any string starting with `-` with an apostrophe to defuse formula
+      // injection, which would turn the correction into a text cell that a SUM over
+      // the column silently skips. Anything that is not a finite number goes
+      // through the stricter reader, so this can never print `NaN` or `undefined`.
+      const formattedAmount: string | number =
         typeof r.amountMYR === "number" && Number.isFinite(r.amountMYR)
-          ? r.amountMYR.toFixed(2)
+          ? r.amountMYR < 0
+            ? Number(r.amountMYR.toFixed(2))
+            : r.amountMYR.toFixed(2)
           : formatAmountCell(r.amountMYR);
 
       rows.push([

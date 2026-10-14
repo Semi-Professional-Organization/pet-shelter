@@ -31,6 +31,7 @@ import {
 import { submitDonationPledgeAction } from "@/actions/donations";
 import type { DonationPledgeDTO } from "@/lib/validations/donation";
 import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel";
+import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
 import { getPublicPets } from "@/actions/pets";
 import { SponsorshipTier } from "@/types/sponsorship";
 import { Pet } from "@/types/pet";
@@ -113,6 +114,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const [wantsTaxReceipt, setWantsTaxReceipt] = useState(false);
   const [notes, setNotes] = useState("");
   const [copiedBank, setCopiedBank] = useState(false);
+  const qrConfig = useDonationQrConfig();
   // What the donor says they are paying with. Until 2026-10-13 this form sent
   // `duitnow_qr` for every gift while publishing the Maybank account beside the
   // QR, so a bank-transfer donor was recorded on the wrong rail — on their receipt,
@@ -626,13 +628,18 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           {/* DuitNow QR — shared with the pet sponsorship modal */}
           <DonationQrPanel
             className="md:col-span-5"
-            // The panel's channel switcher is a second place to say how you are
-            // paying. Its choice moves the control below, which is the one value
-            // submitted — the bank's QR is a bank transfer; DuitNow and the TNG
-            // wallet are both QR payments.
-            onChannelChange={(channel) =>
-              setPaymentMethod(channel === "bank" ? "online_banking" : "duitnow_qr")
-            }
+            // The question below is the one source of truth for how the donor
+            // paid, exactly as the radio group is in the sponsorship modal, so the
+            // panel is given no other channels to offer. Its switcher would be a
+            // second selector the submitted payload cannot see, and the payload
+            // has no value for a wallet payment in any case: a Touch 'n Go gift
+            // would be receipted as DuitNow whatever the donor picked.
+            //
+            // ceiling: `/donate` therefore shows only the DuitNow code, even when
+            // the shelter has uploaded TNG and bank QR images. Offering them here
+            // needs a payment-method value for each, on the pledge, the receipt
+            // and the coordinator's queue — not a tab.
+            configOverride={{ ...qrConfig, tngQrUrl: "", bankQrUrl: "" }}
             instructions={t(
               "donations.duitNowInstructions",
               "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app."
