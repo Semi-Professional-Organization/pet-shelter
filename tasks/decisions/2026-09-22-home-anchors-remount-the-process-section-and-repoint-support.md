@@ -11,7 +11,7 @@ anchors. They are not one problem, and they do not get one answer.
 
 | Export | Disposition | Why |
 |---|---|---|
-| `HomeProcessSection` (`#how-it-works`) | **Remounted on `/`** | Three links want it and the content exists nowhere else |
+| `HomeProcessSection` (`#how-it-works`) | **Remounted on `/`** | Its two adoption-process links want it and the content exists nowhere else |
 | `HomeCommunitySection` (`#support`) | **Deleted**; its one link repointed | `/get-involved` already holds the same content, better |
 | `HomeGalleryHeader` | **Deleted** | It was `return null` |
 
@@ -33,29 +33,56 @@ id exists anywhere else in `src`**. The candidates were checked:
   only on `/pets`.
 
 `HomeProcessSection` holds the three-step journey in both languages, is styled as a home section
-(`border-t`, `max-w-7xl`), and its id is the one all three links already name. Restoring it costs
-an import and a line, and changes no link. It goes back in its original slot — between the `#adopt`
+(`border-t`, `max-w-7xl`), and its id is the one the navbar's "Adoption Process & Criteria" and the
+footer's "Adoption Process & Fees" already name. Restoring it costs an import and a line. It goes back in its original slot — between the `#adopt`
 gallery and `HomeStandardsSection` — which is where `1137d3e` removed it from.
 
 **Remounting it also had to repair it.** Its step copy was inline ternaries duplicating
 `home.step1Title`…`step3Desc`, which no longer had any reader — and in three weeks unmounted the
 two copies drifted: the dictionary says "Semak & Hantar Permohonan" where the component said "Pilih
 Haiwan & Hantar Permohonan", and "no hidden fees" where the component said "zero adoption fees".
-Mounting a section is publishing its copy, so the divergence had to be settled first, and the
-dictionary won because it is the copy a translator can reach. The heading, eyebrow and subtitle stay
-inline like every other section in this file: `home.howItWorksTitle`/`Subtitle` are *different
-sentences*, not second copies of them, so adopting those keys would have been a copy change rather
-than a deduplication. They remain unused.
+Mounting a section is publishing its copy, so the divergence had to be settled first. The copy
+moved into the dictionary, because that is the copy a translator can reach — and the heading,
+eyebrow and subtitle followed on 2026-10-14, so no half of the component is unreachable.
 
-One more thing the remount exposed: `Navbar.tsx:55` advertised the destination as a "Panduan
-4-langkah" in Malay, and the section renders three steps, `01`–`03`. The link went nowhere before,
-so nothing could contradict it.
+**But "the dictionary wins" picked the right home and, once, the wrong words.** Step 3's dictionary
+text said "no hidden fees" — which implies visible ones — on a page whose standards section,
+directly below, says "100% Free Adoption Policy". The inline English it replaced, "zero adoption
+fees", was the correct one, and for three days the test pinned the wrong wording by asserting the
+right one was absent. Step 3 now says "zero adoption fees" / "tanpa sebarang yuran adopsi" in both
+languages, and the test asserts the policy rather than the source. Choosing where a string lives is
+not choosing what it says; each copy has to be read against what the organisation actually states.
+
+Two more things the remount exposed, both invisible while the anchor went nowhere:
+
+- `Navbar.tsx:55` advertised the destination as a "Panduan 4-langkah" in Malay, and the section
+  renders three steps, `01`–`03`.
+- **The TNRM pillar's "Learn More" pointed here too**, and it is not about adoption at all — TNRM is
+  trap-neuter-return-manage. The first version of this entry counted it among "three links" that
+  want the section without reading it, while rejecting `/adopt` on the grounds that a misleading
+  destination is no better than a broken one. The same standard applies. It now points at `/faq`,
+  which describes itself as "Answers on TNRM and community animals"; the FAQ's category is internal
+  state with no URL parameter, so the page is as deep as a link can go.
 
 That commit is titled "chore(ui): update home page" and left four links behind pointing into what it
 removed. Leaving the links is the evidence that the removal was not a considered decision *about
 those links*; it is not evidence that the section was wanted back. Anyone who does want the home
-page shorter should delete the section and the three links together, which is now one guard failure
+page shorter should delete the section and its two links together, which is now one guard failure
 away from being obvious.
+
+## A limit on hard-loading the anchor
+
+A hard load of `/#how-it-works` — a shared link, a new tab, a refresh — lands on the static HTML,
+where the featured-pets gallery above the section is still its loading fallback: `PetGallery`'s
+controller reads `useSearchParams()`, which keeps that subtree out of the prerender. Hydration then
+replaces the short fallback with the much taller grid, and the bulletin feed and post-hydration
+Malay copy change height too. Browsers with CSS scroll anchoring compensate; one that does not
+leaves the reader inside the gallery, undoing `scroll-mt-24`. Client-side navigation through
+`<Link>` is unaffected.
+
+This is not new — `#mission` sits below the same gallery and has the same exposure — so it is
+recorded here rather than fixed. Closing it means reserving the gallery's height in its fallback,
+which is a layout decision, not an anchor one.
 
 ## What `#support` gains by moving
 
@@ -99,7 +126,7 @@ than it reads:
 - It scanned raw file text, so commenting a mount out still counted it as rendered — the exact
   defect the guard exists to catch, passing silently. Block comments are now stripped first.
   Verified by probe: commenting out `<HomeProcessSection />` makes `#how-it-works` unresolved and
-  names the three links that break. Three commented-out JSX blocks already exist in this tree, so
+  names the links that break — three at the time, two since the TNRM pillar moved to `/faq`. Three commented-out JSX blocks already exist in this tree, so
   the stripping is load-bearing rather than theoretical. Line comments are deliberately left alone —
   a double slash occurs inside every `https://` URL in a JSX attribute.
 

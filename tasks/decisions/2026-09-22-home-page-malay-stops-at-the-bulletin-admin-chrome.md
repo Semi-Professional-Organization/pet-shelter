@@ -20,12 +20,13 @@ page rendered itself moved across the client boundary instead:
 | `page.tsx` Suspense fallback, "Loading rescue animals…" | `HomeGalleryLoading` in `HomeSections.tsx` |
 | `page.tsx` "View All Animals" link | `HomeViewAllPetsLink` in `HomeSections.tsx` |
 
-`Hero`'s `<h1>` and its image `alt` were already inside a client component and take inline `isMs`
-ternaries, matching the five other ternaries in that file. They do **not** take dictionary keys:
-the entire `hero.*` namespace is unused — `Hero` never calls `t()` — so adding keys there would
-have grown a dead namespace rather than used a live one. `hero.title` in particular holds
-different copy ("Adopt a dog or cat from your local shelter.") and is asserted on by
-`tests/unit/i18n.test.ts`, so repurposing it would have broken a test to reuse a name.
+`Hero`'s `<h1>` and its image `alt` read `hero.tnrmHeadline` and `hero.imageAlt`. They first
+shipped as inline `isMs` ternaries, on the grounds that the whole `hero.*` namespace was unused and
+adding to it would grow a dead namespace — and a review pointed out that this left the page's most
+prominent string unreachable by a translator, the exact split-source defect the same branch was
+fixing in `HomeProcessSection`. **Superseded 2026-10-14**: both are dictionary keys now. `hero.title`
+was still not repurposed — it holds different copy ("Adopt a dog or cat from your local shelter.")
+and `tests/unit/i18n.test.ts` asserts on it.
 
 ## Which wording was kept, and why
 
@@ -68,7 +69,12 @@ has no reader at all, so it is an orphan-key problem rather than a copy problem,
 `tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`.
 
 **These are visible English copy changes**, and they remain the easiest thing here to reverse: the
-five values above live in `src/lib/i18n/translations.ts`, and the Malay follows each one.
+five values above live in `src/lib/i18n/translations.ts`, and the Malay follows each one. The same
+pass also reached the browser-tab title of `/bulletins` ("Bulletins & Updates" → "Shelter
+Bulletins") and the admin sidebar's link to it ("Community Bulletins" → "Shelter Bulletins"), both
+of which the first version of this table missed — the tab title being the most widely seen name of
+all. The empty-feed message `bulletins.noUpdates`, added for this page, sat beside an unread
+`bulletins.noBulletins` that said nearly the same; the unread one was deleted.
 
 One string deliberately did **not** reuse its nearest key. The entry suggested `common.loading`
 ("Loading…" / "Memuatkan…") for the gallery's "Loading rescue animals…". Using it would have
@@ -78,20 +84,25 @@ languages instead, and `common.loading` remains unused.
 
 ## The heading prop takes a key, not a string
 
-`BulletinFeed`'s `title?: string` became `titleKey?: BulletinKey`, a template type over
-`keyof TranslationDictionary["bulletins"]`. Every caller is a Server Component that cannot resolve
-its own heading without giving up ISR, so each hands over a key and the feed — already a client
-component — resolves it. `/bulletins` passes `bulletins.allNoticesTitle`, `/pets` passes
-`bulletins.petsFeedTitle`, `/` passes nothing and gets `home.bulletinsTitle`.
+`BulletinFeed`'s `title?: string` became a **required** `titleKey: TranslationKey`. Every caller is
+a Server Component that cannot resolve its own heading without giving up ISR, so each hands over a
+key and the feed — already a client component — resolves it. `/bulletins` passes
+`bulletins.allNoticesTitle`, `/pets` passes `bulletins.petsFeedTitle`, and `/` passes
+`home.bulletinsTitle`. It was optional at first, defaulting to `home.bulletinsTitle`, which meant a
+shared feature component quietly owned a home-page string and a new caller that forgot the prop
+would be headed "Latest Bulletins" anywhere; required since 2026-10-14.
 
 This was not in the entry's inventory. It became necessary *because of* the rest of this change:
 once the chips, byline and empty state around those two feeds rendered Malay, an English string
 literal above them left `/bulletins` and `/pets` in a worse mixed-language state than before. A
 change that improves one page by degrading two is not an improvement.
 
-The same typing rule applies to the category chips. `labelKey` is a `bulletins.*` template type
-rather than `string`, so renaming a key is a compile error instead of a chip silently falling back
-to English on the Malay site. **No `t()` call in `BulletinFeed` passes an English fallback**:
+The same typing rule applies to the category chips. `labelKey` is a `TranslationKey` rather than
+`string`, and the component reads it through `useTypedTranslation()`, so renaming a key is a
+compile error instead of a chip silently falling back to English on the Malay site. (It began as a
+per-namespace `BulletinKey` alias; the aliases were dropped for one dictionary-derived type —
+`tasks/open/translation-keys-the-dictionary-does-not-have.md` explains why `t` itself is not yet
+typed.) **No `t()` call in `BulletinFeed` passes an English fallback**:
 `LanguageProvider` already falls through to the `en` dictionary when a key is missing from the
 active one, so a literal argument could only ever be a second copy of the label — unreachable, and
 free to drift from the one a translator edits.
@@ -134,7 +145,7 @@ A comment at the `isAdminMode` block in `BulletinFeed.tsx` points here, so the n
 
 ## Verification
 
-`tests/components/homeMalay.test.tsx`, 18 cases. Every Malay case asserts the **English is absent**
+`tests/components/homeMalay.test.tsx`, 23 cases as of 2026-10-14 (18 when first written). Every Malay case asserts the **English is absent**
 rather than that the Malay is present, which is the gap the entry names: the existing
 `home.test.tsx` asserted presence and passed for sixteen days beside a hardcoded English `<h1>`.
 Two further cases pin the English side, because an inverted `isMs` would satisfy every Malay

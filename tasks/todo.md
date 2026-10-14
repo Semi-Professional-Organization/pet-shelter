@@ -1570,7 +1570,7 @@ is English until hydration. Translating the `<h1>` makes that mismatch sharper, 
 scope and stated in the PR; it needs a decision about whether `/` gives up ISR, which this work
 deliberately did not.
 
-**`/pets` and `/bulletins` still pass English `title` props to `BulletinFeed`.** The prop still
+**Superseded — see "Corrections" below.** **`/pets` and `/bulletins` still pass English `title` props to `BulletinFeed`.** The prop still
 works and a test pins that it does. Those pages are outside `#78`'s inventory and have other
 untranslated chrome of their own.
 
@@ -1656,12 +1656,78 @@ and ~25 dictionary keys still have no reader. Both are in
 rather than another hand-picked sweep. The `<html lang>` gap that had been recorded only in a
 component docblock is now `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`.
 
+## Resumed 2026-10-13 — rounds three and four, and the copy pass
+
+The branch sat for three weeks. On return `master` had gained #93, #100, #102, #94 and #42; each was
+merged in, with `npm run db:generate` after #94 changed the schema. The ledger entry for the test
+flake conflicted twice, because #102 and this branch had independently extended it with the same
+discovery a day apart; resolved to `master`'s version plus only what this branch measured.
+
+**Round three** (asked for as "code review and open PR") found fifteen issues. Four were holes in
+the anchor guard, two of which could have produced a false green: a `//` mid-line cut a live `href`
+out of the scan, and `\bid=` matched the tail of `data-pet-id=`. All fixed in `243412d`, and PR #104
+was opened — **without reviewing `243412d` itself.** That is exactly the case close-out step 6
+names. It was caught only because later work forced another review; written up as a lesson.
+
+**The copy pass** (`f7dd5b2`, asked for directly) gave the bulletin feature one English name after
+finding it answered to seven. No copy convention is written down in `docs/`; the rule used — one
+noun, scope in the qualifier, Title Case — was read off what the markup already did.
+
+**Round four** reviewed everything since round three, and found fourteen more. The ones that changed
+what the PR claimed:
+
+- The copy pass had missed the two most-seen names — the `/bulletins` browser-tab title and the
+  admin sidebar link. Fixed.
+- Adopting the dictionary's step-3 text made the adoption section say **"no hidden fees"** above a
+  section headed "100% Free Adoption Policy". The inline text it replaced was the correct one, and
+  the test had pinned the wrong wording by asserting the right one was absent. Both corrected.
+- With `#how-it-works` restored, the **TNRM** pillar's "Learn More" landed on adoption steps. It
+  now goes to `/faq`, the page that explains TNRM.
+- The guard's comment stripping was rebuilt on TypeScript's parser after a third regex version
+  still had a hole — a `/*` inside `accept="image/*"` swallowed real code. A string-skipping scanner
+  would have been worse: JSX text is full of apostrophes. The parser also showed that inside JSX
+  children `// <X />` is not a comment and renders, which an earlier fixture had asserted the
+  opposite of. Each repair was probed red against the code it replaced.
+- Typing `t()` itself was probed and **not** shipped: 38 errors across nine files, eighteen of which
+  are keys that exist in no dictionary and so render English on the Malay site today — sixteen in
+  the adoption wizard. Filed as `tasks/open/translation-keys-the-dictionary-does-not-have.md`. A
+  `useTypedTranslation()` hook now enforces real keys for the components this branch owns.
+- Sixteen dead `t()` fallbacks in `Footer` were removed; two were kept because their keys exist
+  nowhere and the fallback is the only text there is. A new `Footer` suite pins both, and its first
+  version had a case that could never fail — `container.textContent` glues sibling text together,
+  so a `\b` never matched. Caught by probing it with a dropped live fallback.
+
+## Corrections to this stream's own earlier claims
+
+- "`/pets` and `/bulletins` still pass English `title` props" (under *deliberately not done*) was
+  superseded in `b90304d`: the prop is now a required `titleKey` and both pages pass one.
+- The flake entry was told that "three of the twelve" component failures were hook timeouts. All
+  twelve were timeouts and none an assertion; the three was a count of Vitest's deduplicated error
+  blocks. Corrected in the entry, written up as a lesson.
+- `tasks/open/drift-log-recorded-nothing-for-a-whole-session.md` stated "the hook is firing", from
+  guard-log timing in a log that carries no session id. A controlled count on 2026-10-14 — 140 lines
+  before one call, 140 after — showed the hook wrote nothing at all for this session. Corrected and
+  retitled; also a lesson.
+- One `homeMalay` run on 2026-10-14 reported a single failure whose error was not captured, because
+  its output had been filtered to the summary line. Three runs immediately after were green. It is
+  recorded as unexplained rather than attributed to the flake.
+
 ## Verification
 
-Final: `npm run check` 0 errors, 12 pre-existing warnings (one fewer than at the base);
-`npm run test:all` 119 files / 1850 tests; `npm run test:integration` 70; `npm run build` compiled
-with `/` still `○ (Static) 5m` — ISR intact, which was `#78`'s binding constraint.
+Final, on the tree merged with `master` at `187593c`:
 
-Each new suite was run against the unfixed tree first and observed failing: 1 of 1 for `#77`, both
-cases naming all four broken links for `#80`, 12 of the then-17 for `#78`. Every repair to the
-anchor guard was re-probed by breaking it again afterwards.
+- `npm run check` — 0 errors, 12 pre-existing warnings, one fewer than at the base.
+- `npx vitest run --project unit` — 100 files, **1611 tests**, 0 assertion errors, 0 timeouts.
+- `npx vitest run --project components` — 15 files, **209 tests**, 0 assertion errors, 0 timeouts.
+- `npm run test:integration` — 9 files, **92 tests**.
+- `npm run build` — compiled; `/` and `/bulletins` both still `○ (Static)`.
+
+The full unit and component tiers were green on this run and red (timeouts only) on others; that is
+`tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, and one green run is a data
+point, not a fix. `f7dd5b2`'s commit trailer recorded only a subset of the component suite and no
+unit run for a dictionary change; the parity test was run afterwards and passes, so the gap is in
+the record, not the code.
+
+Each new suite was run against the unfixed code first and observed failing — 1 of 1 for `#77`,
+both cases naming all four broken links for `#80`, 12 of the then-17 for `#78` — and every repair
+to the guard was re-probed by breaking it again afterwards.

@@ -29,13 +29,22 @@ screen.
 **Duplicated across components.** `Navbar.tsx`'s brand tagline renders the hero's `<h1>` English
 verbatim — "Coexistence through TNRM & Education" — while its Malay is a shortened form. Shortening
 the English to match was tried on 2026-09-22 and reverted: it drops "& Education", one of the three
-pillars `HomeOurWorkSection` names, which is a content decision and not a deduplication. Neither
-copy is reachable by a translator.
+pillars `HomeOurWorkSection` names, which is a content decision and not a deduplication. Since
+2026-10-14 the hero's copy is a dictionary key, `hero.tnrmHeadline`; the navbar's tagline is still
+inline, so the two English strings remain identical by coincidence rather than by source.
 
-**Keys with no reader.** After the eight deletions, roughly 14 of 24 `home.*` keys and 11 of 23
-`bulletins.*` keys still have no reader anywhere in `src` — including `home.howItWorksSubtitle`,
-and `bulletins.noBulletins`, which is a near-duplicate of the `bulletins.noUpdates` that does ship.
-Someone editing either has no way to tell which one a visitor sees.
+**Keys with no reader.** Counted on 2026-10-14 by searching `src` for each key as a quoted literal:
+
+- `home.*` — **13 of 25** have no reader: `bulletinsSubtitle`, `availableTitle`,
+  `availableSubtitle`, `protocolsTitle`, `protocolsSubtitle`, and all eight of `protocol1Title`
+  … `protocol4Desc` — which are the diverged duplicates of `HomeStandardsSection` above.
+- `bulletins.*` — **8 of 22**: `badge`, the five `filter*` keys, `urgentBadge` and
+  `contactCoordinator`.
+
+A key built at runtime would not be found by that search, so these are candidates, not proof. An
+earlier count in this entry was an estimate ("roughly 14 of 24 … 11 of 23") and named
+`home.howItWorksSubtitle` and `bulletins.noBulletins`; the first now has a reader and the second
+was deleted as a duplicate of `bulletins.noUpdates`.
 
 ## Why a guard, not another sweep
 
@@ -44,8 +53,10 @@ and left every other orphan in place. That does not prevent the next orphan, and
 be equally arbitrary. `tests/unit/i18n.test.ts` checks only that `en` and `ms` carry the same keys —
 it cannot see that a key has no consumer, and nothing scans JSX for literals that bypass one.
 
-The diff that raised this already builds a compile-time key type (`BulletinKey` in
-`BulletinFeed.tsx`), so the pieces for a structural guard exist.
+The pieces for a structural guard now exist: `TranslationKey` in `src/lib/i18n/translations.ts`
+derives every leaf path from the dictionary, and `useTypedTranslation()` in `LanguageProvider`
+already enforces it at the call sites it covers. The other direction — keys that the code calls
+but the dictionary lacks — is `tasks/open/translation-keys-the-dictionary-does-not-have.md`.
 
 **Settles when:** a test asserts every dictionary leaf has a reader in `src` — with an explicit,
 justified allowlist for any key deliberately kept unused — and the copy that currently bypasses a
