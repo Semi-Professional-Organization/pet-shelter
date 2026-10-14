@@ -69,7 +69,7 @@ export function Navbar() {
   const getInvolvedLinks = [
     {
       href: "/sponsors",
-      label: isMs ? "Dinding Penaja Awam" : "Public Sponsor Wall",
+      label: t("nav.sponsorWall"),
       desc: isMs
         ? "Penyokong Gangsa, Perak & Emas kami"
         : "Our Bronze, Silver & Gold supporters",

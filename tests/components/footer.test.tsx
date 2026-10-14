@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 import { Footer } from "@/components/layout/Footer";
 import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
@@ -12,10 +12,12 @@ import { renderWithLanguage } from "./support/render";
  * their English fallback argument removed. Those fallbacks were dead — each
  * key exists in both dictionaries, so the fallback could never show — and they
  * had drifted from the dictionary while nobody could see them. Two were not
- * dead: `nav.sponsorWall` and `nav.sponsorPortal` exist in neither dictionary,
- * so their fallback IS the shipped text, and removing it would render the
- * literal path. That distinction was established by checking each key, not by
- * reading the call — see
+ * dead: `nav.sponsorWall` and `nav.sponsorPortal` existed in neither
+ * dictionary, so their fallback WAS the shipped text, and removing it would
+ * have rendered the literal path. That distinction was established by checking
+ * each key, not by reading the call. `nav.sponsorWall` has since become a real
+ * key — the navbar already shipped Malay for the same link — leaving
+ * `nav.sponsorPortal` as the one still tracked in
  * `tasks/open/translation-keys-the-dictionary-does-not-have.md`.
  *
  * The registration line is the reason this file exists: its call changed
@@ -38,20 +40,41 @@ describe("Footer", () => {
     expect(screen.queryByText(/\{regNo\}/)).not.toBeInTheDocument();
   });
 
-  it("renders the two links whose keys the dictionary lacks as words, not paths", () => {
-    // These keep their fallback because it is the only text they have. If the
-    // fallback were dropped, `t()` would return the path itself.
+  it("renders the link whose key the dictionary lacks as words, not a path", () => {
+    // `nav.sponsorPortal` keeps its fallback because it is the only text it
+    // has. If the fallback were dropped, `t()` would return the path itself.
     renderWithLanguage(<Footer />);
 
-    expect(screen.getByRole("link", { name: "Public Sponsor Wall" })).toHaveAttribute(
-      "href",
-      "/sponsors",
-    );
     expect(screen.getByRole("link", { name: "Sponsor Portal" })).toHaveAttribute(
       "href",
       "/sponsor/dashboard",
     );
     expect(screen.queryByText(/^nav\./)).not.toBeInTheDocument();
+  });
+
+  it("translates the sponsor wall link the way the navbar already did", () => {
+    // `nav.sponsorWall` was missing from both dictionaries while the navbar
+    // carried "Dinding Penaja Awam" inline for the same `/sponsors` link. One
+    // key, read by both, so the Malay site no longer shows the same link in two
+    // languages on one page.
+    renderWithLanguage(<Footer />, { language: "ms" });
+    expect(screen.getByRole("link", { name: "Dinding Penaja Awam" })).toHaveAttribute(
+      "href",
+      "/sponsors",
+    );
+    expect(screen.queryByText("Public Sponsor Wall")).not.toBeInTheDocument();
+  });
+
+  it("fills in the registration number when rendered with no provider at all", () => {
+    // `useLanguage` has a fallback for components rendered outside a
+    // `LanguageProvider`, and it was a separate, diverged copy of `t`: it never
+    // interpolated, so this line printed "ROS Reg: {regNo}" in place of the
+    // shelter's registration number. Both paths now share one `translate()`.
+    // Rendered with plain `render`, deliberately — every other case here goes
+    // through the provider, which is why the defect was invisible.
+    render(<Footer />);
+    expect(screen.getByText(`ROS Reg: ${PUBLIC_ROS_REGISTRATION_NO}`)).toBeInTheDocument();
+    expect(screen.queryByText(/\{regNo\}/)).not.toBeInTheDocument();
   });
 
   it("names the bulletin feature the way the rest of the site does", () => {

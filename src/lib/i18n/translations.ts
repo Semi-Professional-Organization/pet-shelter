@@ -23,6 +23,7 @@ export interface TranslationDictionary {
     visitingHours: string;
     browsePets: string;
     transparency: string;
+    sponsorWall: string;
   };
   common: {
     freeAdoption: string;
@@ -396,6 +397,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       visitingHours: "Tue–Sun: 10:00 AM – 5:00 PM",
       browsePets: "Browse Pets",
       transparency: "Where Your Money Goes",
+      sponsorWall: "Public Sponsor Wall",
     },
     common: {
       freeAdoption: "100% Free Adoption",
@@ -772,6 +774,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       visitingHours: "Sel–Ahad: 10:00 PG – 5:00 PTG",
       browsePets: "Lihat Haiwan",
       transparency: "Ke Mana Wang Anda Pergi",
+      sponsorWall: "Dinding Penaja Awam",
     },
     common: {
       freeAdoption: "Adopsi 100% Percuma",

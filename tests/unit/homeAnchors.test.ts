@@ -104,6 +104,30 @@ const RENDERED_COMPONENT = /<([A-Z]\w*)/g;
  * splits on newlines afterwards; deleting them shifted every reported line
  * number by the comment lines above it.
  */
+/**
+ * Ranges that start inside an earlier range that SURVIVED — which no real
+ * comment can do. A single sweep in start order, tracking the furthest end
+ * kept so far, so it is linear rather than the pairwise scan it replaced.
+ *
+ * "Survived" is the point. The first version tested each range against every
+ * other, including ones it had already dropped, so a fake range found inside a
+ * JSDoc block — dropped, correctly — then took down the real `{/* … *\/}`
+ * that happened to start inside it, leaving a commented-out mount counted as
+ * rendered. A dropped range must not drop anything else.
+ */
+function nestedRanges(ranges: [number, number][]): [number, number][] {
+  const dropped: [number, number][] = [];
+  let keptEnd = -1;
+  for (const [pos, end] of [...ranges].sort(([a], [b]) => a - b)) {
+    if (pos < keptEnd) {
+      dropped.push([pos, end]);
+      continue;
+    }
+    keptEnd = Math.max(keptEnd, end);
+  }
+  return dropped;
+}
+
 function parseSource(fileName: string, text: string): ts.SourceFile {
   return ts.createSourceFile(
     fileName,
@@ -153,10 +177,7 @@ function stripComments(
   // Backstop for the same class of error: a real comment cannot start inside
   // another real comment, so any range that does was found by scanning from a
   // position that was already trivia. Drop it rather than let it overrun.
-  const sorted = [...ranges].sort(([a], [b]) => a - b);
-  for (const [pos] of sorted) {
-    if (sorted.some(([p, e]) => p < pos && pos < e)) ranges.delete(pos);
-  }
+  for (const [pos] of nestedRanges([...ranges])) ranges.delete(pos);
 
   // Code units, not code points: TypeScript reports UTF-16 offsets, and
   // `Navbar.tsx` — on every route's layout tree — contains an emoji outside
@@ -213,13 +234,12 @@ interface ImportTarget {
  * which pressures the next person to loosen the guard instead of the parser.
  * Recording the *exported* name is what lets an alias resolve.
  */
-const importCache = new Map<string, Map<string, ImportTarget>>();
 function importMap(fromFile: string): Map<string, ImportTarget> {
-  const cached = importCache.get(fromFile);
-  if (cached) return cached;
+  const entry = parsed(fromFile);
+  if (entry.imports) return entry.imports;
 
   const map = new Map<string, ImportTarget>();
-  const { source } = parsed(fromFile);
+  const { source } = entry;
 
   for (const statement of source.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
@@ -246,7 +266,7 @@ function importMap(fromFile: string): Map<string, ImportTarget> {
     }
   }
 
-  importCache.set(fromFile, map);
+  entry.imports = map;
   return map;
 }
 
@@ -363,8 +383,14 @@ function entriesForRoute(route: string): string[] {
  * comments and again, from the stripped text, to read its imports. Comments do
  * not change a file's statements, so one tree serves both.
  */
-const parsedCache = new Map<string, { text: string; source: ts.SourceFile }>();
-function parsed(file: string, raw?: string): { text: string; source: ts.SourceFile } {
+interface ParsedFile {
+  text: string;
+  source: ts.SourceFile;
+  blocks?: Map<string, string>;
+  imports?: Map<string, ImportTarget>;
+}
+const parsedCache = new Map<string, ParsedFile>();
+function parsed(file: string, raw?: string): ParsedFile {
   let entry = parsedCache.get(file);
   if (!entry) {
     const original = raw ?? readFileSync(file, "utf8");
@@ -390,7 +416,8 @@ function idsRenderedBy(
   function visit(file: string, source: string) {
     const text = readStripped(file);
     const imports = importMap(file);
-    const blocks = componentBlocks(text);
+    const entry = parsed(file);
+    const blocks = (entry.blocks ??= componentBlocks(text));
     // An entry file is one component, so its whole text is its body.
     // Elsewhere, only the named component's block counts.
     const body = roots.includes(file) ? text : (blocks.get(source) ?? "");
@@ -665,6 +692,46 @@ describe("in-app anchor links", () => {
       expect(stripComments(line), tag).toContain('href="/#ghost2"');
       expect(stripComments(line), tag).not.toContain("note");
     }
+  });
+
+  it("still blanks a real comment that follows a one-line JSDoc", () => {
+    // The case review found after the backstop was added: a fake range from
+    // inside the doc must be dropped WITHOUT taking the real `{/* <Dead /> */}`
+    // down with it. Two independent layers prevent this — the JSDoc skip in
+    // `stripComments`, and `nestedRanges` checking only surviving ranges — and
+    // after the fix either alone is sufficient, so this outcome cannot fail
+    // unless both are broken. The next case pins the sweep on its own.
+    const line =
+      "/** @param x // note */ export function F() { return <main>{/* <Dead /> */}<Live /></main>; }";
+    const stripped = stripComments(line);
+    expect(stripped).not.toContain("<Dead");
+    expect(stripped).toContain("<Live");
+    expect(stripped).toContain("export function F");
+  });
+
+  it("drops a range only when it starts inside a range that survived", () => {
+    // Ranges in start order: a real JSDoc [0, 25), a fake line comment found
+    // inside it running to end of line [13, 90), and a real block comment
+    // [60, 74) that starts inside the FAKE range but after the real doc ends.
+    // The fake is dropped. The real block comment must not be: the range it
+    // starts inside was itself dropped. The pairwise version this replaced
+    // dropped both.
+    expect(
+      nestedRanges([
+        [0, 25],
+        [13, 90],
+        [60, 74],
+      ]),
+    ).toEqual([[13, 90]]);
+
+    // Order of input does not matter; the sweep sorts by start.
+    expect(
+      nestedRanges([
+        [60, 74],
+        [13, 90],
+        [0, 25],
+      ]),
+    ).toEqual([[13, 90]]);
   });
 
   it("resolves a literal link into a dynamic route", () => {

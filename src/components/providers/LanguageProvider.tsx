@@ -201,6 +201,13 @@ export function useTypedTranslation(): {
   // Returns `isMs` too, so a component reads the context once rather than
   // calling `useLanguage()` again beside this. Params pass through, so a key
   // with `{placeholders}` — `footer.rosReg` — can use the typed form.
+  //
+  // ceiling: `params` is optional for every key, so `t("footer.rosReg")` with
+  // no params type-checks and renders "ROS Reg: {regNo}". Requiring params for
+  // exactly the keys that contain a placeholder needs the dictionary's values
+  // visible to the type system, and `TranslationDictionary` types them as
+  // `string`. Upgrade path: declare the dictionaries `as const satisfies
+  // TranslationDictionary` and derive a placeholder map from the values.
   const { t, isMs } = useLanguage();
   const typed = useCallback(
     (key: TranslationKey, params?: Record<string, string | number>) =>

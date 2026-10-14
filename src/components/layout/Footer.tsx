@@ -9,10 +9,11 @@ import { useLanguage, useTypedTranslation } from "@/components/providers/Languag
 
 export function Footer() {
   const { t, isMs } = useTypedTranslation();
-  // Untyped, for the two links whose keys exist in no dictionary. Their
-  // English fallback is the only text they have, so they cannot use the typed
-  // `t` until the keys are added — tasks/open/translation-keys-the-dictionary-does-not-have.md.
-  // Every other key in this file is now checked at compile time.
+  // Untyped, for the one link whose key exists in no dictionary. Its English
+  // fallback is the only text it has, so it cannot use the typed `t` until the
+  // key is added — tasks/open/translation-keys-the-dictionary-does-not-have.md.
+  // (`nav.sponsorWall` was the other; the navbar already shipped Malay for
+  // the same link, so the key now exists and both read it.)
   const { t: untypedT } = useLanguage();
 
   return (
@@ -77,7 +78,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/sponsors" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {untypedT("nav.sponsorWall", "Public Sponsor Wall")}
+                  {t("nav.sponsorWall")}
                 </Link>
               </li>
               <li>
