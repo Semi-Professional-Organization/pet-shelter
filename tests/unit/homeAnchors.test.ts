@@ -82,29 +82,6 @@ const ID_ATTRIBUTE = /[\s{]id=["']([A-Za-z0-9_-]+)["']/g;
 const RENDERED_COMPONENT = /<([A-Z]\w*)/g;
 
 /**
- * Blanks out comments, keeping the file's line count and every line's length.
- *
- * Without this, commenting a mount out still counts it as rendered: the exact
- * defect this file guards, passing silently. Three commented-out JSX blocks
- * exist in this tree today, in `HomeSections.tsx` and `Hero.tsx`, so it is
- * load-bearing rather than theoretical.
- *
- * **Found by TypeScript's parser, not by pattern.** Three regex versions came
- * before this one, and each review found the next hole: a `//` mid-line cut a
- * live `href` out of `<a title="Tue // Sun">`; a `/*` inside a string such as
- * `accept="image/*"` opened a comment that swallowed real code up to the next
- * `*\/`; and the obvious repair — a scanner that skips strings — breaks on JSX
- * text, where every apostrophe in "shelter's" or "Don't" would open a string
- * that never closes. Only a parser knows which characters are trivia. It also
- * gets JSX right: inside children, `// <X />` is not a comment at all — it
- * renders the text "// " followed by the element — and only `{/* … *\/}` or a
- * `//` inside braces actually removes a mount.
- *
- * Comment bodies become blanks rather than vanishing, because `anchorLinks`
- * splits on newlines afterwards; deleting them shifted every reported line
- * number by the comment lines above it.
- */
-/**
  * Ranges that start inside an earlier range that SURVIVED — which no real
  * comment can do. A single sweep in start order, tracking the furthest end
  * kept so far, so it is linear rather than the pairwise scan it replaced.
@@ -138,6 +115,29 @@ function parseSource(fileName: string, text: string): ts.SourceFile {
   );
 }
 
+/**
+ * Blanks out comments, keeping the file's line count and every line's length.
+ *
+ * Without this, commenting a mount out still counts it as rendered: the exact
+ * defect this file guards, passing silently. Three commented-out JSX blocks
+ * exist in this tree today, in `HomeSections.tsx` and `Hero.tsx`, so it is
+ * load-bearing rather than theoretical.
+ *
+ * **Found by TypeScript's parser, not by pattern.** Three regex versions came
+ * before this one, and each review found the next hole: a `//` mid-line cut a
+ * live `href` out of `<a title="Tue // Sun">`; a `/*` inside a string such as
+ * `accept="image/*"` opened a comment that swallowed real code up to the next
+ * `*\/`; and the obvious repair — a scanner that skips strings — breaks on JSX
+ * text, where every apostrophe in "shelter's" or "Don't" would open a string
+ * that never closes. Only a parser knows which characters are trivia. It also
+ * gets JSX right: inside children, `// <X />` is not a comment at all — it
+ * renders the text "// " followed by the element — and only `{/* … *\/}` or a
+ * `//` inside braces actually removes a mount.
+ *
+ * Comment bodies become blanks rather than vanishing, because `anchorLinks`
+ * splits on newlines afterwards; deleting them shifted every reported line
+ * number by the comment lines above it.
+ */
 function stripComments(
   text: string,
   fileName = "fragment.tsx",
@@ -150,12 +150,13 @@ function stripComments(
     for (const range of found ?? []) ranges.set(range.pos, range.end);
   };
   const visit = (node: ts.Node) => {
-    // A JSDoc block is already collected whole, as leading trivia of the
-    // declaration it documents. Descending into its tag nodes asks the
-    // context-free scanner about positions *inside* the doc, where it reads
-    // `@param x // note` as a line comment running to end of line — past the
-    // closing `*/`, blanking the code after a one-line doc.
-    if (node.kind >= ts.SyntaxKind.FirstJSDocNode && node.kind <= ts.SyntaxKind.LastJSDocNode) return;
+    // Descending into JSDoc tag nodes asks the context-free scanner about
+    // positions *inside* a doc block, where `@param x // note` reads as a line
+    // comment running past the closing `*/`. Those fake ranges always start
+    // inside the real doc range, so `nestedRanges` below drops them. A
+    // separate skip for JSDoc nodes once did the same job; it was removed
+    // because no test could fail without it — redundant code with nothing
+    // pinning it is how this file kept collecting review findings.
     if (ts.isJsxText(node)) jsxText.push([node.pos, node.end]);
     collect(ts.getLeadingCommentRanges(text, node.getFullStart()));
     collect(ts.getTrailingCommentRanges(text, node.getEnd()));
@@ -170,6 +171,10 @@ function stripComments(
   // element — but in JSX children that is text, and the element renders. So a
   // "comment" that starts inside a JsxText node is discarded. Only the parsed
   // tree knows where JSX text is; that is the point of using it.
+  // ceiling: comment ranges × JsxText nodes, pairwise. The largest file a
+  // route reaches has a few hundred of each, so this is milliseconds; if it
+  // ever is not, sort both by start and sweep them together as `nestedRanges`
+  // does.
   for (const [pos] of [...ranges]) {
     if (jsxText.some(([start, end]) => pos >= start && pos < end)) ranges.delete(pos);
   }
@@ -400,9 +405,6 @@ function parsed(file: string, raw?: string): ParsedFile {
   }
   return entry;
 }
-function readStripped(file: string): string {
-  return parsed(file).text;
-}
 
 /** Ids rendered by a route, walking down from each of its entry files. */
 function idsRenderedBy(
@@ -414,9 +416,11 @@ function idsRenderedBy(
   const seen = new Set<string>();
 
   function visit(file: string, source: string) {
-    const text = readStripped(file);
-    const imports = importMap(file);
+    // One cache entry carries the text, the import map and the component
+    // blocks for this file.
     const entry = parsed(file);
+    const text = entry.text;
+    const imports = importMap(file);
     const blocks = (entry.blocks ??= componentBlocks(text));
     // An entry file is one component, so its whole text is its body.
     // Elsewhere, only the named component's block counts.

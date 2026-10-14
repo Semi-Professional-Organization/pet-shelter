@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { Footer } from "@/components/layout/Footer";
+import { Navbar } from "@/components/layout/Navbar";
 import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
-import { renderWithLanguage } from "./support/render";
+import { renderWithLanguage, setupUser } from "./support/render";
 
 /**
  * Tier 4: what the site-wide footer renders.
@@ -107,5 +108,27 @@ describe("Footer", () => {
     // on screen.
     renderWithLanguage(<Footer />, { language });
     expect(screen.queryAllByText(/^(footer|nav|common)\.[A-Za-z]+$/)).toHaveLength(0);
+  });
+});
+
+describe("the shared sponsor-wall key", () => {
+  // `nav.sponsorWall` replaced two copies of one label: the navbar's inline
+  // "Dinding Penaja Awam" / "Public Sponsor Wall", and the footer's English-only
+  // fallback. The footer half is pinned above. This is the navbar half — without
+  // it, restoring the navbar's inline copy, or giving it different Malay, would
+  // pass every test while the two drifted apart again.
+  it("is what the navbar's Get Involved menu shows on the Malay site", async () => {
+    const user = setupUser();
+    renderWithLanguage(<Navbar />, { language: "ms" });
+
+    // Hover, not click: the desktop menu opens on `mouseenter` and its button
+    // TOGGLES on click, so a simulated click enters (opening it) and then
+    // clicks (closing it again). Hovering is also what a desktop visitor does.
+    await user.hover(screen.getAllByRole("button", { name: /Sertai Kami/ })[0]);
+
+    const links = screen.getAllByRole("link", { name: /Dinding Penaja Awam/ });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute("href", "/sponsors");
+    expect(screen.queryByText("Public Sponsor Wall")).not.toBeInTheDocument();
   });
 });
