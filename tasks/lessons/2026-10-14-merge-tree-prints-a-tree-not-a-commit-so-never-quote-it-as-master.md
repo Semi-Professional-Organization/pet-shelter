@@ -20,8 +20,23 @@ on, an earlier fetch, a tool's output I had not identified. Three of those were 
 ledger entries describing two SQL files as transcriptions when one does no arithmetic at all;
 another described a validation rule that existed only in a reverted commit.
 
+**A second, quieter version: a real commit that is not on `master`.** The review of the branch that
+fixed the above caught the same session citing `925b7c6` as where a fix "landed". `925b7c6` is a
+genuine commit — but on `feat/pet-form-birth-date`, which `master` received as a single squash,
+`187593c`. `git merge-base --is-ancestor 925b7c6 origin/master` exits 1. So `git log master` never
+shows it, and once the feature branch is deleted after merge the hash resolves to nothing at all.
+`git cat-file -t` says `commit` and is no help here; ancestry is the question.
+
+The same review caught a third shape in the same text: stating as fact that an open PR "deletes"
+a file. The PR had not merged, and on `master` the file was still there and still cited. A claim
+about another branch's future is a claim about state, and it goes stale the moment that branch is
+revised.
+
 **Rule:** a ref you quote as `master` comes from `git rev-parse origin/master` after a fetch, and
 nowhere else. Before writing any hash into a commit message, ledger entry or message to another
-session, run `git cat-file -t <hash>` and check it says `commit`. More generally, check a claim
+session, run `git cat-file -t <hash>` and check it says `commit` — and if the text says the hash is
+where something *landed*, also `git merge-base --is-ancestor <hash> origin/master`, which a squash
+merge fails. Cite the squash, and keep branch hashes for when the branch history is the point.
+Claim another PR will do something only as a conditional, with its state as of writing. More generally, check a claim
 about `master` against `git show origin/master:<path>` at the moment of writing — not against the
 working tree, which is your branch and not theirs.

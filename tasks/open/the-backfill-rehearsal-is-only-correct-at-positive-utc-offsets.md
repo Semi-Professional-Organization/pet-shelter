@@ -20,13 +20,18 @@ mismatches against a migration that is actually correct. The natural reading is 
 broken", and the natural response is to change the SQL, which would then be wrong for everyone
 east of UTC.
 
-## Landing PR #42 does not close this, and makes the copy drift twice
+## PR #42 did not close this, and made the copy drift twice
 
-PR #42 makes the real `approximateBirthDate` timezone-invariant — it parses `YYYY-MM-DD` into
-calendar parts and builds dates with `Date.UTC`, where `master` at `6d32df9` still uses
-`d.setFullYear(...)` / `d.setMonth(...)` at lines 161 and 169. All four rollover values the
-rehearsal pins are preserved by that change, forward roll included, and the five tests in
-`tests/unit/petAge.test.ts` pin them from the TypeScript side.
+PR #42, merged as `187593c`, made the real `approximateBirthDate` timezone-invariant for
+`YYYY-MM-DD` intakes: it parses them into calendar parts and builds dates with `Date.UTC`. Before
+it, at `18c533e`, the function used `d.setFullYear(...)` / `d.setMonth(...)` at lines 161 and 169.
+All four rollover values the rehearsal pins are preserved by that change, forward roll included,
+and `tests/unit/petAge.test.ts` pins them from the TypeScript side.
+
+(An earlier version of this paragraph cited `6d32df9` as the `master` commit. It is a *tree*
+object — the output of `git merge-tree --write-tree`, misnamed as "master" in a message between
+sessions and copied here. `git cat-file -t 6d32df9` prints `tree`. See
+`tasks/lessons/2026-10-14-merge-tree-prints-a-tree-not-a-commit-so-never-quote-it-as-master.md`.)
 
 It is tempting to conclude the timezone problem is therefore solved. It is not, because the
 rehearsal does not call the function — `appRule` in `rehearse.mjs` (around line 663) is a

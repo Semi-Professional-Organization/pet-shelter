@@ -30,19 +30,34 @@ Record active multi-step work streams below.
       `1 tahun 6 months` than the app computed, despite this branch's claim that it "fails
       closed"). That session took F10, F12 and F13 onto #113; this branch took the rest that do
       not touch `petAge.ts` or the SQL.
-- [x] **F15 — corrected a false public ledger entry.**
-      `pet-form-date-rules-tightened-without-a-data-check.md` described a strict `intakeDate` check
-      that existed only in a reverted commit, asked for a production count against a rule `master`
-      never had, and reopened a settled decision. Rewritten to keep only what is true: the
-      birthday-after-intake rule strands animals born at the shelter.
+- [x] **F15 — corrected a false public ledger entry**, in two passes. The entry described a strict
+      `intakeDate` check that existed only in a reverted commit, asked for a production count
+      against a rule `master` never had, and reopened a settled decision. The first rewrite
+      overcorrected — it said a stranded record's *status* could not be changed (it can:
+      `updatePetStatus` bypasses `petFormSchema`) and that no existing row was at risk (the
+      `2024-01-01` column default can produce one). Second pass fixed both, and renamed the file to
+      `birthday-after-intake-rule-refuses-animals-born-at-the-shelter.md`, because the old name
+      described the withdrawn claim and is the public issue's title.
 - [x] **F11 — pinned seven accepted spellings nothing tested.** `tahun`, `thn`, `bln`, bare `m`,
-      `yr`, `week`, `mnths`. Proved each assertion kills its own mutant: dropped one spelling at a
-      time from the real patterns, ran the suite, restored the original bytes from memory. Seven
-      mutants, seven kills, the other 27 tests untouched every time.
+      `yr`, `week`, `mnths`. One `it.each` case per spelling, so a dropped one is reported by name.
+      Proved each case kills its own mutant: dropped one spelling at a time from the real patterns,
+      ran the suite, restored the original bytes from memory. Seven mutants, each killed by exactly
+      its own case and no other — `1 failed | 33 passed` every time.
 - [x] **F14 — corrected the previous stream's record of what was not done.** Two bullets said the
-      `minggu` regex was left alone; it was fixed in `925b7c6`. Struck through rather than deleted.
-- [x] Filed `drift-log-records-nothing-for-some-sessions.md`: the drift hook logged 161 lines for
-      the #113 session and none at all for this one, across hundreds of writes.
+      `minggu` regex was left alone; it was fixed in #42 (`187593c`). Struck through rather than
+      deleted, and branch-commit hashes replaced with the squash on `master` where the point is
+      where something landed.
+- [x] Filed `drift-log-has-recorded-nothing-since-2026-10-13.md`. First version compared this session's
+      zero lines against 161 for another and blamed how the worktree was entered. Wrong: the whole
+      log is 161 lines from **one** session across 90 minutes on 2026-10-13, and nothing from anyone
+      since. Rewritten as what it is — the log went silent for every session.
+
+- [x] **Reviewed this branch before opening it**, `/code-review high`, and it found ten more — six of
+      them prose stating a state that was not true, in a branch whose whole purpose was correcting
+      that. The tree hash was still in a public entry; two corrections cited squashed-branch commits
+      that are not ancestors of `master`; the stream said an open PR "deletes" a file; the drift
+      entry's comparison was meaningless; the rewritten date-rules entry named the wrong failure
+      and dropped a real risk. Each probed, all ten fixed or recorded.
 
 ## Review
 
@@ -54,6 +69,16 @@ night it happened and kept producing it, because naming it did not change what I
 writing. What would have: grepping each claim against `origin/master` at the moment of writing,
 not against the branch I was standing on.
 
+Then the review of *this* branch found six more of the same, written after I had already put the
+lesson into words — including the tree hash surviving in a public entry this branch was created
+to fix. Writing the rule down did not stop me breaking it. What did, in the second round, was
+mechanical: for the new parser entry, every claim was run against the real function on `master`
+through a throwaway test before it was written, and the two that resisted a runtime probe went to
+`tsc` instead. Whether that held is not yet known — the entry was written after the second review
+ran, so no review has seen it. Check first, then write; reading it back later is too late, and
+while drafting this very paragraph I first wrote that the second review had cleared that entry,
+which it could not have.
+
 The one that cost most was `6d32df9`. `git merge-tree --write-tree` prints a *tree* OID. I told
 another session "merges clean against master at `6d32df9`", it repeated the hash in good faith, and
 it ended up in a public issue as the commit where `master` still used local setters. `git cat-file
@@ -61,19 +86,25 @@ it ended up in a public issue as the commit where `master` still used local sett
 
 ## Explicitly NOT done
 
-- **F4, F8, F9** — Malay decimals reading as years, an unbounded weeks count throwing
-  `RangeError`, and `withDerivedAge`'s return type. All in `approximateBirthDate`. Deferred until
-  PR #113 merges, at that session's request, because #113 also edits `petAge.ts`.
-- **F5 and F6** — compact compounds like `2y3m` reading the trailing unit, and unlisted spellings
-  falling through. **Not fixable on the app side alone.** For `2y3m` the SQL's `\M` also fails,
-  because Postgres counts the digit as a word character, so app and backfill currently agree — both
-  wrong the same way. Fixing the app alone would open a new silent divergence. They wait for a
-  change that touches the SQL too.
-- **F2 remainder** — the expand harness's stale `appRule`. Needs `embedded-postgres` to run, and
-  deleting the copy changes O1/O2 wholesale. Tracked in the rehearsal entry.
-- **F7** — three copies of the estimate guard disagree on an empty-string `birthDate`. Latent: no
-  current writer produces one. The clean fix moves `deriveBirthDate` to return
-  `{ birthDate, isEstimate }`, which is `petAge.ts`, so it waits with F4/F8/F9.
+The open defects are tracked in the ledger, not here — a work stream may record what was not done,
+but `tasks/README.md` does not let it hold an open question. Each was reproduced against the real
+function on `master` before being filed, rather than copied from the review.
+
+- **F4, F7, F8, F9 — deferred until PR #113 merges**, at that session's request, because #113 also
+  edits `petAge.ts`. Decimals read the wrong digits (`0,75 tahun` → seventy-five years), an
+  unbounded count throws `RangeError`, the return type can lie, and three copies of the estimate
+  rule disagree on `birthDate: ''`. In `approximate-birth-date-misreads-several-age-shapes.md`.
+- **F5, F6 — not fixable on the app side alone.** Compact compounds (`2y3m` → three months) and
+  unlisted spellings (`3 mgg` → intake). The backfill's `\M` fails on `2y3m` the same way, so app
+  and SQL currently agree, both wrong; fixing only the app opens a silent divergence. Same entry.
+- **F2 remainder — the expand harness's stale `appRule`.** Needs `embedded-postgres` to run, and
+  deleting the copy changes O1/O2 wholesale. In the rehearsal entry.
+- **The structural half of F11.** The seven spellings are pinned, but a spelling *added* to a
+  pattern still goes untested until someone adds a row. Making that impossible means exporting the
+  vocabulary from `petAge.ts` and feeding both the patterns and the test from it.
+- **The `tasks/todo.md` conflict with #113.** Both branches prepend a stream at the same anchor, so
+  whichever merges second conflicts and loses its CI run until resolved. Inherent to this file's
+  one-append-point design (its own header says so); resolved by keeping both streams.
 
 # Pet form birth date — critique PR #42, then yield it to PR #94
 
@@ -159,28 +190,36 @@ master was not checked.
 ## Explicitly NOT done
 
 > **Corrected 2026-10-14.** Two bullets below this note said the `minggu` regex was left alone
-> deliberately. It was not: `925b7c6` made weeks a unit in both languages, after the owner ruled
-> that "3 minggu" means three weeks. They were written before that commit and never revised, and a
+> deliberately. It was not: #42 made weeks a unit in both languages, after the owner ruled that
+> "3 minggu" means three weeks. They were written before that change and never revised, and a
 > `/code-review max` found them still saying the opposite at merge. They are struck through rather
 > than deleted, so the reasoning that *was* followed for a while stays readable.
+>
+> **On hashes in this stream.** #42 was squash-merged to `master` as `187593c`. Its branch commits —
+> `925b7c6` (weeks), `4cad3ce` (a review's fix round) — are real but are *not* ancestors of
+> `master` (`git merge-base --is-ancestor 925b7c6 origin/master` exits 1), and they vanish from
+> reach if `feat/pet-form-birth-date` is deleted. Where this stream says where something *landed*,
+> it cites #42 / `187593c`. Branch hashes appear only where the point is the branch history itself.
 
 - ~~**The `minggu` regex, the admin-save flag downgrade, and the Malay/SQL vocabulary gap.**
   All three are recorded as ledger entries rather than fixed here: anchoring that regex moves the
   arithmetic three implementations were aligned on, and the flag downgrade is PR #94s to land.
   `tasks/open/malay-age-units-outpace-the-backfill.md`,
   `tasks/open/every-admin-save-downgrades-an-exact-birthday.md`.~~
-  **What actually happened:** the flag downgrade was fixed by #94 and its entry deleted. The `minggu` regex was fixed here in
-  `925b7c6`. The vocabulary gap is now owned by PR #113's decision entry, which deletes the Malay
-  entry this bullet cited.
+  **What actually happened:** the flag downgrade was fixed by #94 and its entry deleted. The
+  `minggu` regex was fixed in #42 (`187593c`). The vocabulary gap is proposed to move into PR #113's
+  decision entry, which would delete the Malay entry this bullet cited — but #113 was still open
+  when this was written, and on `master` that entry still exists and `petAge.ts` still cites it.
 - **The expand harness's `appRule` was left stale — the omission that mattered most.**
   `20260922_pets_birth_date/rehearse.mjs` restates `approximateBirthDate` with local setters and
-  the old unanchored patterns. `925b7c6` widened the real function without touching that copy, so
+  the old unanchored patterns. #42 widened the real function without touching that copy, so
   9 of 9 Malay-or-weeks inputs now disagree with it while O1 still passes 10/10 — every
   `pets.json` age is plain English. Not fixed: nobody here can run that harness without
   `embedded-postgres`, and deleting the copy changes O1/O2 wholesale. Tracked in
   `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
-- **#42 merged with nothing after the 2026-10-13 review reviewed.** That includes `925b7c6`, a
-  behaviour change, and the review's own fix round `4cad3ce`. A `max` review run afterwards found
+- **#42 merged with nothing after the 2026-10-13 review reviewed.** That includes the branch
+  commits `925b7c6`, a behaviour change, and `4cad3ce`, the review's own fix round — both squashed
+  into `187593c`, so neither is on `master` by that name. A `max` review run afterwards found
   15 issues, three of which change what the PR claimed. Every fix is a follow-up PR as a result.
 
 - **The form.** Reverted to master in full — `PetFormDialog`, `actions/pets.ts`, `petStore.ts`,
@@ -196,7 +235,7 @@ master was not checked.
   expand session, refused at the migration so no production row carries it — but still wrong on
   the fixture path. Left alone deliberately: anchoring that regex changes the very referent all
   three implementations just agreed on, and it deserves its own change, not a ride-along.~~
-  **What actually happened:** fixed in `925b7c6` — see the correction note above.
+  **What actually happened:** fixed in #42 (`187593c`) — see the correction note above.
 
 # Pet birth date — production conversion and the form that feeds it
 
