@@ -34,17 +34,22 @@ pillars `HomeOurWorkSection` names, which is a content decision and not a dedupl
 inline, so the two English strings remain identical by coincidence rather than by source.
 
 **The navbar and the footer label the same links differently.** The footer reads `nav.*` keys; the
-navbar inlines its own pairs, and on 2026-10-14 three of them disagreed with the key the footer uses
-— in English as well as Malay:
+navbar inlines its own pairs. On 2026-10-14, every link both of them carry except `/sponsors`
+disagreed with the key the footer uses — five links, in Malay for all five and in English for four
+(`/donate`'s desktop English matches). Navbar labels are listed desktop first, then mobile where it
+differs:
 
 | Link | Navbar (en / ms) | Footer key (en / ms) |
 |---|---|---|
-| `/donate` | "Donate & Sponsor" / "Taja & Sumbang" | `nav.donate`: "Donate & Sponsor" / "Derma & Penajaan" |
-| `/applications/track` | "Track Application Status" / "Semak Status Permohonan" | `nav.trackApplication`: "Track Application" / "Semak Permohonan" |
-| `/pets` | "Meet Our Animals" / "Haiwan Kami", "Lihat Haiwan Reskue" | `nav.adoptablePets`: "Adoptable Pets" / "Haiwan Angkat" |
+| `/pets` | "Meet Our Animals" / "Haiwan Kami", "Lihat Haiwan Reskue", "Haiwan Reskue Kami" | `nav.adoptablePets`: "Adoptable Pets" / "Haiwan Angkat" |
+| `/#how-it-works` | "Adoption Process & Criteria" / "Proses & Syarat Adopsi" | `nav.adoptionProcess`: "Adoption Process" / "Proses Adopsi" |
+| `/applications/track` | "Track Application Status" / "Semak Status Permohonan"; mobile "Track Application" | `nav.trackApplication`: "Track Application" / "Semak Permohonan" |
+| `/get-involved#volunteer` | "Volunteer & Field Shifts" / "Sukarelawan Santuari & TNRM" | `nav.volunteerFoster`: "Volunteer & Foster" / "Sukarelawan & Asuhan" |
+| `/donate` | "Donate & Sponsor" / "Taja & Sumbang"; mobile "… (LHDN)" | `nav.donate`: "Donate & Sponsor" / "Derma & Penajaan" |
 
-The navbar does not even agree with itself: its mobile menu says "Track Application" where the
-desktop menu says "Track Application Status". `nav.sponsorWall` was the one link fixed, because the
+The navbar does not even agree with itself: on `/pets` and `/applications/track` its mobile menu
+and desktop menu use different words. Found by comparing each navbar `href` that the footer also
+links; a first count of three missed two, so treat this as measured once, not as exhaustive. `nav.sponsorWall` was the one link fixed, because the
 footer's copy of it was a fallback for a key that did not exist; it is pinned in both languages by
 `tests/components/navbar.test.tsx`. Picking the wording for the other three is a copy decision, and
 fixing them one at a time with a one-off test each is the special-casing this entry argues against.

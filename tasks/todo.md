@@ -1822,6 +1822,22 @@ confirmed by reading the cited lines:
 Round eight found no correctness defect and nothing that changes what the PR claims. Its own fixes
 are still new code, so round nine reviews them.
 
+## Round nine — reviewing round eight's fix
+
+Reviewed `131bf8c` and the ledger in `ea724d3`. No product-code defect. It confirmed the ledger's
+menu claim by probe (swapping hover for click fails both language cases), and the ceiling's sizes as
+an upper bound. Three findings, each confirmed against the source:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The navbar/footer table listed three drifting links; five drift, and `/donate`'s English matches | Fixed: all five, with the mobile labels. **`ea724d3`'s commit message still says three**, and history is not rewritten for it — this row is the correction |
+| 2 | The footer half of `nav.sponsorWall` was pinned only in Malay, against a literal: the gap round eight closed in the navbar | Fixed: both languages against the dictionary. Probed: an inline English `"Sponsor Wall"` in the footer now fails the `en` case |
+| 3 | `importMap`'s new default parameter was never used | Fixed: the entry is a required parameter |
+
+Each of these was the same shape: a fix applied to the case in front of it and not to its twin. That
+was the lesson the review loop kept teaching, so it is written down —
+`tasks/lessons/2026-10-14-a-fix-for-one-half-of-a-pair-must-be-checked-against-the-other.md`.
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:
