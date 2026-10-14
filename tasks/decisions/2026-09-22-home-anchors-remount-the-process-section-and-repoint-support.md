@@ -57,13 +57,14 @@ sebarang yuran adopsi komersial", and the test asserts that wording and the abse
 ones. Choosing where a string lives is not choosing what it says; each copy has to be read against
 what the organisation actually states, and against what its admin screens allow.
 
-**Left for the owner:** the site promises free adoption, unqualified, in eleven places — including
-pillar 3 of this same page, the adoption form's submit button and three applicant emails — while
-the same configurable fees exist. Every seeded fee is "Free" today, so nothing contradicts on
-screen. Whether the policy is "free" or "no commercial fee" is the shelter's decision, not this
-change's; the full inventory is
-`tasks/open/the-site-promises-free-adoption-while-fees-are-configurable.md`. (An earlier version of
-this paragraph named only two of the eleven.)
+**Left for the owner:** the site promises free adoption, unqualified, in twelve places — including
+a "Free Adoption" badge on every pet card whatever that pet's fee, pillar 3 of this same page, the
+adoption form's submit button, and one email every applicant receives — while each pet's fee is a
+free-text field staff can edit. Every *seeded* fee is "Free"; production was not observed. Whether
+the policy is "free" or "no commercial fee" is the shelter's decision, not this change's; the
+verified inventory is
+`tasks/open/the-site-promises-free-adoption-while-fees-are-configurable.md`. (Earlier versions of
+this paragraph named two places, then eleven with the emails miscounted.)
 
 Two more things the remount exposed, both invisible while the anchor went nowhere:
 
@@ -150,7 +151,7 @@ move it to a `<div>` or `<section>`, or widen the allowlist.
 ## The guard's comment handling
 
 The guard must ignore commented-out code, or a mount someone commented out still counts as
-rendered — the defect it exists to catch. Getting that right took five attempts, and the history is
+rendered — the defect it exists to catch. Getting that right took six attempts, and the history is
 the reason the current form looks as it does:
 
 1. A regex deleting `/* … */` shifted every reported line number, by 33 in one case.
@@ -162,8 +163,16 @@ the reason the current form looks as it does:
    `// <X />` is text and renders. But walking into JSDoc tag nodes asked the context-free comment
    scanner about positions *inside* a doc block, where `@param x // note` read as a line comment
    running past the `*/` and blanked the code after a one-line doc.
-5. JSDoc nodes are now skipped — the doc block is already collected whole as leading trivia of its
-   declaration — and any range that starts inside another range is discarded as a backstop.
+5. JSDoc nodes were skipped, and as a backstop any range starting inside another range was
+   discarded. The backstop was itself wrong: it tested each range against every other, *including
+   ranges it had already discarded*, so a fake range found inside a JSDoc — dropped, correctly —
+   took down a real `{/* <Dead /> */}` starting inside it.
+6. **Current design.** `nestedRanges` sweeps the ranges in start order and drops one only when it
+   starts inside a range that **survived**, tracking the furthest kept end — linear, and a dropped
+   range can no longer drop anything else. The separate JSDoc skip was then removed: fake ranges
+   from inside a doc always start inside the real doc range, so the sweep alone handles them, and
+   no test could fail without the skip. Redundant code that nothing pins is how this file kept
+   collecting review findings. Disabling the sweep now fails both JSDoc cases.
 
 Each repair was probed red against the version it replaced. Imports are read from the same parsed
 tree: `import A, { B }` keeps both, `{ A as B }` resolves to the exported name, and a default

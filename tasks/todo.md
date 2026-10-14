@@ -1758,13 +1758,55 @@ close the round before:
 Not fixed, and marked: the typed `t` cannot require params for keys with placeholders, because the
 dictionary's values are typed as `string`. Recorded with a `ceiling:` comment and its upgrade path.
 
+## Every finding from rounds six and seven, and what happened to it
+
+The round-six section above said "eleven findings" and accounted for six. A finding that is neither
+fixed nor dismissed with a reason is the part nobody can reconstruct, so both rounds are listed
+whole here.
+
+**Round six** (11):
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Backstop dropped real comments via already-dropped ranges | Fixed: survivors-only sweep |
+| 2 | JSDoc test could not fail with the skip removed | **Not closed in round six — only reworded.** Closed in round seven by removing the skip |
+| 3 | No-provider `t` fix had no test | Fixed: `Footer` rendered with plain `render` |
+| 4 | Owner's free-adoption list incomplete | Moved to its own open entry — whose first version was itself wrong; see round seven |
+| 5 | `nav.sponsorWall` drifted from the navbar's copy | Fixed: one key, read by both |
+| 6 | Typed `t` cannot require params for placeholder keys | Not fixed: marked with a `ceiling:` and its upgrade paths |
+| 7 | Unmarked O(n²) scan in the backstop | Fixed: the sweep is linear |
+| 8 | Stale line numbers in the missing-keys entry | Fixed |
+| 9 | Escaped backticks and a duplicated paragraph in this stream | Fixed |
+| 10 | Blocks recomputed per visit; two per-file caches | Fixed: one cache entry per file |
+| 11 | `Footer` reads the context twice | **Deliberately kept.** It needs one untyped call for `nav.sponsorPortal`, a key that does not exist; the second read is named `untypedT`, commented as that defect, and goes when the key is added |
+
+**Round seven** (14). Its verdict on the code was that it "looks right"; most findings were about what
+the round claimed and recorded.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | JSDoc skip still untested | Fixed by deleting it; disabling the sweep now fails both JSDoc cases |
+| 2 | Free-adoption inventory missing four promises | Fixed: rebuilt from each source line read in context |
+| 3 | Decision still described the pre-fix backstop | Fixed |
+| 4 | `adoptionFeeDog`/`Cat` are read by nothing public | Fixed: the entry now points at the per-pet field, the only one that reaches a page |
+| 5 | Wrong counts — emails, a conditional wizard line, a medical-records line | Fixed: twelve places, two emails, one to applicants |
+| 6 | "Nothing contradicts on screen" was unobserved | Fixed: scoped to seed data and marked ASSERTED |
+| 7 | Round six's dispositions were missing | This table |
+| 8 | Provider docs still said eighteen missing keys | Fixed: seventeen |
+| 9 | `nestedRanges`' doc sat on `stripComments`' doc | Fixed: each doc above its own function |
+| 10 | JSX-text filter was the same unmarked pairwise scan | Marked with a `ceiling:` and its upgrade path |
+| 11 | Navbar half of the shared key unpinned | Fixed: a test opens the menu by hover; probed against a drifted label |
+| 12 | A cheaper way to catch missing params: detect a leftover `{name}` | **Not implemented.** Recorded in the ceiling as the cheaper upgrade path. It changes runtime behaviour for every key and would fail any existing test that renders a placeholder without params — a site-wide change, made at the end of a review loop, would itself need another round |
+| 13 | `visit` looked up the same cache entry three times | Fixed; the now-unused `readStripped` went with it |
+| 14 | `decisions/` entries rewritten in place, against `tasks/README.md` | **Answered, not changed.** These entries exist only on this unmerged branch; nothing has been decided until it merges, and revising a draft is not reversing a record. The README states no exception for drafts. Whether it should is the owner's call |
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:
 
 - `npm run check` — 0 errors, 12 pre-existing warnings, one fewer than at the base.
 - `npx vitest run --project unit` — 100 files, **1614 tests**; 0 assertion errors, 0 timeouts.
-- `npx vitest run --project components` — 15 files, **212 tests**; 0 assertion errors, 0 timeouts.
+- `npx vitest run --project components` — 15 files, **213 tests**; 0 assertion errors, 0 timeouts.
 - `npm run test:integration` — 9 files, **92 tests**.
 - `npm run build` — compiled; `/` and `/bulletins` both still `○ (Static)`.
 
