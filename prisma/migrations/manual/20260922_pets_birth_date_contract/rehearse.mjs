@@ -10,10 +10,15 @@
  * **What this deliberately does NOT assert.** The contract half derives nothing. Turning "2 years"
  * into a date belongs to the expand half (../20260922_pets_birth_date/), which owns that rule
  * alone — an earlier revision of this folder carried a second copy, and the two disagreed on
- * month-end and leap-day rows. So there is no date arithmetic to check here, and no reason to
- * import approximateBirthDate. What this file checks instead is that the contract refuses every
- * state in which dropping the columns would destroy something, and preserves everything in the
- * one state where it proceeds.
+ * month-end and leap-day rows. So the CONTRACT has no date arithmetic to check. What this file
+ * checks about the contract is that it refuses every state in which dropping the columns would
+ * destroy something, and preserves everything in the one state where it proceeds.
+ *
+ * It does import approximateBirthDate — once, in scenario 0, and only to check EXPAND. Expand's
+ * own harness compares its SQL against a hand copy of the function that has since drifted from
+ * the original on both timezone and vocabulary, and its fixture-based guard is too narrow to
+ * notice. This file already runs the real expand SQL under tsx, so it is the one place the real
+ * function and the real SQL can be compared directly, with no copy in between.
  *
  * If the expand migration is present in the tree, scenario 0 runs the real thing and then the
  * contract on top of it, which is the sequence an operator will actually perform. When it is not
@@ -273,6 +278,95 @@ if (HAS_EXPAND) {
     !byName(await cols(refused, "pets")).has("birthDate")
   );
   await refused.close();
+
+  // ---- Expand against the REAL function, not a copy of it ---------------------------------------
+  //
+  // Expand's own harness compares its SQL against `appRule`, a hand transcription of
+  // `approximateBirthDate` that its own comment calls "a copy, and therefore capable of drifting".
+  // After #42 it has drifted twice: the real function moved to `Date.UTC` and gained a weeks unit,
+  // while `appRule` kept local-time setters and the old unanchored /(\d+)\s*y/ and /(\d+)\s*m/. Its
+  // O1 guard cannot see either, because O1 pins the copy against `src/data/pets.json`, whose ten
+  // ages are all plain English years and months. So O2 there would keep passing against the wrong
+  // rule. Found by the session that wrote #42.
+  //
+  // This harness already runs the real expand SQL and already runs under tsx, so it can import the
+  // real function — which is the one repair that closes both halves. Nothing here is a copy.
+  const { approximateBirthDate } = await import(
+    new URL("../../../../src/lib/domain/petAge.ts", import.meta.url).href
+  );
+
+  // Every unit spelling expand's header says it reads, plus the four rollover cases its own
+  // rehearsal pins, plus a compound. If the real function ever changes on any of these, this fails.
+  const AGREED = [
+    ["a-2y", "2 years", "2026-06-12"],
+    ["a-1y", "1 year", "2025-03-04"],
+    ["a-3yrs", "3 yrs", "2026-01-15"],
+    ["a-1yr", "1 yr", "2026-01-15"],
+    ["a-4mo", "4 months", "2026-07-22"],
+    ["a-1mo", "1 month", "2026-07-22"],
+    ["a-2mths", "2 mths", "2026-07-22"],
+    ["a-2mth", "2 mth", "2026-07-22"],
+    ["a-6mos", "6 mos", "2026-07-22"],
+    ["a-leap", "1 year", "2024-02-29"],
+    ["a-end1", "1 month", "2026-03-31"],
+    ["a-end2", "1 month", "2026-05-31"],
+    ["a-18mo", "18 months", "2026-06-12"],
+    ["a-compound", "1 year 6 months", "2026-06-12"],
+    // pets.json pet-008: the row that derived 2026-03-01 at UTC+8 and 2026-03-04 in
+    // America/New_York under the old local-time setters. The timezone entry asks for it by name.
+    ["a-pet008", "5 months", "2026-08-01"],
+  ];
+  const agreed = new PGlite();
+  await agreed.exec(PROD_SCHEMA);
+  for (const [id, age, intake] of AGREED) await insertPreExpand(agreed, [id, age, "adult", intake]);
+  const agreedErr = await tryExec(agreed, EXPAND);
+  check(
+    `expand accepts all ${AGREED.length} spellings its header says it reads`,
+    agreedErr === "",
+    agreedErr.slice(0, 200)
+  );
+  if (!agreedErr) {
+    const stored = new Map(
+      (await agreed.query(`SELECT "id","birthDate" FROM "public"."pets"`)).rows.map((r) => [r.id, r.birthDate])
+    );
+    const drift = AGREED.filter(
+      ([id, age, intake]) => stored.get(id) !== approximateBirthDate(age, intake).birthDate
+    ).map(([id, age, intake]) => `${id} "${age}"@${intake}: sql=${stored.get(id)} app=${approximateBirthDate(age, intake).birthDate}`);
+    check(
+      "every stored birthday equals what the real approximateBirthDate computes",
+      drift.length === 0,
+      drift.join(" | ")
+    );
+  }
+  await agreed.close();
+
+  // Containment, made executable rather than left as prose. After #42 the app reads strings the
+  // backfill deliberately refuses. That is safe ONLY in this direction — a refused row is named and
+  // stops the backfill, it is never stored differently — so both halves are asserted: the app reads
+  // it, and expand refuses it. If someone teaches expand one of these without matching the app,
+  // or teaches the app one without anyone noticing expand refuses it, this is where it shows.
+  const APP_ONLY = [
+    ["3 minggu", "weeks, Malay"],
+    ["3 weeks", "weeks"],
+    ["3 wks", "weeks"],
+    ["2 tahun", "years, Malay"],
+    ["4 bulan", "months, Malay"],
+    ["3 mnth", "a month abbreviation expand does not list"],
+    ["5 yo", "a year abbreviation expand does not list"],
+  ];
+  for (const [age, why] of APP_ONLY) {
+    const intake = "2026-06-12";
+    check(
+      `the app reads "${age}" (${why})`,
+      approximateBirthDate(age, intake).birthDate !== intake
+    );
+    const one = new PGlite();
+    await one.exec(PROD_SCHEMA);
+    await insertPreExpand(one, ["only", age, "adult", intake]);
+    const oneErr = await tryExec(one, EXPAND);
+    check(`  ...and expand refuses it rather than storing a different date`, oneErr !== "", "expand accepted it");
+    await one.close();
+  }
 }
 
 console.log("\n== 1. the contract refuses every state where dropping would destroy something");

@@ -15,6 +15,42 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# The backfill rehearsal checks the real age function
+
+**Branch:** `fix/rehearsal-checks-the-real-age-function` · opened 2026-10-14 · follows #94 and #42
+
+## Items
+
+- [x] Merge #42 (owner's instruction once the `minggu` revision landed). Verified its behaviour
+      change before merging: all three units now compute through `Date.UTC`, every rollover value
+      the backfill transcribes is preserved, and English spellings are unchanged.
+- [x] Verify the #42 session's finding rather than take it on trust: expand's `rehearse.mjs`
+      compares against `appRule`, a hand copy still on local setters and the old unanchored
+      patterns, and `pets.json` holds only plain English ages — so its O1 guard cannot see either
+      drift. Confirmed. This session had claimed #42 closed the timezone entry; it did not.
+- [x] Add a sound comparison to the contract harness: the real `approximateBirthDate` against the
+      real expand SQL on every spelling expand reads, the rollover cases and `pet-008`. 77/77 in
+      four timezones; mutation-tested.
+- [x] Make the containment executable: each app-only spelling is read by the app and refused by
+      the backfill.
+- [x] Correct the expand header, which still said it read "the spellings the app itself reads".
+      Comment-only, verified three ways, because the harness parses part of that header.
+- [x] Settle `malay-age-units-outpace-the-backfill.md` into `decisions/`; fix the source comment
+      that cited it.
+
+## Review
+
+**Not done, deliberately:** expand's own harness was not edited. It still restates the function,
+so its O1/O2 still report green against a drifted copy, and the timezone entry stays open for that
+reason. Fixing it needs `embedded-postgres`, which this session did not install into a shared
+`node_modules`; editing a harness you cannot run is how a safe failure becomes an unsafe one. The
+suggested repair in the entry is to retire O1/O2 there and point at the new check, not to correct
+the copy.
+
+**What was wrong in this session, briefly:** it asserted that #42 closed the timezone entry without
+checking what the rehearsal actually compares against, and earlier gave a spec built on master's
+state while the branch had moved past it. Both corrected by the #42 session, which measured.
+
 # Pet form birth date — critique PR #42, then yield it to PR #94
 
 **Branch:** `feat/pet-form-birth-date` · PR #42 · picked up 2026-09-22

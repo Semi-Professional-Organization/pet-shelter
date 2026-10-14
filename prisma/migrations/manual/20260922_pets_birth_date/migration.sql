@@ -63,12 +63,30 @@
 -- is true for every backfilled row without exception: a date derived from prose is an estimate,
 -- whatever the prose claimed.
 --
--- Two units are recognised, and only in the spellings the app itself reads:
+-- Two units are recognised:
 --   years   [0-9]+ followed by year | years | yr | yrs | y
 --   months  [0-9]+ followed by month | months | mth | mths | mo | mos | m
 -- Each must end at a word boundary, so "3 minggu" (Malay for three weeks) is refused rather
 -- than read as three months on its leading `m`. Years are tried first, so "1 year 6 months"
 -- backfills as 1 year -- which is what the app does with the same string.
+--
+-- **This file reads a strict subset of what the app reads, and that is deliberate.** Since #42
+-- (2026-10-14) `approximateBirthDate` also reads weeks in both languages (`weeks`, `wks`,
+-- `minggu`, `mggu` -- "3 minggu" is three weeks, not three months), Malay years and months
+-- (`tahun`, `thn`, `bulan`, `bln`), `mnth` and `yo`. None of those is transcribed here; every one
+-- is refused, and the refusal names the row. That is containment in the safe direction: for any
+-- string this file does read, it stores exactly what the app computes, and for any it does not,
+-- it stops and asks rather than storing something different. An earlier version of this line
+-- said these were "the spellings the app itself reads", which was true until #42 widened the
+-- app and stopped being true the moment it merged.
+--
+-- The comparison that keeps this honest lives in
+-- `20260922_pets_birth_date_contract/rehearse.mjs`, scenario 0: it runs this file's SQL against
+-- the REAL `approximateBirthDate`, imported rather than copied, on every spelling above and the
+-- four rollover cases, in any timezone; and it asserts that each app-only spelling is read by the
+-- app and refused here. This file's own `rehearse.mjs` compares against `appRule`, a hand copy
+-- that has drifted from the function on both timezone and vocabulary since #42 -- see
+-- `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
 --
 -- THE INVARIANT THIS FILE KEEPS
 --

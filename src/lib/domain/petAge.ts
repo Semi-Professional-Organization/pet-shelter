@@ -189,10 +189,11 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
  * years and months only; this function also reads Malay (`tahun`, `thn`, `bulan`, `bln`,
  * `minggu`, `mggu`) and weeks in either language. So "2 tahun" or "3 minggu" yields a birthday
  * here and is *refused and named* there, which fails closed: the backfill stops on the row rather
- * than storing a different date from the one the app would compute. The migration's own header
- * claims it reads "only in the spellings the app itself reads" — true when written, wider now on
- * this side. Recorded in `tasks/open/malay-age-units-outpace-the-backfill.md`; not a licence to
- * treat the arithmetic as independent.
+ * than storing a different date from the one the app would compute. That asymmetry is deliberate
+ * and recorded in `tasks/decisions/2026-10-14-the-backfill-refuses-what-it-does-not-transcribe.md`,
+ * and the migration's header now says so. It is not a licence to treat the arithmetic as
+ * independent: `20260922_pets_birth_date_contract/rehearse.mjs` imports this function and fails
+ * if the backfill ever stores a date it would not compute.
  *
  * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
  * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
