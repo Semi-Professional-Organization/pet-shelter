@@ -85,15 +85,21 @@ comment, checked by filtering the diff.
 
 - **This is a claim about a corpus, not a proof about every string.** An earlier version of this
   bullet said an English divergence "would need two rules disagreeing on English, which no
-  measurement has shown". The no-break space was exactly that, measured the same day. Two residuals
-  are known and not closed:
+  measurement has shown". The no-break space was exactly that, measured the same day. One residual
+  is known and not closed:
   - **A non-ASCII letter glued to a unit**, e.g. `tahun` followed by `ñ`. JS `\b` treats `ñ` as a
     boundary; Postgres `\M` treats it as part of the word. Unrealistic as age prose, and closing it
     needs a separate refusal stage after the fractional check. Recorded as a `ceiling:` in the SQL.
-  - **Compact compounds such as `2y3m`.** Today the app and the migration *both* read the trailing
-    unit, three months — they agree by accident. A fix to the app alone, making it read the larger
-    unit, would open a new silent divergence. Any change to how the app reads compact forms must
-    land together with the SQL. The session on #42 holds that follow-up and has been told so.
+
+  **Compact compounds are not a residual**, and an earlier draft of this entry said they were. It
+  claimed `2y3m` was read as three months by both sides — agreeing by accident — so that fixing the
+  app alone would open a divergence. That was reasoned from `\M` semantics, not run. Measured
+  against the regex actually in the file: the fractional check matches `2y3m`, `5yrs8mths` and
+  `1y6m` (a digit, a short non-digit run, a digit, a unit) and refuses them before any unit is read.
+  `1y2w` and `6 mons` are not fractional but match no unit either, so they are refused as
+  underivable. Nothing is stored for any of them, so the app's reading of compact forms can be
+  fixed on its own without touching the SQL. Corrected by the session on #42, which had accepted
+  the same wrong claim from this one.
 - **Expand's own 92-check harness was not re-run.** It needs `embedded-postgres`, not installed into
   a `node_modules` other worktrees share. The checks this change touches are J1 and J3, reproduced
   above; L1 and O3 assert single-unit app-only strings are refused naming the row, which they still

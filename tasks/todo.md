@@ -70,8 +70,11 @@ Record active multi-step work streams below.
       a `6d32df9` "master" ref in a public entry that is a git *tree*, not a commit — handed back
       to that session**, which asked to own it: the line also needs rewriting now #42 has merged,
       and two sessions editing one line of a public entry is how it gets a conflict. Agreed a split: they
-      take the app-side parsing fixes; F5 and F6 must land together with the SQL, because fixing
-      the app alone would open new silent divergences.
+      take the app-side parsing fixes. This session first told them F5 and F6 had to land with the
+      SQL, claiming `2y3m` was read as three months on both sides. **Wrong, and corrected by them:**
+      measured against the file, the backfill's fractional check refuses `2y3m`, `5yrs8mths` and
+      `1y6m` outright, and `1y2w`, `6 mons` match no unit and are refused too — so the app side can
+      be fixed alone. A fifth unrun claim about regex behaviour from this session tonight.
 
 ## Review
 
