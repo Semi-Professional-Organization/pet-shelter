@@ -255,3 +255,38 @@ Declined, with reasons:
 
 Filed for the owner, not fixed: `tasks/open/bulletin-bylines-publish-staff-names.md` — every post
 puts an editor's personal name on three public pages, and there is no way to post as a team.
+
+## Round six: reviewing round five's fixes — and reversing one
+
+**This reverses round five's seeding rule.** Round five made the migration script seed only on the
+run that *creates* the table, to stop a re-run resurrecting deleted notices. That fixed the
+resurrection and broke the launch. The migration's own header names `prisma db execute --file`
+as a way to apply it; applied that way, the script finds the table already there and seeds
+nothing — and because production stops serving the fixture once the table exists, every public
+feed would have been empty from day one.
+
+The rule is now **seed an empty table, leave a non-empty one alone**, in one transaction under the
+migrations' advisory lock (so a failure mid-seed rolls back instead of leaving a half-seeded table
+the next run refuses to touch). `--seed` is gone; npm swallowed it without `--` anyway. Rehearsed
+on a real Postgres in both directions: the SQL applied alone, then the script — it seeded four;
+then a staff delete and a re-run — the deleted notice stayed deleted. The residual case is stated
+in the script: if staff delete *every* notice and someone re-runs it, the launch notices return.
+
+Other corrections worth recording as decisions:
+
+- **Whether to serve the fixture is now asked of the database first** (`isDatabasePersistent()`),
+  not of `NODE_ENV`. With no `DATABASE_URL` the fixture is the only data, so a production build
+  without a database no longer prerenders empty feeds. Production also logs the P2021 fallback,
+  which was the one path with no trace.
+- **"Today" for the form's default date is the shelter's day too**, not the browser's. The
+  date decides when a notice goes live, so a browser-local default could schedule an urgent notice
+  by accident for an editor outside Malaysia. The day is assembled from `formatToParts`, and the
+  bound is `< start of the next shelter day` because the column defaults to `now()`.
+- **A missing column (P2022) has its own editor message.** Sending it to the table migration was
+  the wrong fix; that migration only creates what is absent.
+
+Declined: moving `orNullIfMissing` to a shared module. There are two private copies now (this
+repository and transparency's), and AGENTS.md says to wait for a third occurrence. The bulletin
+copy collapses four try/catch blocks, which was the part of the finding that mattered.
+
+Twenty-seven mutants across six rounds, all killed.

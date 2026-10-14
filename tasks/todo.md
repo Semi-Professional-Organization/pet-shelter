@@ -56,7 +56,13 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       only on the run that creates the table. Rehearsed on a real Postgres on port 5433, clear
       of another session's server on 5432 — which is how the "(remote)" label on a local URL
       was found and fixed in both migration scripts.
-- [x] Twenty-one mutants across five rounds, all killed (4 + 4 + 5 + 2 + 6).
+- [x] Round 6, round 5's fixes on their own: fifteen findings. Round 5's seeding rule had broken
+      the launch (a table created by `prisma db execute` was never seeded, and production stops
+      serving the fixture once the table exists); reversed to "seed an empty table". Rehearsed
+      both ways on a real Postgres. The fixture question now asks whether a database exists
+      before asking `NODE_ENV`; the form's default date is the shelter's; P2022 has its own
+      message; the third copy of the migration-target label, in `check-drift.ts`, is fixed.
+- [x] Twenty-seven mutants across six rounds, all killed (4 + 4 + 5 + 2 + 6 + 6).
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.
