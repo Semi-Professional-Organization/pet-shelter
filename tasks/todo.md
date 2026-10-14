@@ -68,6 +68,13 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       pinned.
 - [x] Round 8: converged — "no correctness bugs serious enough to block". Seven low-severity
       fixes, including a factual error in the public launch-notices entry; one decline.
+- [x] Round 8's fixes reviewed on their own (`ec8fbce..b9ffbba`), by hand: the forked
+      `/code-review` returned empty after one tool call, so it is not counted as a review. No
+      findings — every `isScheduledForLater` caller passes the shared day, and the emptied form
+      default cannot post because the schema's `YYYY-MM-DD` regex rejects `""`. The seed's new
+      rollback path was proven on embedded Postgres: a CHECK constraint rejecting the second
+      fixture row made the script exit 1 with the constraint's own message, the table held 0 rows
+      afterwards, and a clean re-run seeded all four.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.
