@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync, existsSync, mkdtempSync, writeFile
 import { tmpdir } from "os";
 import { join, dirname, resolve, relative, sep } from "path";
 import { fileURLToPath } from "url";
+import ts from "typescript";
 
 /**
  * Structural guard: every in-app `#anchor` link in `src` targets an id that the
@@ -87,29 +88,63 @@ const RENDERED_COMPONENT = /<([A-Z]\w*)/g;
  * defect this file guards, passing silently. Three commented-out JSX blocks
  * exist in this tree today, in `HomeSections.tsx` and `Hero.tsx`, so it is
  * load-bearing rather than theoretical.
+ *
+ * **Found by TypeScript's parser, not by pattern.** Three regex versions came
+ * before this one, and each review found the next hole: a `//` mid-line cut a
+ * live `href` out of `<a title="Tue // Sun">`; a `/*` inside a string such as
+ * `accept="image/*"` opened a comment that swallowed real code up to the next
+ * `*\/`; and the obvious repair — a scanner that skips strings — breaks on JSX
+ * text, where every apostrophe in "shelter's" or "Don't" would open a string
+ * that never closes. Only a parser knows which characters are trivia. It also
+ * gets JSX right: inside children, `// <X />` is not a comment at all — it
+ * renders the text "// " followed by the element — and only `{/* … *\/}` or a
+ * `//` inside braces actually removes a mount.
+ *
+ * Comment bodies become blanks rather than vanishing, because `anchorLinks`
+ * splits on newlines afterwards; deleting them shifted every reported line
+ * number by the comment lines above it.
  */
-function stripComments(text: string): string {
-  const blank = (s: string) => s.replace(/[^\n]/g, " ");
-  return (
-    text
-      // Comment bodies become blanks rather than vanishing. `anchorLinks`
-      // splits on newlines afterwards, and deleting the text outright shifted
-      // every reported line number by the comment lines above it — a guard
-      // whose whole value is naming where the broken link sits must not
-      // misname it by 33 lines, into a different component.
-      .replace(/\/\*[\s\S]*?\*\//g, blank)
-      // A line comment counts only when the slashes OPEN the line, after
-      // nothing but indentation. That blanks a mount someone commented out
-      // with `//` — the hole the block-comment pass alone left — without
-      // needing to know whether a mid-line `//` is a comment, a `https://`,
-      // or text inside a string. An earlier version blanked from any
-      // whitespace-preceded `//`, which would have cut the rest of the line
-      // out of `<a title="Tue // Sun" href="/#ghost">` and dropped a broken
-      // link from the scan entirely: a false green in the one guard this
-      // branch relies on. A trailing comment after real code is left alone,
-      // which can only over-accept, never under-report.
-      .replace(/^([ \t]*)\/\/[^\n]*/gm, (match, indent: string) => indent + blank(match.slice(indent.length)))
+function stripComments(text: string, fileName = "fragment.tsx"): string {
+  const source = ts.createSourceFile(
+    fileName,
+    text,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
+
+  const ranges = new Map<number, number>();
+  const jsxText: [number, number][] = [];
+  const collect = (found: ts.CommentRange[] | undefined) => {
+    for (const range of found ?? []) ranges.set(range.pos, range.end);
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxText(node)) jsxText.push([node.pos, node.end]);
+    collect(ts.getLeadingCommentRanges(text, node.getFullStart()));
+    collect(ts.getTrailingCommentRanges(text, node.getEnd()));
+    // `getChildren` includes tokens, so a comment that is leading trivia of a
+    // closing brace — which is where `{/* … */}` keeps its comment — is reached.
+    for (const child of node.getChildren(source)) visit(child);
+  };
+  visit(source);
+
+  // `getLeadingCommentRanges` is a context-free scanner. Asked about a position
+  // inside JSX children, it reads `// <Text />` as a comment and would blank the
+  // element — but in JSX children that is text, and the element renders. So a
+  // "comment" that starts inside a JsxText node is discarded. Only the parsed
+  // tree knows where JSX text is; that is the point of using it.
+  for (const [pos] of [...ranges]) {
+    if (jsxText.some(([start, end]) => pos >= start && pos < end)) ranges.delete(pos);
+  }
+
+  // Code units, not code points: TypeScript reports UTF-16 offsets, and
+  // `Navbar.tsx` — on every route's layout tree — contains an emoji outside
+  // the BMP. Spreading by code point would shift every offset after it.
+  const chars = text.split("");
+  for (const [pos, end] of ranges) {
+    for (let i = pos; i < end; i += 1) if (chars[i] !== "\n") chars[i] = " ";
+  }
+  return chars.join("");
 }
 
 /** Every `.ts`/`.tsx` file under `src`. */
@@ -140,32 +175,66 @@ function resolveImport(specifier: string, fromFile: string): string | null {
   return null;
 }
 
-/** name -> file, for every import in `text` that resolves into `src`. */
-function importMap(text: string, fromFile: string): Map<string, string> {
-  const map = new Map<string, string>();
+/** Where an imported local name comes from: the file, and the name it is exported as. */
+interface ImportTarget {
+  file: string;
+  exportName: string;
+}
 
-  const named = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']([^"']+)["']/g;
-  for (const [, names, specifier] of text.matchAll(named)) {
-    const file = resolveImport(specifier, fromFile);
+/**
+ * local name -> source, for every import in `text` that resolves into `src`.
+ *
+ * Read from the AST rather than matched. Two regex versions each lost a shape
+ * the walk needs: `import Foo, { Bar } from …` kept `Foo` and dropped `Bar`,
+ * and `import { A as B }` mapped `B` to the right file but sent the walk
+ * looking for a component called `B`, which does not exist there. Either way
+ * the subtree vanished and a working link was reported broken — a false red,
+ * which pressures the next person to loosen the guard instead of the parser.
+ * Recording the *exported* name is what lets an alias resolve.
+ */
+const importCache = new Map<string, Map<string, ImportTarget>>();
+function importMap(fromFile: string): Map<string, ImportTarget> {
+  const cached = importCache.get(fromFile);
+  if (cached) return cached;
+
+  const map = new Map<string, ImportTarget>();
+  const source = ts.createSourceFile(
+    fromFile,
+    readStripped(fromFile),
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ false,
+    fromFile.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const clause = statement.importClause;
+    if (!clause) continue;
+    const file = resolveImport(statement.moduleSpecifier.text, fromFile);
     if (!file) continue;
-    for (const raw of names.split(",")) {
-      const name = raw.split(/\s+as\s+/).pop()!.trim();
-      if (name) map.set(name, file);
+
+    if (clause.name) {
+      const exportName = defaultExportName(file);
+      if (exportName) map.set(clause.name.text, { file, exportName });
+    }
+    if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+      for (const element of clause.namedBindings.elements) {
+        map.set(element.name.text, {
+          file,
+          exportName: (element.propertyName ?? element.name).text,
+        });
+      }
     }
   }
 
-  // Default imports too. Nothing under `src/app` uses this shape for a
-  // component today, but nothing forbids it, and a missed import means the
-  // walk never enters the component — reporting a working link as broken.
-  // A false red is worse than a miss here: it pressures the next person to
-  // loosen the guard rather than fix the parser.
-  const byDefault = /import\s+([A-Z]\w*)\s*(?:,\s*\{[^}]*\}\s*)?from\s+["']([^"']+)["']/g;
-  for (const [, name, specifier] of text.matchAll(byDefault)) {
-    const file = resolveImport(specifier, fromFile);
-    if (file) map.set(name, file);
-  }
-
+  importCache.set(fromFile, map);
   return map;
+}
+
+/** The declared name of a file's `export default function`, if it has one. */
+function defaultExportName(file: string): string | null {
+  return /^export\s+default\s+(?:async\s+)?function\s+([A-Z]\w*)/m.exec(readStripped(file))?.[1] ?? null;
 }
 
 /**
@@ -258,7 +327,7 @@ const sourceCache = new Map<string, string>();
 function readStripped(file: string): string {
   let text = sourceCache.get(file);
   if (text === undefined) {
-    text = stripComments(readFileSync(file, "utf8"));
+    text = stripComments(readFileSync(file, "utf8"), file);
     sourceCache.set(file, text);
   }
   return text;
@@ -275,7 +344,7 @@ function idsRenderedBy(
 
   function visit(file: string, source: string) {
     const text = readStripped(file);
-    const imports = importMap(text, file);
+    const imports = importMap(file);
     const blocks = componentBlocks(text);
     // An entry file is one component, so its whole text is its body.
     // Elsewhere, only the named component's block counts.
@@ -296,13 +365,14 @@ function idsRenderedBy(
     }
 
     for (const [, name] of body.matchAll(RENDERED_COMPONENT)) {
-      // A component declared in this same file, or imported from src.
-      const target = blocks.has(name) ? file : imports.get(name);
+      // A component declared in this same file, or imported from src —
+      // looked up by the name it is EXPORTED as, so an alias resolves.
+      const target = blocks.has(name) ? { file, exportName: name } : imports.get(name);
       if (!target) continue;
-      const key = `${target}::${name}`;
+      const key = `${target.file}::${target.exportName}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      visit(target, name);
+      visit(target.file, target.exportName);
     }
   }
 
@@ -330,15 +400,19 @@ interface AnchorLink {
  * query string before the fragment IS matched, and the query is discarded
  * before resolving the route.
  */
+const ANCHOR_LINK = /["'`]\/([A-Za-z0-9/_.=&?-]*)#([A-Za-z0-9_-]+)/g;
+
 function anchorLinks(): AnchorLink[] {
   const found: AnchorLink[] = [];
   for (const file of sourceFiles()) {
+    // Cheap pre-filter on the raw text. A file with no candidate before its
+    // comments are removed cannot have one after, and only three of ~245
+    // source files have any — parsing the rest cost six seconds for nothing.
+    if (!readFileSync(file, "utf8").match(ANCHOR_LINK)) continue;
     readStripped(file)
       .split(/\r?\n/)
       .forEach((text, i) => {
-        for (const [, path, id] of text.matchAll(
-          /["'`]\/([A-Za-z0-9/_.=&?-]*)#([A-Za-z0-9_-]+)/g,
-        )) {
+        for (const [, path, id] of text.matchAll(ANCHOR_LINK)) {
           const route = path.split("?")[0].replace(/\/$/, "");
           found.push({
             file: relative(ROOT, file).split(sep).join("/"),
@@ -376,7 +450,7 @@ describe("in-app anchor links", () => {
     expect(getInvolved).not.toContain("how-it-works");
   });
 
-  it("does not count a commented-out mount as rendered", () => {
+  it("follows real renders: comments, aliases, mixed imports and strings", () => {
     // Exercised through `idsRenderedBy`, not against `stripComments` directly.
     // A first version of this case asserted on the helper's output, and
     // deleting the helper's call inside the walk left every test in this file
@@ -388,13 +462,20 @@ describe("in-app anchor links", () => {
       writeFileSync(
         page,
         [
-          'import { Live, Dead } from "./sections";',
+          'import Layout, { Live, Dead, DeadToo, Text, Upload } from "./sections";',
+          'import { Original as Renamed } from "./sections";',
           "export default function Page() {",
           "  return (",
           "    <main>",
+          "      <Layout />",
           "      <Live />",
+          "      <Renamed />",
           "      {/* <Dead /> */}",
-          "      // <DeadToo />",
+          "      {",
+          "        // <DeadToo />",
+          "      }",
+          "      // <Text />",
+          "      <Upload />",
           "    </main>",
           "  );",
           "}",
@@ -403,8 +484,14 @@ describe("in-app anchor links", () => {
       writeFileSync(
         join(fixtures, "sections.tsx"),
         [
+          "export default function Layout() {",
+          '  return <header id="default-import-anchor" />;',
+          "}",
           "export function Live() {",
           '  return <section id="live-anchor" data-pet-id="phantom-anchor" />;',
+          "}",
+          "export function Original() {",
+          '  return <section id="aliased-anchor" />;',
           "}",
           "export function Dead() {",
           '  return <section id="dead-anchor" />;',
@@ -412,14 +499,50 @@ describe("in-app anchor links", () => {
           "export function DeadToo() {",
           '  return <section id="dead-too-anchor" />;',
           "}",
+          "export function Text() {",
+          '  return <section id="jsx-text-anchor" />;',
+          "}",
+          "export function Upload() {",
+          "  return (",
+          '    <div id="upload-anchor">',
+          '      <input type="file" accept="image/*" />',
+          '      <section id="after-the-glob" />',
+          "    </div>",
+          "  );",
+          "}",
+          // The old stripper's lazy match needs a closing marker somewhere
+          // after the string to run to; without one it matched nothing and
+          // this fixture would have passed against the buggy code too.
+          "/** A later doc comment, whose closing marker the fake comment ran to. */",
+          "export function Later() {",
+          "  return null;",
+          "}",
         ].join("\n"),
       );
 
       const ids = idsRenderedBy(page);
       expect(ids).toContain("live-anchor");
-      // Commented out both ways a mount can be commented out.
+
+      // Both ways a mount is really commented out in JSX.
       expect(ids).not.toContain("dead-anchor");
       expect(ids).not.toContain("dead-too-anchor");
+
+      // Inside JSX children, `// <Text />` is NOT a comment: it renders the
+      // text "// " and then the element. An earlier fixture asserted this mount
+      // was dead, encoding a regex's mistake as the expected behaviour. The
+      // parser knows better, and so does the browser.
+      expect(ids).toContain("jsx-text-anchor");
+
+      // `import Layout, { … }` keeps the default AND the named bindings, and
+      // `{ Original as Renamed }` resolves to the block called `Original`.
+      expect(ids).toContain("default-import-anchor");
+      expect(ids).toContain("aliased-anchor");
+
+      // A `/*` inside a string opened a fake comment that swallowed real code
+      // up to the next `*/`. Here that would have hidden the section after it.
+      expect(ids).toContain("upload-anchor");
+      expect(ids).toContain("after-the-glob");
+
       // `data-pet-id` is not an anchor. `\bid=` used to match its tail, which
       // would register a scroll target no browser can find.
       expect(ids).not.toContain("phantom-anchor");

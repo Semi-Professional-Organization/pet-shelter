@@ -23,7 +23,7 @@ import { ThemeToggle } from "@/components/providers/ThemeToggle";
 import { LanguageToggle } from "@/components/providers/LanguageToggle";
 import { PetMatchQuiz } from "@/components/features/pets/PetMatchQuiz";
 import { SponsorshipModal } from "@/components/features/pets/SponsorshipModal";
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
 import {
   Sheet,
   SheetContent,
@@ -34,7 +34,8 @@ import {
 
 export function Navbar() {
   const pathname = usePathname();
-  const { isMs, t } = useLanguage();
+  const { isMs } = useLanguage();
+  const t = useTypedTranslation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isSponsorshipOpen, setIsSponsorshipOpen] = useState(false);

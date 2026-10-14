@@ -13,14 +13,11 @@ import {
   RotateCcw
 } from "lucide-react";
 import { Bulletin, BulletinCategory, BulletinFormData, BulletinTargetPage } from "@/types/bulletin";
-import type { TranslationDictionary } from "@/lib/i18n/translations";
+import type { TranslationKey } from "@/lib/i18n/translations";
 import { useBulletins } from "@/lib/client/bulletinStore";
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import { useTypedTranslation } from "@/components/providers/LanguageProvider";
 import { AdminBulletinModal } from "./AdminBulletinModal";
 import { Button } from "@/components/ui/button";
-
-/** A dot path into the `bulletins` namespace, checked against the dictionary. */
-type BulletinKey = `bulletins.${keyof TranslationDictionary["bulletins"]}`;
 
 interface BulletinFeedProps {
   targetPage?: BulletinTargetPage;
@@ -30,9 +27,14 @@ interface BulletinFeedProps {
    * Every caller is a Server Component, and the reader's language is client
    * state, so a page cannot resolve its own heading without giving up ISR. It
    * hands over a key and this component — which is already a client component —
-   * resolves it. Omitted, the feed titles itself `home.bulletinsTitle`.
+   * resolves it.
+   *
+   * Required. An earlier version defaulted to `home.bulletinsTitle` when it
+   * was left out, which meant a shared feature component quietly owned a
+   * home-page string, and any new caller that forgot the prop would be headed
+   * "Latest Bulletins" on whatever page it sat. Every caller now names its own.
    */
-  titleKey?: BulletinKey;
+  titleKey: TranslationKey;
   maxItems?: number;
   compact?: boolean;
 }
@@ -53,7 +55,7 @@ interface BulletinFeedProps {
  */
 const CATEGORY_LABELS: Record<
   BulletinCategory,
-  { labelKey: BulletinKey; toneClass: string }
+  { labelKey: TranslationKey; toneClass: string }
 > = {
   urgent_need: { labelKey: "bulletins.categoryUrgentNeed", toneClass: "tone-danger" },
   clinic: { labelKey: "bulletins.categoryClinic", toneClass: "tone-success" },
@@ -68,7 +70,7 @@ export function BulletinFeed({
   maxItems,
   compact = false,
 }: BulletinFeedProps) {
-  const { t } = useLanguage();
+  const t = useTypedTranslation();
   const {
     bulletins,
     isAdminMode,
@@ -109,7 +111,7 @@ export function BulletinFeed({
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 mb-6">
         <div>
           <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            {titleKey ? t(titleKey) : t("home.bulletinsTitle")}
+            {t(titleKey)}
           </h2>
         </div>
 

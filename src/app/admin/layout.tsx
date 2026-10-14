@@ -102,7 +102,7 @@ export default function AdminLayout({
     { href: "/admin/members", label: "Staff & Permissions", icon: Users, permissions: [PERMISSIONS.MANAGE_MEMBERS] },
     { href: "/admin/audit", label: "Audit & Security Logs", icon: ShieldCheck, permissions: [PERMISSIONS.VIEW_AUDIT_LOG] },
     { href: "/admin/settings", label: "Shelter Settings", icon: Settings, permissions: [PERMISSIONS.MANAGE_SETTINGS, PERMISSIONS.SEND_SHELTER_EMAIL] },
-    { href: "/bulletins", label: "Community Bulletins", icon: Bell, permissions: null },
+    { href: "/bulletins", label: "Shelter Bulletins", icon: Bell, permissions: null },
   ].filter(
     (tab) =>
       tab.permissions === null ||

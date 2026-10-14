@@ -3,7 +3,7 @@ import { BulletinFeed } from "@/components/features/bulletins/BulletinFeed";
 import { BulletinsPageIntro } from "@/components/features/bulletins/BulletinsPageIntro";
 
 export const metadata: Metadata = {
-  title: "Bulletins & Updates | Hope for Strays (Petaling Jaya)",
+  title: "Shelter Bulletins | Hope for Strays (Petaling Jaya)",
   description: "Stay updated on shelter clinics, urgent foster needs, volunteer events, and rescue stories from Hope for Strays in Petaling Jaya, Selangor.",
 };
 

@@ -18,20 +18,8 @@ import {
   Package
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { useLanguage } from "@/components/providers/LanguageProvider";
-import type { TranslationDictionary } from "@/lib/i18n/translations";
-
-/**
- * A dot path into the `home` namespace, checked against the dictionary.
- *
- * `t()` takes a plain `string`, and its last resort is to return the path it
- * was handed. So a key renamed in `translations.ts` type-checks clean, passes
- * the key-parity test in `tests/unit/i18n.test.ts`, and renders the literal
- * text `home.step1Title` to a visitor as a card heading. Annotating the keys
- * makes that rename a compile error, the way `BulletinKey` already does for
- * the `bulletins` namespace — the protection was added there and not here.
- */
-type HomeKey = `home.${keyof TranslationDictionary["home"]}`;
+import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
+import type { TranslationKey } from "@/lib/i18n/translations";
 
 /**
  * The two strings `src/app/page.tsx` used to render itself.
@@ -50,13 +38,12 @@ type HomeKey = `home.${keyof TranslationDictionary["home"]}`;
  * `<html lang>` attribute takes the same path rather than being simply wrong —
  * `layout.tsx` serves `lang="en"` and `LanguageProvider` corrects
  * `document.documentElement.lang` in an effect — so the mismatch exists only
- * in the server-rendered document, which is what a crawler reads. No entry in
- * `tasks/open/` covers that today, and closing it means deciding whether `/`
- * gives up ISR: a larger change than this one, not a deferral to a tracker
- * that exists.
+ * in the server-rendered document, which is what a crawler reads. Closing it
+ * means deciding whether `/` gives up ISR, a larger change than this one; it is
+ * tracked in `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`.
  */
 export function HomeGalleryLoading() {
-  const { t } = useLanguage();
+  const t = useTypedTranslation();
 
   return (
     <div className="flex items-center justify-center py-20 text-muted-foreground">
@@ -67,7 +54,7 @@ export function HomeGalleryLoading() {
 }
 
 export function HomeViewAllPetsLink() {
-  const { t } = useLanguage();
+  const t = useTypedTranslation();
 
   return (
     <div className="flex justify-center pt-6">
@@ -224,7 +211,13 @@ export function HomeOurWorkSection() {
 
                 <div className="pt-4 border-t border-border/60">
                   <Link
-                    href={idx === 0 ? "/#how-it-works" : idx === 1 ? "/get-involved" : "/needs"}
+                    // Pillar 0 is TNRM. It used to point at `/#how-it-works`,
+                    // which is the three-step *adoption* journey — harmless
+                    // while that anchor rendered nowhere, misleading once it
+                    // was restored. `/faq` is the page that explains TNRM
+                    // ("Answers on TNRM and community animals"); its category
+                    // is internal state, so the page is as deep as a link goes.
+                    href={idx === 0 ? "/faq" : idx === 1 ? "/get-involved" : "/needs"}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
                   >
                     <span>{isMs ? "Ketahui Lebih Lanjut" : "Learn More"}</span>
@@ -343,9 +336,9 @@ export function HomeQuickActionsSection() {
  * three-step process the cards below actually show.
  */
 export function HomeProcessSection() {
-  const { t } = useLanguage();
+  const t = useTypedTranslation();
 
-  const steps: { num: string; titleKey: HomeKey; descKey: HomeKey; icon: typeof FileText }[] = [
+  const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey; icon: typeof FileText }[] = [
     {
       num: "01",
       titleKey: "home.step1Title",

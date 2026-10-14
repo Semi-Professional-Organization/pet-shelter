@@ -25,24 +25,24 @@ export function Footer() {
               </span>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {t("footer.orgDesc", "A non-profit animal rescue organisation serving Petaling Jaya and Selangor since 2016. Dedicated to rescuing, rehabilitating, and rehoming homeless dogs and cats.")}
+              {t("footer.orgDesc")}
             </p>
           </div>
 
           {/* Column 2: Navigation Links */}
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-foreground mb-3">
-              {t("footer.quickLinksTitle", "Quick Links")}
+              {t("footer.quickLinksTitle")}
             </h3>
             <ul className="space-y-2.5 text-sm">
               <li>
                 <Link href="/pets" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.adoptablePets", "Adoptable Dogs & Cats")}
+                  {t("nav.adoptablePets")}
                 </Link>
               </li>
               <li>
                 <Link href="/applications/track" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.trackApplication", "Track Adoption Application")}
+                  {t("nav.trackApplication")}
                 </Link>
               </li>
               <li>
@@ -52,22 +52,22 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/#how-it-works" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.adoptionProcess", "Adoption Process & Fees")}
+                  {t("nav.adoptionProcess")}
                 </Link>
               </li>
               <li>
                 <Link href="/get-involved#volunteer" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.volunteerFoster", "Volunteer & Foster Care")}
+                  {t("nav.volunteerFoster")}
                 </Link>
               </li>
               <li>
                 <Link href="/donate" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.donate", "Shelter Wishlist & Donations")}
+                  {t("nav.donate")}
                 </Link>
               </li>
               <li>
                 <Link href="/transparency" className="text-muted-foreground hover:text-foreground hover:underline transition-colors font-medium">
-                  {t("nav.transparency", "Where Your Money Goes")}
+                  {t("nav.transparency")}
                 </Link>
               </li>
               <li>
@@ -86,7 +86,7 @@ export function Footer() {
           {/* Column 3: Hours */}
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-foreground mb-3">
-              {t("footer.visitingHoursTitle", "Visiting Hours")}
+              {t("footer.visitingHoursTitle")}
             </h3>
             <div className="space-y-2 text-sm text-muted-foreground">
               <div className="flex items-start gap-2.5">
@@ -94,7 +94,7 @@ export function Footer() {
                 <div>
                   <p className="font-bold text-foreground">{isMs ? "Selasa – Ahad" : "Tuesday – Sunday"}</p>
                   <p className="font-medium">{isMs ? "10:00 Pagi – 5:00 Petang" : "10:00 AM – 5:00 PM"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t("footer.closedMondays", "Closed Mondays for sanctuary deep cleaning")}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t("footer.closedMondays")}</p>
                 </div>
               </div>
             </div>
@@ -103,12 +103,12 @@ export function Footer() {
           {/* Column 4: Location & Contact */}
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wider text-foreground mb-3">
-              {t("footer.locationContactTitle", "Location & Contact")}
+              {t("footer.locationContactTitle")}
             </h3>
             <ul className="space-y-2.5 text-sm text-muted-foreground">
               <li className="flex items-start gap-2.5">
                 <MapPin className="size-4 text-foreground shrink-0 mt-0.5" />
-                <span className="leading-relaxed">{t("footer.address", "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia")}</span>
+                <span className="leading-relaxed">{t("footer.address")}</span>
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="size-4 text-foreground shrink-0" />
@@ -142,20 +142,20 @@ export function Footer() {
           <div className="flex flex-wrap items-center gap-3">
             <p>© 2024 Hope for Strays.</p>
             <span className="text-muted-foreground/40 hidden sm:inline">•</span>
-            <p className="font-mono">{t("footer.rosReg", "ROS Reg: {regNo}", { regNo: PUBLIC_ROS_REGISTRATION_NO })}</p>
+            <p className="font-mono">{t("footer.rosReg", { regNo: PUBLIC_ROS_REGISTRATION_NO })}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-4">
             <Link href="/privacy" className="hover:text-foreground hover:underline font-medium">
-              {t("footer.privacyNotice", "Privacy Notice (PDPA)")}
+              {t("footer.privacyNotice")}
             </Link>
             <span className="text-muted-foreground/40">•</span>
             <Link href="/terms" className="hover:text-foreground hover:underline font-medium">
-              {t("footer.adoptionTerms", "Adoption Terms")}
+              {t("footer.adoptionTerms")}
             </Link>
             <span className="text-muted-foreground/40">•</span>
             <Link href="/admin/login" className="font-semibold hover:text-foreground hover:underline">
-              {t("footer.staffPortal", "Staff Portal")}
+              {t("footer.staffPortal")}
             </Link>
             <span className="text-muted-foreground/40">•</span>
             <LanguageToggle />

@@ -45,10 +45,10 @@ export default async function HomePage() {
 
       <HomeQuickActionsSection />
 
-      {/* 3. Shelter bulletins — headed by home.bulletinsTitle */}
+      {/* 3. Latest bulletins */}
       <section className="border-t border-border bg-background py-10 sm:py-14">
         <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-          <BulletinFeed targetPage="home" maxItems={2} />
+          <BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" maxItems={2} />
         </div>
       </section>
 

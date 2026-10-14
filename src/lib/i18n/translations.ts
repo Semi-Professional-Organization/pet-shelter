@@ -1,5 +1,12 @@
 export type Language = "en" | "ms";
 
+/** Every leaf of the dictionary as a dot path, e.g. `home.step1Title`. */
+type Leaves<T, P extends string = ""> = {
+  [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaves<T[K], `${P}${K}.`>;
+}[keyof T & string];
+
+export type TranslationKey = Leaves<TranslationDictionary>;
+
 export interface TranslationDictionary {
   nav: {
     adoptablePets: string;
@@ -343,7 +350,6 @@ export interface TranslationDictionary {
     filterGeneral: string;
     urgentBadge: string;
     contactCoordinator: string;
-    noBulletins: string;
     allNoticesTitle: string;
     petsFeedTitle: string;
     categoryUrgentNeed: string;
@@ -466,7 +472,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       step2Title: "Meet & Socialize",
       step2Desc: "Spend time interacting with the animal in our outdoor play yard or cat room. If you have resident pets, we arrange a structured, supervised introduction.",
       step3Title: "Finalize & Welcome Home",
-      step3Desc: "Sign our standard adoption agreement with no hidden fees. All animals are already vaccinated, microchipped, and spayed or neutered.",
+      step3Desc: "Sign our standard adoption agreement with zero adoption fees. All animals are already vaccinated, microchipped, and spayed or neutered.",
       protocolsTitle: "Our Animal Welfare Standards",
       protocolsSubtitle: "Built upon clinical veterinary rigor, lifetime accountability, and unconditional compassion.",
       protocol1Title: "Complete Veterinary Protocol",
@@ -722,7 +728,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       filterGeneral: "General",
       urgentBadge: "Urgent Notice",
       contactCoordinator: "WhatsApp Coordinator",
-      noBulletins: "No active bulletins found for the selected category.",
       allNoticesTitle: "All Bulletins",
       petsFeedTitle: "Adoption & Clinic Bulletins",
       categoryUrgentNeed: "Urgent Foster / Need",
@@ -843,7 +848,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       step2Title: "Sesi Suai Kenal & Interaksi",
       step2Desc: "Luangkan masa berinteraksi bersama haiwan pilihan di kawasan riadah luar atau bilik kucing. Pengenalan terselia disediakan jika anda mempunyai haiwan sedia ada.",
       step3Title: "Tandatangan Perjanjian & Bawa Pulang",
-      step3Desc: "Tandatangani perjanjian adopsi rasmi tanpa sebarang yuran tersembunyi. Semua haiwan telah lengkap divaksin, dipasang cip mikro dan dimandulkan.",
+      step3Desc: "Tandatangani perjanjian adopsi rasmi tanpa sebarang yuran adopsi. Semua haiwan telah lengkap divaksin, dipasang cip mikro dan dimandulkan.",
       protocolsTitle: "Piawaian Kebajikan Haiwan Kami",
       protocolsSubtitle: "Berasaskan ketelitian klinikal veterinar, kebertanggungjawaban sepanjang hayat, dan belas kasihan.",
       protocol1Title: "Protokol Veterinar Lengkap",
@@ -1095,7 +1100,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       filterGeneral: "Umum",
       urgentBadge: "Notis Segera",
       contactCoordinator: "WhatsApp Penyelaras",
-      noBulletins: "Tiada buletin aktif dijumpai untuk kategori pilihan.",
       allNoticesTitle: "Semua Buletin",
       petsFeedTitle: "Buletin Adopsi & Klinik",
       categoryUrgentNeed: "Asuhan Segera / Keperluan",

@@ -99,9 +99,9 @@ describe("Home gallery chrome on the Malay site", () => {
 });
 
 describe("BulletinFeed on the Malay site", () => {
-  it("translates the heading it falls back to", () => {
+  it("translates the home page's feed heading", () => {
     seedBulletins([bulletin()]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText("Buletin Terkini")).toBeInTheDocument();
     expect(screen.queryByText("Latest Bulletins")).not.toBeInTheDocument();
@@ -167,7 +167,7 @@ describe("BulletinFeed on the Malay site", () => {
     ["announcement", "Notis", "Notice"],
   ])("translates the %s category chip", (category, malay, english) => {
     seedBulletins([bulletin({ category })]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText(malay)).toBeInTheDocument();
     expect(screen.queryByText(english)).not.toBeInTheDocument();
@@ -175,7 +175,7 @@ describe("BulletinFeed on the Malay site", () => {
 
   it("translates the pinned chip", () => {
     seedBulletins([bulletin({ isPinned: true })]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText("Disemat")).toBeInTheDocument();
     expect(screen.queryByText("Pinned")).not.toBeInTheDocument();
@@ -183,7 +183,7 @@ describe("BulletinFeed on the Malay site", () => {
 
   it("translates the byline", () => {
     seedBulletins([bulletin()]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText(/Dihantar oleh:/)).toBeInTheDocument();
     expect(screen.queryByText(/Posted by:/)).not.toBeInTheDocument();
@@ -191,7 +191,7 @@ describe("BulletinFeed on the Malay site", () => {
 
   it("translates the staff toggle every visitor is shown", () => {
     seedBulletins([bulletin()]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(
       screen.getByRole("button", { name: /Akses Pentadbir Kakitangan/i })
@@ -201,7 +201,7 @@ describe("BulletinFeed on the Malay site", () => {
 
   it("translates the empty state", () => {
     seedBulletins([]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(
       screen.getByText("Tiada kemas kini atau buletin disiarkan untuk bahagian ini.")
@@ -230,9 +230,14 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText("Browse & Submit Application")).toBeInTheDocument();
     expect(screen.getByText("Meet & Socialize")).toBeInTheDocument();
     expect(screen.getByText("Finalize & Welcome Home")).toBeInTheDocument();
-    // The wording the inline ternary had drifted to, which the dictionary does
-    // not use. Its presence would mean the literals came back.
-    expect(screen.queryByText(/zero adoption fees/)).not.toBeInTheDocument();
+    // Step 3 must state the fee policy. An earlier version of this test pinned
+    // the dictionary's "no hidden fees" and asserted "zero adoption fees" was
+    // ABSENT — locking in wording that implies visible fees, on a page whose
+    // own standards section, directly below, says "100% Free Adoption Policy".
+    // The dictionary was the right home for this copy and the wrong source of
+    // it: choosing where a string lives is not choosing what it says.
+    expect(screen.getByText(/zero adoption fees/)).toBeInTheDocument();
+    expect(screen.queryByText(/no hidden fees/)).not.toBeInTheDocument();
   });
 
   it("renders the three steps in Malay, with no English left behind", () => {
@@ -245,6 +250,10 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText("Semak & Hantar Permohonan")).toBeInTheDocument();
     expect(screen.getByText("Sesi Suai Kenal & Interaksi")).toBeInTheDocument();
     expect(screen.getByText("Tandatangan Perjanjian & Bawa Pulang")).toBeInTheDocument();
+    // The same fee-policy pin, in Malay: "tanpa sebarang yuran adopsi" (no
+    // adoption fee at all), not "yuran tersembunyi" (no *hidden* fee).
+    expect(screen.getByText(/tanpa sebarang yuran adopsi/)).toBeInTheDocument();
+    expect(screen.queryByText(/yuran tersembunyi/)).not.toBeInTheDocument();
 
     expect(screen.queryByText("Our Transparent Adoption Journey")).not.toBeInTheDocument();
     expect(screen.queryByText("Adoption Protocol")).not.toBeInTheDocument();
@@ -266,7 +275,7 @@ describe("the home page's English is unchanged", () => {
   // English side is pinned too.
   it("keeps the English copy on the English site", () => {
     seedBulletins([bulletin({ category: "clinic", isPinned: true })]);
-    renderWithLanguage(<BulletinFeed targetPage="home" />);
+    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />);
 
     expect(screen.getByText("Latest Bulletins")).toBeInTheDocument();
     expect(screen.getByText("Clinic / Vaccine")).toBeInTheDocument();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import { useTypedTranslation } from "@/components/providers/LanguageProvider";
 
 /**
  * The `/bulletins` page heading and intro.
@@ -21,7 +21,7 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
  * existed in both locales with no reader.
  */
 export function BulletinsPageIntro() {
-  const { t } = useLanguage();
+  const t = useTypedTranslation();
 
   return (
     <div className="mb-10 max-w-2xl">

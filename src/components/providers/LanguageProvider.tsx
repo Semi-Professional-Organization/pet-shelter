@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useSyncExternalStore, useMemo } from "react";
-import { Language, TranslationDictionary, translations } from "@/lib/i18n/translations";
+import { Language, TranslationDictionary, TranslationKey, translations } from "@/lib/i18n/translations";
 
 interface LanguageContextValue {
   language: Language;
@@ -169,4 +169,25 @@ export function useLanguage(): LanguageContextValue {
     };
   }
   return context;
+}
+
+/**
+ * `t`, restricted to keys that exist in the dictionary.
+ *
+ * `useLanguage().t` takes a plain `string` and, as its last resort, returns
+ * the path it was handed. So a key that is renamed, misspelled or never added
+ * type-checks clean and renders as literal text — `home.step1Title` as a card
+ * heading. Calling through this hook makes that a compile error instead.
+ *
+ * Why a second hook rather than typing `t` itself: typing `t` was tried and
+ * produced 38 errors in nine files. Twenty are dynamic keys that need
+ * threading through as `TranslationKey`; eighteen are keys that exist in
+ * neither dictionary, and so already render English on the Malay site — see
+ * `tasks/open/translation-keys-the-dictionary-does-not-have.md`. Components
+ * move to this hook one at a time; once nothing still needs the untyped form,
+ * `t` itself should take `TranslationKey` and this hook should go.
+ */
+export function useTypedTranslation(): (key: TranslationKey) => string {
+  const { t } = useLanguage();
+  return useCallback((key: TranslationKey) => t(key), [t]);
 }
