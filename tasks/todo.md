@@ -66,6 +66,8 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
 - [x] Round 7: ten findings, all small — the review is converging. Three declined with reasons in
       the decision entry. Filed for the shelter: the launch notices are from August and two are
       pinned.
+- [x] Round 8: converged — "no correctness bugs serious enough to block". Seven low-severity
+      fixes, including a factual error in the public launch-notices entry; one decline.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.

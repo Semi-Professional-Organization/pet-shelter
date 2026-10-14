@@ -24,7 +24,11 @@ import {
   BULLETIN_FEED_ORDER_BY,
   sortBulletinsForFeed,
 } from "@/lib/domain/bulletinOrdering";
-import { isScheduledForLater, startOfNextShelterDay } from "@/lib/domain/bulletinSchedule";
+import {
+  isScheduledForLater,
+  shelterToday,
+  startOfNextShelterDay,
+} from "@/lib/domain/bulletinSchedule";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
@@ -179,6 +183,14 @@ export function isBulletinColumnMissing(err: unknown): boolean {
 }
 
 /**
+ * Whether the "table does not exist yet" warning has been logged in this
+ * process. See the P2021 branch in `getPublicBulletins`, which sets it.
+ * `resetBulletins` clears it, deliberately: that reset is test-only and
+ * clearing the flag is what keeps one test's warning from silencing the next.
+ */
+let warnedTableMissing = false;
+
+/**
  * Whether a failed public read may fall back to the committed fixture.
  *
  * - **No database configured** (`isDatabasePersistent()` false): yes. The
@@ -206,9 +218,6 @@ export function isBulletinColumnMissing(err: unknown): boolean {
  * empty state is worded to be true in both cases ("No updates to show right
  * now"), rather than claiming nothing has been posted.
  */
-/** See the P2021 branch in `getPublicBulletins`. Reset by `resetBulletins`. */
-let warnedTableMissing = false;
-
 function mayServeFixtureAfter(err: unknown): boolean {
   if (!isDatabasePersistent()) return true;
   if (process.env.NODE_ENV !== "production") return true;
@@ -377,10 +386,14 @@ export async function getPublicBulletins(
   // Slice before projecting: `toBulletin` runs the URL allow-list, which builds
   // a `URL` per field, and there is no reason to do that for rows about to be
   // discarded. The query path already gets this right by pushing `take` down.
+  const today = shelterToday();
   const ordered = sortBulletinsForFeed(
     serverBulletins.filter(
       (b) =>
-        b.isPublished && !isScheduledForLater(b.publishedAt) && matchesTarget(b, targetPage)
+        b.isPublished &&
+        // One "today" for the whole pass; see `isScheduledForLater`.
+        !isScheduledForLater(b.publishedAt, today) &&
+        matchesTarget(b, targetPage)
     )
   );
   const limited = limit !== undefined ? ordered.slice(0, limit) : ordered;

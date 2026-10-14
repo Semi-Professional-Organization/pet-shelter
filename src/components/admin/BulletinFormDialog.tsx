@@ -47,19 +47,6 @@ const MEDIA_TYPE_LABELS: Record<(typeof BULLETIN_MEDIA_TYPES)[number], string> =
   video: "Video embed",
 };
 
-/**
- * The default notice date: the SHELTER's today, not the browser's.
- *
- * The date decides when a notice goes live, and the server judges that against
- * `Asia/Kuala_Lumpur` (`@/lib/domain/bulletinSchedule`). A browser-local default
- * disagreed with it for anyone not in Malaysia: an editor in Tokyo or Sydney
- * posting an urgent notice between their midnight and Malaysia's got Malaysia's
- * *tomorrow* as the default, and the notice stayed off every public feed for
- * hours. UTC was wrong the other way, by eight hours, for everyone in Malaysia.
- * Using the server's own rule — `shelterToday` — is the only default that cannot
- * disagree with it.
- */
-
 const EMPTY: BulletinFormInput = {
   category: "announcement",
   targetPage: "all",
@@ -72,7 +59,10 @@ const EMPTY: BulletinFormInput = {
   videoEmbedUrl: "",
   isPinned: false,
   isPublished: true,
-  publishedAt: shelterToday(),
+  // Filled when a create form opens (below), never at module load — a value
+  // computed here would be the day this bundle was evaluated, possibly days
+  // ago in a long-lived tab, and any `reset(EMPTY)` would post with it.
+  publishedAt: "",
 };
 
 const selectClass =
@@ -188,6 +178,11 @@ export function BulletinFormDialog({
         publishedAt: editingBulletin.publishedAt,
       });
     } else if (open) {
+      // The default notice date is the SHELTER's today, not the browser's: the
+      // date decides when a notice goes live and the server judges that in
+      // Asia/Kuala_Lumpur, so a browser-local default could schedule an urgent
+      // notice by accident for an editor outside Malaysia. Using the server's
+      // own rule is the only default that cannot disagree with it.
       reset({ ...EMPTY, publishedAt: shelterToday() });
     }
   }

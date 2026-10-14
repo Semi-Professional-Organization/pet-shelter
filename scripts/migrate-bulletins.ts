@@ -156,14 +156,16 @@ async function main() {
     } catch (err) {
       // ROLLBACK on a connection that has just dropped throws too, and if it
       // escaped it would replace the real failure with "Connection terminated".
+      let rollbackFailed = false;
       try {
         await client.query("ROLLBACK");
-      } catch {
-        // The original error below is the one worth reporting.
+      } catch (rollbackErr) {
+        rollbackFailed = true;
+        console.error("Seed ROLLBACK also failed (the seed error follows):", rollbackErr);
       }
-      // Passing the error tells the pool to destroy this client rather than
-      // hand a broken connection to the next caller.
-      client.release(err instanceof Error ? err : true);
+      // Destroy the client only if ROLLBACK failed — that is the case where the
+      // connection's state is unknown. A rolled-back client is healthy.
+      client.release(rollbackFailed);
       throw err;
     }
     client.release();

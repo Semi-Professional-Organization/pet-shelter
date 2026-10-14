@@ -1658,7 +1658,7 @@ describe("corrections from the sixth review", () => {
     // test above, which is what fails if the read goes back to `lte` midnight.
     // The badge's answer for a row whose stored instant is mid-morning today.
     const now = new Date("2026-10-14T03:00:00.000Z"); // 11:00 in KL
-    expect(isScheduledForLater("2026-10-14T05:00:00.000Z", now)).toBe(false);
+    expect(isScheduledForLater("2026-10-14T05:00:00.000Z", shelterToday(now))).toBe(false);
     expect(startOfNextShelterDay(now) > new Date("2026-10-14T05:00:00.000Z")).toBe(true);
   });
 
@@ -1724,7 +1724,10 @@ describe("corrections from the sixth review", () => {
     expect(prismaMock.bulletin.delete).toHaveBeenCalledTimes(1);
     // And the audit carries what was actually deleted, not a row read earlier.
     const entry = getAuditLogs(10).find((e) => e.action === "BULLETIN_DELETED");
-    expect((entry?.details as Record<string, unknown>).title).toBe("The row delete returned");
+    // Asserted first, so a delete that stops auditing fails as a readable
+    // expectation rather than a TypeError reading `.title` of undefined.
+    expect(entry).toBeDefined();
+    expect(entry?.details).toMatchObject({ title: "The row delete returned" });
   });
 
   it("warns once that the table is missing, not on every request", async () => {

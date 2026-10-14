@@ -41,7 +41,7 @@ import {
 } from "@/lib/presentation/bulletinPresentation";
 import { BULLETIN_CATEGORIES, BulletinFormInput } from "@/lib/validations/bulletin";
 import { BulletinRecord } from "@/types/bulletin";
-import { isScheduledForLater } from "@/lib/domain/bulletinSchedule";
+import { isScheduledForLater, shelterToday } from "@/lib/domain/bulletinSchedule";
 import { cn } from "@/lib/utils";
 
 type CategoryFilter = (typeof BULLETIN_CATEGORIES)[number] | "all";
@@ -162,11 +162,14 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
     [bulletins, category, published, search]
   );
 
+  // One "today" for the whole render, shared by the count and every row's badge,
+  // so the two cannot disagree across the shelter's midnight.
+  const today = shelterToday();
   const publishedCount = bulletins.filter((b) => b.isPublished).length;
   // Published but dated in the future: on no public feed yet. Counted apart so
   // "published" in the summary line means what a visitor can actually see.
   const scheduledCount = bulletins.filter(
-    (b) => b.isPublished && isScheduledForLater(b.publishedAt)
+    (b) => b.isPublished && isScheduledForLater(b.publishedAt, today)
   ).length;
 
   function handleOpenCreate() {
@@ -323,7 +326,7 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
                     {!bulletin.isPublished && (
                       <span className="tone-chip tone-neutral px-2.5 py-0.5">Draft</span>
                     )}
-                    {bulletin.isPublished && isScheduledForLater(bulletin.publishedAt) && (
+                    {bulletin.isPublished && isScheduledForLater(bulletin.publishedAt, today) && (
                       // A published notice with a future date is not on any
                       // public feed yet. Without this badge the editor sees
                       // "published" and a row that appears nowhere.

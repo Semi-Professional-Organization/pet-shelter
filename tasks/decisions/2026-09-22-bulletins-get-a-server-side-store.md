@@ -313,5 +313,23 @@ Declined, with reasons:
   to wait for a third.
 
 Filed for the shelter: `tasks/open/bulletin-launch-notices-are-dated-and-pinned.md`. The seeded
-launch notices are from August and two are pinned, so once they are real rows they lead every
-feed until someone unpins or deletes them.
+launch notices are from August and two are pinned. Once they are real rows the home page leads
+with both until someone unpins or deletes them; the clinic notice, which targets every feed, also
+leads `/pets`.
+
+## Round eight: converged
+
+The reviewer's own verdict: no correctness bugs serious enough to block. Eight low-severity
+findings, seven fixed — one of them a factual error in the public open entry about the launch
+notices (the urgent appeal targets the home page and never appears on `/pets`; the entry had it
+leading every feed), and one the third instance on this branch of code inserted between a JSDoc
+block and its declaration. The scheduling check now takes one "today" per pass, so a render that
+crosses the shelter's midnight cannot badge a notice scheduled while counting it live.
+
+Declined: decoupling the log-once flag from `resetBulletins`. That reset is test-only, and clearing
+the flag there is what stops one test's warning from silencing the next.
+
+Eight review rounds, 29 mutants killed. The review history above is the most useful thing in this
+entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
+took four attempts, and the seeding rule that one round reversed are each a pattern with its own
+lesson file.

@@ -19,17 +19,24 @@
 const SHELTER_TIME_ZONE = "Asia/Kuala_Lumpur";
 
 /**
- * Built once. An `Intl.DateTimeFormat` is an ICU object and not cheap, and
- * `shelterToday` runs per row — twice per row in the admin table, once per row
- * on the fixture path — so constructing one per call was 2N for a value that
- * cannot change within a render.
+ * Built once, on first use. An `Intl.DateTimeFormat` is an ICU object and not
+ * cheap, so constructing one per call cost one per row.
+ *
+ * Lazily rather than at module scope: on a runtime whose ICU lacks this zone
+ * the constructor throws `RangeError`, and at module scope that would fail the
+ * *import* — taking down every module that imports this one, the repository
+ * included — instead of just the call that needed the date.
  */
-const SHELTER_DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
-  timeZone: SHELTER_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
+let shelterDayFormat: Intl.DateTimeFormat | undefined;
+function getShelterDayFormat(): Intl.DateTimeFormat {
+  shelterDayFormat ??= new Intl.DateTimeFormat("en-CA", {
+    timeZone: SHELTER_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return shelterDayFormat;
+}
 
 /**
  * The shelter's calendar day as `YYYY-MM-DD`.
@@ -43,7 +50,7 @@ const SHELTER_DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
  * in the donation ledger reads the parts for the same reason.
  */
 export function shelterToday(now: Date = new Date()): string {
-  const parts = SHELTER_DAY_FORMAT.formatToParts(now);
+  const parts = getShelterDayFormat().formatToParts(now);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
@@ -65,8 +72,15 @@ export function startOfNextShelterDay(now: Date = new Date()): Date {
   return new Date(today.getTime() + 24 * 60 * 60 * 1000);
 }
 
-/** True when a published notice is dated after the shelter's today. */
-export function isScheduledForLater(publishedAt: string, now: Date = new Date()): boolean {
+/**
+ * True when a published notice is dated after the shelter's today.
+ *
+ * Pass `today` when checking many rows. Computing it per row is not just slower:
+ * a pass that runs across the shelter's midnight would judge earlier rows
+ * against yesterday and later rows against today, so one render could badge a
+ * notice dated today as scheduled while counting it as live.
+ */
+export function isScheduledForLater(publishedAt: string, today: string = shelterToday()): boolean {
   // Day strings compare correctly as text because both are `YYYY-MM-DD`.
-  return publishedAt.slice(0, 10) > shelterToday(now);
+  return publishedAt.slice(0, 10) > today;
 }
