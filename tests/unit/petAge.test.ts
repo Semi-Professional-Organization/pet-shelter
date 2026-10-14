@@ -216,6 +216,30 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(approximateBirthDate("1 y/o", "2026-06-12").birthDate).toBe("2025-06-12");
     });
 
+    /**
+     * One assertion per accepted spelling that nothing above reaches.
+     *
+     * The unit patterns are a closed list behind a word boundary, so dropping any one spelling does
+     * not fail loudly — that age silently falls through to the intake date, which is the very
+     * failure the list exists to prevent. A `/code-review max` mutation sweep on 2026-10-14 removed
+     * spellings one at a time and found these seven survived: a mutant dropping all of them passed
+     * the suite 27/27. Each line below is here to kill exactly one of those mutants.
+     */
+    it("reads every accepted spelling, not just the common ones", () => {
+      const intake = "2026-06-12";
+      // Malay singles — the vocabulary the docstring is about, with no direct assertion until now.
+      expect(approximateBirthDate("2 tahun", intake).birthDate).toBe("2024-06-12");
+      expect(approximateBirthDate("3 thn", intake).birthDate).toBe("2023-06-12");
+      expect(approximateBirthDate("6 bln", intake).birthDate).toBe("2025-12-12");
+      // The bare one-letter month, which the boundary makes easy to lose.
+      expect(approximateBirthDate("3 m", intake).birthDate).toBe("2026-03-12");
+      // Singular forms whose plurals are pinned above, so `s?` cannot quietly become `s`.
+      expect(approximateBirthDate("1 yr", intake).birthDate).toBe("2025-06-12");
+      expect(approximateBirthDate("1 week", intake).birthDate).toBe("2026-06-05");
+      // And the plural of the misspelling the app has always read via the bare `m`.
+      expect(approximateBirthDate("3 mnths", intake).birthDate).toBe("2026-03-12");
+    });
+
     it("lets the largest unit win in a compound age", () => {
       // Weeks are matched last for this reason: a month plus weeks is a month, the way a year
       // plus months is a year.
