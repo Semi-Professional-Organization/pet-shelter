@@ -48,14 +48,6 @@ export const BULLETIN_IMAGE_HOSTS = Object.freeze([
 ] as const);
 
 /**
- * Hosts allowed in an `<iframe src>`.
- *
- * Narrower than the image list on purpose: an image host can at worst serve the
- * wrong picture, whereas an embed host runs code. `youtube-nocookie` is first
- * because it is what the shipped fixture uses and what staff should prefer — it
- * does not set tracking cookies on a visitor who never plays the video.
- */
-/**
  * One frozen rule. `Object.freeze` is shallow: freezing only the array left each
  * `{ host, prefix }` object writable, so page script could still set
  * `BULLETIN_EMBED_RULES[0].prefix = "/"` and widen the client-side check — the
@@ -64,6 +56,15 @@ export const BULLETIN_IMAGE_HOSTS = Object.freeze([
  */
 const embedRule = (host: string, prefix: string) => Object.freeze({ host, prefix });
 
+/**
+ * Hosts allowed in an `<iframe src>`, each with the path an embeddable URL on
+ * it must start with.
+ *
+ * Narrower than the image list on purpose: an image host can at worst serve the
+ * wrong picture, whereas an embed host runs code. `youtube-nocookie` is first
+ * because it is what staff should prefer — it does not set tracking cookies on
+ * a visitor who never plays the video.
+ */
 export const BULLETIN_EMBED_RULES = Object.freeze([
   embedRule("www.youtube-nocookie.com", "/embed/"),
   embedRule("youtube-nocookie.com", "/embed/"),

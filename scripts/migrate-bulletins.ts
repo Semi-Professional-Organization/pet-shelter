@@ -1,11 +1,12 @@
 /**
  * Applies the community bulletin migration and seeds `src/data/bulletins.json` into it.
  *
- * **Re-running it never touches content.** The launch notices are inserted only
- * by the run that creates the table, so a re-run cannot overwrite a notice staff
- * edited (that is what `ON CONFLICT DO NOTHING` alone guarded) nor bring back one
- * they deleted (which it did not). `--seed` forces the insert, still with
- * `DO NOTHING`, for a first run that failed partway through seeding.
+ * **It seeds an empty table and leaves a non-empty one alone.** The launch
+ * notices go in, all four in one transaction, only when `bulletins` holds no
+ * rows — however the table came to exist, whether this script created it or the
+ * SQL was applied another way first. A table with any rows is staff content and
+ * is not touched, so a re-run cannot overwrite a notice staff edited or bring
+ * back one they deleted.
  *
  * Separate from `prisma/seed.ts` for the reason `migrate-faqs.ts` gives: that
  * script is refused against anything but a local database
@@ -85,77 +86,84 @@ async function main() {
     console.log("Removed      :", removed.join(", ") || "(none)");
 
     /**
-     * Seed only when THIS run created the table — or when an operator asks for
-     * it explicitly with `--seed`.
+     * Seed an EMPTY table; leave a non-empty one alone.
      *
-     * `ON CONFLICT DO NOTHING` (below) protects a notice staff have edited, but
-     * not one they have DELETED: a deleted row has no conflict to collide with,
-     * so a re-run would put it straight back, published and pinned, through
-     * `pg`, with no audit entry. And re-runs are expected — this file is
-     * idempotent and also carries the clean-up that drops a retired index — so
-     * "safe to re-run" has to mean safe for the content as well as the schema.
+     * Two earlier rules each failed a real case:
      *
-     * The escape hatch is for one case: a first run that created the table and
-     * then failed partway through seeding. It still inserts with DO NOTHING.
+     * - "Seed every run, ON CONFLICT DO NOTHING" protected a notice staff had
+     *   edited but not one they had DELETED — a deleted row has no conflict to
+     *   collide with — so a re-run put it straight back, pinned, through `pg`,
+     *   with no audit entry.
+     * - "Seed only when this run created the table" broke the launch instead.
+     *   The migration's own header names `prisma db execute --file` as a way to
+     *   apply it; applied that way, or by `db:push`, the table already exists
+     *   when this script runs, so it seeded nothing — and once the table exists
+     *   production stops falling back to the fixture, so every public feed
+     *   would have been empty from day one.
+     *
+     * "Empty" is the honest test for "has anyone put content here yet". Its one
+     * residual case is stated rather than hidden: if staff delete EVERY notice
+     * and someone then re-runs this, the four launch notices return. That is
+     * far rarer than the launch path above, and visible — this prints what it
+     * did.
+     *
+     * One transaction, under the same advisory lock as the migration file: the
+     * emptiness check and the inserts cannot be split by a concurrent run, and
+     * a failure partway rolls the seed back instead of leaving a half-seeded
+     * table that the next run would then refuse to touch.
      */
-    const createdNow = added.includes("bulletins");
-    const forceSeed = process.argv.includes("--seed");
-    if (!createdNow && !forceSeed) {
-      const total = await pool.query('select count(*)::int n from "bulletins"');
-      console.log(
-        `Seeded       : skipped — "bulletins" already existed (${total.rows[0].n} rows). ` +
-          "The launch notices are not re-applied: staff own this table's content now, " +
-          "and re-inserting would bring back any they deleted. Pass --seed only to " +
-          "finish a first run that failed partway through seeding."
-      );
-      return;
+    const client = await pool.connect();
+    let inserted = 0;
+    let skippedWith: number | null = null;
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(4210771001)");
+      const existing = await client.query('select count(*)::int n from "bulletins"');
+      if (existing.rows[0].n > 0) {
+        skippedWith = existing.rows[0].n;
+      } else {
+        for (const bulletin of bulletinsData) {
+          const res = await client.query(
+            `INSERT INTO "bulletins"
+               ("id","category","targetPage","title","content","titleMs","contentMs",
+                "mediaType","mediaUrl","videoEmbedUrl","isPinned","isPublished",
+                "authorName","publishedAt","updatedAt")
+             VALUES ($1, $2::"BulletinCategory", $3::"BulletinTargetPage", $4, $5, $6, $7,
+                     $8::"BulletinMediaType", $9, $10, $11, $12, $13, $14::date, NOW())`,
+            [
+              bulletin.id,
+              bulletin.category,
+              bulletin.targetPage,
+              bulletin.title,
+              bulletin.content,
+              bulletin.titleMs,
+              bulletin.contentMs,
+              bulletin.mediaType,
+              bulletin.mediaUrl,
+              bulletin.videoEmbedUrl,
+              bulletin.isPinned,
+              bulletin.isPublished,
+              bulletin.authorName,
+              bulletin.publishedAt,
+            ]
+          );
+          inserted += res.rowCount ?? 0;
+        }
+      }
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
     }
 
-    let inserted = 0;
-    for (const bulletin of bulletinsData) {
-      /**
-       * `DO NOTHING`, not `DO UPDATE`.
-       *
-       * This script can be pointed at a hosted branch — that is the whole
-       * reason it exists apart from `prisma/seed.ts`, which refuses anything
-       * but localhost. So a row it meets again is a row staff may have edited
-       * through /admin/bulletins since it was seeded. An upsert would snap the
-       * title, body, image and notice date back to the committed fixture with
-       * no warning, no audit entry and no way to tell it had happened, because
-       * this writes through `pg` rather than through the repository.
-       *
-       * The fixture is launch content. Once a notice exists, the editor owns
-       * it. Correcting seeded copy is an edit in the admin screen, not a
-       * re-run of this script — and if the fixture really must be reimposed,
-       * that is a deliberate `DELETE` first, typed out by a human who has read
-       * this paragraph.
-       */
-      const res = await pool.query(
-        `INSERT INTO "bulletins"
-           ("id","category","targetPage","title","content","titleMs","contentMs",
-            "mediaType","mediaUrl","videoEmbedUrl","isPinned","isPublished",
-            "authorName","publishedAt","updatedAt")
-         VALUES ($1, $2::"BulletinCategory", $3::"BulletinTargetPage", $4, $5, $6, $7,
-                 $8::"BulletinMediaType", $9, $10, $11, $12, $13, $14::date, NOW())
-         ON CONFLICT ("id") DO NOTHING`,
-        [
-          bulletin.id,
-          bulletin.category,
-          bulletin.targetPage,
-          bulletin.title,
-          bulletin.content,
-          bulletin.titleMs,
-          bulletin.contentMs,
-          bulletin.mediaType,
-          bulletin.mediaUrl,
-          bulletin.videoEmbedUrl,
-          bulletin.isPinned,
-          bulletin.isPublished,
-          bulletin.authorName,
-          bulletin.publishedAt,
-        ]
+    if (skippedWith !== null) {
+      console.log(
+        `Seeded       : skipped — "bulletins" already holds ${skippedWith} rows, which ` +
+          "are staff content. The launch notices go into an empty table only."
       );
-      inserted += res.rowCount ?? 0;
+      return;
     }
 
     const counts = await pool.query(
@@ -163,9 +171,8 @@ async function main() {
     );
     const total = await pool.query('select count(*)::int n from "bulletins"');
     console.log(
-      `Seeded       : ${inserted} new of ${bulletinsData.length} fixture notices, ` +
-        `${total.rows[0].n} rows total ` +
-        `(${bulletinsData.length - inserted} already present and left untouched)`
+      `Seeded       : ${inserted} launch notices into an empty table, ` +
+        `${total.rows[0].n} rows total`
     );
     for (const row of counts.rows as { category: string; n: number }[]) {
       console.log(`  ${row.category.padEnd(14)} ${row.n}`);

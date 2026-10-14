@@ -27,7 +27,11 @@ import {
   presentBulletinCategory,
 } from "@/lib/presentation/bulletinPresentation";
 import { getRevalidatedPaths, revalidatePathSpy } from "../setup/nextMocks";
-import { shelterToday } from "@/lib/domain/bulletinSchedule";
+import {
+  isScheduledForLater,
+  shelterToday,
+  startOfNextShelterDay,
+} from "@/lib/domain/bulletinSchedule";
 import {
   BULLETIN_FEED_ORDER_BY,
   sortBulletinsForFeed,
@@ -736,7 +740,7 @@ describe("getPublicBulletins", () => {
     expect(scoped.where).toEqual({
       isPublished: true,
       // The schedule predicate: notices dated after the shelter's today stay off.
-      publishedAt: { lte: expect.any(Date) },
+      publishedAt: { lt: expect.any(Date) },
       targetPage: { in: ["all", "home"] },
     });
     // Every tiebreaker DESC. `publishedAt` is a calendar day, so ties are
@@ -753,7 +757,7 @@ describe("getPublicBulletins", () => {
     await getPublicBulletins("all");
     expect(lastQuery(prismaMock.bulletin.findMany).where).toEqual({
       isPublished: true,
-      publishedAt: { lte: expect.any(Date) },
+      publishedAt: { lt: expect.any(Date) },
       targetPage: undefined,
     });
   });
@@ -1452,9 +1456,10 @@ describe("corrections from the fifth review", () => {
     it("serves NO notices in production when the table exists but the read fails", async () => {
       // The fixture would bring back notices staff deleted and hide everything
       // they posted, and `/` and `/bulletins` are ISR, so that render would be
-      // cached as the good page for up to five minutes. Empty asserts nothing
-      // false. And it must be logged: production otherwise swallows it silently.
+      // cached as the good page for up to five minutes. And it must be logged:
+      // production otherwise swallows it silently.
       vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("DATABASE_URL", "postgresql://u:p@db.example/x");
       prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P1001"));
       const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
 
@@ -1467,6 +1472,7 @@ describe("corrections from the fifth review", () => {
       // launch content the migration would seed — what visitors saw before this
       // feature — so serving it is correct, not a resurrection.
       vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("DATABASE_URL", "postgresql://u:p@db.example/x");
       prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P2021"));
       const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
 
@@ -1478,6 +1484,7 @@ describe("corrections from the fifth review", () => {
       // P2022 means the table exists and holds staff content under a drifted
       // schema; the fixture would hide that content.
       vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("DATABASE_URL", "postgresql://u:p@db.example/x");
       prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P2022"));
       const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
 
@@ -1569,7 +1576,9 @@ describe("corrections from the fifth review", () => {
     // "A delete is the one change nothing else records" — so the Malay copy and
     // media have to be in the entry, or they are gone for good.
     sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
-    prismaMock.bulletin.findUnique.mockResolvedValue(
+    // What `delete` RETURNS is what the audit must record — not a row read
+    // beforehand, which an edit landing in between would make stale.
+    prismaMock.bulletin.delete.mockResolvedValue(
       dbRow({ titleMs: "Notis", videoEmbedUrl: ALLOWED_EMBED, mediaType: "video" })
     );
     const { resetAuditLogs, getAuditLogs } = await import("@/lib/domain/auditLog");
@@ -1600,5 +1609,106 @@ describe("corrections from the fifth review", () => {
     expect(BULLETIN_TARGET_PAGE_LABELS.home).toMatch(/Bulletins page/);
     expect(BULLETIN_TARGET_PAGE_LABELS.pets).toMatch(/Bulletins page/);
     expect(BULLETIN_TARGET_PAGE_LABELS.bulletins).toMatch(/only/i);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Sixth review round                                                          */
+/* -------------------------------------------------------------------------- */
+
+describe("corrections from the sixth review", () => {
+  const prismaError = (code: string) =>
+    Object.assign(new Error(`prisma ${code}`), { name: "PrismaClientKnownRequestError", code });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reads 'today' in the shelter's zone, not UTC", () => {
+    // 17:00 UTC on the 13th is 01:00 on the 14th in Kuala Lumpur. A UTC
+    // reading says the 13th and would hide a notice an overnight volunteer
+    // dated today for up to eight hours. Fixed instants, so swapping the zone
+    // or reading UTC fails here — the scheduling test computes its dates with
+    // shelterToday itself and could not tell.
+    expect(shelterToday(new Date("2026-10-13T17:00:00.000Z"))).toBe("2026-10-14");
+    expect(shelterToday(new Date("2026-10-13T15:59:00.000Z"))).toBe("2026-10-13");
+  });
+
+  it("bounds the feed at the start of the shelter's tomorrow, exclusively", async () => {
+    // `< tomorrow's midnight`, not `<= today's`: the column defaults to now(),
+    // so a row inserted other than through the form carries a time of day and
+    // `<= midnight` hid it until the next day while the admin badge called it
+    // live. Pinned to an exact instant.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-13T17:00:00.000Z")); // the 14th in KL
+    prismaMock.bulletin.findMany.mockResolvedValue([]);
+    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+    await getPublicBulletins("all");
+    const where = lastQuery(prismaMock.bulletin.findMany).where as {
+      publishedAt: { lt: Date };
+    };
+    expect(where.publishedAt.lt.toISOString()).toBe("2026-10-15T00:00:00.000Z");
+  });
+
+  it("agrees with the bound for a row stored at a time of day", () => {
+    // The badge's answer for a row whose stored instant is mid-morning today.
+    const now = new Date("2026-10-14T03:00:00.000Z"); // 11:00 in KL
+    expect(isScheduledForLater("2026-10-14T05:00:00.000Z", now)).toBe(false);
+    expect(startOfNextShelterDay(now) > new Date("2026-10-14T05:00:00.000Z")).toBe(true);
+  });
+
+  it("serves the fixture when no database is configured at all, even in production", async () => {
+    // With no DATABASE_URL the fixture is the only data there is. Asking
+    // NODE_ENV instead made a production build with no database prerender an
+    // empty feed and log an error for every page.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "");
+    prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P1001"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+    const ids = (await getPublicBulletins("all")).map((b) => b.id);
+    expect(ids).toContain("bulletin-001");
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("logs when production serves the fixture because the table is missing", async () => {
+    // The likeliest production failure (deployed before the migration) was the
+    // one path that left no trace: production swallows the read error, and
+    // this branch skipped the log.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "postgresql://u:p@db.example/x");
+    prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P2021"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+    await getPublicBulletins("all");
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/does not exist yet/));
+    warnSpy.mockRestore();
+  });
+
+  it("does not send an editor to the table migration for a missing column", async () => {
+    // Re-running that migration only creates what is absent; it cannot add a
+    // column, so naming it for P2022 points at the wrong fix.
+    sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
+    prismaMock.bulletin.create.mockRejectedValue(prismaError("P2022"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { createBulletinAction } = await import("@/actions/bulletins");
+
+    const res = await createBulletinAction(formInput());
+    expect(res.error).toMatch(/out of date/i);
+    expect(res.error).not.toMatch(/20260922_community_bulletins/);
+    errorSpy.mockRestore();
+  });
+
+  it("deletes in one round trip, auditing the row the delete returned", async () => {
+    sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
+    const { deleteBulletinAction } = await import("@/actions/bulletins");
+
+    await deleteBulletinAction("bulletin-db-1");
+    expect(prismaMock.bulletin.findUnique).not.toHaveBeenCalled();
+    expect(prismaMock.bulletin.delete).toHaveBeenCalledTimes(1);
   });
 });

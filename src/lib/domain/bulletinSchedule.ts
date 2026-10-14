@@ -2,47 +2,63 @@
  * When a published bulletin becomes visible.
  *
  * A notice date in the future SCHEDULES the notice: it stays off the public
- * feeds until that day. Before this existed the feed had no `publishedAt <= now`
- * predicate and sorted `publishedAt` descending, while `/` and `/pets` show two
- * notices — so a clinic announcement dated for next month published at once and
- * took the top unpinned slot above every notice posted today, urgent ones
- * included, for weeks, with nothing on screen saying why.
+ * feeds until that day. Before this existed the feed had no date predicate and
+ * sorted `publishedAt` descending, while `/` and `/pets` show two notices — so a
+ * clinic announcement dated for next month published at once and took the top
+ * unpinned slot above every notice posted today, urgent ones included.
  *
  * "Today" is the shelter's day, in `Asia/Kuala_Lumpur`, the zone the rest of
  * this codebase renders in (`src/lib/server/donationLedger.ts` explains why for
  * receipts). UTC would be wrong in a way staff would hit: Malaysia is UTC+8, so
- * between midnight and 08:00 local the UTC date is still yesterday, and an
- * overnight volunteer's urgent notice — which the form dates *today*, local —
- * would stay hidden for up to eight hours.
+ * between midnight and 08:00 local the UTC date is still yesterday.
  *
- * Pure and dependency-free so the admin table can badge a notice "Scheduled"
- * with exactly the rule the server applies.
+ * Pure and dependency-free, so the admin table badges a notice "Scheduled" and
+ * the form defaults its date with exactly the rule the server applies.
  */
 
 const SHELTER_TIME_ZONE = "Asia/Kuala_Lumpur";
 
-/** The shelter's calendar day as `YYYY-MM-DD`. */
+/**
+ * The shelter's calendar day as `YYYY-MM-DD`.
+ *
+ * Assembled from `formatToParts`, not from `format()`. The order and separators
+ * of a formatted date come from the runtime's locale data, which is not part of
+ * the contract: `en-CA` happens to produce `YYYY-MM-DD` in current ICU builds,
+ * and if it ever did not, the server would build an Invalid Date (Prisma
+ * rejects it, the read fails, every feed empties) and the browser would compare
+ * `"2026-…" > "10/14/2026"` and badge every notice Scheduled. `receiptScopeFor`
+ * in the donation ledger reads the parts for the same reason.
+ */
 export function shelterToday(now: Date = new Date()): string {
-  // `en-CA` formats as YYYY-MM-DD, which is why it is used here rather than for
-  // any display reason.
-  return new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: SHELTER_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 /**
- * The shelter's day as the instant `publishedAt` is stored at: midnight UTC of
- * that calendar day. Notice dates are written that way (see `parseNoticeDate`
- * in the repository), so `publishedAt <= this` means "dated today or earlier".
+ * The exclusive upper bound for "dated today or earlier", in the column's terms:
+ * midnight UTC at the start of the shelter's *tomorrow*.
+ *
+ * Exclusive and next-day rather than `<=` today's midnight, because the bound
+ * must hold for any instant within a day, not just midnight. Notice dates the
+ * form writes are midnight UTC, but the column defaults to `now()`, so a row
+ * inserted any other way carries a time of day; `<= midnight` would hide it
+ * until tomorrow while the admin badge — which compares day strings — called it
+ * live. `< tomorrow's midnight` gives both the same answer.
  */
-export function shelterTodayAsStoredInstant(now: Date = new Date()): Date {
-  return new Date(`${shelterToday(now)}T00:00:00.000Z`);
+export function startOfNextShelterDay(now: Date = new Date()): Date {
+  const today = new Date(`${shelterToday(now)}T00:00:00.000Z`);
+  return new Date(today.getTime() + 24 * 60 * 60 * 1000);
 }
 
 /** True when a published notice is dated after the shelter's today. */
 export function isScheduledForLater(publishedAt: string, now: Date = new Date()): boolean {
-  return publishedAt > shelterToday(now);
+  // Day strings compare correctly as text because both are `YYYY-MM-DD`.
+  return publishedAt.slice(0, 10) > shelterToday(now);
 }

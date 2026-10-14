@@ -69,9 +69,8 @@ export default async function AdminBulletinsPage() {
           Bulletins are unavailable
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          {result.error ?? "The bulletin list could not be loaded."} The public
-          feeds read the same database, so until it is reachable they cannot
-          show what staff have posted either.
+          {result.error ?? "The bulletin list could not be loaded."} Until this
+          is fixed, the public feeds cannot show anything posted here either.
         </p>
       </div>
     );

@@ -10,9 +10,13 @@
 -- rehearsal.
 --
 -- Applied with `npm run db:migrate:bulletins`, which runs this file and then
--- INSERTS src/data/bulletins.json, leaving any row that already exists alone —
--- a re-run cannot revert a notice staff have edited. Written by hand rather than
--- applied with
+-- seeds src/data/bulletins.json — but only into an EMPTY table, so a re-run
+-- cannot revert a notice staff have edited or bring back one they deleted. If
+-- this file is applied some other way (e.g. `prisma db execute --file`), run
+-- that script afterwards anyway: it sees the empty table and seeds it, and the
+-- public feeds need the launch notices once the table exists.
+--
+-- Written by hand rather than applied with
 -- `prisma db push` for the reason 20260903_faq_knowledge_base/migration.sql
 -- gives, and for one more that is specific to today:
 --

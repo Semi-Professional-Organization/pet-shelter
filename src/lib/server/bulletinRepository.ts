@@ -24,23 +24,22 @@ import {
   BULLETIN_FEED_ORDER_BY,
   sortBulletinsForFeed,
 } from "@/lib/domain/bulletinOrdering";
-import {
-  isScheduledForLater,
-  shelterTodayAsStoredInstant,
-} from "@/lib/domain/bulletinSchedule";
+import { isScheduledForLater, startOfNextShelterDay } from "@/lib/domain/bulletinSchedule";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
-import { handlePersistenceError } from "@/lib/persistenceMode";
+import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
 
 /**
  * Bulletin reads and writes over the repository layer.
  *
- * Storage strategy matches `./faqRepository`: Prisma when a database is
- * reachable, the committed `src/data/bulletins.json` fixture when it is not, so
- * the public feed still renders during an outage and the unit suite needs no
- * database. As with FAQ — and unlike the older pet path — an *empty* result is
- * not treated as an outage; see `getPublicBulletins`.
+ * Storage follows `./faqRepository` with one deliberate departure. Prisma is
+ * the source; the committed `src/data/bulletins.json` fixture is what serves
+ * when there is no database (local development, the unit suite) or when the
+ * table does not exist yet. Unlike FAQ, a *failed* read against a database that
+ * holds staff content does not serve the fixture in production — it serves no
+ * notices; `mayServeFixtureAfter` says why. As with FAQ, an *empty* result is an
+ * answer, not an outage; see `getPublicBulletins`.
  *
  * This module is the only bulletin code permitted to touch Prisma
  * (docs/architecture/LAYERS.md, L-B2); `src/actions/bulletins.ts` calls in here.
@@ -134,37 +133,59 @@ export function resetBulletins(): void {
  */
 
 /**
- * Prisma's "record to update/delete does not exist". Reached when a row is
- * deleted between an editor opening it and acting on it; mapped to the action's
- * not-found answer rather than reported as a generic failure.
+ * Resolves to `null` when Prisma reports the row gone (P2025); rethrows
+ * anything else.
+ *
+ * Reached when a notice is deleted between an editor opening it and acting on
+ * it, and mapped to the action's "no longer exists" rather than a generic
+ * failure with a logged stack. The same shape as the private helper of the same
+ * name in `./transparencyRepository` — two copies, which AGENTS.md's
+ * "Boundaries and duplication" says to leave until a third occurrence.
  */
-function isRecordMissing(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    (err as { code?: unknown }).code === "P2025"
-  );
+async function orNullIfMissing<T>(operation: () => Promise<T>): Promise<T | null> {
+  try {
+    return await operation();
+  } catch (err) {
+    if (prismaCode(err) === "P2025") return null;
+    throw err;
+  }
+}
+
+function prismaCode(err: unknown): unknown {
+  return typeof err === "object" && err !== null ? (err as { code?: unknown }).code : undefined;
 }
 
 /**
- * True when the `bulletins` table (P2021) or one of its columns (P2022) does not
- * exist — the state of any database the hand-run migration has not reached.
+ * The `bulletins` table does not exist (P2021): a database the hand-run
+ * migration has not reached. Running that migration is the fix.
  *
- * Exported because the action layer needs the same answer to tell an editor
- * *why* nothing saves: `isDatabaseUnavailable` covers connectivity, not a
- * schema that was never applied.
+ * Exported because the action layer must tell an editor *why* nothing saves —
+ * `isDatabaseUnavailable` covers connectivity, not a schema never applied.
  */
-export function isBulletinSchemaMissing(err: unknown): boolean {
-  if (typeof err !== "object" || err === null) return false;
-  const code = (err as { code?: unknown }).code;
-  return code === "P2021" || code === "P2022";
+export function isBulletinTableMissing(err: unknown): boolean {
+  return prismaCode(err) === "P2021";
+}
+
+/**
+ * The table exists but a column the code expects does not (P2022): a schema
+ * that has drifted behind the code. Kept apart from a missing table because the
+ * fix differs — re-running the bulletin migration cannot help (it only creates
+ * what is absent, with `IF NOT EXISTS`), so an editor sent there would be sent
+ * to the wrong place.
+ */
+export function isBulletinColumnMissing(err: unknown): boolean {
+  return prismaCode(err) === "P2022";
 }
 
 /**
  * Whether a failed public read may fall back to the committed fixture.
  *
- * - **Outside production**: yes. The fixture is the offline dataset that local
- *   development without a database, and the unit suite, run on.
+ * - **No database configured** (`isDatabasePersistent()` false): yes. The
+ *   fixture is the only data there is — local development, the unit suite, and
+ *   a `next build` with no `DATABASE_URL`. An earlier revision asked
+ *   `NODE_ENV` instead, which is the wrong question: a production build with no
+ *   database then prerendered an empty feed and logged an error per page.
+ * - **Outside production**: yes, for the same development convenience.
  * - **In production, table missing (P2021)**: yes. That is a deploy that landed
  *   before the migration, and the fixture is precisely the launch content the
  *   migration would seed — what visitors saw before this feature existed.
@@ -172,29 +193,22 @@ export function isBulletinSchemaMissing(err: unknown): boolean {
  *   contents. Serving the fixture on a transient failure would bring back
  *   notices staff have deleted or unpublished and hide everything they posted,
  *   and `/` and `/bulletins` are ISR, so that render would be cached as the good
- *   page for up to five minutes. An empty feed asserts nothing false; the
- *   fixture would.
+ *   page for up to five minutes. A missing *column* (P2022) is in this branch
+ *   too: the table exists and holds staff content under a drifted schema.
  *
- * Why empty rather than throwing, which on an ISR page would keep serving the
- * last good render: `/` reads pets, impact stats and bulletins in one
+ * Why no notices rather than throwing, which on an ISR page would keep serving
+ * the last good render: `/` reads pets, impact stats and bulletins in one
  * `Promise.all`, so a throw on a cold render (a fresh deploy, a new region)
  * takes the whole home page down to the error boundary over one section; and
  * `/pets` is `force-dynamic`, where it would fail every request for as long as
- * the outage lasted. Losing the news section beats losing the page.
- *
- * A local `next build` in a worktree has no database, so it logs the
- * `[bulletins] public read failed` error once for each prerendered page that
- * reads bulletins, and prerenders those pages with an empty feed. That is this
- * policy working, not a broken build; a Vercel build has `DATABASE_URL` and
- * does not reach this branch unless the database is genuinely down.
+ * the outage lasted. Losing the news section beats losing the page. The feed's
+ * empty state is worded to be true in both cases ("No updates to show right
+ * now"), rather than claiming nothing has been posted.
  */
 function mayServeFixtureAfter(err: unknown): boolean {
+  if (!isDatabasePersistent()) return true;
   if (process.env.NODE_ENV !== "production") return true;
-  // P2021 only. A missing *column* (P2022) means a table that exists and holds
-  // staff content under a drifted schema — the fixture would hide that content.
-  return (
-    typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2021"
-  );
+  return isBulletinTableMissing(err);
 }
 
 /**
@@ -289,9 +303,10 @@ function matchesTarget(record: { targetPage: BulletinTargetPage }, page: Bulleti
  * A successful query returning no rows is an ANSWER — staff have unpublished
  * everything, or nothing targets this page — not an outage. Substituting the
  * fixture there would resurrect retracted notices and leave no way to empty the
- * feed, so only a thrown error falls back. This is the settled repo-wide
- * position; `tests/integration/faqEmptyPublishSet.test.ts` pins it for FAQ and
- * `getServerPetsAsync` was brought onto it afterwards.
+ * feed. That much is the settled repo-wide position;
+ * `tests/integration/faqEmptyPublishSet.test.ts` pins it for FAQ. What a
+ * *thrown* error serves is narrower here than for FAQ: see
+ * `mayServeFixtureAfter`.
  *
  * `limit` is pushed into the query rather than sliced afterwards: the ordering
  * is the database's, so `take` returns the notices a page would have shown
@@ -314,7 +329,7 @@ export async function getPublicBulletins(
         isPublished: true,
         // A future notice date schedules the notice; see
         // `@/lib/domain/bulletinSchedule` for why "today" is the shelter's day.
-        publishedAt: { lte: shelterTodayAsStoredInstant() },
+        publishedAt: { lt: startOfNextShelterDay() },
         targetPage:
           targetPage === "all"
             ? undefined
@@ -332,14 +347,22 @@ export async function getPublicBulletins(
   } catch (err) {
     // Rethrows in strict mode and on unique violations; otherwise returns.
     handlePersistenceError("Bulletin read", err);
+    // `handlePersistenceError` logs only in development, so in production each
+    // branch below logs for itself — including the one that serves the fixture,
+    // which is the likeliest production failure of all (deployed before the
+    // migration) and would otherwise leave no trace in the logs.
     if (!mayServeFixtureAfter(err)) {
-      // `handlePersistenceError` logs only in development, so without this a
-      // production outage would empty the feed with no trace anywhere.
       console.error(
         "[bulletins] public read failed; serving no notices rather than the launch fixture",
         err
       );
       return [];
+    }
+    if (process.env.NODE_ENV === "production" && isDatabasePersistent()) {
+      console.warn(
+        "[bulletins] the bulletins table does not exist yet; serving the launch fixture. " +
+          "Apply prisma/migrations/manual/20260922_community_bulletins."
+      );
     }
   }
 
@@ -374,14 +397,6 @@ export async function listBulletinRecords(): Promise<BulletinRecord[]> {
 }
 
 /**
- * The fields an editor controls, shared by create and update.
- *
- * `authorName` is deliberately NOT here: a create takes it from the acting
- * session, an update must leave it alone, and neither may take it from the
- * form. Keeping it out of the shared shape means a future field cannot pick up
- * the byline by accident.
- */
-/**
  * Every field an editor can change, as the audit log should see it.
  *
  * Earlier revisions logged only title, category and target page on an edit, and
@@ -408,6 +423,14 @@ function auditableState(record: BulletinRecord) {
   };
 }
 
+/**
+ * The fields an editor controls, shared by create and update.
+ *
+ * `authorName` is deliberately NOT here: a create takes it from the acting
+ * session, an update must leave it alone, and neither may take it from the
+ * form. Keeping it out of the shared shape means a future field cannot pick up
+ * the byline by accident.
+ */
 function editablePayload(values: BulletinFormValues) {
   return {
     category: values.category as PrismaBulletinCategory,
@@ -473,14 +496,11 @@ export async function updateServerBulletin(
   const before = mapDbBulletin(existing);
   // `authorName` is omitted: an edit does not reassign the byline, so correcting
   // a colleague's typo does not silently put your name on their notice.
-  let updated: DbBulletinRow;
-  try {
-    updated = await prisma.bulletin.update({ where: { id }, data: editablePayload(values) });
-  } catch (err) {
-    // Deleted by someone else between the read above and this write.
-    if (isRecordMissing(err)) return null;
-    throw err;
-  }
+  // Null if someone else deleted it between the read above and this write.
+  const updated = await orNullIfMissing(() =>
+    prisma.bulletin.update({ where: { id }, data: editablePayload(values) })
+  );
+  if (!updated) return null;
   const record = mapDbBulletin(updated);
 
   recordAuditLog({
@@ -506,13 +526,10 @@ export async function setServerBulletinPublished(
   // One round trip. A separate existence read first was a check-then-act race:
   // a row deleted between the two surfaced as a generic failure and a logged
   // stack instead of the not-found answer.
-  let updated: DbBulletinRow;
-  try {
-    updated = await prisma.bulletin.update({ where: { id }, data: { isPublished } });
-  } catch (err) {
-    if (isRecordMissing(err)) return null;
-    throw err;
-  }
+  const updated = await orNullIfMissing(() =>
+    prisma.bulletin.update({ where: { id }, data: { isPublished } })
+  );
+  if (!updated) return null;
   const record = mapDbBulletin(updated);
 
   recordAuditLog({
@@ -534,13 +551,10 @@ export async function setServerBulletinPinned(
   actor: SessionUser
 ): Promise<BulletinRecord | null> {
   // One round trip; see setServerBulletinPublished.
-  let updated: DbBulletinRow;
-  try {
-    updated = await prisma.bulletin.update({ where: { id }, data: { isPinned } });
-  } catch (err) {
-    if (isRecordMissing(err)) return null;
-    throw err;
-  }
+  const updated = await orNullIfMissing(() =>
+    prisma.bulletin.update({ where: { id }, data: { isPinned } })
+  );
+  if (!updated) return null;
   const record = mapDbBulletin(updated);
 
   recordAuditLog({
@@ -557,17 +571,13 @@ export async function setServerBulletinPinned(
 }
 
 export async function deleteServerBulletin(id: string, actor: SessionUser): Promise<boolean> {
-  const existing = await prisma.bulletin.findUnique({ where: { id } });
-  if (!existing) return false;
-
-  const record = mapDbBulletin(existing);
-  try {
-    await prisma.bulletin.delete({ where: { id } });
-  } catch (err) {
-    // Deleted by someone else between the read above and this write.
-    if (isRecordMissing(err)) return false;
-    throw err;
-  }
+  // `delete` returns the row it removed, so that is what the audit records.
+  // Reading it first was an extra round trip and a race: an edit landing
+  // between the read and the delete meant the audit kept the *older* notice,
+  // not the one actually deleted — the opposite of "the whole notice".
+  const deleted = await orNullIfMissing(() => prisma.bulletin.delete({ where: { id } }));
+  if (!deleted) return false;
+  const record = mapDbBulletin(deleted);
 
   recordAuditLog({
     actorId: actor.id,

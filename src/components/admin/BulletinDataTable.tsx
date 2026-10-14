@@ -50,10 +50,19 @@ type PublishedFilter = "all" | "published" | "draft";
 const selectClass =
   "bg-background border border-input px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-foreground";
 
-/** Shown when a server action fails before it can return its own result. */
+/**
+ * Shown when a server action fails before it returns its own result.
+ *
+ * It must not claim nothing was saved: the request may have reached the server
+ * and committed before the response was lost (a dropped connection, a function
+ * timeout, a failed refresh payload). An editor told "nothing was saved" clicks
+ * Save again and posts the notice twice. Telling them to reload and look first
+ * is the only advice that is right in both cases.
+ */
 const UNREACHABLE_MESSAGE =
-  "The server could not be reached, so nothing was saved. Check your connection " +
-  "and reload the page — if the site was just updated, a reload is what fixes it.";
+  "The server did not respond, so this change may or may not have been saved. " +
+  "Reload the page and check before trying again — if the site was just updated, " +
+  "the reload is also what fixes it.";
 
 /** Matches a record against the toolbar query, across both languages. */
 function matches(bulletin: BulletinRecord, query: string): boolean {
@@ -128,7 +137,10 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
           return;
         }
         router.refresh();
-      } catch {
+      } catch (err) {
+        // Logged, so a stale action id after a deploy can be told apart from
+        // being offline or from a client bug.
+        console.error("[bulletins] server action failed before returning a result", err);
         setError(UNREACHABLE_MESSAGE);
       }
     });
@@ -151,6 +163,11 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
   );
 
   const publishedCount = bulletins.filter((b) => b.isPublished).length;
+  // Published but dated in the future: on no public feed yet. Counted apart so
+  // "published" in the summary line means what a visitor can actually see.
+  const scheduledCount = bulletins.filter(
+    (b) => b.isPublished && isScheduledForLater(b.publishedAt)
+  ).length;
 
   function handleOpenCreate() {
     setEditing(null);
@@ -176,7 +193,8 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
       result = editing
         ? await updateBulletinAction(editing.id, values)
         : await createBulletinAction(values);
-    } catch {
+    } catch (err) {
+      console.error("[bulletins] save failed before returning a result", err);
       // Same transport-level failure as `run`. Here it would otherwise be an
       // unhandled rejection that left the dialog open with no message at all.
       setSaveError(UNREACHABLE_MESSAGE);
@@ -249,8 +267,8 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
       </div>
 
       <p className="text-xs text-muted-foreground">
-        {bulletins.length} total · {publishedCount} published ·{" "}
-        {bulletins.length - publishedCount} draft
+        {bulletins.length} total · {publishedCount - scheduledCount} live ·{" "}
+        {scheduledCount} scheduled · {bulletins.length - publishedCount} draft
         {filtered.length !== bulletins.length && ` · ${filtered.length} matching filters`}
       </p>
 
@@ -268,7 +286,7 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
         <div className="border border-border rounded-2xl bg-muted/30 px-6 py-12 text-center">
           <p className="text-sm text-muted-foreground">
             {bulletins.length === 0
-              ? "No bulletins yet. Post one and it appears on the public feeds immediately."
+              ? "No bulletins yet. A notice dated today goes on the public feeds as soon as you publish it; a later date schedules it."
               : "No bulletins match the current filters."}
           </p>
         </div>

@@ -140,9 +140,13 @@ export function BulletinFeed({
         </div>
       ) : (
         <div className="border border-dashed border-border bg-muted/10 p-8 text-center space-y-3">
-          <p className="text-sm text-muted-foreground">
-            No updates or bulletins posted for this section.
-          </p>
+          {/*
+            Worded to be true whatever emptied the list. It used to say nothing
+            had been posted, which is false during a database outage — when the
+            repository serves no notices rather than stale ones — and `/` and
+            `/bulletins` cache this render for up to five minutes.
+          */}
+          <p className="text-sm text-muted-foreground">No updates to show right now.</p>
         </div>
       )}
     </section>

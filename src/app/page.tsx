@@ -30,9 +30,11 @@ export default async function HomePage() {
   const [initialPets, impactStats, bulletins] = await Promise.all([
     getPublicPets(),
     readHomeImpactStats(),
-    // Folded into the same parallel read: the bulletin query degrades to the
-    // committed fixture rather than throwing, so a slow or unreachable feed
-    // cannot take the home page down any more than the impact read can.
+    // Folded into the same parallel read. Like the impact read it degrades
+    // rather than throwing — to no notices when the database is down, to the
+    // launch notices when the table does not exist yet (see
+    // `mayServeFixtureAfter`) — so a slow or failing feed cannot take the home
+    // page down over one section.
     getPublicBulletins("home", 2),
   ]);
 

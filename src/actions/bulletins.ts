@@ -14,7 +14,8 @@ import { isDatabaseUnavailable } from "@/lib/server/transparencyRepository";
 import {
   deleteServerBulletin,
   insertServerBulletin,
-  isBulletinSchemaMissing,
+  isBulletinColumnMissing,
+  isBulletinTableMissing,
   listBulletinRecords,
   setServerBulletinPinned,
   setServerBulletinPublished,
@@ -134,10 +135,22 @@ function toMessage(err: unknown, fallback: string): string {
   // migration reached this database. The likeliest production failure for this
   // feature, and the one a generic message hides completely — the editor needs
   // to know nothing will save until someone runs the migration.
-  if (isBulletinSchemaMissing(err)) {
+  if (isBulletinTableMissing(err)) {
     return (
       "Bulletins are not set up on this database yet, so nothing can be saved. " +
       "The migration in prisma/migrations/manual/20260922_community_bulletins needs to be applied."
+    );
+  }
+
+  // The table exists but the code expects a column it lacks — a schema that has
+  // drifted behind the code. Kept apart from the message above because the fix
+  // differs: re-running that migration only creates what is absent, so it cannot
+  // add a column, and naming it here would send someone to the wrong fix.
+  if (isBulletinColumnMissing(err)) {
+    console.error("[bulletins] schema is missing a column the code expects", err);
+    return (
+      "The bulletins table is out of date for this version of the site, so nothing " +
+      "can be saved. Someone needs to bring the database schema up to date."
     );
   }
 

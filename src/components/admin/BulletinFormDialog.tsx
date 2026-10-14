@@ -18,6 +18,7 @@ import {
 } from "@/lib/presentation/bulletinPresentation";
 import { BULLETIN_EMBED_HOSTS, BULLETIN_IMAGE_HOSTS } from "@/lib/domain/bulletinMedia";
 import { BulletinRecord } from "@/types/bulletin";
+import { shelterToday } from "@/lib/domain/bulletinSchedule";
 import {
   Dialog,
   DialogContent,
@@ -47,20 +48,17 @@ const MEDIA_TYPE_LABELS: Record<(typeof BULLETIN_MEDIA_TYPES)[number], string> =
 };
 
 /**
- * Today where the editor is, not in UTC.
+ * The default notice date: the SHELTER's today, not the browser's.
  *
- * `toISOString().slice(0, 10)` is the UTC day, and Malaysia is UTC+8: at 02:00
- * local the two disagree, so an overnight volunteer posting an urgent foster
- * notice would get a card dated yesterday unless they noticed and corrected it.
- * This is the same drift `bulletinRepository.toDateString` argues against,
- * applied in the other direction — there the value is already a fixed calendar
- * day, here it is "now" and must be read in the viewer's own zone.
+ * The date decides when a notice goes live, and the server judges that against
+ * `Asia/Kuala_Lumpur` (`@/lib/domain/bulletinSchedule`). A browser-local default
+ * disagreed with it for anyone not in Malaysia: an editor in Tokyo or Sydney
+ * posting an urgent notice between their midnight and Malaysia's got Malaysia's
+ * *tomorrow* as the default, and the notice stayed off every public feed for
+ * hours. UTC was wrong the other way, by eight hours, for everyone in Malaysia.
+ * Using the server's own rule is the only default that cannot disagree with it.
  */
-function today(): string {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-}
+const today = () => shelterToday();
 
 const EMPTY: BulletinFormInput = {
   category: "announcement",
