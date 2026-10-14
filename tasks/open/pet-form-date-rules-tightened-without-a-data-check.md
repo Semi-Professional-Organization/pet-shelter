@@ -1,35 +1,36 @@
-# A birthday-after-intake rule could strand rows nobody has counted
+# The birthday-after-intake rule would refuse an animal born at the shelter
 
-**Status:** ASSERTED · opened 2026-09-22 · from PS-114
+**Status:** open · opened 2026-09-22 · corrected 2026-10-14 · from PS-114
 
-The pet form is gaining a rule that `birthDate` must not be after `intakeDate`, stated as "an
-animal cannot be admitted before it is born". It is true of an animal admitted from outside. It
-is not true of one born at the shelter: a pregnant intake is ordinary shelter work, and a puppy
-born three weeks after its mother arrived legitimately has a birthday after the intake date it
-inherits. Nothing has ever prevented such a row.
+`petFormSchema` refuses a pet whose `birthDate` is after its `intakeDate`
+(`src/lib/validations/pet.ts`, around line 314), on the reasoning that an animal cannot have been
+born after it arrived. That is true of an animal taken in from outside. It is not true of one born
+*at* the shelter: a pregnant intake is ordinary shelter work, and a puppy born three weeks after its
+mother arrived has a real birthday after any intake date it inherits from her.
 
-Because the admin form validates the *whole* pet on every save, a row that violates the rule
-becomes uneditable. The operator changes a description and the save fails on a date field they
-never touched, with no way forward that is not falsifying one of the two dates.
+Two things make that more than a cosmetic refusal:
 
-This gets sharper, not softer, as the birth date work lands: PR #94 makes `birthDate` required
-rather than optional, so every animal must carry a birthday and none may post-date its intake.
+- **It cannot be worked around at save time.** `updatePet` re-validates the whole pet on every
+  edit, so once such a record exists the operator cannot change its description, photo or status
+  without first falsifying one of the two dates.
+- **The form now requires a birthday.** Since #94, `birthDate` is collected rather than derived, so
+  every animal carries one — and none may post-date its intake.
 
-A second, quieter version of the same question: `intakeDate` is a plain `String` in
-`prisma/schema.prisma` with no constraint, so nothing in the database has ever enforced
-`YYYY-MM-DD`. Any row holding a datetime or a partial date fails a strict calendar check on a
-field the operator did not edit.
+No existing row is at risk from the backfill: it derives `birthDate` as intake minus age, which can
+never be after intake. The exposure is new animals entered by hand, and any record edited later.
 
-**Belief, not observed.** Every `intakeDate` literal in this repository is already a clean
-`YYYY-MM-DD` — checked across `src/`, `prisma/` and `tests/`, zero with a time component — and
-all ten fixtures in `src/data/pets.json` satisfy `birthDate <= intakeDate`. The production table
-has *not* been checked, because agents here are refused production reads. Note that the backfill
-migrations derive `birthDate` from `intakeDate` minus an age, which cannot produce a birthday
-after intake — so the risk is concentrated in rows edited by hand afterwards, and in the
-`2024-01-01` column default landing on an animal taken in before 2024.
+**What this entry used to say, and why it was wrong.** An earlier version also warned that
+`intakeDate` had been tightened to a strict `YYYY-MM-DD` calendar check and would strand non-ISO
+rows, and asked for a production count of them. That check existed only in a PR #42 commit that
+was reverted before merge. `master` keeps `intakeDate` as `z.string().min(4)` on purpose — see
+`tasks/decisions/2026-09-22-the-pet-form-collects-a-birthday-not-age-prose.md`, which settled it for
+the same stranding reason. The entry was reopening a closed decision, and was wrong about its effect
+besides: a non-ISO intake does not trip the birthday rule, it *skips* it, because the rule only
+runs when `intakeDate` matches `^\d{4}-\d{2}-\d{2}$`. It also claimed every `intakeDate` literal in
+the repository was clean ISO; `tests/unit/rehabilitation.test.ts` uses `"2026"`. Corrected after a
+`/code-review max` caught all three.
 
-**Settles when:** someone with production access counts the rows where `intakeDate` does not
-match `^\d{4}-\d{2}-\d{2}$`, and the rows where `birthDate > intakeDate`, and either reports both
-empty or the rules are relaxed to match the data. The born-at-the-shelter case needs a
-maintainer's answer regardless of what the counts say — most likely "give the animal its own
-intake date", which is worth writing down somewhere an operator will read.
+**Settles when:** a maintainer decides what an animal born at the shelter records as its intake
+date. The likely answer is its own birth date — the day it entered the shelter's care, rather than
+its mother's arrival — which keeps the rule and needs only a line in the operator-facing help. The
+alternative is to exempt such animals from the rule, which needs a way to mark them.
