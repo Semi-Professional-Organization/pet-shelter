@@ -180,12 +180,6 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(approximateBirthDate("18 months", "2026-06-12").birthDate).toBe("2024-12-12");
     });
 
-    it("does not read a Malay week as a month", () => {
-      // `3 minggu` is Malay for three weeks and used to read as three *months*: a bare `m` with no
-      // boundary matched the m of minggu, ten weeks early. Named by the value it used to produce.
-      expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).not.toBe("2026-03-12");
-    });
-
     /**
      * Every accepted unit spelling, one case each, in one table.
      *
@@ -200,7 +194,8 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
      * means exporting the vocabulary from `petAge.ts` and feeding both the patterns and this table.
      */
     it.each([
-      // Weeks, in both languages.
+      // Weeks, in both languages. `3 minggu` used to read as three *months* (2026-03-12): a bare
+      // `m` with no boundary matched the m of minggu, ten weeks early.
       ["3 minggu", "2026-05-22"],
       ["2 mggu", "2026-05-29"],
       ["3 weeks", "2026-05-22"],
@@ -208,6 +203,8 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       ["3 wk", "2026-05-22"],
       ["1 week", "2026-06-05"],
       // Months. The bare `m` and the abbreviations the boundary would otherwise reject.
+      ["4 months", "2026-02-12"],
+      ["1 month", "2026-05-12"],
       ["3 m", "2026-03-12"],
       ["6 mo", "2025-12-12"],
       ["4 mos", "2026-02-12"],
@@ -216,7 +213,11 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       ["3 mnth", "2026-03-12"],
       ["3 mnths", "2026-03-12"],
       ["6 bln", "2025-12-12"],
+      ["4 bulan", "2026-02-12"],
       // Years.
+      ["2 years", "2024-06-12"],
+      ["1 year", "2025-06-12"],
+      ["2 y", "2024-06-12"],
       ["1 yr", "2025-06-12"],
       ["3 yrs", "2023-06-12"],
       ["5 yo", "2021-06-12"],
