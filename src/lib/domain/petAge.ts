@@ -95,19 +95,25 @@ export function formatAgeBandRange(band: AgeCategory, locale: "en" | "ms" = "en"
  */
 export function withDerivedAge<T extends {
   birthDate?: string;
+  birthDateIsEstimate?: boolean;
   intakeDate: string;
   age?: string;
   ageCategory?: string;
 }>(pet: T, asOf: Date | string = new Date()): T & {
   birthDate: string;
+  birthDateIsEstimate: boolean;
   age: string;
   ageCategory: AgeCategory;
 } {
   const birthDate = deriveBirthDate(pet);
+  // A birthday nobody entered is always an estimate: with no `birthDate` the value below is
+  // approximated from the age text or falls back to intake, and neither is an exact birthday.
+  const birthDateIsEstimate = pet.birthDate ? (pet.birthDateIsEstimate ?? true) : true;
 
   return {
     ...pet,
     birthDate,
+    birthDateIsEstimate,
     age: formatAgeString(birthDate, asOf).en,
     ageCategory: computeAgeCategory(birthDate, asOf),
   };
@@ -144,31 +150,95 @@ export function deriveBirthDate(pet: { birthDate?: string; age?: string; intakeD
 }
 
 /**
- * Approximates a birth date from a legacy age string (e.g. "2 years", "4 months")
- * relative to an intake date.
+ * The age units this module understands, English and Malay. Applied to an already-lowercased
+ * string, so none needs the `i` flag.
+ *
+ * **Every unit ends at a word boundary, and every abbreviation is listed explicitly.** Those two
+ * properties are one decision, not two. A bare `m` with no boundary matches the *m* of `minggu`
+ * — Malay for *weeks* — and read "3 minggu" as three months, ten weeks early, for exactly the
+ * operators the Malay vocabulary was added to serve. But adding the boundary alone is a worse
+ * bug: `\b` after a bare `m` or `y` rejects any abbreviation that continues with letters, so
+ * `2 mth`, `2 mths`, `3 mnth` and `5 yo` all stop parsing and fall silently through to the
+ * intake date. Measured, both ways. The boundary is only safe because `mths?`, `mnths?`, `mos?`
+ * and `yo` are spelled out beside the bare forms.
+ *
+ * `mnths?` is here and is deliberately *not* in the backfill SQL's list: the app has always read
+ * `3 mnth` via the bare `m`, and dropping it to match the migration would trade a wrong date for
+ * a silent fall-through.
  */
-export function approximateBirthDate(ageStr: string, intakeDateStr: string): { birthDate: string; isEstimate: boolean } {
+const AGE_YEARS_PATTERN = /(\d+)\s*(?:years?|yrs?|yo|tahun|thn|y)\b/;
+const AGE_MONTHS_PATTERN = /(\d+)\s*(?:months?|mths?|mnths?|mos?|bulan|bln|m)\b/;
+const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
+
+/**
+ * Approximates a birth date from an age string (e.g. "2 years", "4 months", "2 tahun") relative
+ * to the intake date. Timezone-invariant UTC arithmetic.
+ *
+ * **This function is transcribed into SQL, and that transcription is the reason not to "fix" the
+ * rollover below.** The production backfill that fills `pets.birthDate` from the old `age` prose
+ * reimplements this arithmetic in Postgres, in
+ * `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` — the *expand* half, landed
+ * on master by #94. A backfill's job is to store what the application itself would have computed,
+ * so the two have to agree case for case. The *contract* half beside it,
+ * `20260922_pets_birth_date_contract/`, only archives and drops the old columns and contains no
+ * date arithmetic at all, so it is not a third copy — an earlier revision of it did carry its own
+ * backfill, the two disagreed on month-end and leap-day rows, and removing it was the fix. The
+ * two folder names differ by one word; check which you have open.
+ *
+ * They agree on the arithmetic and **not** on the vocabulary, deliberately. The SQL reads English
+ * years and months only; this function also reads Malay (`tahun`, `thn`, `bulan`, `bln`,
+ * `minggu`, `mggu`) and weeks in either language. So "2 tahun" or "3 minggu" yields a birthday
+ * here and is *refused and named* there, which fails closed: the backfill stops on the row rather
+ * than storing a different date from the one the app would compute. The migration's own header
+ * claims it reads "only in the spellings the app itself reads" — true when written, wider now on
+ * this side. Recorded in `tasks/open/malay-age-units-outpace-the-backfill.md`; not a licence to
+ * treat the arithmetic as independent.
+ *
+ * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
+ * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
+ * 2026-03-03, not 2026-02-28. Clamping reads better and keeps the anniversary in the intended
+ * month, and it was briefly implemented here — but Postgres `make_interval` clamps while
+ * JavaScript rolls, so both SQL files build the date with `make_date(y, m, 1) + (day - 1)` to
+ * match *this* function. Changing the behaviour here silently changes what a migrated row should
+ * have contained. The cost of the rollover is bounded and understood: it biases an animal a few
+ * days younger, and only a row sitting within a day or two of exactly 12, 36 or 96 months lands
+ * in a different `AGE_BAND_MIN_MONTHS` band as a result. Every value it produces carries
+ * `birthDateIsEstimate: true`. The tests below pin it; they fail on an improvement, on purpose.
+ */
+export function approximateBirthDate(
+  ageStr: string,
+  intakeDateStr: string
+): { birthDate: string; isEstimate: boolean } {
   const norm = ageStr.toLowerCase().trim();
-  const intake = new Date(intakeDateStr);
-  if (isNaN(intake.getTime())) {
+  const parts = parseDateParts(intakeDateStr);
+  if (!parts) {
     return { birthDate: new Date().toISOString().split("T")[0], isEstimate: true };
   }
 
-  const yearMatch = norm.match(/(\d+)\s*y/);
+  const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    const d = new Date(intake);
-    d.setFullYear(d.getFullYear() - years);
+    const d = new Date(Date.UTC(parts.year - years, parts.month, parts.day));
     return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
   }
 
-  const monthMatch = norm.match(/(\d+)\s*m/);
+  const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    const d = new Date(intake);
-    d.setMonth(d.getMonth() - months);
+    const d = new Date(Date.UTC(parts.year, parts.month - months, parts.day));
     return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
   }
 
-  return { birthDate: intakeDateStr, isEstimate: true };
+  // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
+  // "1 year 6 months" reads the year. Day arithmetic rather than a month or year offset, so the
+  // month-end rollover above cannot arise here — `Date.UTC` normalises a negative day exactly.
+  const weekMatch = norm.match(AGE_WEEKS_PATTERN);
+  if (weekMatch) {
+    const weeks = parseInt(weekMatch[1], 10);
+    const d = new Date(Date.UTC(parts.year, parts.month, parts.day - weeks * 7));
+    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+  }
+
+  const dateOnly = intakeDateStr.split("T")[0];
+  return { birthDate: dateOnly, isEstimate: true };
 }
