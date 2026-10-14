@@ -112,10 +112,11 @@ lesson into words — including the tree hash surviving in a public entry this b
 to fix. Writing the rule down did not stop me breaking it. What did, in the second round, was
 mechanical: for the new parser entry, every claim was run against the real function on `master`
 through a throwaway test before it was written, and the two that resisted a runtime probe went to
-`tsc` instead. Whether that held is not yet known — the entry was written after the second review
-ran, so no review has seen it. Check first, then write; reading it back later is too late, and
-while drafting this very paragraph I first wrote that the second review had cleared that entry,
-which it could not have.
+`tsc` instead. It held: the fourth review re-ran every parser claim and citation in that entry and
+found them all correct. (When this paragraph was first drafted, no review had yet seen the entry,
+and I first wrote that the second one had cleared it — which it could not have.) What later reviews
+still found was in claims I had *reasoned* rather than run, and in the probe itself: the SQL
+emulator had been silently broken all along. Check first, then write — and check the checker.
 
 The one that cost most was `6d32df9`. `git merge-tree --write-tree` prints a *tree* OID. I told
 another session "merges clean against master at `6d32df9`", it repeated the hash in good faith, and
@@ -141,12 +142,15 @@ function on `master` before being filed, rather than copied from the review.
 - **F5's coupling to the SQL was a false premise, and this stream carried it for a round.** An
   earlier version said compact compounds could not be fixed app-side because the backfill's `\M`
   "fails the same way" and the two "agree, both wrong". It was accepted from another session after
-  only the app half was checked. The backfill's fractional check runs first and *aborts* on `2y3m`
-  (`migration.sql` lines 403 and 445–448), so nothing is stored wrong. That session confirmed it on
+  only the app half was checked. The backfill's fractional check *aborts* on `2y3m` (`migration.sql`
+  lines 403 and 445–448), so nothing is stored wrong — it runs second, after the no-unit check at
+  429, which `2y3m` passes because its trailing `3m` is a unit the backfill reads. That session confirmed it on
   a real Postgres and withdrew the claim from its own decision entry.
 - **F2 remainder — the expand harness's stale `appRule`.** Needs `embedded-postgres` to run, and
   deleting the copy changes O1/O2 wholesale. In the rehearsal entry.
-- **`CLAUDE.md` step 7 still says nothing about what `git merge-tree --write-tree` prints.** A
+- **`CLAUDE.md` step 7 still says nothing about what `git merge-tree --write-tree` prints.** Filed as
+  `tasks/open/close-out-step-7-does-not-say-what-merge-tree-prints.md`, so it surfaces at session
+  start and mirrors to an issue rather than living only here. A
   review argued the tree-hash trap belongs there, not only in a lesson — and `CLAUDE.md` step 6
   itself records that a lesson living only in `tasks/lessons/` was ignored and let PR #38 ship a
   defect. Not changed here: `CLAUDE.md` is the process every session follows, and changing it is

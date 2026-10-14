@@ -31,14 +31,15 @@ proves.** Two gaps stop it proving more:
   `log()` swallows a failed append. So a changed or empty payload from the harness would leave the
   script running and the liveness log silent. (The comment on that exit says "Fail open, loudly";
   it is silent.)
-- **It sits in the same directory as the drift log.** Both resolve through `tmpdir()`. If the hook
-  process were handed a different temp directory, it would write both logs somewhere else, and
-  this copy of each would freeze — exactly what is observed. The liveness log also begins only at
+- **It moves with the drift log.** Both default to `tmpdir()`, but each is overridden first by an
+  environment variable — `AGENT_GUARD_LOG` and `AGENT_DRIFT_LOG` (lines 61 and 73). So a different
+  temp directory, or either variable set for the hook process, would send both logs somewhere else
+  and freeze this copy of each — exactly what is observed. The liveness log also begins only at
   2026-10-13T14:46Z, though nothing rotates it, so it was recreated around then too. That fits a
   temp-directory change or clean-up as well as it fits "not invoked".
 
-So the candidates still open are: the hook not being invoked; its payload no longer parsing; or its
-temp directory having moved. The per-session state file, `claude-agent-drift.<session>.state`, adds
+So four candidates stay open: the hook not being invoked; its payload no longer parsing; its temp
+directory having moved; or `AGENT_GUARD_LOG` / `AGENT_DRIFT_LOG` set in its environment. The per-session state file, `claude-agent-drift.<session>.state`, adds
 nothing decisive — it exists for `1c022c97` only, is written inside the `PostToolUse` branch after
 a `git status` in a `try` (line 200), and lives in the same `tmpdir()`.
 
@@ -54,21 +55,25 @@ carrying the entry caught it.
 
 **Why it matters.** The drift log is the close-out's only mechanical check for a "while I am here"
 edit. `AGENTS.md` already warns that an empty filter result means "no *observed* drift, not none",
-and an empty result looks the same whether a session was quiet or the hook never ran. A useful but
-**not decisive** check at close-out: if `%TEMP%\claude-agent-guard.log` (`$TMPDIR` elsewhere) is
-older than your session's first tool call, the drift log's silence tells you nothing — whichever of
-the three causes above is at work. Either way, account for touched paths with `git status` and the
-branch diff against `origin/master`, as the PR #42 session did. A fresh liveness line does not prove
-the drift log is complete either, since the drift log is written later in the script, behind a
-`git status` that can fail.
+and an empty result looks the same whether a session was quiet or the hook never ran.
 
-**Settles when:** the cause is found among the three — confirmed by something that can see past the
-liveness log, such as the hook's resolved temp directory or the raw payload it receives — and the
+**Do not use the liveness log to tell which.** Its lines are `timestamp agent tool` with no session
+ID, so a hook firing for *any* concurrent session refreshes it — a session whose own hook is silent
+would see a fresh file and wrongly trust its empty drift output. The only evidence keyed to one
+session is its state file, `claude-agent-drift.<session-id>.state` in the same directory: if yours
+exists, the hook reached the drift branch for you at least once; if it does not, that is ambiguous —
+the hook may not have run, or its `git status` may have failed. Neither proves the drift log is
+complete. So account for touched paths with `git status` and the branch diff against
+`origin/master` regardless, as the PR #42 session did.
+
+**Settles when:** the cause is found among the four — confirmed by something that can see past the
+liveness log, such as the hook's resolved temp directory, its log-path environment variables or
+the raw payload it receives — and the
 drift log is writing again. Detecting the fix needs no separate experiment, since fresh liveness and
 drift lines will show it, but a stale liveness log alone cannot say which cause it was. The silence
 began around 2026-10-13T16:57Z.
 
-One thing is ruled out for all three: **a committed change.** The last commit to touch
+One thing is ruled out for all four: **a committed change.** The last commit to touch
 `.claude/settings.json` or `agent-guard.mjs` on `master` is from 2026-09-09, a month earlier. Every
 remaining candidate lives where git does not look — uncommitted `.claude/settings.local.json`, the
 user-level settings, the environment the harness gives the hook process, or how the harness loads

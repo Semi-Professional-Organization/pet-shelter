@@ -16,8 +16,12 @@ fail: `updatePetStatus` builds `{ ...existing, status }` and writes it without g
 
 **A record could also arrive already violating the rule,** and then every full edit of it would
 fail on a field the operator never touched, because `updatePet` re-validates the whole pet. The
-backfill cannot produce one — it derives `birthDate` as intake minus age, which is never after
-intake — but the column can. `prisma/schema.prisma` declares
+backfill cannot produce a birthday *after intake* — it derives `birthDate` as intake minus age —
+but it can produce one the sixty-year rule rejects: it accepts ages up to and including sixty years
+(`migration.sql` around line 456) measured from *intake*, while the form measures sixty years back
+from *today*. A recorded age of 60 with a 2025 intake backfills to 1965, which the form then refuses
+as more than sixty years ago. No shelter animal is that old, so in practice it is a typo the
+backfill does not catch — but it is a source. The column is another. `prisma/schema.prisma` declares
 `birthDate String @default("2024-01-01")`, and the expand migration adds the column with the same
 default. So any writer that omits `birthDate` stores 1 January 2024 — a raw SQL insert, an import
 script, a one-off fix run in the Neon console. If that row's `intakeDate` is before 2024, its
@@ -61,12 +65,16 @@ only the one this entry is about — so the check covers all four:
     SELECT id, "birthDate", "intakeDate" FROM pets
      WHERE "birthDate" !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
         OR ("intakeDate" ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' AND "birthDate" > "intakeDate")
-        OR "birthDate" > to_char(now() + interval '1 day', 'YYYY-MM-DD')
-        OR "birthDate" < to_char(now() - interval '60 years', 'YYYY-MM-DD');
+        OR "birthDate" > to_char((now() AT TIME ZONE 'UTC') + interval '1 day', 'YYYY-MM-DD')
+        OR "birthDate" < to_char((now() AT TIME ZONE 'UTC') - interval '21915 days', 'YYYY-MM-DD');
 
 The four lines are, in order, the form's ISO-date shape, birthday-after-intake, the future bound and
-the sixty-year bound (`src/lib/validations/pet.ts`, around lines 230, 314, 338 and 354). That catches
-a `2024-01-01` default on an animal taken in before 2024, a birthday corrected by hand after its
-intake, and a malformed or implausible value typed into the console. **One gap:** the shape test
+the sixty-year bound (`src/lib/validations/pet.ts`, around lines 230, 314, 338 and 354). The two
+bounds copy the form's arithmetic exactly: both work on today's date *in UTC*, and sixty years is
+`60 × 365.25 = 21,915` days, not sixty calendar years. Converting `now()` to UTC before adding the
+interval matters — on a zoned timestamp a day can be 23 or 25 hours, and the session's own time zone
+would decide which date counts as today. That catches a `2024-01-01` default on an animal taken in
+before 2024, a birthday corrected by hand after its intake, a sixty-year-old age the backfill let
+through, and a malformed value typed into the console. **One gap:** the shape test
 cannot see an impossible day such as `2024-02-30`, which `isoDateSchema` rejects but this regex
 admits; checking that needs a cast, run row by row so one bad value does not abort the query.
