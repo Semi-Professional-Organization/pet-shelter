@@ -37,7 +37,7 @@
 import fs from "node:fs";
 import { Pool } from "pg";
 
-import { resolveDatabaseUrl, LOCAL_DATABASE_URL } from "../prisma/env";
+import { resolveDatabaseUrl, isLocalDatabaseUrl } from "../prisma/env";
 import { resolveDatabaseSsl } from "../src/lib/server/databaseSsl";
 import bulletinsData from "../src/data/bulletins.json";
 
@@ -50,7 +50,10 @@ async function main() {
   console.log(
     "Target:",
     connectionString.replace(/:\/\/([^:]+):[^@]+@/, "://$1:***@"),
-    connectionString === LOCAL_DATABASE_URL ? "(local)" : "(remote)"
+    // By host, not by string equality with the one canonical local URL: a
+    // local database on any other port or name used to print "(remote)",
+    // which is backwards for the line an operator reads to tell them apart.
+    isLocalDatabaseUrl(connectionString) ? "(local)" : "(remote)"
   );
 
   const pool = new Pool({
