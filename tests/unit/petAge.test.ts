@@ -180,68 +180,49 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(approximateBirthDate("18 months", "2026-06-12").birthDate).toBe("2024-12-12");
     });
 
-    /**
-     * Weeks, and the abbreviations that make the word boundary safe.
-     *
-     * `3 minggu` is Malay for three weeks and used to read as three *months*, because a bare `m`
-     * with no boundary matches the m of minggu — ten weeks early, for exactly the operators the
-     * Malay vocabulary serves. Adding the boundary alone is a worse bug: it rejects every short
-     * month form that continues with letters. Both halves are pinned here, because fixing one
-     * and breaking the other passes a narrow test table.
-     */
-    it("reads weeks in both languages", () => {
-      expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).toBe("2026-05-22");
-      expect(approximateBirthDate("2 mggu", "2026-06-12").birthDate).toBe("2026-05-29");
-      expect(approximateBirthDate("3 weeks", "2026-06-12").birthDate).toBe("2026-05-22");
-      expect(approximateBirthDate("3 wks", "2026-06-12").birthDate).toBe("2026-05-22");
-      expect(approximateBirthDate("3 wk", "2026-06-12").birthDate).toBe("2026-05-22");
-    });
-
     it("does not read a Malay week as a month", () => {
-      // The defect itself, named by the value it used to produce.
+      // `3 minggu` is Malay for three weeks and used to read as three *months*: a bare `m` with no
+      // boundary matched the m of minggu, ten weeks early. Named by the value it used to produce.
       expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).not.toBe("2026-03-12");
     });
 
-    it("still reads every short month and year form", () => {
-      // These four are what a bare `\b` after `m`/`y` silently destroys. If this test fails, the
-      // unit list lost an abbreviation and those ages now fall through to the intake date.
-      expect(approximateBirthDate("2 mth", "2026-06-12").birthDate).toBe("2026-04-12");
-      expect(approximateBirthDate("2 mths", "2026-06-12").birthDate).toBe("2026-04-12");
-      expect(approximateBirthDate("3 mnth", "2026-06-12").birthDate).toBe("2026-03-12");
-      expect(approximateBirthDate("5 yo", "2026-06-12").birthDate).toBe("2021-06-12");
-      // And the forms that already worked, so the curated list cannot quietly shrink.
-      expect(approximateBirthDate("6 mo", "2026-06-12").birthDate).toBe("2025-12-12");
-      expect(approximateBirthDate("4 mos", "2026-06-12").birthDate).toBe("2026-02-12");
-      expect(approximateBirthDate("3 yrs", "2026-06-12").birthDate).toBe("2023-06-12");
-      expect(approximateBirthDate("1 y/o", "2026-06-12").birthDate).toBe("2025-06-12");
-    });
-
     /**
-     * One case per accepted spelling that nothing above reaches.
+     * Every accepted unit spelling, one case each, in one table.
      *
      * The unit patterns are a closed list behind a word boundary, so dropping a spelling does not
      * fail loudly — that age silently falls through to the intake date, the very failure the list
-     * exists to prevent. A mutation sweep found these seven spellings untested: dropping all of them
-     * left the suite green. Each row kills exactly one such mutant, and being its own case rather
-     * than a line in one block, it is reported by name — a single `it` stops at its first failing
-     * `expect` and hides every later one.
+     * exists to prevent. The boundary is what stops `3 minggu` reading as months; listing every
+     * abbreviation beside it is what keeps the boundary from rejecting `2 mth`, `3 mnth` or `5 yo`.
      *
-     * Still a hand-kept list: a spelling *added* to a pattern goes untested until a row is added
-     * here. Making that structural means exporting the vocabulary from `petAge.ts` and feeding both
-     * the patterns and this table from it.
+     * One table rather than several blocks, so each spelling is reported by name: a single `it`
+     * with many `expect`s stops at its first failure and hides every later one. Still hand-kept — a
+     * spelling *added* to a pattern goes untested until a row is added here. Making that structural
+     * means exporting the vocabulary from `petAge.ts` and feeding both the patterns and this table.
      */
     it.each([
-      // Malay units not asserted elsewhere in this file (`minggu`, `mggu` and `bulan` already are).
+      // Weeks, in both languages.
+      ["3 minggu", "2026-05-22"],
+      ["2 mggu", "2026-05-29"],
+      ["3 weeks", "2026-05-22"],
+      ["3 wks", "2026-05-22"],
+      ["3 wk", "2026-05-22"],
+      ["1 week", "2026-06-05"],
+      // Months. The bare `m` and the abbreviations the boundary would otherwise reject.
+      ["3 m", "2026-03-12"],
+      ["6 mo", "2025-12-12"],
+      ["4 mos", "2026-02-12"],
+      ["2 mth", "2026-04-12"],
+      ["2 mths", "2026-04-12"],
+      ["3 mnth", "2026-03-12"],
+      ["3 mnths", "2026-03-12"],
+      ["6 bln", "2025-12-12"],
+      // Years.
+      ["1 yr", "2025-06-12"],
+      ["3 yrs", "2023-06-12"],
+      ["5 yo", "2021-06-12"],
+      ["1 y/o", "2025-06-12"],
       ["2 tahun", "2024-06-12"],
       ["3 thn", "2023-06-12"],
-      ["6 bln", "2025-12-12"],
-      // The bare one-letter month, which the boundary makes easy to lose.
-      ["3 m", "2026-03-12"],
-      // Singular forms whose plurals are pinned above, so `s?` cannot quietly become `s`.
-      ["1 yr", "2025-06-12"],
-      ["1 week", "2026-06-05"],
-      // And the plural of the misspelling the app has always read via the bare `m`.
-      ["3 mnths", "2026-03-12"],
     ])("reads the accepted spelling %j", (input, expected) => {
       expect(approximateBirthDate(input, "2026-06-12").birthDate).toBe(expected);
     });
