@@ -231,7 +231,7 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
      * the patterns and this table from it.
      */
     it.each([
-      // Malay singles — the vocabulary the docstring is about, with no direct assertion until now.
+      // Malay units not asserted elsewhere in this file (`minggu`, `mggu` and `bulan` already are).
       ["2 tahun", "2024-06-12"],
       ["3 thn", "2023-06-12"],
       ["6 bln", "2025-12-12"],
