@@ -63,10 +63,13 @@ from reading as months.
   These Malay cases are new in #42, which added the units: before it they fell through to intake.
   **The English cases are not new** — `0.5 years` reads as five years and `1.5 months` as five
   months both before #42 and on `master`. The backfill refuses all of them, but not for one reason:
-  the English ones as fractional, and the Malay ones because its fractional check lists English
-  units only, so `0,5 tahun` matches no unit and is refused as underivable instead. A maintainer
-  reproducing these on Postgres will see the "cannot be derived" exception for the Malay cases,
-  not the "fractional" one. The trap is already a lesson: `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
+  the English ones as fractional, and the Malay ones as underivable. The cause of the second is the
+  backfill's *unit* patterns, which list English units only: `0,5 tahun` matches none, so it is
+  stopped by the no-unit check, which runs before the fractional one ever sees it. Adding Malay
+  units to the fractional pattern alone would therefore change nothing — the no-unit check would
+  still refuse these first. A maintainer reproducing them on Postgres will see the "cannot be
+  derived" exception, not the "fractional" one. The trap is already a lesson:
+  `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
 
 - **An unbounded count crashes it.** `15000000 weeks` throws `RangeError: Invalid time value`;
   `12345678 wks` returns `-234583-03-21`. A cap mirroring the backfill's sixty years / 720 months

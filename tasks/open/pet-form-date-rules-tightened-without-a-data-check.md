@@ -2,9 +2,9 @@
 
 **Status:** open · opened 2026-09-22 · rewritten 2026-10-14 · from PS-114
 
-`petFormSchema` refuses a pet whose `birthDate` is after its `intakeDate`
-(`src/lib/validations/pet.ts`, around line 314), on the reasoning that an animal cannot have been
-born after it arrived. That holds for an animal taken in from outside. It does not hold for one
+`petFormSchema` refuses a pet whose `birthDate` is after its `intakeDate` (in its `superRefine`,
+`src/lib/validations/pet.ts`), on the reasoning that an animal cannot have been born after it
+arrived. That holds for an animal taken in from outside. It does not hold for one
 born *at* the shelter: a pregnant intake is ordinary shelter work, and a puppy born three weeks
 after its mother arrived has a real birthday after any intake date it inherits from her.
 
@@ -17,9 +17,10 @@ fail: `updatePetStatus` builds `{ ...existing, status }` and writes it without g
 **A record could also arrive already violating the rule,** and then every full edit of it would
 fail on a field the operator never touched, because `updatePet` re-validates the whole pet. The
 backfill cannot produce a birthday *after intake* — it derives `birthDate` as intake minus age —
-but it can produce one the sixty-year rule rejects: it accepts ages up to and including sixty years
-(`migration.sql` around line 456) measured from *intake*, while the form measures sixty years back
-from *today*. A recorded age of 60 with a 2025 intake backfills to 1965, which the form then refuses
+but it can produce one the sixty-year rule rejects. It accepts ages up to and including sixty
+years — the check that raises "not a plausible animal age" in `migration.sql` — measured from
+*intake*, while the form measures sixty years back from *today*. A recorded age of 60 with a
+2025 intake backfills to 1965, which the form then refuses
 as more than sixty years ago. No shelter animal is that old, so in practice it is a typo the
 backfill does not catch — but it is a source. The column is another. `prisma/schema.prisma` declares
 `birthDate String @default("2024-01-01")`, and the expand migration adds the column with the same
@@ -69,7 +70,9 @@ only the one this entry is about — so the check covers all four:
         OR "birthDate" < to_char((now() AT TIME ZONE 'UTC') - interval '21915 days', 'YYYY-MM-DD');
 
 The four lines are, in order, the form's ISO-date shape, birthday-after-intake, the future bound and
-the sixty-year bound (`src/lib/validations/pet.ts`, around lines 230, 314, 338 and 354). The two
+the sixty-year bound — in `src/lib/validations/pet.ts`, `isoDateSchema` on the field, then within
+`petFormSchema`'s `superRefine` the comparison with `intakeDate`, `tomorrowUtc` and
+`earliestPlausible`. The two
 bounds copy the form's arithmetic exactly: both work on today's date *in UTC*, and sixty years is
 `60 × 365.25 = 21,915` days, not sixty calendar years. Converting `now()` to UTC before adding the
 interval matters — on a zoned timestamp a day can be 23 or 25 hours, and the session's own time zone

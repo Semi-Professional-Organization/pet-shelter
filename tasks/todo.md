@@ -45,7 +45,9 @@ Record active multi-step work streams below.
       `yr`, `week`, `mnths`. One `it.each` case per spelling, so a dropped one is reported by name.
       Proved each case kills its own mutant: dropped one spelling at a time from the real patterns,
       ran the suite, restored the original bytes from memory. Seven mutants, each killed by exactly
-      its own case and no other — `1 failed | 33 passed` every time.
+      its own case and no other, every time. Later rounds folded every accepted spelling into that
+      one table, so each unit alternative in the patterns now has a named row; the mutation result
+      was re-run after each change and held.
 - [x] **F14 — corrected the previous stream's record, here rather than in it.** The stream below
       says the `minggu` regex was left alone; it was fixed in #42. An earlier pass on this branch
       edited that stream in place. A review pointed out that `CLAUDE.md` step 5 and this file's own
@@ -78,6 +80,16 @@ Record active multi-step work streams below.
       verdicts for inputs with a space were computed on the wrong pattern; most happened to be
       right. Rebuilt with the backslash from its character code and self-tested; only the English
       decimals changed. A lesson and a memory note record it.
+
+- [x] **Fifth and sixth reviews.** The fifth found subtler interactions: a mixed Malay/English age
+      is stored wrong by the expand migration on `master` *now* (filed as live, not hypothetical);
+      the no-unit check runs before the fractional one; a sibling entry's planned fix would reopen
+      a divergence (the two now link each other); an env var redirects the hook's logs; the
+      liveness log cannot be attributed to a session. The sixth reported the code clean and every
+      cited fact correct, and found precision and process items — a headline still asserting a
+      conclusion the body had withdrawn, the wrong cause given for one refusal, a table claiming
+      "every spelling" with six missing, and a decision held in this stream instead of
+      `tasks/decisions/`. All fixed.
 
 ## Corrections to the stream below
 
@@ -160,12 +172,11 @@ function on `master` before being filed, rather than copied from the review.
   origin/master` for the commit."*
 - **The structural half of F11.** The seven spellings are pinned, but a spelling *added* to a
   pattern still goes untested until someone adds a row. Making that impossible means exporting the
-  vocabulary from `petAge.ts` and feeding both the patterns and the test from it. Relatedly, the
-  mutation sweep covered spellings only: removing the trailing `\b` from the years or weeks pattern
-  still leaves the suite green. Deliberately **not** pinned. The only inputs that tell those
-  boundaries apart are ones like `2 yrsold`, which fall through to intake *because* of #42's
-  regression — so a test that kills that mutant would assert the regression as correct. The months
-  boundary is pinned, since `3 minggu` is the case it exists for.
+  vocabulary from `petAge.ts` and feeding both the patterns and the test from it.
+- **The years and weeks word boundaries are unpinned, deliberately.** Removing either still leaves
+  the suite green, and pinning them would mean asserting a wrong answer. Recorded as a decision —
+  `tasks/decisions/2026-10-14-the-years-and-weeks-unit-boundaries-are-left-unpinned.md` — because it
+  is a choice someone could reasonably reverse, and a stream is not where the next session looks.
 - **The `tasks/todo.md` conflict with #113.** Both branches prepend a stream at the same anchor, so
   whichever merges second conflicts and loses its CI run until resolved. Inherent to this file's
   one-append-point design (its own header says so); resolved by keeping both streams.

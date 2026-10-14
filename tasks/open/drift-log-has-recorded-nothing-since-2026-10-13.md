@@ -19,7 +19,7 @@ What `claude-agent-drift.log` actually contains, measured directly:
 rotated". A log that holds ninety minutes from one session and nothing older therefore looks to
 have been recreated around 15:09Z on 2026-10-13, then gone quiet about ninety minutes later.
 
-**The hook is not being called at all — and its own files already show it.** The script
+**Its own files narrow the cause, but do not settle it.** The script
 `.claude/hooks/agent-guard.mjs` exists and `.claude/settings.json` references it, so it is
 configured. It also keeps a liveness log, `claude-agent-guard.log`, appended by `log(...)` at line
 152, before the `PostToolUse` branch at line 168. That file was last written at
@@ -32,16 +32,18 @@ proves.** Two gaps stop it proving more:
   script running and the liveness log silent. (The comment on that exit says "Fail open, loudly";
   it is silent.)
 - **It moves with the drift log.** Both default to `tmpdir()`, but each is overridden first by an
-  environment variable — `AGENT_GUARD_LOG` and `AGENT_DRIFT_LOG` (lines 61 and 73). So a different
-  temp directory, or either variable set for the hook process, would send both logs somewhere else
+  environment variable — `AGENT_GUARD_LOG` and `AGENT_DRIFT_LOG` (lines 61 and 73), as is the
+  per-session state file by `AGENT_DRIFT_STATE` (line 148). So a different temp directory, or any of
+  those variables set for the hook process, would send the files somewhere else
   and freeze this copy of each — exactly what is observed. The liveness log also begins only at
   2026-10-13T14:46Z, though nothing rotates it, so it was recreated around then too. That fits a
   temp-directory change or clean-up as well as it fits "not invoked".
 
 So four candidates stay open: the hook not being invoked; its payload no longer parsing; its temp
-directory having moved; or `AGENT_GUARD_LOG` / `AGENT_DRIFT_LOG` set in its environment. The per-session state file, `claude-agent-drift.<session>.state`, adds
-nothing decisive — it exists for `1c022c97` only, is written inside the `PostToolUse` branch after
-a `git status` in a `try` (line 200), and lives in the same `tmpdir()`.
+directory having moved; or one of the log-path variables set in its environment. The per-session
+state file, `claude-agent-drift.<session>.state`, adds nothing decisive — it exists for `1c022c97`
+only, is written inside the `PostToolUse` branch after a `git status` in a `try` (line 200), and
+moves with the others under the same temp directory or its own `AGENT_DRIFT_STATE`.
 
 ## Correction
 
@@ -60,9 +62,10 @@ and an empty result looks the same whether a session was quiet or the hook never
 **Do not use the liveness log to tell which.** Its lines are `timestamp agent tool` with no session
 ID, so a hook firing for *any* concurrent session refreshes it — a session whose own hook is silent
 would see a fresh file and wrongly trust its empty drift output. The only evidence keyed to one
-session is its state file, `claude-agent-drift.<session-id>.state` in the same directory: if yours
-exists, the hook reached the drift branch for you at least once; if it does not, that is ambiguous —
-the hook may not have run, or its `git status` may have failed. Neither proves the drift log is
+session is its state file, `claude-agent-drift.<session-id>.state`, normally in the same directory:
+if yours exists, the hook reached the drift branch for you at least once; if it does not, that is
+ambiguous — the hook may not have run, its `git status` may have failed, or `AGENT_DRIFT_STATE` may
+have put the file somewhere else. Neither proves the drift log is
 complete. So account for touched paths with `git status` and the branch diff against
 `origin/master` regardless, as the PR #42 session did.
 
