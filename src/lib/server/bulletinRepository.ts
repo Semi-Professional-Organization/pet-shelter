@@ -174,6 +174,19 @@ export function isBulletinSchemaMissing(err: unknown): boolean {
  *   and `/` and `/bulletins` are ISR, so that render would be cached as the good
  *   page for up to five minutes. An empty feed asserts nothing false; the
  *   fixture would.
+ *
+ * Why empty rather than throwing, which on an ISR page would keep serving the
+ * last good render: `/` reads pets, impact stats and bulletins in one
+ * `Promise.all`, so a throw on a cold render (a fresh deploy, a new region)
+ * takes the whole home page down to the error boundary over one section; and
+ * `/pets` is `force-dynamic`, where it would fail every request for as long as
+ * the outage lasted. Losing the news section beats losing the page.
+ *
+ * A local `next build` in a worktree has no database, so it logs the
+ * `[bulletins] public read failed` error once for each prerendered page that
+ * reads bulletins, and prerenders those pages with an empty feed. That is this
+ * policy working, not a broken build; a Vercel build has `DATABASE_URL` and
+ * does not reach this branch unless the database is genuinely down.
  */
 function mayServeFixtureAfter(err: unknown): boolean {
   if (process.env.NODE_ENV !== "production") return true;
