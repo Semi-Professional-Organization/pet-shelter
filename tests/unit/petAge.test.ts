@@ -217,19 +217,19 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
     });
 
     /**
-     * One assertion per accepted spelling that nothing above reaches.
+     * One case per accepted spelling that nothing above reaches.
      *
-     * The unit patterns are a closed list behind a word boundary, so dropping any one spelling does
-     * not fail loudly — that age silently falls through to the intake date, which is the very
-     * failure the list exists to prevent. A `/code-review max` mutation sweep on 2026-10-14 removed
-     * spellings one at a time and found these seven survived: a mutant dropping all of them passed
-     * the suite 27/27. Each line below is here to kill exactly one of those mutants.
+     * The unit patterns are a closed list behind a word boundary, so dropping a spelling does not
+     * fail loudly — that age silently falls through to the intake date, the very failure the list
+     * exists to prevent. A mutation sweep found these seven spellings untested: dropping all of them
+     * left the suite green. Each row kills exactly one such mutant, and being its own case rather
+     * than a line in one block, it is reported by name — a single `it` stops at its first failing
+     * `expect` and hides every later one.
+     *
+     * Still a hand-kept list: a spelling *added* to a pattern goes untested until a row is added
+     * here. Making that structural means exporting the vocabulary from `petAge.ts` and feeding both
+     * the patterns and this table from it.
      */
-    // One case per spelling rather than one block, so a dropped spelling is reported by name. A
-    // single `it` stops at its first failing `expect`, which would hide every later mutant behind
-    // the first. Still a hand-kept list: a spelling *added* to a pattern goes untested until a row
-    // is added here. Making that structural means exporting the vocabulary from `petAge.ts` and
-    // feeding both the patterns and this table from it — deferred while PR #113 edits that file.
     it.each([
       // Malay singles — the vocabulary the docstring is about, with no direct assertion until now.
       ["2 tahun", "2024-06-12"],
