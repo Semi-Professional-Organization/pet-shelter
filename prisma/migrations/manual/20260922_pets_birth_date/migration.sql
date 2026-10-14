@@ -73,23 +73,26 @@
 -- **This file reads a strict subset of what the app reads, and that is deliberate.** Since #42
 -- (2026-10-14) `approximateBirthDate` also reads weeks in both languages (`weeks`, `wks`,
 -- `minggu`, `mggu` -- "3 minggu" is three weeks, not three months), Malay years and months
--- (`tahun`, `thn`, `bulan`, `bln`), `mnth` and `yo`. None of those is transcribed here. A string
--- whose ONLY unit is one of them is refused and the refusal names the row.
+-- (`tahun`, `thn`, `bulan`, `bln`), `mnth` and `yo`. None of those is transcribed here, and **any
+-- string containing one of them, anywhere, is refused** and named -- including a string that also
+-- contains an English unit this file does read.
 --
--- **A string that MIXES one of them with an English unit is not refused, and is stored
--- differently from what the app computes.** `1 tahun 6 months`: the app tries years first, reads
--- `tahun`, and stops at one year; this file does not read `tahun`, skips it, finds `6 months`, and
--- stores six months. No error, no NOTICE. Measured 2026-10-14 against the real
--- `approximateBirthDate`: three of five mixed strings disagree. #42 opened this by teaching the app
--- Malay; before it, the app also skipped `tahun` and agreed with this file. **Run the pre-flight
--- in `tasks/open/malay-age-units-outpace-the-backfill.md` before applying this file** -- if it
--- returns no rows, the divergence cannot occur on that database. The repair, not yet made, is to
--- refuse any string containing an app-only unit anywhere, in both this file's refusal set and the
--- pre-check query below, together.
+-- That last part is the fix for a defect found on 2026-10-14. Before it, `1 tahun 6 months` was
+-- not refused: the app tries years first, reads `tahun`, and stops at one year, while this file
+-- skipped `tahun`, found `6 months` further along, and stored six months -- a different birthday,
+-- no error. Three of five mixed strings measured that way. #42 opened it by teaching the app Malay;
+-- the earlier `yo` mixes predate even that. The refusal now sits in this file's unit
+-- classification and in the pre-check query below, together, so the pre-check names these rows
+-- `unparseable age` before anything runs.
 --
--- An earlier version of this paragraph claimed the opposite -- that every string this file does
--- not read is refused -- and before that, that it read "the spellings the app itself reads". Both
--- were asserted, not measured.
+-- **Cost, deliberately accepted:** `3 minggu 2 months` and `2 years 3 weeks` used to agree (both
+-- sides read the English unit) and are now refused too. Telling "agrees by luck" from "agrees by
+-- rule" would need a second copy of the app's unit precedence in this file. Refusing costs one
+-- manual correction per row; the pre-check lists them first.
+--
+-- An earlier version of this paragraph said these mixed strings were not refused, and before that,
+-- that every string this file does not read is refused, and before that, that it read "the
+-- spellings the app itself reads". The first was measured; the other two were asserted.
 --
 -- The comparison against the app lives in `20260922_pets_birth_date_contract/rehearse.mjs`,
 -- scenario 0, run with `npx tsx`. It runs this file's SQL against the REAL `approximateBirthDate`,
@@ -117,14 +120,17 @@
 --
 -- Two consequences follow from the invariant, and both are deliberate.
 --
--- **Malay age words are refused, not translated.** `approximateBirthDate` matches only
--- /(\d+)\s*y/ and /(\d+)\s*m/, so "2 tahun", "3 thn", "4 bulan" and "6 bln" match nothing
--- there and it returns the intake date itself -- "born the day we took it in". Reading them as
--- years and months would be *more correct* and was this file's first behaviour, but it would
--- store a value the app does not compute, and the contract migration would then refuse the
--- whole table. So they are refused here and named in the pre-check instead, for a human to
--- rewrite in the same sitting. If your rows carry Malay ages, this is the normalisation to run
--- first -- read it, then run it yourself; this file will not do it for you:
+-- **Malay age words are refused, not translated.** Since #42 `approximateBirthDate` does read
+-- "2 tahun", "3 thn", "4 bulan" and "6 bln" as years and months -- an earlier version of this
+-- paragraph said it matched only /(\d+)\s*y/ and /(\d+)\s*m/ and fell through to the intake
+-- date, which was true until #42 merged. This file still refuses them on purpose: transcribing a
+-- unit means keeping a second copy of the app's rule for it in SQL, and every copy is a place for
+-- the two to drift. Refusing one costs a manual correction; storing one differently is a silent
+-- wrong birthday. They are named in the pre-check, for a human to rewrite in the same sitting.
+--
+-- The normalisation below makes such a row derivable here, and after it the two sides agree:
+-- "2 tahun" becomes "2 years", which this file reads and the app reads the same way. Read it,
+-- then run it yourself; this file will not do it for you:
 --
 --   UPDATE "public"."pets" SET "age" = regexp_replace("age", '(tahun|thn)\M', 'years', 'gi')
 --    WHERE "age" ~* '[0-9]+[[:space:]]*(tahun|thn)\M';
@@ -182,10 +188,14 @@
 --   * Every table is named with its schema, so the result does not depend on search_path.
 --   * The Prisma-level checks drive findMany({ include: PET_INCLUDE }) -- the query
 --     petRepository.ts:65 actually sends, relations and all -- not a simpler bare findMany.
---   * The invariant above is checked, not asserted: every date this file stores is compared
---     against approximateBirthDate's own output across twelve shapes, both rollover cases
---     included, and the transcribed rule is itself pinned against src/data/pets.json so a
---     drifted copy fails first.
+--   * The invariant above is checked -- but not by this file's own rehearsal any more. That
+--     harness compares against `appRule`, a transcription of approximateBirthDate that has
+--     drifted from it since #42 (local-time setters, the old unanchored patterns), and its
+--     guard pins the copy against src/data/pets.json, whose ages are all plain English, so it
+--     cannot see the drift. The comparison against the REAL function, imported rather than
+--     copied, is in `20260922_pets_birth_date_contract/rehearse.mjs` scenario 0: nineteen
+--     spellings and the rollover cases, in any timezone. An earlier version of this bullet said
+--     "a drifted copy fails first"; #42 showed it does not.
 --   * The scratch table is TEMP and ON COMMIT DROP. It never exists in `public`.
 --   * If a statement does fail, an editor that sends this whole file as one query skips the
 --     rest of it, so the COMMIT on the last line never runs and the session is left holding an
@@ -208,6 +218,9 @@
 --                 > extract(day FROM (make_date(substr(left("intakeDate",10),1,4)::int,
 --                                               substr(left("intakeDate",10),6,2)::int, 1)
 --                                     + interval '1 month' - interval '1 day')) THEN 'bad intakeDate'
+--            WHEN lower(coalesce("age",''))
+--                 ~ '[0-9]+[[:space:]]*(tahun|thn|bulan|bln|minggu|mggu|weeks|week|wks|wk|mnths|mnth|yo)\M'
+--                 THEN 'unparseable age'
 --            WHEN lower(coalesce("age",''))
 --                 ~ '[0-9][^0-9]{1,5}[0-9]+[[:space:]]*(years|year|yrs|yr|y|months|month|mths|mth|mos|mo|m)\M'
 --                 THEN 'fractional age'
@@ -269,7 +282,11 @@
 --    ORDER BY "id";
 --
 -- Expect none unless an animal was taken in on the 29th, 30th or 31st. Each row it returns has a
--- birthday moved back to the end of its month, which is deliberate -- see "THE BACKFILL RULE".
+-- birthday rolled FORWARD past a month that is too short -- intake 2026-03-31 minus one month is
+-- stored as 2026-03-03, not 2026-02-28 -- which is deliberate, because it is what the app's own
+-- approximateBirthDate computes for the same string. An earlier version of this line said
+-- "moved back to the end of its month"; that described the clamping rule this file used before
+-- b40a7d7, and is the opposite of what it now does.
 --
 -- `birthDate` and `birthDateIsEstimate` should be NOT NULL; `age` and `ageCategory` should now
 -- read YES under is_nullable, with every value still present. Then load the public catalogue:
@@ -283,14 +300,21 @@
 -- "PetStatus" as the owner applied on 2026-09-18, `intakeDate` as text, and every other scalar
 -- master's Pet model declares, so a Prisma select differs from it in exactly the two columns.
 --
--- Ninety-two checks, all passing. Eighty-five at the SQL level and seven driving master's own
--- generated Prisma client. They are listed in
--- tasks/decisions/2026-09-22-pets-birth-date-backfills-from-intake-date.md. In summary:
+-- Ninety-two checks, all passing when run on 2026-09-22. Eighty-five at the SQL level and seven
+-- driving master's own generated Prisma client. They are listed in
+-- tasks/decisions/2026-09-22-pets-birth-date-backfills-from-intake-date.md. **Two of them, O1 and
+-- O2, have since stopped meaning what they say**: they compare against `appRule`, a copy of
+-- approximateBirthDate that #42 left behind, so they still pass against a rule the app no longer
+-- uses. The live comparison is in the contract harness (see the invariant bullet above). Not
+-- re-run after the 2026-10-14 refusal change -- this harness needs embedded-postgres; the parts of
+-- it that change touches, J1 and J3, are reproduced and pass in the contract harness. In summary:
 --   * The ten src/data/pets.json animals backfill to the exact `birthDate` that file carries,
 --     10/10, which is the independent check on the rule -- that fixture was written by hand and
 --     this SQL was not derived from it.
---   * English and Malay units, "1 year 6 months" taking the year, and an age embedded in a
---     sentence, all derive what the app's approximateBirthDate derives.
+--   * English units, "1 year 6 months" taking the year, and an age embedded in a sentence derive
+--     what approximateBirthDate derives. Malay units do not: since b40a7d7 they are refused, and
+--     since 2026-10-14 so is any string that contains one alongside an English unit. (An earlier
+--     version of this bullet said "English and Malay units ... all derive what the app derives".)
 --   * Before: prisma.pet.findMany and prisma.pet.create both fail on the missing column.
 --     After: both succeed, the archive update succeeds, and the backfilled date is the right one.
 --   * Every refusal leaves the table untouched: unparseable age, NULL age, empty age, a
@@ -434,6 +458,15 @@ BEGIN
                  ~ '[0-9][^0-9]{1,5}[0-9]+[[:space:]]*(years|year|yrs|yr|y|months|month|mths|mth|mos|mo|m)\M'
                  AS fractional,
                CASE
+                 -- Any unit the app reads and this file does not, ANYWHERE in the string, makes
+                 -- the row underivable -- not only when it is the unit that would have matched.
+                 -- Without this, "1 tahun 6 months" skips `tahun`, finds `6 months`, and stores
+                 -- six months while the app reads one year: a different birthday, no error. #42
+                 -- taught the app these units; this keeps the backfill to "store what the app
+                 -- computes, or refuse". Checked first, so it wins over an English unit later on.
+                 WHEN lower(coalesce(p."age", ''))
+                        ~ '[0-9]+[[:space:]]*(tahun|thn|bulan|bln|minggu|mggu|weeks|week|wks|wk|mnths|mnth|yo)\M'
+                   THEN NULL
                  WHEN lower(coalesce(p."age", '')) ~ '[0-9]+[[:space:]]*(years|year|yrs|yr|y)\M'
                    THEN 'years'
                  WHEN lower(coalesce(p."age", '')) ~ '[0-9]+[[:space:]]*(months|month|mths|mth|mos|mo|m)\M'
@@ -506,9 +539,12 @@ BEGIN
     -- 2024-02-29 minus one year is 2023-03-01: the day of month is kept and the overflow spills
     -- into the next month. make_date(target month, 1) + (day - 1) reproduces exactly that.
     -- Neither date is more correct -- every row here is an estimate and the two rules differ by
-    -- a day or three. What decides it is that this one can be CHECKED: the contract migration
-    -- re-derives every row with the app's own function and compares, which is a check that can
-    -- fail. A clamped date could only ever be compared against hand-typed constants.
+    -- a day or three. What decides it is that this one can be CHECKED: the contract harness
+    -- (20260922_pets_birth_date_contract/rehearse.mjs, scenario 0) imports the app's own function
+    -- and compares it against this UPDATE's output, which is a check that can fail. A clamped date
+    -- could only ever be compared against hand-typed constants. (This comment used to say the
+    -- contract MIGRATION re-derives every row; it stopped doing that when the pair was split, so
+    -- that a second copy of this rule would not exist.)
     UPDATE "public"."pets" p
        SET "birthDate" = to_char(
              CASE WHEN b.unit = 'years'

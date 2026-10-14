@@ -42,10 +42,20 @@ Record active multi-step work streams below.
       is restored with the measured table at the top and a pre-flight query, tested on pglite
       against thirteen strings, for the owner to run before applying expand. The decision never
       reached master.
-- [x] Harness revised from the same review: mixed strings pinned as a known defect at exact values;
-      single-unit refusals asserted by message and row id rather than "any error"; app readings
-      asserted by exact date rather than "differs from intake"; the bare `y`/`mo`/`m` and no-space
-      `5y` forms added; a clear failure under plain `node`. 80/80.
+- [x] Harness revised from the same review: single-unit refusals asserted by message and row id
+      rather than "any error"; app readings asserted by exact date rather than "differs from
+      intake"; the bare `y`/`mo`/`m` and no-space `5y` forms added; a clear failure under plain
+      `node`.
+- [x] **Fixed the mixed-string defect** rather than pinning it — a second review showed it was
+      broader (`2 tahun 3 years`, `5 yo and 3 years`) and that pinning a fixable defect green was
+      the wrong call. Three SQL lines in expand's unit classification, mirrored in its header
+      pre-check. Expand's own J1 and J3 reproduced in the contract harness and passing for 18
+      fixtures; mutation-tested by removing the pre-check half, which J1 caught. The only
+      executable change to expand is those three lines. 88/88. The vocabulary entry settles into
+      `decisions/` — this time with a claim that was measured, and with its residuals named.
+- [x] Corrected five stale claims in expand's header the review found, all made false by #42 or
+      b40a7d7: the app's Malay behaviour, O2's coverage, "ninety-two checks", the month-end
+      direction, and the contract "re-deriving".
 
 ## Review
 
@@ -56,11 +66,11 @@ reason. Fixing it needs `embedded-postgres`, which this session did not install 
 suggested repair in the entry is to retire O1/O2 there and point at the new check, not to correct
 the copy.
 
-**Not done, also deliberately: the mixed-string defect is not fixed.** The repair belongs in the
-expand SQL's refusal set and its header pre-check query together, and its own harness — whose J1
-check asserts the two agree — could not be run. It is pinned, documented in the migration header
-and in `petAge.ts`, and guarded at the human level by the pre-flight. It should be fixed before the
-owner applies expand, or the pre-flight must return no rows.
+**The mixed-string defect is fixed** — after this stream had first recorded it as deliberately
+not fixed, on the grounds that expand's harness could not be run. That reasoning did not survive
+review: the two checks the change touches were reproducible. Lesson filed. Expand's own 92-check
+harness is still not re-run here, which the decision entry states, along with exactly which of its
+checks were reproduced and why the rest are unaffected.
 
 **What was wrong in this session, briefly:** it asserted that #42 closed the timezone entry without
 checking what the rehearsal compares against; gave a spec built on master while the branch had moved

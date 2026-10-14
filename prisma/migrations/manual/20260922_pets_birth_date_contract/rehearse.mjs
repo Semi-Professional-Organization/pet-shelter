@@ -390,34 +390,96 @@ if (HAS_EXPAND) {
     await one.close();
   }
 
-  // KNOWN DEFECT, pinned exactly. See tasks/open/malay-age-units-outpace-the-backfill.md.
+  // Mixed strings: an app-only unit together with an English one. Before the fix these were NOT
+  // refused — the app read the Malay year first and stopped, the backfill skipped it and read the
+  // English unit further along, and the two stored different dates with no error. Measured, at
+  // intake 2026-06-12: "1 tahun 6 months" app 2025-06-12, backfill 2025-12-12. The backfill now
+  // treats any app-only unit anywhere as underivable. Each case asserts both that the app reads it
+  // to a definite date AND that the backfill refuses it — so a row can never be stored as a
+  // different birthday from the one the app would compute, which is the whole invariant.
   //
-  // A string that MIXES an app-only unit with an English one is not refused: the app reads the
-  // Malay year first and stops, the backfill skips it and reads the English month, and the two
-  // store different dates with no error. #42 opened this. It is pinned here at its exact current
-  // values rather than asserted as refused, so the harness stays green while the defect is known
-  // and recorded — and fails the moment anything about it changes. If one of these starts failing
-  // because the backfill now REFUSES it, the defect is fixed: move the string into APP_ONLY above.
-  const KNOWN_DIVERGENT = [
-    ["1 tahun 6 months", "2025-06-12", "2025-12-12"],
-    ["2 tahun, approx 6 mos", "2024-06-12", "2025-12-12"],
-    ["1 tahun (18 months)", "2025-06-12", "2024-12-12"],
+  // `3 minggu 2 months` and `2 years 3 weeks` used to AGREE (both sides read the English unit).
+  // They are refused now too. That is a deliberate, conservative regression: refusing a row costs
+  // a manual correction; telling "agrees by luck" from "agrees by rule" would cost a second copy
+  // of the app's precedence logic in SQL, which is the defect this whole pair exists to avoid.
+  const MIXED = [
+    "1 tahun 6 months",
+    "2 tahun, approx 6 mos",
+    "1 tahun (18 months)",
+    "2 tahun 3 years",
+    "5 yo and 3 years",
+    "2 thn 1 year",
+    "3 minggu 2 months",
+    "2 years 3 weeks",
   ];
-  for (const [age, appWant, sqlWant] of KNOWN_DIVERGENT) {
+  for (const age of MIXED) {
     const one = new PGlite();
     await one.exec(PROD_SCHEMA);
     await insertPreExpand(one, ["mixed-row", age, "adult", intake]);
     const oneErr = await tryExec(one, EXPAND);
-    const stored = oneErr
-      ? "REFUSED"
-      : (await one.query(`SELECT "birthDate" FROM "public"."pets"`)).rows[0].birthDate;
-    const app = approximateBirthDate(age, intake).birthDate;
     check(
-      `KNOWN DEFECT "${age}": app ${appWant}, backfill stores ${sqlWant} (open entry; fixed = move to APP_ONLY)`,
-      app === appWant && stored === sqlWant,
-      `app=${app} backfill=${stored}`
+      `mixed "${age}" is refused rather than stored differently from the app`,
+      /cannot be derived/.test(oneErr) && /mixed-row/.test(oneErr),
+      oneErr ? oneErr.split("\n")[0].slice(0, 160) : "the backfill stored it"
     );
     await one.close();
+  }
+
+  // ---- expand's own J1 and J3, reproduced here so they can actually run -----------------------
+  //
+  // Expand's harness checks that the header's pre-check query returns the right verdict for every
+  // way the file refuses (J1) and that each verdict matches what the file actually does (J3). That
+  // harness needs embedded-postgres; this one does not. Changing the file's refusal set means the
+  // pre-check had to change with it, so the pairing is re-checked here: same extraction, same eight
+  // fixtures and expected labels, same two assertions — plus the mixed strings above, which must
+  // read `unparseable age` and be refused.
+  const lines = EXPAND.split("\n");
+  const from = lines.findIndex((l) => l.includes("SELECT * FROM ("));
+  const to = lines.findIndex((l) => l.includes(`ORDER BY (verdict LIKE 'ok:%'), verdict, "id";`));
+  check("the header pre-check query can be located exactly as expand's J1 locates it", from >= 0 && to > from);
+  if (from >= 0 && to > from) {
+    const PRECHECK = lines.slice(from, to + 1).map((l) => l.replace(/^--\s?/, "")).join("\n");
+    const J = [
+      ["j-1", "2 years", "2026-06-12", "ok: years"],
+      ["j-2", "unknown", "2026-06-12", "unparseable age"],
+      ["j-3", "2 years", "2024-02-31", "bad intakeDate"],
+      ["j-4", "4 months", "2026-06-12", "ok: months"],
+      ["j-5", "2 years", "not-a-date", "bad intakeDate"],
+      ["j-6", "500 years", "2026-06-12", "implausible age"],
+      ["j-7", "900 months", "2026-06-12", "implausible age"],
+      ["j-8", "1.5 years", "2026-06-12", "fractional age"],
+      ...MIXED.map((age, k) => [`j-mixed-${k}`, age, "2026-06-12", "unparseable age"]),
+      ["j-tahun", "2 tahun", "2026-06-12", "unparseable age"],
+      ["j-weeks", "3 weeks", "2026-06-12", "unparseable age"],
+    ];
+    const pc = new PGlite();
+    await pc.exec(PROD_SCHEMA);
+    for (const [id, age, intakeDate] of J) await insertPreExpand(pc, [id, age, "adult", intakeDate]);
+    const verdict = Object.fromEntries((await pc.query(PRECHECK)).rows.map((x) => [x.id, x.verdict]));
+    await pc.close();
+    const wrong = J.filter(([id, , , want]) => verdict[id] !== want);
+    check(
+      `J1 (reproduced): the pre-check returns the right verdict for all ${J.length} fixtures`,
+      wrong.length === 0,
+      wrong.map(([id, , , want]) => `${id}: want ${want}, got ${verdict[id]}`).join(" | ")
+    );
+
+    const disagree = [];
+    for (const [id, age, intakeDate, want] of J) {
+      const db1 = new PGlite();
+      await db1.exec(PROD_SCHEMA);
+      await insertPreExpand(db1, [id, age, "adult", intakeDate]);
+      const failed = (await tryExec(db1, EXPAND)) !== "";
+      if ((want.startsWith("ok:") ? !failed : failed) === false) {
+        disagree.push(`${id} (${want}): ${failed ? "refused" : "accepted"}`);
+      }
+      await db1.close();
+    }
+    check(
+      `J3 (reproduced): every pre-check verdict matches what the file actually does`,
+      disagree.length === 0,
+      disagree.join(" | ")
+    );
   }
 }
 

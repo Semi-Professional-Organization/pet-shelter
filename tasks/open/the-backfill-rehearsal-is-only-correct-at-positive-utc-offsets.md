@@ -75,12 +75,13 @@ single-unit strings.** A future change to `approximateBirthDate` on any spelling
 fails a check that cannot be fooled by a stale copy — once someone runs it, since it is a manual
 `npx tsx` script and not part of `npm test` or CI.
 
-**It is not covered for mixed-language strings, and that was claimed and then disproved the same
-day.** `/code-review` on the PR adding this check measured `1 tahun 6 months` stored as six months
-by the backfill while the app reads one year, with no refusal. That is a separate, open defect —
-`tasks/open/malay-age-units-outpace-the-backfill.md`, which has a tested pre-flight query to run
-before applying expand. The harness now pins those three strings at their exact current values, so
-the defect cannot widen unnoticed; it does not fix it. Current count: **80/80**.
+**Mixed-language strings were a separate defect, found and fixed the same day.** `/code-review`
+on the PR adding this check measured `1 tahun 6 months` stored as six months by the backfill while
+the app reads one year, with no refusal. The backfill now refuses any age containing a unit it does
+not read, anywhere in the string; the same check now asserts eight mixed strings are refused, and
+reproduces expand's J1 and J3 to show the pre-check agrees with the file. Settled in
+`tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`. Current
+count: **88/88**.
 
 **Why this does not close the entry.** The condition below names *expand's* `rehearse.mjs`, and
 that file still restates the function as `appRule`, still with local setters and the old unanchored
