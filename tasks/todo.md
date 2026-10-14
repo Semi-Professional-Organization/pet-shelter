@@ -35,18 +35,23 @@ Record active multi-step work streams below.
       against a rule `master` never had, and reopened a settled decision. The first rewrite
       overcorrected — it said a stranded record's *status* could not be changed (it can:
       `updatePetStatus` bypasses `petFormSchema`) and that no existing row was at risk (the
-      `2024-01-01` column default can produce one). Second pass fixed both, and renamed the file to
-      `birthday-after-intake-rule-refuses-animals-born-at-the-shelter.md`, because the old name
-      described the withdrawn claim and is the public issue's title.
+      `2024-01-01` column default can produce one). Second pass fixed both, and widened the
+      production check to every row with `birthDate > intakeDate`, so a hand-corrected birthday is
+      caught as well as the default. It also renamed the file, believing the name was the public
+      issue's title. It is not — the mirror takes the title from the first heading — and renaming
+      would have *closed* the issue as if settled. The rename was reverted; the new heading
+      retitles the issue in place.
 - [x] **F11 — pinned seven accepted spellings nothing tested.** `tahun`, `thn`, `bln`, bare `m`,
       `yr`, `week`, `mnths`. One `it.each` case per spelling, so a dropped one is reported by name.
       Proved each case kills its own mutant: dropped one spelling at a time from the real patterns,
       ran the suite, restored the original bytes from memory. Seven mutants, each killed by exactly
       its own case and no other — `1 failed | 33 passed` every time.
-- [x] **F14 — corrected the previous stream's record of what was not done.** Two bullets said the
-      `minggu` regex was left alone; it was fixed in #42 (`187593c`). Struck through rather than
-      deleted, and branch-commit hashes replaced with the squash on `master` where the point is
-      where something landed.
+- [x] **F14 — corrected the previous stream's record, here rather than in it.** The stream below
+      says the `minggu` regex was left alone; it was fixed in #42. An earlier pass on this branch
+      edited that stream in place. A review pointed out that `CLAUDE.md` step 5 and this file's own
+      header forbid reformatting what is below a new stream, so those edits were reverted and the
+      corrections moved into the section below — the stream underneath is now byte-identical to
+      `master`.
 - [x] Filed `drift-log-has-recorded-nothing-since-2026-10-13.md`. First version compared this session's
       zero lines against 161 for another and blamed how the worktree was entered. Wrong: the whole
       log is 161 lines from **one** session across 90 minutes on 2026-10-13, and nothing from anyone
@@ -58,6 +63,24 @@ Record active multi-step work streams below.
       that are not ancestors of `master`; the stream said an open PR "deletes" a file; the drift
       entry's comparison was meaningless; the rewritten date-rules entry named the wrong failure
       and dropped a real risk. Each probed, all ten fixed or recorded.
+
+## Corrections to the stream below
+
+`Pet form birth date — critique PR #42, then yield it to PR #94` is left exactly as written. These
+are the parts of it that are wrong, recorded here because a stream below this one is not edited:
+
+- **Its two "`minggu` left alone deliberately" bullets are false.** #42 made weeks a unit in both
+  languages after the owner ruled that "3 minggu" means three weeks. Both bullets were written
+  before that change and never revised.
+- **Where it cites a commit as where something landed, read `187593c`.** #42 was squash-merged to
+  `master` as `187593c`. Its branch commits — `925b7c6` (weeks), `4cad3ce` (a review's fix round) —
+  are real but are not ancestors of `master` (`git merge-base --is-ancestor 925b7c6 origin/master`
+  exits 1), and they stop resolving if `feat/pet-form-birth-date` is deleted.
+- **It omits the omission that mattered most:** the expand harness's `appRule` was left stale
+  while #42 widened the real function. In
+  `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
+- **It omits that #42 merged unreviewed** after the 2026-10-13 review — including `925b7c6`, a
+  behaviour change, and `4cad3ce`, that review's own fix round.
 
 ## Review
 
@@ -90,15 +113,32 @@ The open defects are tracked in the ledger, not here — a work stream may recor
 but `tasks/README.md` does not let it hold an open question. Each was reproduced against the real
 function on `master` before being filed, rather than copied from the review.
 
-- **F4, F7, F8, F9 — deferred until PR #113 merges**, at that session's request, because #113 also
-  edits `petAge.ts`. Decimals read the wrong digits (`0,75 tahun` → seventy-five years), an
-  unbounded count throws `RangeError`, the return type can lie, and three copies of the estimate
-  rule disagree on `birthDate: ''`. In `approximate-birth-date-misreads-several-age-shapes.md`.
-- **F5, F6 — not fixable on the app side alone.** Compact compounds (`2y3m` → three months) and
-  unlisted spellings (`3 mgg` → intake). The backfill's `\M` fails on `2y3m` the same way, so app
-  and SQL currently agree, both wrong; fixing only the app opens a silent divergence. Same entry.
+- **F4–F9, all of the parser defects — deferred until open PR #113 lands or is withdrawn**, at that
+  session's request, because #113 also edits `petAge.ts`. All are fixable in the app alone: the
+  backfill refuses every affected shape, so changing what the app computes for them changes nothing
+  it stores. Most are **regressions #42 introduced** with its trailing `\b` — `2y3m` read correctly
+  as two years before #42 and reads as three months now; `6 mons` read as six months and now falls
+  through to intake. Decimals read the wrong digits (`0,75 tahun` → seventy-five years; the English
+  cases predate #42), an unbounded count throws `RangeError`, the return type can lie, and three
+  copies of the estimate rule disagree on `birthDate: ''`. In
+  `approximate-birth-date-misreads-several-age-shapes.md`, every case reproduced against both the
+  pre-#42 and current function.
+- **F5's coupling to the SQL was a false premise, and this stream carried it for a round.** An
+  earlier version said compact compounds could not be fixed app-side because the backfill's `\M`
+  "fails the same way" and the two "agree, both wrong". It was accepted from another session after
+  only the app half was checked. The backfill's fractional check runs first and *aborts* on `2y3m`
+  (`migration.sql` lines 403 and 445–448), so nothing is stored wrong. That session confirmed it on
+  a real Postgres and withdrew the claim from its own decision entry.
 - **F2 remainder — the expand harness's stale `appRule`.** Needs `embedded-postgres` to run, and
   deleting the copy changes O1/O2 wholesale. In the rehearsal entry.
+- **`CLAUDE.md` step 7 still says nothing about what `git merge-tree --write-tree` prints.** A
+  review argued the tree-hash trap belongs there, not only in a lesson — and `CLAUDE.md` step 6
+  itself records that a lesson living only in `tasks/lessons/` was ignored and let PR #38 ship a
+  defect. Not changed here: `CLAUDE.md` is the process every session follows, and changing it is
+  the owner's decision rather than a ride-along on a ledger branch. The clause, ready to add to
+  step 7: *"Its first output line is the **tree** the merge would produce, not a commit — never
+  quote it as a ref. Use the exit status for clean or conflicted, and cite `git rev-parse
+  origin/master` for the commit."*
 - **The structural half of F11.** The seven spellings are pinned, but a spelling *added* to a
   pattern still goes untested until someone adds a row. Making that impossible means exporting the
   vocabulary from `petAge.ts` and feeding both the patterns and the test from it.
@@ -189,38 +229,11 @@ master was not checked.
       check accepted it identically and returned the same string. No regression.
 ## Explicitly NOT done
 
-> **Corrected 2026-10-14.** Two bullets below this note said the `minggu` regex was left alone
-> deliberately. It was not: #42 made weeks a unit in both languages, after the owner ruled that
-> "3 minggu" means three weeks. They were written before that change and never revised, and a
-> `/code-review max` found them still saying the opposite at merge. They are struck through rather
-> than deleted, so the reasoning that *was* followed for a while stays readable.
->
-> **On hashes in this stream.** #42 was squash-merged to `master` as `187593c`. Its branch commits —
-> `925b7c6` (weeks), `4cad3ce` (a review's fix round) — are real but are *not* ancestors of
-> `master` (`git merge-base --is-ancestor 925b7c6 origin/master` exits 1), and they vanish from
-> reach if `feat/pet-form-birth-date` is deleted. Where this stream says where something *landed*,
-> it cites #42 / `187593c`. Branch hashes appear only where the point is the branch history itself.
-
-- ~~**The `minggu` regex, the admin-save flag downgrade, and the Malay/SQL vocabulary gap.**
+- **The `minggu` regex, the admin-save flag downgrade, and the Malay/SQL vocabulary gap.**
   All three are recorded as ledger entries rather than fixed here: anchoring that regex moves the
   arithmetic three implementations were aligned on, and the flag downgrade is PR #94s to land.
   `tasks/open/malay-age-units-outpace-the-backfill.md`,
-  `tasks/open/every-admin-save-downgrades-an-exact-birthday.md`.~~
-  **What actually happened:** the flag downgrade was fixed by #94 and its entry deleted. The
-  `minggu` regex was fixed in #42 (`187593c`). The vocabulary gap is proposed to move into PR #113's
-  decision entry, which would delete the Malay entry this bullet cited — but #113 was still open
-  when this was written, and on `master` that entry still exists and `petAge.ts` still cites it.
-- **The expand harness's `appRule` was left stale — the omission that mattered most.**
-  `20260922_pets_birth_date/rehearse.mjs` restates `approximateBirthDate` with local setters and
-  the old unanchored patterns. #42 widened the real function without touching that copy, so
-  9 of 9 Malay-or-weeks inputs now disagree with it while O1 still passes 10/10 — every
-  `pets.json` age is plain English. Not fixed: nobody here can run that harness without
-  `embedded-postgres`, and deleting the copy changes O1/O2 wholesale. Tracked in
-  `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
-- **#42 merged with nothing after the 2026-10-13 review reviewed.** That includes the branch
-  commits `925b7c6`, a behaviour change, and `4cad3ce`, the review's own fix round — both squashed
-  into `187593c`, so neither is on `master` by that name. A `max` review run afterwards found
-  15 issues, three of which change what the PR claimed. Every fix is a follow-up PR as a result.
+  `tasks/open/every-admin-save-downgrades-an-exact-birthday.md`.
 
 - **The form.** Reverted to master in full — `PetFormDialog`, `actions/pets.ts`, `petStore.ts`,
   `validations/pet.ts` and the component test. PR #94 owns it. `tasks/open/pet-form-has-no-birth-date-field.md`
@@ -231,12 +244,10 @@ master was not checked.
 - **No migration.** Two already exist. This branch touches neither.
 - **`hasAgeUnit` dropped.** It existed only to serve the dialog's age→birthday derivation, which
   #94 removes; keeping it would have shipped an exported function with no caller.
-- ~~**`/(\d+)\s*m/` matching "3 minggu" (Malay for *weeks*) as three months.** Real, found by the
+- **`/(\d+)\s*m/` matching "3 minggu" (Malay for *weeks*) as three months.** Real, found by the
   expand session, refused at the migration so no production row carries it — but still wrong on
   the fixture path. Left alone deliberately: anchoring that regex changes the very referent all
-  three implementations just agreed on, and it deserves its own change, not a ride-along.~~
-  **What actually happened:** fixed in #42 (`187593c`) — see the correction note above.
-
+  three implementations just agreed on, and it deserves its own change, not a ride-along.
 # Pet birth date — production conversion and the form that feeds it
 
 **Branch:** `worktree-pet-birth-date-migration` · opened 2026-09-22

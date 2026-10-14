@@ -19,10 +19,20 @@ What `claude-agent-drift.log` actually contains, measured directly:
 rotated". A log that holds ninety minutes from one session and nothing older therefore looks to
 have been recreated around 15:09Z on 2026-10-13, then gone quiet about ninety minutes later.
 
-**What was checked and is not the cause:** the hook script `.claude/hooks/agent-guard.mjs` exists,
-and `.claude/settings.json` references it. So it is configured. Why it stopped writing — a changed
-`TEMP` path, the hook exiting early, a matcher no longer firing, the file being held open — is not
-known, and nothing here has tested any of those.
+**The hook is not being called at all — and its own files already show it.** The script
+`.claude/hooks/agent-guard.mjs` exists and `.claude/settings.json` references it, so it is
+configured. And it leaves a trace that settles whether it runs: every invocation appends a line to
+`claude-agent-guard.log` **unconditionally** — `log(...)` at line 152 of the script, before the
+`PostToolUse` branch at line 168. That file was last written at 2026-10-13T16:57Z. So the script
+has not been invoked by any session since. That rules out every explanation that needs the script
+to run — exiting early, a held file handle, a bad drift-log path — and leaves the ones where it is
+never invoked: the hook not being loaded, its matcher not firing, or the command failing before
+the script starts.
+
+A weaker trace agrees. The per-session state file, `claude-agent-drift.<session>.state`, exists for
+`1c022c97` only. It is weaker because it is written *inside* the `PostToolUse` branch, after a
+`git status` call in a `try` (line 200), so its absence alone could mean `git status` failed rather
+than that the hook never ran. The liveness log has no such condition.
 
 ## Correction
 
@@ -36,12 +46,17 @@ carrying the entry caught it.
 
 **Why it matters.** The drift log is the close-out's only mechanical check for a "while I am here"
 edit. `AGENTS.md` already warns that an empty filter result means "no *observed* drift, not none",
-but a reader at close-out has no way to tell a quiet session from a log that has stopped
-recording. Until this is fixed, account for touched paths with `git status` and the branch diff
-against `origin/master`, as the PR #42 session did.
+and an empty result looks the same whether a session was quiet or the hook never ran. **There is a
+cheap way to tell them apart at close-out:** check the modification time of
+`%TEMP%\claude-agent-guard.log` (`$TMPDIR` elsewhere). If it is older than your session's first
+tool call, the hook did not run for you, and the drift log's silence means nothing. Then account
+for touched paths with `git status` and the branch diff against `origin/master`, as the PR #42
+session did.
 
-**Settles when:** someone starts a fresh session the ordinary way, makes one write through a
-matched tool, and checks whether a line appears. If it does not, the hook is broken for everyone
-and the cause above needs finding. If it does, the silence is specific to how the earlier sessions
-ran, and this entry should say what that was. Either way, record where the log is being written
-and confirm it is the path `AGENTS.md` names.
+**Settles when:** the hook is invoked again — which the liveness log shows directly, so no separate
+experiment is needed to *detect* the fix — and the cause is recorded: why a configured hook stopped
+being called around 2026-10-13T16:57Z. **A committed change is ruled out:** the last commit to
+touch `.claude/settings.json` or `agent-guard.mjs` on `master` is from 2026-09-09, a month earlier.
+That leaves what git does not record — uncommitted `.claude/settings.local.json`, the user-level
+settings, or how the harness loads project hooks — and a session that can inspect its own active
+hook configuration is better placed to check than one reading files after the fact.

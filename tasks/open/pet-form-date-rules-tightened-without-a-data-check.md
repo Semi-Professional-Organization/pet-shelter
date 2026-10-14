@@ -38,10 +38,23 @@ literal in the repository was clean ISO; `tests/unit/rehabilitation.test.ts` use
 
 A first rewrite on 2026-10-14 then overcorrected: it said the operator could not change a stranded
 record's *status* (they can — see above) and that no existing row was at risk (the column default
-can produce one). Both found by a second review and fixed here. The file was renamed because its
-old name described the withdrawn claim, and that name is the public issue's title.
+can produce one). Both found by a second review and fixed here.
+
+The filename is kept even though it now describes the withdrawn claim. The public issue's *title*
+comes from this file's first heading, not its name (`parseEntry` in `scripts/ledger-issues.mjs`),
+so the new heading retitles the existing issue in place. Renaming the file would instead close
+that issue — which reads publicly as "settled" — and open a fresh one with none of its history. It
+was briefly renamed on the mistaken belief that the name was the title.
 
 **Settles when:** a maintainer decides what an animal born at the shelter records as its intake
 date — most likely its own birth date, the day it entered the shelter's care, which keeps the rule
-and needs only a line of operator help — and someone confirms no production row carries the
-`2024-01-01` default with an intake before 2024, which is a count only an owner can run.
+and needs only a line of operator help — and someone with production access confirms no stored row
+already violates the rule:
+
+    SELECT count(*) FROM pets
+     WHERE "intakeDate" ~ '^\d{4}-\d{2}-\d{2}$'
+       AND "birthDate" > "intakeDate";
+
+That covers both sources at once — a `2024-01-01` default on an animal taken in before 2024, and a
+birthday corrected by hand after its intake — where counting only the default would miss the
+second. The `intakeDate` filter matches the rule, which skips any intake that is not ISO.

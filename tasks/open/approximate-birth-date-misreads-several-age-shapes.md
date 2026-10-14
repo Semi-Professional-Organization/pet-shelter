@@ -1,71 +1,87 @@
-# `approximateBirthDate` misreads several shapes of age, two of them badly
+# `approximateBirthDate` misreads several shapes of age, most of them since PR #42
 
-**Status:** open · opened 2026-10-14 · from a `/code-review max` of PR #42, each case reproduced
+**Status:** open · opened 2026-10-14 · rewritten 2026-10-14 · from reviews of PR #42, each case reproduced
 
-Every result below is the real function on `master` at `187593c`, called with intake `2026-06-12`.
+Every result below comes from running the real function — `master` at `187593c`, and the pre-#42
+version extracted from `18c533e` — with intake `2026-06-12`, under `TZ=UTC`. The backfill verdicts
+come from the patterns in `prisma/migrations/manual/20260922_pets_birth_date/migration.sql`,
+emulated with Postgres's `\M` taken as "next character is not alphanumeric or `_`".
 
-**Where it reaches today.** Since #94 the pet form collects a birthday directly, so
-`approximateBirthDate` runs only for a record that has no `birthDate`: chiefly a pet saved to
-browser `localStorage` before #94, on first render. That is narrow. But this function is also the
-*reference* the birth-date backfill is checked against — PR #113 makes the contract rehearsal
-import it — so every wrong answer here is a wrong answer from the oracle, and the narrow reach
-widens the moment the known `petStore.ts` mount-effect defect is fixed.
+**Where it reaches today.** Since #94 the pet form collects a birthday directly, so this function
+runs only for a record with no `birthDate`: chiefly a pet saved to browser `localStorage` before
+#94, on first render. That is narrow, and widens the moment the known `petStore.ts` mount-effect
+defect is fixed. It also matters as a reference: at the time of writing, open PR #113 would have
+the contract rehearsal import this function and compare the backfill against it, so if #113
+merges, every wrong answer here becomes a wrong answer from that harness's oracle.
 
-## Fixable in the app alone
+## Regressions PR #42 introduced
 
-These change nothing the backfill stores, because the SQL already refuses each shape.
+#42 added a trailing `\b` to each unit pattern, to stop `3 minggu` (Malay for three weeks) being
+read as three months. That boundary cannot sit between a unit letter and a following digit or
+letter, so shapes the earlier function read correctly now fail:
 
-- **Decimals and fractions read the wrong digits.** The pattern captures the digit run *beside*
-  the unit, so `0,5 tahun` — a six-month kitten — reads as `5 tahun`:
+| age | before #42 | `master` | backfill |
+|---|---|---|---|
+| `2y3m` | 2024-06-12 (two years) | 2026-03-12 (three months) | refused, fractional |
+| `5yrs8mths` | 2021-06-12 (five years) | 2025-10-12 (eight months) | refused, fractional |
+| `1y6m` | 2025-06-12 (one year) | 2025-12-12 (six months) | refused, fractional |
+| `1y2w` | 2025-06-12 (one year) | 2026-06-12 (intake) | refused, no unit |
+| `6 mons`, `6 mon`, `6 mts` | 2025-12-12 (six months) | 2026-06-12 (intake) | refused, no unit |
+| `2 yrsold` | 2024-06-12 (two years) | 2026-06-12 (intake) | refused, no unit |
 
-      0,5 tahun   -> 2021-06-12   five years old
-      0,75 tahun  -> 1951-06-12   seventy-five years old
-      1/2 tahun   -> 2024-06-12   two years
-      1.5 bulan   -> 2026-01-12   five months
+`3 mgg`, the usual Malay short form of *minggu*, is different and not a regression: before #42 it
+read as three **months** (2026-03-12), which was wrong, and on `master` it falls through to the
+intake date, which is wrong more conservatively. It should read as three weeks, the way `3 minggu`
+now does (2026-05-22) — the one case in this family that #42 fixed rather than broke. The backfill
+refuses it.
 
-  Before #42 added Malay units these fell through to the intake date, which is wrong but
-  conservative. The trap is already a lesson:
-  `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
+**All of these are fixable in the app alone.** The backfill refuses every one — three as fractional
+ages, the rest for having no unit it recognises — so changing what the app computes for them
+changes nothing the migration stores. A refused row is not stored.
 
-- **An unbounded count crashes it.** `15000000 weeks` **throws** `RangeError: Invalid time value`;
-  `12345678 wks` returns `-234583-03-21`. Years and months had the same exposure before #42; the
-  weeks branch extends it to a unit that used to fall through safely. A cap mirroring the SQL's
-  sixty years / 720 months (about 3,130 weeks) closes all three branches.
+The fix is not a single token. Replacing each trailing `\b` with `(?![a-z])` restores the compact
+compounds, but not `6 mons`, where the unit is followed by a letter; those need `mons?`, `mts?` and
+`mgg` listed explicitly. The guard cannot simply be removed, because it is what keeps `3 minggu`
+from reading as months.
 
-- **The return type can lie.** `withDerivedAge` types `birthDateIsEstimate` as whatever came in,
-  so a literal `false` survives inference while the runtime returns `true`, and a `T` whose flag is
-  typed `undefined` reduces the whole result to `never`. No production caller is affected. Fix:
+## Also fixable in the app alone
+
+- **Decimals and fractions read the digits beside the unit.** `0,5 tahun` — a six-month kitten —
+  reads as `5 tahun`, five years; `0,75 tahun` reads as seventy-five; `1.5 bulan` as five months.
+  These Malay cases are new in #42, which added the units: before it they fell through to intake.
+  **The English cases are not new** — `0.5 years` reads as five years and `1.5 months` as five
+  months both before #42 and on `master`. The backfill refuses all of them as fractional. The trap
+  is already a lesson: `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
+
+- **An unbounded count crashes it.** `15000000 weeks` throws `RangeError: Invalid time value`;
+  `12345678 wks` returns `-234583-03-21`. A cap mirroring the backfill's sixty years / 720 months
+  (about 3,130 weeks) closes all three branches.
+
+- **The return type can lie** — confirmed with `tsc`, since no runtime probe sees a type.
+  `withDerivedAge({ …, birthDateIsEstimate: false })` with no `birthDate` is typed `false` but
+  returns `true`; an explicitly `undefined` flag collapses the result to `never`. Fix:
   `Omit<T, 'birthDate' | 'birthDateIsEstimate' | 'age' | 'ageCategory'> & { … }`.
 
-- **Three copies of the estimate rule disagree** on a `birthDate` of `''`, which satisfies
-  `NOT NULL`: `mapDbPetToPet` keeps a stored `false`, while `withDerivedAge` and
-  `buildPetPersistencePayload` force `true`. Latent — no writer produces `''` today. The clean fix
-  has `deriveBirthDate` return `{ birthDate, isEstimate }` (the value `approximateBirthDate`
-  already computes and discards) and uses it at all three sites.
+- **Three copies of the estimate rule disagree** on `birthDate: ''`, which satisfies `NOT NULL`:
+  `withDerivedAge` and `buildPetPersistencePayload` return `true`, `mapDbPetToPet` returns `false`.
+  Latent — no writer produces `''` today. The clean fix has `deriveBirthDate` return
+  `{ birthDate, isEstimate }` and uses it at all three sites.
 
-## Not fixable in the app alone
+## Not yet checked
 
-Each of these would *open* a silent divergence from the backfill if only the app were changed, so
-they need a change that touches the SQL in the same step.
+A *mixed* string — one recognised unit and one unlisted — might be read differently by the app and
+the backfill once unlisted spellings are added app-side. Single spellings are refused by the
+backfill, so they fail closed; mixes were not probed.
 
-- **Compact compounds read the smaller unit.** A trailing `\b` cannot sit between a unit letter
-  and a following digit, so the larger unit is skipped:
+**Settles when:** these are fixed and pinned by tests — after open PR #113 lands or is withdrawn,
+since it also edits `petAge.ts` — and the mixed-string question is answered by probe rather than by
+reasoning about `\M`.
 
-      2y3m       -> 2026-03-12   three months, not two years
-      5yrs8mths  -> 2025-10-12   eight months, not five years
-      1y6m       -> 2025-12-12   six months
-      1y2w       -> 2026-06-12   falls through to intake
+## Correction
 
-  The probed app fix is replacing each trailing `\b` with `(?![a-z])`. But the backfill's `\M`
-  fails the same way — Postgres counts the digit as a word character — so app and SQL currently
-  *agree*, both wrong. Fixing the app alone makes them disagree.
-
-- **Unlisted spellings fall silently through to intake.** `6 mons`, `6 mon`, `6 mts`, `2 yrsold`
-  and `3 mgg` — the last being the usual Malay short form of *minggu* — all return `2026-06-12`.
-  Adding them to the app means the backfill must refuse each, or mixed strings reopen the
-  divergence `tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`
-  closes (pending PR #113).
-
-**Settles when:** the first group is fixed, and pinned by tests, after PR #113 merges — it also
-edits `petAge.ts`. The second group is fixed together with the backfill SQL, with the harness's
-corpus extended to cover each shape, or explicitly refused on both sides.
+The first version of this entry said compact compounds and unlisted spellings were *not* fixable in
+the app alone, because the backfill's `\M` "fails the same way" so app and SQL "currently agree,
+both wrong". That was accepted from another session after only the app half was checked, with the
+SQL half reasoned rather than read. The backfill's fractional check runs first and aborts on
+`2y3m`, so nothing is stored wrong. It also presented these as standing limits rather than as
+regressions #42 introduced, and implied the decimal defect was new and Malay-only.
