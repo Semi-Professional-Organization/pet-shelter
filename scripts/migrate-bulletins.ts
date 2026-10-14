@@ -1,10 +1,11 @@
 /**
  * Applies the community bulletin migration and seeds `src/data/bulletins.json` into it.
  *
- * **Re-running it never overwrites an existing notice.** Rows are inserted with
- * `ON CONFLICT DO NOTHING`, so staff edits made through /admin/bulletins survive
- * a second run. See the comment on the INSERT for why that matters more here
- * than in the seed.
+ * **Re-running it never touches content.** The launch notices are inserted only
+ * by the run that creates the table, so a re-run cannot overwrite a notice staff
+ * edited (that is what `ON CONFLICT DO NOTHING` alone guarded) nor bring back one
+ * they deleted (which it did not). `--seed` forces the insert, still with
+ * `DO NOTHING`, for a first run that failed partway through seeding.
  *
  * Separate from `prisma/seed.ts` for the reason `migrate-faqs.ts` gives: that
  * script is refused against anything but a local database
@@ -79,6 +80,33 @@ async function main() {
     const removed = before.filter((t) => !after.includes(t));
     console.log("Added        :", added.join(", ") || "(none)");
     console.log("Removed      :", removed.join(", ") || "(none)");
+
+    /**
+     * Seed only when THIS run created the table — or when an operator asks for
+     * it explicitly with `--seed`.
+     *
+     * `ON CONFLICT DO NOTHING` (below) protects a notice staff have edited, but
+     * not one they have DELETED: a deleted row has no conflict to collide with,
+     * so a re-run would put it straight back, published and pinned, through
+     * `pg`, with no audit entry. And re-runs are expected — this file is
+     * idempotent and also carries the clean-up that drops a retired index — so
+     * "safe to re-run" has to mean safe for the content as well as the schema.
+     *
+     * The escape hatch is for one case: a first run that created the table and
+     * then failed partway through seeding. It still inserts with DO NOTHING.
+     */
+    const createdNow = added.includes("bulletins");
+    const forceSeed = process.argv.includes("--seed");
+    if (!createdNow && !forceSeed) {
+      const total = await pool.query('select count(*)::int n from "bulletins"');
+      console.log(
+        `Seeded       : skipped — "bulletins" already existed (${total.rows[0].n} rows). ` +
+          "The launch notices are not re-applied: staff own this table's content now, " +
+          "and re-inserting would bring back any they deleted. Pass --seed only to " +
+          "finish a first run that failed partway through seeding."
+      );
+      return;
+    }
 
     let inserted = 0;
     for (const bulletin of bulletinsData) {

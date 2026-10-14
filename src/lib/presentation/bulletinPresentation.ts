@@ -75,10 +75,18 @@ export function normaliseBulletinCategory(value: string): BulletinCategory {
   return isKnownBulletinCategory(value) ? value : "announcement";
 }
 
-/** Where a notice appears, for the admin editor's select and its table column. */
+/**
+ * Where a notice appears, for the admin editor's select and its table column.
+ *
+ * Every published notice appears on `/bulletins`, which is the full archive and
+ * reads with no target filter. The target only decides which *scoped* feed also
+ * carries it. The labels used to read "Home page" and "Adoption directory",
+ * which promised exclusivity the archive does not honour — an editor posting a
+ * home-page-only promotion then found it on `/bulletins` too.
+ */
 export const BULLETIN_TARGET_PAGE_LABELS: Record<BulletinTargetPage, string> = {
   all: "Every feed",
-  home: "Home page",
-  pets: "Adoption directory",
-  bulletins: "Bulletins page",
+  home: "Home page + Bulletins page",
+  pets: "Adoption directory + Bulletins page",
+  bulletins: "Bulletins page only",
 };

@@ -21,11 +21,13 @@ import {
 import type { SessionUser } from "@/lib/security/session";
 import fixtureJson from "@/data/bulletins.json";
 import {
+  BULLETIN_TARGET_PAGE_LABELS,
   isKnownBulletinCategory,
   normaliseBulletinCategory,
   presentBulletinCategory,
 } from "@/lib/presentation/bulletinPresentation";
 import { getRevalidatedPaths, revalidatePathSpy } from "../setup/nextMocks";
+import { shelterToday } from "@/lib/domain/bulletinSchedule";
 import {
   BULLETIN_FEED_ORDER_BY,
   sortBulletinsForFeed,
@@ -731,7 +733,12 @@ describe("getPublicBulletins", () => {
 
     await getPublicBulletins("home", 2);
     const scoped = lastQuery(prismaMock.bulletin.findMany);
-    expect(scoped.where).toEqual({ isPublished: true, targetPage: { in: ["all", "home"] } });
+    expect(scoped.where).toEqual({
+      isPublished: true,
+      // The schedule predicate: notices dated after the shelter's today stay off.
+      publishedAt: { lte: expect.any(Date) },
+      targetPage: { in: ["all", "home"] },
+    });
     // Every tiebreaker DESC. `publishedAt` is a calendar day, so ties are
     // ordinary; an ASC tiebreaker resolves a tied day to the OLDEST notice and
     // a two-item feed would then drop the newest — the failure the tiebreaker
@@ -746,6 +753,7 @@ describe("getPublicBulletins", () => {
     await getPublicBulletins("all");
     expect(lastQuery(prismaMock.bulletin.findMany).where).toEqual({
       isPublished: true,
+      publishedAt: { lte: expect.any(Date) },
       targetPage: undefined,
     });
   });
@@ -772,9 +780,10 @@ describe("getPublicBulletins", () => {
     it("sorts pinned first, then newest, and applies the limit afterwards", async () => {
       // The shipped fixture cannot discriminate "pinned first" from "newest
       // first": its two pinned rows are also its two newest, so both orderings
-      // produce the same list. `sortForFeed` is module-private and the fallback
-      // store has no writer, so the one way to put a newer *unpinned* notice in
-      // front of it is to add a row to the fixture the store clones on reset.
+      // produce the same list. The rule itself is tested directly against
+      // `sortBulletinsForFeed`; this test is about the repository's fixture path,
+      // whose store has no writer, so the one way to put a newer *unpinned*
+      // notice in front is to add a row to the fixture the store clones on reset.
       await withExtraFixtureRow(
         {
           id: "bulletin-newest-unpinned",
@@ -790,7 +799,10 @@ describe("getPublicBulletins", () => {
           isPinned: false,
           isPublished: true,
           authorName: "Shelter Team",
-          publishedAt: "2026-12-31",
+          // Newer than both pinned notices but in the past, so it is visible.
+          // It was 2026-12-31 until future dates began to schedule a notice;
+          // that row is now hidden, which is the next test's subject.
+          publishedAt: "2026-09-01",
         },
         async () => {
           const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
@@ -799,7 +811,7 @@ describe("getPublicBulletins", () => {
           expect(home.map((b) => b.id)).toEqual([
             "bulletin-001", // pinned, 2026-08-14
             "bulletin-002", // pinned, 2026-08-12
-            "bulletin-newest-unpinned", // 2026-12-31, but unpinned
+            "bulletin-newest-unpinned", // 2026-09-01, newest, but unpinned
           ]);
 
           // The limit is applied after sorting, so the page gets the two
@@ -808,6 +820,42 @@ describe("getPublicBulletins", () => {
           expect(limited.map((b) => b.id)).toEqual(["bulletin-001", "bulletin-002"]);
         }
       );
+    });
+
+    it("keeps a published notice off the feeds until its date arrives", async () => {
+      // A future notice date SCHEDULES the notice. Without the predicate it
+      // published at once and took the top unpinned slot of the two-item feeds
+      // on / and /pets above everything posted today, for as long as it stayed
+      // the newest date. Dates are computed from the shelter's today, so this
+      // test keeps meaning the same thing whenever it runs.
+      const today = shelterToday();
+      const tomorrow = shelterToday(new Date(Date.now() + 26 * 60 * 60 * 1000));
+      const scheduledRow = (id: string, publishedAt: string) => ({
+        id,
+        title: `Notice dated ${publishedAt}`,
+        content: "Body copy long enough to be a real notice.",
+        titleMs: null,
+        contentMs: null,
+        category: "announcement",
+        targetPage: "all",
+        mediaType: "none",
+        mediaUrl: null,
+        videoEmbedUrl: null,
+        isPinned: false,
+        isPublished: true,
+        authorName: "Shelter Team",
+        publishedAt,
+      });
+
+      await withExtraFixtureRow(scheduledRow("bulletin-dated-tomorrow", tomorrow), async () => {
+        await withExtraFixtureRow(scheduledRow("bulletin-dated-today", today), async () => {
+          const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+          const ids = (await getPublicBulletins("all")).map((b) => b.id);
+          // Dated today: live. Dated tomorrow: not yet.
+          expect(ids).toContain("bulletin-dated-today");
+          expect(ids).not.toContain("bulletin-dated-tomorrow");
+        });
+      });
     });
 
     it("hides an unpublished notice from the public feed", async () => {
@@ -1083,17 +1131,43 @@ describe("corrections from review", () => {
     expect(await getPublicBulletins("home", 0)).toEqual([]);
   });
 
-  it("orders ties deterministically on the fixture path too", async () => {
-    // Both paths must break ties the same way; otherwise an outage silently
-    // reorders the feed.
+  it("breaks a same-day tie on the fixture path, newest id first", async () => {
+    // An earlier version of this test re-read the shipped fixture, which has no
+    // two notices on one day — so it re-checked the primary sort and could not
+    // fail on a broken tiebreaker while claiming to prove one. A same-day pair
+    // has to be constructed.
+    //
+    // Fixture rows derive `createdAt` from the notice date (see
+    // `freshBulletins`), so a same-day pair ties on it too and falls through to
+    // `id`, descending. That is the documented fixture behaviour; the database
+    // breaks the same tie on a real TIMESTAMP(3) instead.
     makeDatabaseUnreachable();
-    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
-
-    const once = (await getPublicBulletins("all")).map((b) => b.id);
-    const twice = (await getPublicBulletins("all")).map((b) => b.id);
-    expect(once).toEqual(twice);
-    // Pinned first, then newest, then id.
-    expect(once).toEqual(["bulletin-001", "bulletin-002", "bulletin-003", "bulletin-004"]);
+    await withExtraFixtureRow(
+      {
+        id: "bulletin-003z",
+        title: "Same day as bulletin-003, later id",
+        content: "Shares 2026-08-10 with bulletin-003 and must sort ahead of it.",
+        titleMs: null,
+        contentMs: null,
+        category: "announcement",
+        targetPage: "all",
+        mediaType: "none",
+        mediaUrl: null,
+        videoEmbedUrl: null,
+        isPinned: false,
+        isPublished: true,
+        authorName: "Shelter Team",
+        publishedAt: "2026-08-10",
+      },
+      async () => {
+        const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+        const ids = (await getPublicBulletins("all")).map((b) => b.id);
+        expect(ids.indexOf("bulletin-003z")).toBe(ids.indexOf("bulletin-003") - 1);
+        // And the answer is the same on every call, which a tie left to sort
+        // stability would not guarantee across engines.
+        expect((await getPublicBulletins("all")).map((b) => b.id)).toEqual(ids);
+      }
+    );
   });
 
   it("presents an unknown category instead of throwing", () => {
@@ -1354,5 +1428,177 @@ describe("corrections from the fourth review", () => {
     // Post-dating is intended, so a plausible future date still passes.
     const soon = `${new Date().getUTCFullYear() + 1}-08-14`;
     expect(bulletinFormSchema.safeParse(formInput({ publishedAt: soon })).success).toBe(true);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Fifth review round (whole PR against master)                                */
+/* -------------------------------------------------------------------------- */
+
+describe("corrections from the fifth review", () => {
+  /** A Prisma-shaped error with a code, as the client throws them. */
+  const prismaError = (code: string) =>
+    Object.assign(new Error(`prisma ${code}`), { name: "PrismaClientKnownRequestError", code });
+
+  describe("what a failed public read serves, by environment", () => {
+    let errorSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    });
+    afterEach(() => {
+      errorSpy.mockRestore();
+    });
+
+    it("serves NO notices in production when the table exists but the read fails", async () => {
+      // The fixture would bring back notices staff deleted and hide everything
+      // they posted, and `/` and `/bulletins` are ISR, so that render would be
+      // cached as the good page for up to five minutes. Empty asserts nothing
+      // false. And it must be logged: production otherwise swallows it silently.
+      vi.stubEnv("NODE_ENV", "production");
+      prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P1001"));
+      const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+      expect(await getPublicBulletins("home", 2)).toEqual([]);
+      expect(errorSpy).toHaveBeenCalled();
+    });
+
+    it("serves the launch fixture in production when the table does not exist yet", async () => {
+      // P2021 is a deploy that landed before the migration. The fixture is the
+      // launch content the migration would seed — what visitors saw before this
+      // feature — so serving it is correct, not a resurrection.
+      vi.stubEnv("NODE_ENV", "production");
+      prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P2021"));
+      const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+      const ids = (await getPublicBulletins("all")).map((b) => b.id);
+      expect(ids).toContain("bulletin-001");
+    });
+
+    it("does not treat a missing COLUMN as a missing table", async () => {
+      // P2022 means the table exists and holds staff content under a drifted
+      // schema; the fixture would hide that content.
+      vi.stubEnv("NODE_ENV", "production");
+      prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P2022"));
+      const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+      expect(await getPublicBulletins("all")).toEqual([]);
+    });
+  });
+
+  describe("what an editor is told", () => {
+    beforeEach(() => {
+      sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
+    });
+
+    it("names the missing migration when the table does not exist", async () => {
+      // The likeliest production failure if the code deploys first. A generic
+      // "Failed to publish" told the editor nothing about why every save failed.
+      prismaMock.bulletin.create.mockRejectedValue(prismaError("P2021"));
+      const { createBulletinAction } = await import("@/actions/bulletins");
+
+      const res = await createBulletinAction(formInput());
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/not set up on this database/i);
+      expect(res.error).toMatch(/20260922_community_bulletins/);
+    });
+
+    it("calls a timeout an outage, not a generic failure", async () => {
+      // P1008 was one of the codes the old hand-picked list of three missed.
+      prismaMock.bulletin.create.mockRejectedValue(prismaError("P1008"));
+      const { createBulletinAction } = await import("@/actions/bulletins");
+
+      const res = await createBulletinAction(formInput());
+      expect(res.error).toMatch(/database is unavailable/i);
+    });
+
+    it.each([
+      ["pin", "setBulletinPinnedAction", (a: Record<string, (...x: unknown[]) => unknown>) => a.setBulletinPinnedAction("bulletin-db-1", true)],
+      ["publish", "setBulletinPublishedAction", (a: Record<string, (...x: unknown[]) => unknown>) => a.setBulletinPublishedAction("bulletin-db-1", false)],
+      ["update", "updateBulletinAction", (a: Record<string, (...x: unknown[]) => unknown>) => a.updateBulletinAction("bulletin-db-1", formInput())],
+      ["delete", "deleteBulletinAction", (a: Record<string, (...x: unknown[]) => unknown>) => a.deleteBulletinAction("bulletin-db-1")],
+    ])("reports a row deleted mid-%s as gone, not as a failure", async (_l, _n, invoke) => {
+      // A check-then-act race: the row vanished between the read and the write.
+      // Prisma answers P2025, which used to surface as a generic failure and a
+      // logged stack instead of the not-found answer.
+      prismaMock.bulletin.update.mockRejectedValue(prismaError("P2025"));
+      prismaMock.bulletin.delete.mockRejectedValue(prismaError("P2025"));
+      const actions = (await import("@/actions/bulletins")) as unknown as Record<
+        string,
+        (...x: unknown[]) => unknown
+      >;
+
+      const res = (await invoke(actions)) as { success: boolean; error?: string };
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/no longer exists/i);
+    });
+  });
+
+  it("never publishes an editor's email address as the byline", async () => {
+    // The byline is rendered on three public, cached, crawlable pages.
+    sessionMock.getCurrentSession.mockResolvedValue({ ...CONTENT_EDITOR, name: "   " });
+    const { createBulletinAction } = await import("@/actions/bulletins");
+
+    await createBulletinAction(formInput());
+    const data = lastWriteData(prismaMock.bulletin.create);
+    expect(data.authorName).toBe("Shelter Team");
+    expect(JSON.stringify(data)).not.toContain(CONTENT_EDITOR.email);
+  });
+
+  it("audits every editable field on an edit, before and after", async () => {
+    // It used to log title, category and target page only, so unticking
+    // Published in the form, or swapping the embedded video, left no trace.
+    sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
+    prismaMock.bulletin.findUnique.mockResolvedValue(dbRow({ isPublished: true }));
+    const { resetAuditLogs, getAuditLogs } = await import("@/lib/domain/auditLog");
+    resetAuditLogs();
+    const { updateBulletinAction } = await import("@/actions/bulletins");
+
+    await updateBulletinAction("bulletin-db-1", formInput({ isPublished: false }));
+
+    const entry = getAuditLogs(10).find((e) => e.action === "BULLETIN_UPDATED");
+    const details = entry?.details as { before: Record<string, unknown>; after: Record<string, unknown> };
+    expect(details.before.isPublished).toBe(true);
+    expect(details.after.isPublished).toBe(false);
+    for (const field of ["content", "videoEmbedUrl", "mediaUrl", "publishedAt", "isPinned"]) {
+      expect(details.before).toHaveProperty(field);
+      expect(details.after).toHaveProperty(field);
+    }
+  });
+
+  it("audits the whole notice on a delete", async () => {
+    // "A delete is the one change nothing else records" — so the Malay copy and
+    // media have to be in the entry, or they are gone for good.
+    sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
+    prismaMock.bulletin.findUnique.mockResolvedValue(
+      dbRow({ titleMs: "Notis", videoEmbedUrl: ALLOWED_EMBED, mediaType: "video" })
+    );
+    const { resetAuditLogs, getAuditLogs } = await import("@/lib/domain/auditLog");
+    resetAuditLogs();
+    const { deleteBulletinAction } = await import("@/actions/bulletins");
+
+    await deleteBulletinAction("bulletin-db-1");
+
+    const entry = getAuditLogs(10).find((e) => e.action === "BULLETIN_DELETED");
+    const details = entry?.details as Record<string, unknown>;
+    expect(details.titleMs).toBe("Notis");
+    expect(details.videoEmbedUrl).toBe(ALLOWED_EMBED);
+    expect(details).toHaveProperty("isPublished");
+    expect(details).toHaveProperty("isPinned");
+  });
+
+  it("freezes each embed rule, not just the array holding them", () => {
+    // Object.freeze is shallow; the rule objects stayed writable in the
+    // browser bundle, so `RULES[0].prefix = "/"` widened the client check.
+    for (const rule of BULLETIN_EMBED_RULES) {
+      expect(Object.isFrozen(rule)).toBe(true);
+    }
+  });
+
+  it("labels each target with every page it actually appears on", () => {
+    // The archive at /bulletins reads with no target filter, so "Home page"
+    // promised an exclusivity that did not exist.
+    expect(BULLETIN_TARGET_PAGE_LABELS.home).toMatch(/Bulletins page/);
+    expect(BULLETIN_TARGET_PAGE_LABELS.pets).toMatch(/Bulletins page/);
+    expect(BULLETIN_TARGET_PAGE_LABELS.bulletins).toMatch(/only/i);
   });
 });

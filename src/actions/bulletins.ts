@@ -10,9 +10,11 @@ import {
   type BulletinFormInput,
 } from "@/lib/validations/bulletin";
 import type { BulletinRecord } from "@/types/bulletin";
+import { isDatabaseUnavailable } from "@/lib/server/transparencyRepository";
 import {
   deleteServerBulletin,
   insertServerBulletin,
+  isBulletinSchemaMissing,
   listBulletinRecords,
   setServerBulletinPinned,
   setServerBulletinPublished,
@@ -128,12 +130,21 @@ function toMessage(err: unknown, fallback: string): string {
     if (first) return first;
   }
 
-  // P1001 and friends: the editor needs to know the change did not save.
-  if (err && typeof err === "object") {
-    const code = (err as { code?: unknown }).code;
-    if (code === "P1001" || code === "P1002" || code === "P1017") {
-      return "The database is unavailable, so this change was not saved. Try again once it is reachable.";
-    }
+  // The table does not exist yet: the code deployed before the hand-run
+  // migration reached this database. The likeliest production failure for this
+  // feature, and the one a generic message hides completely — the editor needs
+  // to know nothing will save until someone runs the migration.
+  if (isBulletinSchemaMissing(err)) {
+    return (
+      "Bulletins are not set up on this database yet, so nothing can be saved. " +
+      "The migration in prisma/migrations/manual/20260922_community_bulletins needs to be applied."
+    );
+  }
+
+  // Connectivity, timeouts, TLS, refused sockets — the shared classifier rather
+  // than a hand-picked list of three codes that missed most of them.
+  if (isDatabaseUnavailable(err)) {
+    return "The database is unavailable, so this change was not saved. Try again once it is reachable.";
   }
 
   console.error("[bulletins]", fallback, err);

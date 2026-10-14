@@ -70,8 +70,8 @@ export default async function AdminBulletinsPage() {
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {result.error ?? "The bulletin list could not be loaded."} The public
-          feeds are still serving the last committed notices, so nothing visitors
-          see has changed.
+          feeds read the same database, so until it is reachable they cannot
+          show what staff have posted either.
         </p>
       </div>
     );

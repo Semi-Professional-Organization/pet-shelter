@@ -264,6 +264,10 @@ export function BulletinFormDialog({
             <div>
               <Label htmlFor="bulletin-date">Notice date</Label>
               <Input id="bulletin-date" type="date" {...register("publishedAt")} />
+              <p className="text-xs text-muted-foreground mt-1">
+                A future date schedules the notice: it stays off the public feeds
+                until that day.
+              </p>
               <FieldError message={errors.publishedAt?.message} />
             </div>
           </div>

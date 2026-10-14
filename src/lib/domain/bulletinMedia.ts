@@ -55,13 +55,22 @@ export const BULLETIN_IMAGE_HOSTS = Object.freeze([
  * because it is what the shipped fixture uses and what staff should prefer — it
  * does not set tracking cookies on a visitor who never plays the video.
  */
+/**
+ * One frozen rule. `Object.freeze` is shallow: freezing only the array left each
+ * `{ host, prefix }` object writable, so page script could still set
+ * `BULLETIN_EMBED_RULES[0].prefix = "/"` and widen the client-side check — the
+ * same "freeze pointed at the wrong level" defect an earlier review round fixed
+ * for the host lists, one level down.
+ */
+const embedRule = (host: string, prefix: string) => Object.freeze({ host, prefix });
+
 export const BULLETIN_EMBED_RULES = Object.freeze([
-  { host: "www.youtube-nocookie.com", prefix: "/embed/" },
-  { host: "youtube-nocookie.com", prefix: "/embed/" },
-  { host: "www.youtube.com", prefix: "/embed/" },
-  { host: "youtube.com", prefix: "/embed/" },
-  { host: "player.vimeo.com", prefix: "/video/" },
-] as const satisfies ReadonlyArray<{ host: string; prefix: string }>);
+  embedRule("www.youtube-nocookie.com", "/embed/"),
+  embedRule("youtube-nocookie.com", "/embed/"),
+  embedRule("www.youtube.com", "/embed/"),
+  embedRule("youtube.com", "/embed/"),
+  embedRule("player.vimeo.com", "/video/"),
+]);
 
 /**
  * Host names only, for the messages that tell staff what is accepted.

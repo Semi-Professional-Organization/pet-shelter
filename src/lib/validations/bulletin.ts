@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isIsoDate } from "@/lib/domain/transparency";
+
 import {
   isAllowedBulletinEmbedUrl,
   isAllowedBulletinImageUrl,
@@ -53,45 +55,34 @@ const optionalUrl = () =>
     .transform((v) => (v ? v : undefined));
 
 /**
- * True only for a day that exists.
- *
- * `Date.parse("2026-02-31T00:00:00Z")` does **not** return NaN — it rolls the
- * surplus days forward and yields 3 March. So a "does this parse" check accepts
- * 31 February and the card then prints a different day from the one that was
- * typed, which for a notice is the whole content. Round-tripping the parsed
- * value back to its parts is what catches it.
- */
-/**
  * How far ahead a notice date may be.
  *
- * Post-dating is intended — a clinic is announced before it happens — so this
- * is a sanity ceiling, not a "no future dates" rule. It exists because the feed
- * has no `publishedAt <= now` predicate and sorts `publishedAt` DESC, while `/`
- * and `/pets` show only two notices. So `2062-08-14`, one slipped digit from
- * `2026-08-14`, publishes immediately, sorts above every real notice, and holds
- * one of those two slots for thirty-six years with nothing on screen saying
- * why newer notices stopped appearing.
+ * A future date SCHEDULES a notice — it stays off the public feeds until that
+ * day (`@/lib/domain/bulletinSchedule`). That makes a slipped digit quiet rather
+ * than loud: `2062-08-14` for `2026-08-14` would be accepted, scheduled
+ * thirty-six years out, and simply never appear, with nothing telling the
+ * editor why. This ceiling turns that into a field error at the moment it can
+ * still be corrected. Five years is generous for any real announcement.
  */
 const MAX_YEARS_AHEAD = 5;
 
-function isRealCalendarDay(value: string): boolean {
-  const [year, month, day] = value.split("-").map(Number);
-  // Postgres has no year zero, so accepting it trades a clear "that date does
-  // not exist" on the date field for `date/time field value out of range` from
-  // the driver, surfaced as the action's generic failure with no field named.
-  if (year < 1) return false;
-  // `Date.UTC(99, ...)` means 1999, not year 99 — the two-digit-year mapping is
-  // older than the API. Without setUTCFullYear the round-trip below would fail
-  // for every year 0000-0099 and refuse a syntactically valid date with "that
-  // date does not exist", which is untrue. Unreachable from an <input
-  // type="date">, but a false refusal in new validation code all the same.
-  const parsed = new Date(Date.UTC(2000, month - 1, day));
-  parsed.setUTCFullYear(year);
-  return (
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() === month - 1 &&
-    parsed.getUTCDate() === day
-  );
+/**
+ * A calendar day that exists and that Postgres can store.
+ *
+ * The existence half is `isIsoDate` from `@/lib/domain/transparency`, the
+ * shared implementation — an earlier revision of this file carried a third copy
+ * of it, and the copies had already diverged (`src/lib/validations/pet.ts`
+ * still refuses years 0000-0099, which this one had been fixed for; recorded in
+ * `tasks/open/three-calendar-day-validators-disagree.md`). It rejects 31
+ * February rather than rolling it to 3 March, which a `Date.parse` check does
+ * not, and the card would then print a different day from the one typed.
+ *
+ * The year-zero rule is the one thing added here. `isIsoDate` accepts year 0;
+ * Postgres has no year zero, so letting it through trades a clear field message
+ * for `date/time field value out of range` from the driver.
+ */
+function isStorableCalendarDay(value: string): boolean {
+  return isIsoDate(value) && Number(value.slice(0, 4)) >= 1;
 }
 
 const IMAGE_HOST_MESSAGE =
@@ -137,23 +128,23 @@ export const bulletinFormSchema = z
     isPinned: z.boolean().default(false),
     isPublished: z.boolean().default(true),
     /**
-     * The notice date the card prints. Accepted as `YYYY-MM-DD` rather than a
-     * datetime because that is what an editor is choosing — a day, not an
-     * instant — and because a datetime would drag the browser's timezone into a
-     * value the shelter means locally.
+     * The notice date the card prints, and the day it goes live: a future date
+     * schedules the notice. Accepted as `YYYY-MM-DD` rather than a datetime
+     * because that is what an editor is choosing — a day, not an instant — and
+     * because a datetime would drag the browser's timezone into a value the
+     * shelter means locally.
      */
     publishedAt: z
       .string()
       .trim()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD form")
-      .refine(isRealCalendarDay, { message: "That date does not exist" })
+      .refine(isStorableCalendarDay, { message: "That date does not exist" })
       .refine(
         (v) => Number(v.slice(0, 4)) <= new Date().getUTCFullYear() + MAX_YEARS_AHEAD,
         {
           message:
             `That date is more than ${MAX_YEARS_AHEAD} years away — check the year. ` +
-            "A far-future notice sorts above every real one and holds a slot on the " +
-            "home page until it passes.",
+            "A future date schedules the notice, so this one would stay hidden until then.",
         }
       ),
   })

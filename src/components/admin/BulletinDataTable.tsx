@@ -41,6 +41,7 @@ import {
 } from "@/lib/presentation/bulletinPresentation";
 import { BULLETIN_CATEGORIES, BulletinFormInput } from "@/lib/validations/bulletin";
 import { BulletinRecord } from "@/types/bulletin";
+import { isScheduledForLater } from "@/lib/domain/bulletinSchedule";
 import { cn } from "@/lib/utils";
 
 type CategoryFilter = (typeof BULLETIN_CATEGORIES)[number] | "all";
@@ -48,6 +49,11 @@ type PublishedFilter = "all" | "published" | "draft";
 
 const selectClass =
   "bg-background border border-input px-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-foreground";
+
+/** Shown when a server action fails before it can return its own result. */
+const UNREACHABLE_MESSAGE =
+  "The server could not be reached, so nothing was saved. Check your connection " +
+  "and reload the page — if the site was just updated, a reload is what fixes it.";
 
 /** Matches a record against the toolbar query, across both languages. */
 function matches(bulletin: BulletinRecord, query: string): boolean {
@@ -103,16 +109,28 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
 
   const bulletins = initialBulletins;
 
-  /** Runs a server action, surfaces its error, and refreshes the table data. */
+  /**
+   * Runs a server action, surfaces its error, and refreshes the table data.
+   *
+   * The `catch` is for failures that never reach the action's own result: the
+   * editor is offline, or a redeploy invalidated the action id ("Failed to find
+   * Server Action"). In React 19 an error thrown inside a transition goes to the
+   * nearest error boundary, so without this one failed Pin click replaced the
+   * whole editor with an error page instead of a line in the banner.
+   */
   function run(action: () => Promise<{ success: boolean; error?: string }>) {
     setError(null);
     startTransition(async () => {
-      const result = await action();
-      if (!result.success) {
-        setError(result.error ?? "The operation failed.");
-        return;
+      try {
+        const result = await action();
+        if (!result.success) {
+          setError(result.error ?? "The operation failed.");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setError(UNREACHABLE_MESSAGE);
       }
-      router.refresh();
     });
   }
 
@@ -153,9 +171,17 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
    */
   async function handleSave(values: BulletinFormInput) {
     setSaveError(null);
-    const result = editing
-      ? await updateBulletinAction(editing.id, values)
-      : await createBulletinAction(values);
+    let result: { success: boolean; error?: string };
+    try {
+      result = editing
+        ? await updateBulletinAction(editing.id, values)
+        : await createBulletinAction(values);
+    } catch {
+      // Same transport-level failure as `run`. Here it would otherwise be an
+      // unhandled rejection that left the dialog open with no message at all.
+      setSaveError(UNREACHABLE_MESSAGE);
+      return;
+    }
 
     if (!result.success) {
       setSaveError(result.error ?? "The bulletin could not be saved.");
@@ -278,6 +304,17 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
                     )}
                     {!bulletin.isPublished && (
                       <span className="tone-chip tone-neutral px-2.5 py-0.5">Draft</span>
+                    )}
+                    {bulletin.isPublished && isScheduledForLater(bulletin.publishedAt) && (
+                      // A published notice with a future date is not on any
+                      // public feed yet. Without this badge the editor sees
+                      // "published" and a row that appears nowhere.
+                      <span
+                        className="tone-chip tone-info px-2.5 py-0.5"
+                        title="Published, but dated in the future: it appears on the public feeds on that day (shelter time)."
+                      >
+                        Scheduled
+                      </span>
                     )}
                     <span className="font-mono text-xs text-muted-foreground">
                       {bulletin.publishedAt}

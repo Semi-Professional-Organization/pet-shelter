@@ -1,4 +1,5 @@
 import type {
+  Bulletin as DbBulletinRow,
   BulletinCategory as PrismaBulletinCategory,
   BulletinTargetPage as PrismaBulletinTargetPage,
   BulletinMediaType as PrismaBulletinMediaType,
@@ -23,6 +24,10 @@ import {
   BULLETIN_FEED_ORDER_BY,
   sortBulletinsForFeed,
 } from "@/lib/domain/bulletinOrdering";
+import {
+  isScheduledForLater,
+  shelterTodayAsStoredInstant,
+} from "@/lib/domain/bulletinSchedule";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
@@ -120,23 +125,63 @@ export function resetBulletins(): void {
   serverBulletins = freshBulletins();
 }
 
-interface DbBulletinRow {
-  id: string;
-  title: string;
-  content: string;
-  titleMs: string | null;
-  contentMs: string | null;
-  category: BulletinCategory;
-  targetPage: BulletinTargetPage;
-  mediaType: BulletinMediaType;
-  mediaUrl: string | null;
-  videoEmbedUrl: string | null;
-  isPinned: boolean;
-  isPublished: boolean;
-  authorName: string;
-  publishedAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
+/**
+ * `DbBulletinRow` is Prisma's generated `Bulletin` type, imported above — not a
+ * hand-copied interface. An earlier revision kept its own copy and cast every
+ * query result through `as unknown as`, which switched off the one check that
+ * matters here: a renamed or retyped column would have typechecked and then
+ * mapped to `undefined` on every card and every audit entry.
+ */
+
+/**
+ * Prisma's "record to update/delete does not exist". Reached when a row is
+ * deleted between an editor opening it and acting on it; mapped to the action's
+ * not-found answer rather than reported as a generic failure.
+ */
+function isRecordMissing(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    (err as { code?: unknown }).code === "P2025"
+  );
+}
+
+/**
+ * True when the `bulletins` table (P2021) or one of its columns (P2022) does not
+ * exist — the state of any database the hand-run migration has not reached.
+ *
+ * Exported because the action layer needs the same answer to tell an editor
+ * *why* nothing saves: `isDatabaseUnavailable` covers connectivity, not a
+ * schema that was never applied.
+ */
+export function isBulletinSchemaMissing(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  return code === "P2021" || code === "P2022";
+}
+
+/**
+ * Whether a failed public read may fall back to the committed fixture.
+ *
+ * - **Outside production**: yes. The fixture is the offline dataset that local
+ *   development without a database, and the unit suite, run on.
+ * - **In production, table missing (P2021)**: yes. That is a deploy that landed
+ *   before the migration, and the fixture is precisely the launch content the
+ *   migration would seed — what visitors saw before this feature existed.
+ * - **In production, anything else**: no. Once the table exists, staff own its
+ *   contents. Serving the fixture on a transient failure would bring back
+ *   notices staff have deleted or unpublished and hide everything they posted,
+ *   and `/` and `/bulletins` are ISR, so that render would be cached as the good
+ *   page for up to five minutes. An empty feed asserts nothing false; the
+ *   fixture would.
+ */
+function mayServeFixtureAfter(err: unknown): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  // P2021 only. A missing *column* (P2022) means a table that exists and holds
+  // staff content under a drifted schema — the fixture would hide that content.
+  return (
+    typeof err === "object" && err !== null && (err as { code?: unknown }).code === "P2021"
+  );
 }
 
 /**
@@ -254,6 +299,9 @@ export async function getPublicBulletins(
     const rows = await prisma.bulletin.findMany({
       where: {
         isPublished: true,
+        // A future notice date schedules the notice; see
+        // `@/lib/domain/bulletinSchedule` for why "today" is the shelter's day.
+        publishedAt: { lte: shelterTodayAsStoredInstant() },
         targetPage:
           targetPage === "all"
             ? undefined
@@ -267,16 +315,29 @@ export async function getPublicBulletins(
       // render the entire published archive.
       ...(limit !== undefined ? { take: limit } : {}),
     });
-    return (rows as unknown as DbBulletinRow[]).map(mapDbBulletin).map(toBulletin);
+    return rows.map(mapDbBulletin).map(toBulletin);
   } catch (err) {
+    // Rethrows in strict mode and on unique violations; otherwise returns.
     handlePersistenceError("Bulletin read", err);
+    if (!mayServeFixtureAfter(err)) {
+      // `handlePersistenceError` logs only in development, so without this a
+      // production outage would empty the feed with no trace anywhere.
+      console.error(
+        "[bulletins] public read failed; serving no notices rather than the launch fixture",
+        err
+      );
+      return [];
+    }
   }
 
   // Slice before projecting: `toBulletin` runs the URL allow-list, which builds
   // a `URL` per field, and there is no reason to do that for rows about to be
   // discarded. The query path already gets this right by pushing `take` down.
   const ordered = sortBulletinsForFeed(
-    serverBulletins.filter((b) => b.isPublished && matchesTarget(b, targetPage))
+    serverBulletins.filter(
+      (b) =>
+        b.isPublished && !isScheduledForLater(b.publishedAt) && matchesTarget(b, targetPage)
+    )
   );
   const limited = limit !== undefined ? ordered.slice(0, limit) : ordered;
   return limited.map(toBulletin);
@@ -296,7 +357,7 @@ export async function listBulletinRecords(): Promise<BulletinRecord[]> {
     // order visitors do rather than an order that shifts between page loads.
     orderBy: [...BULLETIN_FEED_ORDER_BY],
   });
-  return (rows as unknown as DbBulletinRow[]).map(mapDbBulletin);
+  return rows.map(mapDbBulletin);
 }
 
 /**
@@ -307,6 +368,33 @@ export async function listBulletinRecords(): Promise<BulletinRecord[]> {
  * form. Keeping it out of the shared shape means a future field cannot pick up
  * the byline by accident.
  */
+/**
+ * Every field an editor can change, as the audit log should see it.
+ *
+ * Earlier revisions logged only title, category and target page on an edit, and
+ * a partial notice on a delete while claiming in a comment to record "the whole
+ * notice". So unticking Published in the edit form, rewriting the body, or
+ * swapping the embedded video left no trace, and a deleted notice's Malay copy
+ * and media were gone for good.
+ */
+function auditableState(record: BulletinRecord) {
+  return {
+    category: record.category,
+    targetPage: record.targetPage,
+    title: record.title,
+    content: record.content,
+    titleMs: record.titleMs,
+    contentMs: record.contentMs,
+    mediaType: record.mediaType,
+    mediaUrl: record.mediaUrl,
+    videoEmbedUrl: record.videoEmbedUrl,
+    isPinned: record.isPinned,
+    isPublished: record.isPublished,
+    publishedAt: record.publishedAt,
+    authorName: record.authorName,
+  };
+}
+
 function editablePayload(values: BulletinFormValues) {
   return {
     category: values.category as PrismaBulletinCategory,
@@ -332,10 +420,15 @@ export async function insertServerBulletin(
   actor: SessionUser
 ): Promise<BulletinRecord> {
   // The byline is the actor's, never the form's. See bulletinFormSchema.
+  //
+  // It falls back to the shelter, not to `actor.email`: the byline is rendered
+  // on three public, cached, crawlable pages, and an address there is an
+  // address published. A member without a display name is an edge case the
+  // byline should survive quietly, not one that leaks.
   const created = await prisma.bulletin.create({
-    data: { ...editablePayload(values), authorName: actor.name || actor.email },
+    data: { ...editablePayload(values), authorName: actor.name?.trim() || "Shelter Team" },
   });
-  const record = mapDbBulletin(created as unknown as DbBulletinRow);
+  const record = mapDbBulletin(created);
 
   recordAuditLog({
     actorId: actor.id,
@@ -364,14 +457,18 @@ export async function updateServerBulletin(
   const existing = await prisma.bulletin.findUnique({ where: { id } });
   if (!existing) return null;
 
-  const before = mapDbBulletin(existing as unknown as DbBulletinRow);
+  const before = mapDbBulletin(existing);
   // `authorName` is omitted: an edit does not reassign the byline, so correcting
   // a colleague's typo does not silently put your name on their notice.
-  const updated = await prisma.bulletin.update({
-    where: { id },
-    data: editablePayload(values),
-  });
-  const record = mapDbBulletin(updated as unknown as DbBulletinRow);
+  let updated: DbBulletinRow;
+  try {
+    updated = await prisma.bulletin.update({ where: { id }, data: editablePayload(values) });
+  } catch (err) {
+    // Deleted by someone else between the read above and this write.
+    if (isRecordMissing(err)) return null;
+    throw err;
+  }
+  const record = mapDbBulletin(updated);
 
   recordAuditLog({
     actorId: actor.id,
@@ -380,10 +477,9 @@ export async function updateServerBulletin(
     action: "BULLETIN_UPDATED",
     entity: "Bulletin",
     entityId: id,
-    details: {
-      before: { title: before.title, category: before.category, targetPage: before.targetPage },
-      after: { title: record.title, category: record.category, targetPage: record.targetPage },
-    },
+    // `before` matters as much as `after`: it is the only copy of what an edit
+    // overwrote.
+    details: { before: auditableState(before), after: auditableState(record) },
   });
 
   return record;
@@ -394,11 +490,17 @@ export async function setServerBulletinPublished(
   isPublished: boolean,
   actor: SessionUser
 ): Promise<BulletinRecord | null> {
-  const existing = await prisma.bulletin.findUnique({ where: { id } });
-  if (!existing) return null;
-
-  const updated = await prisma.bulletin.update({ where: { id }, data: { isPublished } });
-  const record = mapDbBulletin(updated as unknown as DbBulletinRow);
+  // One round trip. A separate existence read first was a check-then-act race:
+  // a row deleted between the two surfaced as a generic failure and a logged
+  // stack instead of the not-found answer.
+  let updated: DbBulletinRow;
+  try {
+    updated = await prisma.bulletin.update({ where: { id }, data: { isPublished } });
+  } catch (err) {
+    if (isRecordMissing(err)) return null;
+    throw err;
+  }
+  const record = mapDbBulletin(updated);
 
   recordAuditLog({
     actorId: actor.id,
@@ -418,11 +520,15 @@ export async function setServerBulletinPinned(
   isPinned: boolean,
   actor: SessionUser
 ): Promise<BulletinRecord | null> {
-  const existing = await prisma.bulletin.findUnique({ where: { id } });
-  if (!existing) return null;
-
-  const updated = await prisma.bulletin.update({ where: { id }, data: { isPinned } });
-  const record = mapDbBulletin(updated as unknown as DbBulletinRow);
+  // One round trip; see setServerBulletinPublished.
+  let updated: DbBulletinRow;
+  try {
+    updated = await prisma.bulletin.update({ where: { id }, data: { isPinned } });
+  } catch (err) {
+    if (isRecordMissing(err)) return null;
+    throw err;
+  }
+  const record = mapDbBulletin(updated);
 
   recordAuditLog({
     actorId: actor.id,
@@ -441,8 +547,14 @@ export async function deleteServerBulletin(id: string, actor: SessionUser): Prom
   const existing = await prisma.bulletin.findUnique({ where: { id } });
   if (!existing) return false;
 
-  const record = mapDbBulletin(existing as unknown as DbBulletinRow);
-  await prisma.bulletin.delete({ where: { id } });
+  const record = mapDbBulletin(existing);
+  try {
+    await prisma.bulletin.delete({ where: { id } });
+  } catch (err) {
+    // Deleted by someone else between the read above and this write.
+    if (isRecordMissing(err)) return false;
+    throw err;
+  }
 
   recordAuditLog({
     actorId: actor.id,
@@ -452,14 +564,13 @@ export async function deleteServerBulletin(id: string, actor: SessionUser): Prom
     entity: "Bulletin",
     entityId: id,
     // The whole notice, because a delete is the one change nothing else records.
-    details: {
-      category: record.category,
-      targetPage: record.targetPage,
-      title: record.title,
-      content: record.content,
-      authorName: record.authorName,
-      publishedAt: record.publishedAt,
-    },
+    //
+    // ceiling: this audit write is fire-and-forget, as it is for every content
+    // type in this repo (FAQ, transparency), so a failed write after a
+    // successful delete leaves no record. Making it transactional through
+    // `persistAuditLog(tx, …)` is a repo-wide durability decision, not a
+    // bulletin one; see tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md.
+    details: auditableState(record),
   });
 
   return true;

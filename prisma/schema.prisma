@@ -864,12 +864,14 @@ enum BulletinCategory {
   clinic
 }
 
-/// Which public feed a bulletin appears in.
+/// Which scoped public feed carries a bulletin, in addition to the archive.
 ///
-/// `all` means every feed. The others scope a notice to one surface, so a
-/// clinic date can run on /pets without crowding the home page. The public
-/// reader resolves this with `targetPage IN ('all', <page>)` rather than an
-/// equality test, which is why the composite index below leads with it.
+/// Every published notice appears on `/bulletins`, the full archive, which
+/// reads with no target filter. `all` adds it to both scoped feeds; `home` and
+/// `pets` add it to one, so a clinic date can run on /pets without crowding the
+/// home page; `bulletins` keeps it to the archive alone. The scoped readers
+/// resolve this with `targetPage IN ('all', <page>)` rather than an equality
+/// test, which is why the composite index below carries it.
 enum BulletinTargetPage {
   all
   home
