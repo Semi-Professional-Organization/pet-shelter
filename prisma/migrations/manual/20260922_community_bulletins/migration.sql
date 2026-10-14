@@ -9,12 +9,16 @@
 -- `npm run db:migrate:bulletins:local` pins localhost deliberately, for a
 -- rehearsal.
 --
--- Applied with `npm run db:migrate:bulletins`, which runs this file and then
+-- Apply with `npm run db:migrate:bulletins`, which runs this file and then
 -- seeds src/data/bulletins.json — but only into an EMPTY table, so a re-run
--- cannot revert a notice staff have edited or bring back one they deleted. If
--- this file is applied some other way (e.g. `prisma db execute --file`), run
--- that script afterwards anyway: it sees the empty table and seeds it, and the
--- public feeds need the launch notices once the table exists.
+-- cannot revert a notice staff have edited or bring back one they deleted.
+--
+-- Applying this file ON ITS OWN leaves an empty table, and once the table
+-- exists the public feeds stop falling back to the launch notices — they show
+-- none, correctly, because an empty table is an answer. If it was applied that
+-- way, run the script afterwards; it sees the empty table and seeds it. The
+-- seed is deliberately not inlined here: it would be a second copy of the
+-- launch content, free to drift from the JSON the offline fallback serves.
 --
 -- Written by hand rather than applied with
 -- `prisma db push` for the reason 20260903_faq_knowledge_base/migration.sql

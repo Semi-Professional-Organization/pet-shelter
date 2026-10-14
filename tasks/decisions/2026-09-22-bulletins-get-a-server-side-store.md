@@ -290,3 +290,28 @@ repository and transparency's), and AGENTS.md says to wait for a third occurrenc
 copy collapses four try/catch blocks, which was the part of the finding that mattered.
 
 Twenty-seven mutants across six rounds, all killed.
+
+## Round seven: converging
+
+Ten findings, smaller than any round before — fixed: a seed `ROLLBACK` that could mask the real
+error and return a broken client to the pool; a production warning firing on every request to
+the force-dynamic `/pets`; an ICU formatter built per row; a missing `ceiling:` marker; two
+tests weaker than their names.
+
+Declined, with reasons:
+
+- **Inlining the seed into `migration.sql`** (`INSERT … WHERE NOT EXISTS`), so applying the file
+  any way seeds atomically. It would put the launch content in a second place, free to drift from
+  `src/data/bulletins.json`, which the offline fallback serves. The failure it guards against —
+  the SQL applied on its own and the script never run — yields an empty feed, which this design
+  treats as the safe answer. The migration header now says plainly what applying it alone does.
+- **Locking the edit's `before` read.** Two editors saving the same notice at the same instant can
+  make the audit's `before` slightly stale. A correct fix needs `SELECT … FOR UPDATE` inside a
+  transaction; for audit precision in a rare race that is disproportionate, and the FAQ
+  repository's update has the same shape.
+- **Sharing `orNullIfMissing` with the transparency repository.** Still two copies; AGENTS.md says
+  to wait for a third.
+
+Filed for the shelter: `tasks/open/bulletin-launch-notices-are-dated-and-pinned.md`. The seeded
+launch notices are from August and two are pinned, so once they are real rows they lead every
+feed until someone unpins or deletes them.

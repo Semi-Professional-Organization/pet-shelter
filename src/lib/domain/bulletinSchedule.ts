@@ -19,6 +19,19 @@
 const SHELTER_TIME_ZONE = "Asia/Kuala_Lumpur";
 
 /**
+ * Built once. An `Intl.DateTimeFormat` is an ICU object and not cheap, and
+ * `shelterToday` runs per row — twice per row in the admin table, once per row
+ * on the fixture path — so constructing one per call was 2N for a value that
+ * cannot change within a render.
+ */
+const SHELTER_DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: SHELTER_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/**
  * The shelter's calendar day as `YYYY-MM-DD`.
  *
  * Assembled from `formatToParts`, not from `format()`. The order and separators
@@ -30,12 +43,7 @@ const SHELTER_TIME_ZONE = "Asia/Kuala_Lumpur";
  * in the donation ledger reads the parts for the same reason.
  */
 export function shelterToday(now: Date = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: SHELTER_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(now);
+  const parts = SHELTER_DAY_FORMAT.formatToParts(now);
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;

@@ -56,9 +56,9 @@ const MEDIA_TYPE_LABELS: Record<(typeof BULLETIN_MEDIA_TYPES)[number], string> =
  * posting an urgent notice between their midnight and Malaysia's got Malaysia's
  * *tomorrow* as the default, and the notice stayed off every public feed for
  * hours. UTC was wrong the other way, by eight hours, for everyone in Malaysia.
- * Using the server's own rule is the only default that cannot disagree with it.
+ * Using the server's own rule — `shelterToday` — is the only default that cannot
+ * disagree with it.
  */
-const today = () => shelterToday();
 
 const EMPTY: BulletinFormInput = {
   category: "announcement",
@@ -72,7 +72,7 @@ const EMPTY: BulletinFormInput = {
   videoEmbedUrl: "",
   isPinned: false,
   isPublished: true,
-  publishedAt: today(),
+  publishedAt: shelterToday(),
 };
 
 const selectClass =
@@ -188,7 +188,7 @@ export function BulletinFormDialog({
         publishedAt: editingBulletin.publishedAt,
       });
     } else if (open) {
-      reset({ ...EMPTY, publishedAt: today() });
+      reset({ ...EMPTY, publishedAt: shelterToday() });
     }
   }
 

@@ -122,6 +122,7 @@ let serverBulletins: BulletinRecord[] = freshBulletins();
 /** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
 export function resetBulletins(): void {
   serverBulletins = freshBulletins();
+  warnedTableMissing = false;
 }
 
 /**
@@ -205,6 +206,9 @@ export function isBulletinColumnMissing(err: unknown): boolean {
  * empty state is worded to be true in both cases ("No updates to show right
  * now"), rather than claiming nothing has been posted.
  */
+/** See the P2021 branch in `getPublicBulletins`. Reset by `resetBulletins`. */
+let warnedTableMissing = false;
+
 function mayServeFixtureAfter(err: unknown): boolean {
   if (!isDatabasePersistent()) return true;
   if (process.env.NODE_ENV !== "production") return true;
@@ -358,7 +362,11 @@ export async function getPublicBulletins(
       );
       return [];
     }
-    if (process.env.NODE_ENV === "production" && isDatabasePersistent()) {
+    if (process.env.NODE_ENV === "production" && isDatabasePersistent() && !warnedTableMissing) {
+      // Once per process. `/pets` is force-dynamic, so a per-request warning
+      // would log on every visit until someone applied the migration — useful
+      // once, then noise that buries everything else in the logs.
+      warnedTableMissing = true;
       console.warn(
         "[bulletins] the bulletins table does not exist yet; serving the launch fixture. " +
           "Apply prisma/migrations/manual/20260922_community_bulletins."

@@ -1651,7 +1651,11 @@ describe("corrections from the sixth review", () => {
     expect(where.publishedAt.lt.toISOString()).toBe("2026-10-15T00:00:00.000Z");
   });
 
-  it("agrees with the bound for a row stored at a time of day", () => {
+  it("gives the badge and the query's bound the same answer for a mid-day row", () => {
+    // Narrow on purpose: this checks the two FUNCTIONS agree — the one the
+    // admin badge calls and the one the query's `lt` is built from. That the
+    // query actually uses `startOfNextShelterDay` is pinned by the exact-instant
+    // test above, which is what fails if the read goes back to `lte` midnight.
     // The badge's answer for a row whose stored instant is mid-morning today.
     const now = new Date("2026-10-14T03:00:00.000Z"); // 11:00 in KL
     expect(isScheduledForLater("2026-10-14T05:00:00.000Z", now)).toBe(false);
@@ -1705,10 +1709,40 @@ describe("corrections from the sixth review", () => {
 
   it("deletes in one round trip, auditing the row the delete returned", async () => {
     sessionMock.getCurrentSession.mockResolvedValue(CONTENT_EDITOR);
+    prismaMock.bulletin.delete.mockResolvedValue(
+      dbRow({ id: "bulletin-db-1", title: "The row delete returned" })
+    );
+    const { resetAuditLogs, getAuditLogs } = await import("@/lib/domain/auditLog");
+    resetAuditLogs();
     const { deleteBulletinAction } = await import("@/actions/bulletins");
 
-    await deleteBulletinAction("bulletin-db-1");
+    const res = await deleteBulletinAction("bulletin-db-1");
+
+    // It succeeded — a returned row read as falsy would answer "no longer exists".
+    expect(res.success).toBe(true);
     expect(prismaMock.bulletin.findUnique).not.toHaveBeenCalled();
     expect(prismaMock.bulletin.delete).toHaveBeenCalledTimes(1);
+    // And the audit carries what was actually deleted, not a row read earlier.
+    const entry = getAuditLogs(10).find((e) => e.action === "BULLETIN_DELETED");
+    expect((entry?.details as Record<string, unknown>).title).toBe("The row delete returned");
+  });
+
+  it("warns once that the table is missing, not on every request", async () => {
+    // `/pets` is force-dynamic: a per-request warning would log on every visit
+    // until the migration ran, burying everything else in the logs.
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("DATABASE_URL", "postgresql://u:p@db.example/x");
+    prismaMock.bulletin.findMany.mockRejectedValue(prismaError("P2021"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+
+    await getPublicBulletins("pets", 2);
+    await getPublicBulletins("pets", 2);
+    await getPublicBulletins("all");
+    const tableWarnings = warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes("does not exist yet")
+    );
+    expect(tableWarnings).toHaveLength(1);
+    warnSpy.mockRestore();
   });
 });

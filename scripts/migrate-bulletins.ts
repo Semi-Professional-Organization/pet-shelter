@@ -101,11 +101,13 @@ async function main() {
      *   production stops falling back to the fixture, so every public feed
      *   would have been empty from day one.
      *
-     * "Empty" is the honest test for "has anyone put content here yet". Its one
-     * residual case is stated rather than hidden: if staff delete EVERY notice
-     * and someone then re-runs this, the four launch notices return. That is
-     * far rarer than the launch path above, and visible — this prints what it
-     * did.
+     * "Empty" is the honest test for "has anyone put content here yet".
+     *
+     * ceiling: if staff delete EVERY notice and someone then re-runs this, the
+     * four launch notices return. Far rarer than the launch path above, and
+     * visible — this prints what it did. The upgrade, if it is ever hit, is a
+     * marker that records "seeded once" (a one-row table, or a column on an
+     * existing settings row) checked instead of emptiness.
      *
      * One transaction, under the same advisory lock as the migration file: the
      * emptiness check and the inserts cannot be split by a concurrent run, and
@@ -152,11 +154,19 @@ async function main() {
       }
       await client.query("COMMIT");
     } catch (err) {
-      await client.query("ROLLBACK");
+      // ROLLBACK on a connection that has just dropped throws too, and if it
+      // escaped it would replace the real failure with "Connection terminated".
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // The original error below is the one worth reporting.
+      }
+      // Passing the error tells the pool to destroy this client rather than
+      // hand a broken connection to the next caller.
+      client.release(err instanceof Error ? err : true);
       throw err;
-    } finally {
-      client.release();
     }
+    client.release();
 
     if (skippedWith !== null) {
       console.log(
