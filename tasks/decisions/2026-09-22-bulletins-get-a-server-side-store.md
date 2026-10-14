@@ -208,3 +208,50 @@ Five of round 4's findings are in `master`'s adoption code, arriving here with t
 They are not fixed on this branch — a correction to a public submission path does not belong in a
 PR about community notices — and they needed no entry from me: the session that wrote `#93` had
 already filed them.
+
+## Round five: the whole PR against current master
+
+The final whole-diff review before merge found fifteen; none was probed by the reviewer, so each
+was verified before being accepted or declined. Four change decisions recorded above.
+
+**The public read no longer serves the fixture on just any failure in production.** This departs
+from the FAQ and pet repositories on purpose. Their fixtures are content that stays roughly true;
+this one is four launch notices staff will edit and delete, so on a transient failure it brought
+back deleted notices, hid everything staff posted, and — `/` and `/bulletins` being ISR — cached
+that as the good page for five minutes, with no log because production swallows the error. Now:
+outside production, fixture as before; in production, fixture only for P2021 (the table does not
+exist, i.e. the code deployed before the migration — where the fixture *is* the launch content);
+otherwise no notices, and a `console.error`. Whether FAQ and pets should follow is their own
+question; their fixtures do not go stale the same way. See
+`tasks/lessons/2026-10-14-a-copied-fallback-copies-its-assumption-about-the-data.md`.
+
+**A future notice date schedules the notice.** The feed had no date predicate and sorts newest
+first, so a notice dated next month took the top unpinned slot above everything posted today.
+`publishedAt` is now also the go-live day, compared against the **shelter's** day
+(`Asia/Kuala_Lumpur`): UTC would hide an urgent notice posted between midnight and 08:00 local
+for up to eight hours, since the form dates it today, local. The editor badges a published
+future notice "Scheduled". The five-year ceiling stays, with a new reason: a slipped digit now
+schedules a notice decades out, which is silent rather than loud.
+
+**The migration script seeds only on the run that creates the table** (or with `--seed`).
+`ON CONFLICT DO NOTHING` protected an edited notice but not a deleted one. Rehearsed on a real
+Postgres: after a staff delete and edit, a re-run skipped the seed, the deleted notice stayed
+deleted, and the edit survived.
+
+**The target labels say every page a notice appears on.** `/bulletins` is the archive and reads
+with no target filter, so "Home page" promised an exclusivity that did not exist. Behaviour is
+unchanged; the labels and the schema comment now describe it.
+
+Declined, with reasons:
+
+- **Transactional audit on delete.** Every content type here audits fire-and-forget; making one
+  of them transactional is a repo-wide durability decision. Marked with a `ceiling:` comment.
+- **Fixing `FaqDataTable`'s identical transport-failure handling.** The bulletin table now catches
+  a failed server action instead of letting React 19 send it to the error boundary; the FAQ table
+  has the same pattern and is another feature.
+- **Editing `src/lib/validations/pet.ts`'s date check**, which still refuses years 0000-0099. Filed
+  as `tasks/open/three-calendar-day-validators-disagree.md`; that file was under active work by
+  other branches.
+
+Filed for the owner, not fixed: `tasks/open/bulletin-bylines-publish-staff-names.md` — every post
+puts an editor's personal name on three public pages, and there is no way to post as a team.

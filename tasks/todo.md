@@ -49,7 +49,14 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       round 4 (after merging #93) fourteen, of which five are master-side and already
       filed by the session that wrote them. Migration re-rehearsed after every change
       that touched its SQL.
-- [x] Seventeen mutants across rounds 1-3, all killed. Round 4's fixes carry tests too.
+- [x] Round 5, the whole PR against master `187593c` before merge: fifteen findings, verified
+      one by one since the reviewer probed none. The public read no longer serves the launch
+      fixture on a production outage (it resurrected deleted notices and ISR cached them);
+      future-dated notices are scheduled against the shelter's day; the migration script seeds
+      only on the run that creates the table. Rehearsed on a real Postgres on port 5433, clear
+      of another session's server on 5432 — which is how the "(remote)" label on a local URL
+      was found and fixed in both migration scripts.
+- [x] Twenty-one mutants across five rounds, all killed (4 + 4 + 5 + 2 + 6).
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.
