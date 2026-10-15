@@ -8,7 +8,11 @@ export interface DonorDetails {
 }
 
 /**
- * The sponsorship pledge journey on `/donate`, through to the LHDN e-receipt.
+ * The pledge journey on `/donate`, through to its acknowledgement.
+ *
+ * There is no receipt at the end of this page any more: a general gift is
+ * recorded as pending and its LHDN receipt is issued from `/admin/donations`
+ * once a coordinator confirms the transfer.
  */
 export class DonatePage {
   constructor(private readonly page: Page) {}
@@ -73,9 +77,9 @@ export class DonatePage {
       .click();
   }
 
-  /** The issued receipt, identified by its statutory tax reference. */
-  receipt(): Locator {
-    return this.page.getByText(/official receipt|e-receipt|resit/i).first();
+  /** The reference a donor quotes on their transfer. Not a receipt number. */
+  pledgeReference(): Locator {
+    return this.page.getByText(/HFS-GFT-\d{8}-\d{6}/).first();
   }
 
   taxReference(): Locator {

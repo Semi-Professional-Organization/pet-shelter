@@ -467,6 +467,95 @@ model Donation {
   @@map("donations")
 }
 
+/// A general gift a supporter says they have sent, before anyone has checked.
+///
+/// ## Why this is not a `Donation`
+///
+/// The same reason `PetSponsorship` is not one, and it applies here with less
+/// ambiguity: a `Donation` is an issued receipt, and until a coordinator has
+/// matched the transfer against the bank statement there is nothing to issue a
+/// receipt *for*. All the application knows is that somebody filled in a form and
+/// was shown a DuitNow QR.
+///
+/// Until 2026-09-22 the general-donation form allocated an `HFS-DON-*` number the
+/// moment it was submitted, so anyone could mint a Section 44(6) tax document from
+/// a public form without sending money. The defect and the fix are recorded in
+/// `tasks/decisions/2026-09-22-general-gifts-become-pending-until-reconciled.md`,
+/// which settled the open entry that reported it. Reconciliation is the issuance
+/// boundary, exactly as for a sponsorship.
+///
+/// ## Why the pending state could not live on `Donation`
+///
+/// Production enforces `prisma/sql/donation_append_only.sql` below the ORM
+/// (`donations_no_mutation`, applied 2026-09-21). A pending row written into
+/// `donations` could never be updated to attach its receipt number: the trigger
+/// refuses every UPDATE. A status column on a statutory document was already
+/// forbidden by the `Donation` comment; the trigger makes it impossible as well.
+///
+/// ## What the statutory export sees
+///
+/// Nothing here. `fetchDonationReceiptsAction` reads `donations`, so an
+/// unreconciled gift cannot reach an LHDN return however this table is queried.
+/// That is deliberately structural rather than a `where` clause somebody has to
+/// remember — the defect being fixed was a silent one.
+model DonationPledge {
+  id String @id @default(cuid())
+
+  donorName  String
+  donorEmail String
+  donorPhone String?
+  /// Captured at checkout and copied onto the receipt at reconciliation. Never
+  /// projected into the coordinator's queue — confirming that a transfer landed
+  /// does not require reading anybody's NRIC.
+  taxIdOrIc  String?
+
+  tierId    String
+  /// Tier name as displayed at pledge time, snapshotted for the same reason as
+  /// `Donation.tierName`: a later rename of the catalog must not rewrite history.
+  tierName  String
+  /// Integer sen. RM 250.00 is stored as 25000.
+  amountSen Int
+  currency  String @default("MYR")
+  frequency String @default("one_time")
+
+  paymentMethod String
+  /// PENDING_PAYMENT -> ACTIVE | CANCELLED. A plain String with a Zod boundary,
+  /// matching `PetSponsorship.status`: converting a text column to a Postgres enum
+  /// needed a hand-written, rehearsed migration here once already
+  /// (`prisma/migrations/manual/20260917_status_enums/`), and this column earns
+  /// none of that cost.
+  status        String @default("PENDING_PAYMENT")
+
+  /// Free-text dedication ("in honour of Barnaby"), not a foreign key — same
+  /// contract as `Donation.targetPetName`, which this is copied to at issuance.
+  /// A gift naming an animal is still a general gift: a commitment to fund one
+  /// animal's care is a `PetSponsorship`.
+  targetPetName String?
+  notes         String? @db.Text
+
+  /// Handed to the donor at checkout so they can quote it on their transfer.
+  /// Prefixed HFS-GFT: distinguishable at a glance both from an `HFS-DON` receipt
+  /// and from a sponsorship's `HFS-PLG` claim, which a coordinator reading one
+  /// bank statement against two queues needs.
+  pledgeRef     String  @unique
+  /// The `Donation.receiptNumber` issued for this gift, once reconciled. Unique,
+  /// so a second confirmation cannot attach a second statutory receipt to the
+  /// same money.
+  receiptNumber String? @unique
+
+  reconciledAt DateTime?
+  reconciledBy String?
+  cancelledAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Serves the coordinator's queue: pending rows, oldest first.
+  @@index([status, createdAt])
+  @@index([donorEmail])
+  @@map("donation_pledges")
+}
+
 /// A donor who has claimed a sponsor portal account.
 ///
 /// Separate from `User`, which is staff. Sponsors authenticate through their own
