@@ -10,10 +10,15 @@
  * **What this deliberately does NOT assert.** The contract half derives nothing. Turning "2 years"
  * into a date belongs to the expand half (../20260922_pets_birth_date/), which owns that rule
  * alone — an earlier revision of this folder carried a second copy, and the two disagreed on
- * month-end and leap-day rows. So there is no date arithmetic to check here, and no reason to
- * import approximateBirthDate. What this file checks instead is that the contract refuses every
- * state in which dropping the columns would destroy something, and preserves everything in the
- * one state where it proceeds.
+ * month-end and leap-day rows. So the CONTRACT has no date arithmetic to check. What this file
+ * checks about the contract is that it refuses every state in which dropping the columns would
+ * destroy something, and preserves everything in the one state where it proceeds.
+ *
+ * It does import approximateBirthDate — once, in scenario 0, and only to check EXPAND. Expand's
+ * own harness compares its SQL against a hand copy of the function that has since drifted from
+ * the original on both timezone and vocabulary, and its fixture-based guard is too narrow to
+ * notice. This file already runs the real expand SQL under tsx, so it is the one place the real
+ * function and the real SQL can be compared directly, with no copy in between.
  *
  * If the expand migration is present in the tree, scenario 0 runs the real thing and then the
  * contract on top of it, which is the sequence an operator will actually perform. When it is not
@@ -273,6 +278,263 @@ if (HAS_EXPAND) {
     !byName(await cols(refused, "pets")).has("birthDate")
   );
   await refused.close();
+
+  // ---- Expand against the REAL function, not a copy of it ---------------------------------------
+  //
+  // Expand's own harness compares its SQL against `appRule`, a hand transcription of
+  // `approximateBirthDate` that its own comment calls "a copy, and therefore capable of drifting".
+  // After #42 it has drifted twice: the real function moved to `Date.UTC` and gained a weeks unit,
+  // while `appRule` kept local-time setters and the old unanchored /(\d+)\s*y/ and /(\d+)\s*m/. Its
+  // O1 guard cannot see either, because O1 pins the copy against `src/data/pets.json`, whose ten
+  // ages are all plain English years and months. So O2 there would keep passing against the wrong
+  // rule. Found by the session that wrote #42.
+  //
+  // This harness already runs the real expand SQL and already runs under tsx, so it can import the
+  // real function — which is the one repair that closes both halves. Nothing here is a copy.
+  // Fail clearly under plain `node`. The neighbouring expand harness IS run with `node`, so the two
+  // are easy to mix up, and an unguarded .ts import throws ERR_UNKNOWN_FILE_EXTENSION mid-scenario
+  // and silently skips every contract check after it.
+  let approximateBirthDate;
+  try {
+    ({ approximateBirthDate } = await import(
+      new URL("../../../../src/lib/domain/petAge.ts", import.meta.url).href
+    ));
+  } catch (err) {
+    console.log(
+      `\n  FAIL cannot import src/lib/domain/petAge.ts -- ${String(err?.message ?? err).split("\n")[0]}\n` +
+        `       Run this harness with tsx, not node:\n` +
+        `         npx tsx prisma/migrations/manual/20260922_pets_birth_date_contract/rehearse.mjs`
+    );
+    process.exit(2);
+  }
+
+  // Every unit spelling expand's header says it reads, plus the four rollover cases its own
+  // rehearsal pins, plus a compound. If the real function ever changes on any of these, this fails.
+  const AGREED = [
+    ["a-2y", "2 years", "2026-06-12"],
+    ["a-1y", "1 year", "2025-03-04"],
+    ["a-3yrs", "3 yrs", "2026-01-15"],
+    ["a-1yr", "1 yr", "2026-01-15"],
+    ["a-4mo", "4 months", "2026-07-22"],
+    ["a-1mo", "1 month", "2026-07-22"],
+    ["a-2mths", "2 mths", "2026-07-22"],
+    ["a-2mth", "2 mth", "2026-07-22"],
+    ["a-6mos", "6 mos", "2026-07-22"],
+    ["a-leap", "1 year", "2024-02-29"],
+    ["a-end1", "1 month", "2026-03-31"],
+    ["a-end2", "1 month", "2026-05-31"],
+    ["a-18mo", "18 months", "2026-06-12"],
+    ["a-compound", "1 year 6 months", "2026-06-12"],
+    // pets.json pet-008: the row that derived 2026-03-01 at UTC+8 and 2026-03-04 in
+    // America/New_York under the old local-time setters. The timezone entry asks for it by name.
+    ["a-pet008", "5 months", "2026-08-01"],
+    // The bare single-letter forms and the no-space form. These are where the word-boundary
+    // semantics on each side matter most, and the first version of this corpus left them out.
+    ["a-bare-y", "2 y", "2026-06-12"],
+    ["a-bare-mo", "3 mo", "2026-06-12"],
+    ["a-bare-m", "4 m", "2026-06-12"],
+    ["a-nospace", "5y", "2026-06-12"],
+  ];
+  const agreed = new PGlite();
+  await agreed.exec(PROD_SCHEMA);
+  for (const [id, age, intake] of AGREED) await insertPreExpand(agreed, [id, age, "adult", intake]);
+  const agreedErr = await tryExec(agreed, EXPAND);
+  check(
+    `expand accepts all ${AGREED.length} spellings its header says it reads`,
+    agreedErr === "",
+    agreedErr.slice(0, 200)
+  );
+  if (!agreedErr) {
+    const stored = new Map(
+      (await agreed.query(`SELECT "id","birthDate" FROM "public"."pets"`)).rows.map((r) => [r.id, r.birthDate])
+    );
+    const drift = AGREED.filter(
+      ([id, age, intake]) => stored.get(id) !== approximateBirthDate(age, intake).birthDate
+    ).map(([id, age, intake]) => `${id} "${age}"@${intake}: sql=${stored.get(id)} app=${approximateBirthDate(age, intake).birthDate}`);
+    check(
+      "every stored birthday equals what the real approximateBirthDate computes",
+      drift.length === 0,
+      drift.join(" | ")
+    );
+  }
+  await agreed.close();
+
+  // Containment, for strings whose ONLY unit is one the app reads and the backfill does not. Here
+  // the asymmetry is safe: the backfill refuses and names the row. Both halves are asserted with
+  // exact values — the app's reading by its expected date, not merely "differs from intake", so a
+  // regression to reading "3 minggu" as three months would fail; and the backfill's refusal by its
+  // own message and the row id, not "any error at all", so an unrelated syntax error cannot pass
+  // for a deliberate refusal.
+  const intake = "2026-06-12";
+  // Built from code points, never typed as escapes: the editor that wrote this file decodes `\u`
+  // sequences into the literal character, which once put an invisible BOM into a regex here.
+  const NBSP = String.fromCharCode(0xa0); //  no-break space: what pasting from Word produces
+  const NNBSP = String.fromCharCode(0x202f); // narrow no-break space
+  const APP_ONLY = [
+    // The app reads this as a year (JS `\s` matches a no-break space). The backfill refuses it at
+    // its non-ASCII stage, before any of its regex results are used. Refused, not guessed.
+    ["1" + NBSP + "year", "a unit after a no-break space", "2025-06-12"],
+    ["3 minggu", "weeks, Malay", "2026-05-22"],
+    ["3 weeks", "weeks", "2026-05-22"],
+    ["3 wks", "weeks", "2026-05-22"],
+    ["2 tahun", "years, Malay", "2024-06-12"],
+    ["4 bulan", "months, Malay", "2026-02-12"],
+    ["3 mnth", "a month abbreviation the backfill does not list", "2026-03-12"],
+    ["5 yo", "a year abbreviation the backfill does not list", "2021-06-12"],
+  ];
+  for (const [age, why, expected] of APP_ONLY) {
+    const got = approximateBirthDate(age, intake).birthDate;
+    check(`the app reads "${age}" as ${expected} (${why})`, got === expected, `got ${got}`);
+    const one = new PGlite();
+    await one.exec(PROD_SCHEMA);
+    await insertPreExpand(one, ["app-only-row", age, "adult", intake]);
+    const oneErr = await tryExec(one, EXPAND);
+    check(
+      `  ...and the backfill refuses it, naming the row`,
+      // A non-ASCII entry is refused by the non-ASCII stage, which runs first. Same predicate as
+      // expand's harness uses: any code point above 0x7F.
+      ([...age].every((ch) => ch.codePointAt(0) < 128) ? /cannot be derived/ : /non-ASCII/).test(oneErr) &&
+        /app-only-row/.test(oneErr),
+      oneErr ? oneErr.split("\n")[0].slice(0, 160) : "the backfill accepted it"
+    );
+    await one.close();
+  }
+
+  // Mixed strings: an app-only unit together with an English one. Before the fix these were NOT
+  // refused — the app read the Malay year first and stopped, the backfill skipped it and read the
+  // English unit further along, and the two stored different dates with no error. Measured, at
+  // intake 2026-06-12: "1 tahun 6 months" app 2025-06-12, backfill 2025-12-12. The backfill now
+  // treats any app-only unit anywhere as underivable. Their refusal is asserted by J1 and J3 below,
+  // by verdict, message and row id; this list only feeds them.
+  //
+  // `3 minggu 2 months` and `2 years 3 weeks` used to AGREE (both sides read the English unit).
+  // They are refused now too. That is a deliberate, conservative regression: refusing a row costs
+  // a manual correction; telling "agrees by luck" from "agrees by rule" would cost a second copy
+  // of the app's precedence logic in SQL, which is the defect this whole pair exists to avoid.
+  const MIXED = [
+    "1 tahun 6 months",
+    "2 tahun, approx 6 mos",
+    "1 tahun (18 months)",
+    "2 tahun 3 years",
+    "5 yo and 3 years",
+    "2 thn 1 year",
+    "3 minggu 2 months",
+    "2 years 3 weeks",
+  ];
+
+  // Non-ASCII strings, refused by the file's first stage before any regex result is used. The first
+  // three each stored a different birthday from the app's, with no error, under an earlier
+  // version of the file. Measured on pglite (UTF8, ctype C.UTF-8) on 2026-10-15, intake
+  // 2026-06-12, by matching the file's own unit patterns:
+  //   - no-break space: the app reads one year (JS `\s` matches it); Postgres `[[:space:]]` does
+  //     not, so it found only the months;
+  //   - U+0085: the reverse. The app reads six months (JS `\s` does not match it); Postgres
+  //     `[[:space:]]` does, so it found the year first;
+  //   - an n-tilde after "year": the app reads one year (JS `\b` ends the word there); Postgres
+  //     `\M` does not, so it found only the months.
+  // The app's half of each is asserted below, so a change to the app's reading shows up here.
+  const NEL = String.fromCharCode(0x85);
+  const NTILDE = String.fromCharCode(0xf1);
+  const EN_DASH = String.fromCharCode(0x2013);
+  const HALF = String.fromCharCode(0xbd);
+  const NON_ASCII = [
+    "1" + NBSP + "year 6 months",
+    "1" + NEL + "year 6 months",
+    "1 year" + NTILDE + " 6 months",
+    "1" + NBSP + "tahun 6 months",
+    "2" + NNBSP + "yo 3 months",
+    "2" + NBSP + "years",
+    // Expand's own M1 and N1 range shapes and its L3 vulgar fraction: refused by this stage now,
+    // rather than as fractional or unparseable, because it runs first.
+    "3" + EN_DASH + "4 years",
+    "3 " + EN_DASH + " 4 years",
+    "2" + String.fromCharCode(0x2014) + "3 years",
+    "1" + HALF + " years",
+  ];
+  for (const [age, want] of [
+    [NON_ASCII[0], "2025-06-12"],
+    [NON_ASCII[1], "2025-12-12"],
+    [NON_ASCII[2], "2025-06-12"],
+  ]) {
+    const got = approximateBirthDate(age, intake).birthDate;
+    check(`the app reads ${JSON.stringify(age)} as ${want}`, got === want, `got ${got}`);
+  }
+
+  // ---- expand's own J1 and J3, reproduced here so they can actually run -----------------------
+  //
+  // Expand's harness checks that the header's pre-check query returns the right verdict for every
+  // way the file refuses (J1) and that each verdict matches what the file actually does (J3). That
+  // harness needs embedded-postgres; this one does not. Changing the file's refusal set means the
+  // pre-check had to change with it, so the pairing is re-checked here: same extraction, same eight
+  // fixtures and expected labels, same two assertions — plus the mixed strings above, which must
+  // read `unparseable age`, the non-ASCII ones, which must read `non-ASCII age`, and a tab and a
+  // bad-date case that pin where the non-ASCII stage sits.
+  const lines = EXPAND.split("\n");
+  const from = lines.findIndex((l) => l.includes("SELECT * FROM ("));
+  const to = lines.findIndex((l) => l.includes(`ORDER BY (verdict LIKE 'ok:%'), verdict, "id";`));
+  check("the header pre-check query can be located exactly as expand's J1 locates it", from >= 0 && to > from);
+  if (from >= 0 && to > from) {
+    const PRECHECK = lines.slice(from, to + 1).map((l) => l.replace(/^--\s?/, "")).join("\n");
+    const J = [
+      ["j-1", "2 years", "2026-06-12", "ok: years"],
+      ["j-2", "unknown", "2026-06-12", "unparseable age"],
+      ["j-3", "2 years", "2024-02-31", "bad intakeDate"],
+      ["j-4", "4 months", "2026-06-12", "ok: months"],
+      ["j-5", "2 years", "not-a-date", "bad intakeDate"],
+      ["j-6", "500 years", "2026-06-12", "implausible age"],
+      ["j-7", "900 months", "2026-06-12", "implausible age"],
+      ["j-8", "1.5 years", "2026-06-12", "fractional age"],
+      ...MIXED.map((age, k) => [`j-mixed-${k}`, age, "2026-06-12", "unparseable age"]),
+      ...NON_ASCII.map((age, k) => [`j-nonascii-${k}`, age, "2026-06-12", "non-ASCII age"]),
+      // ASCII whitespace other than a space: both engines read it as a space, so it is accepted.
+      ["j-tab", "2\tyears", "2026-06-12", "ok: years"],
+      // Non-ASCII in the age is checked before a bad intake date, in the file and the pre-check.
+      ["j-nonascii-baddate", "2" + NBSP + "years", "not-a-date", "non-ASCII age"],
+      ["j-tahun", "2 tahun", "2026-06-12", "unparseable age"],
+      ["j-weeks", "3 weeks", "2026-06-12", "unparseable age"],
+    ];
+    const pc = new PGlite();
+    await pc.exec(PROD_SCHEMA);
+    for (const [id, age, intakeDate] of J) await insertPreExpand(pc, [id, age, "adult", intakeDate]);
+    const verdict = Object.fromEntries((await pc.query(PRECHECK)).rows.map((x) => [x.id, x.verdict]));
+    await pc.close();
+    const wrong = J.filter(([id, , , want]) => verdict[id] !== want);
+    check(
+      `J1 (reproduced): the pre-check returns the right verdict for all ${J.length} fixtures`,
+      wrong.length === 0,
+      wrong.map(([id, , , want]) => `${id}: want ${want}, got ${verdict[id]}`).join(" | ")
+    );
+
+    // Each refusing verdict is matched to the file's OWN message for it, plus the row id, rather than
+    // "any error at all" — so an unrelated failure (a typo in a regex, a schema mismatch) cannot pass
+    // for a deliberate refusal. `bad intakeDate` and `unparseable age` share one RAISE in the file.
+    const MESSAGE = {
+      "unparseable age": /cannot be derived/,
+      "bad intakeDate": /cannot be derived/,
+      "implausible age": /not a plausible/,
+      "fractional age": /fractional/,
+      "non-ASCII age": /non-ASCII/,
+    };
+    const disagree = [];
+    for (const [id, age, intakeDate, want] of J) {
+      const db1 = new PGlite();
+      await db1.exec(PROD_SCHEMA);
+      await insertPreExpand(db1, [id, age, "adult", intakeDate]);
+      const err = await tryExec(db1, EXPAND);
+      const ok = want.startsWith("ok:")
+        ? err === ""
+        : err !== "" && MESSAGE[want]?.test(err) && err.includes(id);
+      if (!ok) {
+        disagree.push(`${id} (${want}): ${err ? err.split("\n")[0].slice(0, 70) : "accepted"}`);
+      }
+      await db1.close();
+    }
+    check(
+      `J3 (reproduced): every pre-check verdict matches what the file actually does`,
+      disagree.length === 0,
+      disagree.join(" | ")
+    );
+  }
 }
 
 console.log("\n== 1. the contract refuses every state where dropping would destroy something");

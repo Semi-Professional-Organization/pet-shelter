@@ -51,6 +51,53 @@ This is the same defect in miniature that
 is about — a transcription nothing checks against its original — except here the check exists and
 is aimed at a fixture set too narrow to exercise it.
 
+## 2026-10-14: the risk is now covered, but this entry is not settled
+
+**What changed.** #42 merged, and with it `approximateBirthDate` computes through `Date.UTC`
+rather than local setters. `pet-008` (`"5 months"`, intake 2026-08-01) now derives **2026-03-01 at
+both UTC+8 and America/New_York** — measured, where it previously derived 2026-03-04 west of UTC.
+So the *function* is timezone-invariant. The *copy* is not, which is the point above.
+
+**A sound comparison now exists**, in `20260922_pets_birth_date_contract/rehearse.mjs` scenario 0.
+It imports the real `approximateBirthDate` — no copy — runs the real expand SQL on pglite, and
+asserts they agree on every spelling expand reads: all five year and seven month forms, the four
+rollover cases its own rehearsal pins, a compound, and `pet-008`. It passes **77/77 in UTC,
+Asia/Kuala_Lumpur, America/New_York and Pacific/Honolulu**. It was mutation-tested before being
+trusted: making the "app" clamp the leap day instead of rolling it fails exactly one check, naming
+`a-leap "1 year"@2024-02-29: sql=2023-03-01 app=2023-02-28`.
+
+It also makes the containment relationship executable rather than prose: for each of `3 minggu`,
+`3 weeks`, `3 wks`, `2 tahun`, `4 bulan`, `3 mnth` and `5 yo` it asserts that the app reads it and
+that expand refuses it. If either side changes without the other, that is where it shows.
+
+**So the timezone half of this entry's risk is covered, and the vocabulary half is covered for
+single-unit strings.** A future change to `approximateBirthDate` on any spelling expand reads now
+fails a check that cannot be fooled by a stale copy — once someone runs it, since it is a manual
+`npx tsx` script and not part of `npm test` or CI.
+
+**Mixed-language strings were a separate defect, found and fixed the same day.** `/code-review`
+on the PR adding this check measured `1 tahun 6 months` stored as six months by the backfill while
+the app reads one year, with no refusal. The backfill now refuses any age containing a unit it does
+not read, anywhere in the string, and any age containing a non-ASCII character; the same check
+reproduces expand's J1 and J3 over eight mixed strings and four non-ASCII ones to show the
+pre-check agrees with the file, verdict by verdict. Settled in
+`tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md` and
+`tasks/decisions/2026-10-15-the-backfill-refuses-any-non-ascii-age.md`. The count is printed by
+the script; it is not restated here, because the last two restatements went stale within a day.
+
+**Why this does not close the entry.** The condition below names *expand's* `rehearse.mjs`, and
+that file still restates the function as `appRule`, still with local setters and the old unanchored
+patterns. Its O1 and O2 still report green against a rule the app no longer uses. A reader who runs
+that harness and sees 92 passing checks is being told something false about two of them. A guard
+that reports green against the wrong rule is worse than no guard, because it is believed.
+
+It was not fixed here because that harness needs `npm i --no-save embedded-postgres`, a large
+binary install into a `node_modules` other worktrees share, and editing a harness you cannot run is
+how a safe failure becomes an unsafe one — the same reasoning
+`tasks/open/expand-refuses-compound-ages-written-in-short-units.md` gives for leaving its regex
+alone. The smallest honest repair is probably to delete O1/O2 there and point at scenario 0 above,
+rather than to fix the copy — a second copy kept correct is still a second copy.
+
 **Settles when:** `rehearse.mjs` imports `approximateBirthDate` instead of restating it. That is
 now the only option that actually works: pinning `TZ=UTC` would fix the offset half and leave the
 vocabulary half, since a copy with the old patterns disagrees with the function at any timezone.
