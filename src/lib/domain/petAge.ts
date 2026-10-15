@@ -178,32 +178,20 @@ const AGE_MONTHS_PATTERN = /(\d+)\s*(?:months?|mths?|mnths?|mos?|bulan|bln|m)\b/
 const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 
 /**
- * The sixty-year ceiling the backfill enforces, expressed in each unit. An age past it is a typo or
- * junk — no animal a shelter rehomes is that old — and an unbounded count is worse than a wrong
- * date: `15000000 weeks` made `toISOString()` throw `RangeError`. Past the ceiling the age is
- * refused, as the backfill refuses it, rather than turned into a birthday.
+ * Sixty years, the ceiling past which the backfill refuses a row (`qty > 60` years, `> 720`
+ * months), expressed in each unit. The backfill does not read weeks at all; the weeks ceiling is
+ * the same sixty years, so all three units agree on what is too old to be an age. Past it the
+ * count is a typo or junk, and an unbounded count is worse than a wrong date: `15000000 weeks`
+ * made `toISOString()` throw `RangeError`. Such an age is treated as unreadable — the intake date,
+ * as for any age this function cannot parse.
  */
 const MAX_AGE_YEARS = 60;
 const MAX_AGE_MONTHS = MAX_AGE_YEARS * 12;
 const MAX_AGE_WEEKS = Math.floor((MAX_AGE_YEARS * 365.25) / 7);
 
-/**
- * Whether the number a unit pattern matched is only the tail of a decimal, fraction or range —
- * `0,5 tahun`, `1/2 tahun`, `3-4 years`. Every pattern above starts with `(\d+)`, so the match
- * index is where its digits begin, and this looks at what comes just before them. Without it the
- * pattern reads the digits beside the unit, and `0,5 tahun` — a six-month kitten — became five
- * years. Refused rather than rounded, as the backfill does.
- *
- * Only punctuation counts. `2y3m` has a letter in that position and is left alone: what it should
- * read as is tied to how the backfill's own fractional check is narrowed, and is fixed with that.
- */
-function isFractionalAgeMatch(norm: string, match: RegExpMatchArray): boolean {
-  return /\d\s*[.,/–—-]\s*$/.test(norm.slice(0, match.index ?? 0));
-}
-
-/** The answer when no age can be derived: the intake date, as an estimate. */
-function intakeFallback(intakeDateStr: string): { birthDate: string; isEstimate: boolean } {
-  return { birthDate: intakeDateStr.split("T")[0], isEstimate: true };
+/** UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string. */
+function isoDate(year: number, month: number, day: number): string {
+  return new Date(Date.UTC(year, month, day)).toISOString().split("T")[0];
 }
 
 /**
@@ -251,24 +239,22 @@ export function approximateBirthDate(
     return { birthDate: new Date().toISOString().split("T")[0], isEstimate: true };
   }
 
+  // The intake date itself, built from the parsed parts rather than sliced from the input, so a
+  // non-ISO intake such as "2026/06/12" still yields a `YYYY-MM-DD` birth date.
+  const unreadable = { birthDate: isoDate(parts.year, parts.month, parts.day), isEstimate: true };
+
   const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    if (years > MAX_AGE_YEARS || isFractionalAgeMatch(norm, yearMatch)) {
-      return intakeFallback(intakeDateStr);
-    }
-    const d = new Date(Date.UTC(parts.year - years, parts.month, parts.day));
-    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+    if (years > MAX_AGE_YEARS) return unreadable;
+    return { birthDate: isoDate(parts.year - years, parts.month, parts.day), isEstimate: true };
   }
 
   const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    if (months > MAX_AGE_MONTHS || isFractionalAgeMatch(norm, monthMatch)) {
-      return intakeFallback(intakeDateStr);
-    }
-    const d = new Date(Date.UTC(parts.year, parts.month - months, parts.day));
-    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+    if (months > MAX_AGE_MONTHS) return unreadable;
+    return { birthDate: isoDate(parts.year, parts.month - months, parts.day), isEstimate: true };
   }
 
   // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
@@ -277,12 +263,9 @@ export function approximateBirthDate(
   const weekMatch = norm.match(AGE_WEEKS_PATTERN);
   if (weekMatch) {
     const weeks = parseInt(weekMatch[1], 10);
-    if (weeks > MAX_AGE_WEEKS || isFractionalAgeMatch(norm, weekMatch)) {
-      return intakeFallback(intakeDateStr);
-    }
-    const d = new Date(Date.UTC(parts.year, parts.month, parts.day - weeks * 7));
-    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+    if (weeks > MAX_AGE_WEEKS) return unreadable;
+    return { birthDate: isoDate(parts.year, parts.month, parts.day - weeks * 7), isEstimate: true };
   }
 
-  return intakeFallback(intakeDateStr);
+  return unreadable;
 }

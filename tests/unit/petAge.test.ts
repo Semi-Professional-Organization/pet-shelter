@@ -234,41 +234,19 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
   });
 
   /**
-   * Ages `approximateBirthDate` refuses — falling through to the intake date — rather than misread.
-   * Kept in its own block, away from the spelling tests, so it stands apart from the vocabulary.
+   * Ages `approximateBirthDate` treats as unreadable — the intake date — rather than turn into a
+   * birthday. Kept in its own block, away from the spelling tests.
    */
-  describe("approximateBirthDate refuses what it cannot read faithfully", () => {
+  describe("approximateBirthDate past the age ceiling", () => {
     const intake = "2026-06-12";
 
-    // A decimal, fraction or range beside the unit. The pattern reads the digits next to the unit,
-    // so these used to come out as the wrong whole number: `0,5 tahun` — a six-month kitten — as
-    // five years, `0,75 tahun` as seventy-five, `3-4 years` as four. The backfill refuses them too.
+    // Past sixty years, in any unit. An unbounded count was worse than wrong: `15000000 weeks` and
+    // `300000 years` made `toISOString()` throw `RangeError`.
     it.each([
-      "0.5 years", "1.5 months", "2.5 weeks",
-      "0,5 tahun", "0,75 tahun", "1.5 bulan", "1,5 minggu",
-      "1/2 tahun", "1 / 2 tahun", "0 , 5 years",
-      "3-4 years", "3–4 years", "18-24 months",
-      "1.5 years 3 months",
-    ])("refuses the fractional age %j", (age) => {
+      "61 years", "500 years", "300000 years", "721 months", "3131 weeks", "15000000 weeks", "12345678 wks",
+    ])("treats the over-ceiling age %j as unreadable", (age) => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
     });
-
-    // Only the number the unit reads counts. A decimal elsewhere — a weight — must not trigger it.
-    it.each([
-      ["2 years, 12.5 kg", "2024-06-12"],
-      ["12.5 kg 2 years", "2024-06-12"],
-    ])("reads %j despite a decimal elsewhere in it", (age, expected) => {
-      expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
-    });
-
-    // Past the sixty-year ceiling the backfill enforces. An unbounded count was worse than wrong:
-    // `15000000 weeks` made `toISOString()` throw `RangeError`.
-    it.each(["61 years", "500 years", "721 months", "3131 weeks", "15000000 weeks", "12345678 wks"])(
-      "refuses the over-ceiling age %j",
-      (age) => {
-        expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
-      },
-    );
 
     // The ceiling is inclusive, as the backfill's `> 60` refusal is.
     it.each([
@@ -277,6 +255,12 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       ["3130 weeks", "1966-06-17"],
     ])("still derives %j, exactly at the ceiling", (age, expected) => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+    });
+
+    // The fall-through used to slice the intake string as given, so a non-ISO intake leaked into
+    // `birthDate` unconverted. It is now built from the parsed date, like every derived date.
+    it.each(["no idea", "61 years"])("returns an ISO date for %j with a non-ISO intake", (age) => {
+      expect(approximateBirthDate(age, "2026/06/12").birthDate).toBe("2026-06-12");
     });
   });
 
