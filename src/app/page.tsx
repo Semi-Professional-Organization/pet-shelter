@@ -11,6 +11,7 @@ import {
   HomeQuickActionsSection,
 } from "@/components/layout/HomeSections";
 import { getPublicPets } from "@/actions/pets";
+import { getPublicBulletins } from "@/lib/server/bulletinRepository";
 import { readHomeImpactStats } from "@/lib/server/transparencyRepository";
 import { selectHomeMetrics } from "@/lib/domain/metrics";
 
@@ -26,9 +27,15 @@ export default async function HomePage() {
   // Read in parallel: neither depends on the other, and the impact read already
   // degrades to an empty list rather than throwing, so one slow or unreachable
   // query cannot take the whole page down.
-  const [initialPets, impactStats] = await Promise.all([
+  const [initialPets, impactStats, bulletins] = await Promise.all([
     getPublicPets(),
     readHomeImpactStats(),
+    // Folded into the same parallel read. Like the impact read it degrades
+    // rather than throwing — to no notices when the database is down, to the
+    // launch notices when the table does not exist yet (see
+    // `mayServeFixtureAfter`) — so a slow or failing feed cannot take the home
+    // page down over one section.
+    getPublicBulletins("home", 2),
   ]);
 
   // Staff-curated figures overlaid on the FE-02 baseline. See src/lib/domain/metrics.ts
@@ -48,11 +55,7 @@ export default async function HomePage() {
       {/* 3. Latest news and updates */}
       <section className="border-t border-border bg-background py-10 sm:py-14">
         <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-          <BulletinFeed
-            targetPage="home"
-            title="Latest news and updates"
-            maxItems={2}
-          />
+          <BulletinFeed bulletins={bulletins} title="Latest news and updates" />
         </div>
       </section>
 

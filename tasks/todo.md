@@ -15,6 +15,166 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Bulletins get a server-side store (#76)
+
+**Branch:** `worktree-bulletins-76` · opened 2026-09-22 · GRAVE lane
+**Settles:** `tasks/open/bulletins-are-a-per-browser-demo-anyone-can-edit.md` (issue #76),
+and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
+
+## Items
+
+- [x] Audit the brief against `origin/master` 8d36ace before building. Every line of the ledger
+      entry's evidence re-verified at that commit; no in-flight PR overlaps (only #42, birth-date).
+- [x] Put P-D to the owner with three costed options, including one the brief did not name
+      (server-render the fixture read-only). Owner chose (a), the full model. Recorded in
+      `tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`.
+- [x] Claim and five kill conditions written before the spike (`tasks/open/CLAIM-bulletins-76.md`).
+- [x] K1: the embedded-postgres rung recovered and `npm run db:push:local` run verbatim against
+      real PostgreSQL 18.4. Did not fire — the migration is rehearsed, not asserted.
+- [x] Migration rehearsed: hand-written DDL produces objects identical to `prisma db push`,
+      is idempotent, and the enum rejects an out-of-vocabulary category.
+- [x] `Bulletin` model, three enums, one index; `src/lib/server/bulletinRepository.ts`;
+      `src/actions/bulletins.ts` behind `requirePermission(MANAGE_CONTENT)`.
+- [x] `/admin/bulletins` editor; admin nav repointed and the `permissions: null` opt-out removed.
+- [x] K2: `BulletinFeed` is a Server Component with zero client state. Did not fire.
+- [x] Public "Staff Admin Access" toggle, `AdminBulletinModal` and `bulletinStore.ts` deleted.
+- [x] Media host allow-lists, enforced on write *and* on read.
+- [x] `src/data/bulletins.json` reshaped; the `dQw4w9WgXcQ` embed removed from shipped content.
+- [x] Test suite: 114 cases, eight claims checked against mutants.
+- [x] Merge `origin/master` 4782ff2 (#88's AST guard) and re-run every gate.
+- [x] `/code-review`, **four rounds**, because each fix round is new code:
+      round 1 (whole diff) fourteen findings — ten fixed, one declined with a reason;
+      round 2 (the fix commit) thirteen, **two worse than what they replaced**;
+      round 3 (that fix) thirteen, one of them the tiebreaker still being dead;
+      round 4 (after merging #93) fourteen, of which five are master-side and already
+      filed by the session that wrote them. Migration re-rehearsed after every change
+      that touched its SQL.
+- [x] Round 5, the whole PR against master `187593c` before merge: fifteen findings, verified
+      one by one since the reviewer probed none. The public read no longer serves the launch
+      fixture on a production outage (it resurrected deleted notices and ISR cached them);
+      future-dated notices are scheduled against the shelter's day; the migration script seeds
+      only on the run that creates the table. Rehearsed on a real Postgres on port 5433, clear
+      of another session's server on 5432 — which is how the "(remote)" label on a local URL
+      was found and fixed in both migration scripts.
+- [x] Round 6, round 5's fixes on their own: fifteen findings. Round 5's seeding rule had broken
+      the launch (a table created by `prisma db execute` was never seeded, and production stops
+      serving the fixture once the table exists); reversed to "seed an empty table". Rehearsed
+      both ways on a real Postgres. The fixture question now asks whether a database exists
+      before asking `NODE_ENV`; the form's default date is the shelter's; P2022 has its own
+      message; the third copy of the migration-target label, in `check-drift.ts`, is fixed.
+- [x] Twenty-seven mutants across six rounds, all killed (4 + 4 + 5 + 2 + 6 + 6).
+- [x] Round 7: ten findings, all small — the review is converging. Three declined with reasons in
+      the decision entry. Filed for the shelter: the launch notices are from August and two are
+      pinned.
+- [x] Round 8: converged — "no correctness bugs serious enough to block". Seven low-severity
+      fixes, including a factual error in the public launch-notices entry; one decline.
+- [x] Round 8's fixes reviewed on their own (`ec8fbce..b9ffbba`), by hand: the forked
+      `/code-review` returned empty after one tool call, so it is not counted as a review. No
+      findings — every `isScheduledForLater` caller passes the shared day, and the emptied form
+      default cannot post because the schema's `YYYY-MM-DD` regex rejects `""`. The seed's new
+      rollback path was proven on embedded Postgres: a CHECK constraint rejecting the second
+      fixture row made the script exit 1 with the constraint's own message, the table held 0 rows
+      afterwards, and a clean re-run seeded all four.
+- [x] Round 9, 2026-10-15: the review above found nothing because it was mine. Retried at
+      `medium`, the forked `/code-review` found seven. Four fixed: `today` is required, one
+      instant per request, a test that kills three mutants of round eight's fix (none had
+      existed), and console spies restored on failure. Three declined with reasons in the
+      decision entry. Lesson:
+      `tasks/lessons/2026-10-15-an-empty-review-is-a-review-that-did-not-run.md`.
+- [x] Round 10, round 9's fixes: eight findings, two against round 9 itself. The
+      one-instant change is reverted, because the two paths it "aligned" never run together.
+      The admin table takes `today` as a prop, which fixes the hydration mismatch instead of
+      documenting it. The ninth-review test now checks behaviour (a future fixture notice is
+      hidden) and kills three mutants. One finding refuted: the fake timers are restored by
+      their `describe`'s own `afterEach`.
+- [x] Round 11, round 10's fixes: no correctness bug. Of six findings, three were fixed: a
+      component test for the `today` prop, a fallback test that now separates the shelter's day
+      from UTC, and a comment moved back to its line. Two mutants killed. Three declined with
+      reasons in the decision entry. 34 mutants in all.
+- [x] Round 12: round 11's `low` review returned empty (one tool call) and was retried at
+      `medium`. No correctness bug. Three test gaps fixed: a boundary spec, a far-future row,
+      and an exact feed list. One `>=` mutant killed; 35 in all.
+- [x] Round 13: round 12's "feed order" assertion could not detect a broken sort, because the
+      fixture's file order already is feed order. It is now a set derived from the fixture,
+      with ordering left to the ordering tests, as its comment says. The table spec freezes the
+      clock. All six scheduling mutants re-run and still killed.
+- [x] Round 14: seven findings, no correctness bug. One was refuted by a probe: removing the
+      fallback's sort fails two existing tests, which the comment now names. Fixed: the
+      named-row assertions, the instant and day as one pair, the six mutants tabulated in the
+      decision entry, and strikethrough claims reworded in past tense. Two declined. **The
+      review loop stops here**, for the reasons the decision entry states: test-only rounds,
+      no correctness finding, every rule mutant-pinned.
+- [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
+      branch had filed; the duplicate open entry was deleted rather than left to mirror a
+      second issue.
+
+## Review
+
+**Verified.** `npm run check` clean (typecheck, lint 0 errors, docs:check OK). `npm run build`
+run in the worktree after `npm ci`, with throwaway secrets inline. The migration was rehearsed
+against real PostgreSQL 18.4, not reasoned: its DDL produces objects identical to
+`prisma db push`, re-running it is a no-op, the enum rejects an out-of-vocabulary category, and on
+a database seeded with the index this branch later retired, a re-run clears it.
+
+**CI settled the test question: PR #103 is green on every job**, including "Unit, integration &
+component tests" (run `38428838326`, commit `af0fc2c`). That is the same tree that gave two
+different local answers, so the local readings were both wrong about the code — recorded against
+the order-dependence entry, which this stream also widened.
+
+**Locally, `npm run test:all` could not be quoted as a single number, and this stream did not
+pretend otherwise.** Two runs of the same tree, nothing changed between them: `65 failed`, then
+`4 failed | 1964 passed (1968)`. The second run's four were one test each in four unrelated
+non-bulletin files across two projects, and **all four pass in isolation**. That is
+`tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, which records the same shape on
+plain `master` — and which this stream has now widened, because that entry describes the `unit`
+project and these failures were in `components` and `integration`. `tests/unit/bulletins.test.ts`
+is **126 passed** run on its own.
+
+**The reviews are the story of this branch.** Round 2 found that round 1's fix had made an
+ordering bug deterministic rather than fixing it. Round 3 found that round 2's fix for it was
+still dead. Round 4 found that round 3's fix was *also* still dead, for a third reason. One
+ordering rule, four attempts, each one claiming in a comment to have fixed it — which is the
+lesson `tasks/lessons/2026-10-13-a-comment-asserting-a-mechanism-is-a-claim-to-run.md` is about,
+and the strongest argument for the standing order in CLAUDE.md step 6 that this repo has produced.
+
+**The tests were checked against mutants, not trusted.** Dropping the `MANAGE_CONTENT` gate,
+returning `videoEmbedUrl` unfiltered, treating an empty result as an outage, and taking the byline
+from anywhere but the session — all four failed the suite. A suite that passes proves nothing
+about code nobody broke on purpose.
+
+**Deliberately not done:**
+
+- **The feed is still English-only.** `titleMs`/`contentMs` exist, the editor writes them, the
+  reader resolves English into them — but nothing renders them.
+  `tasks/open/home-page-text-stays-english-on-the-malay-site.md` owns the render side and is
+  untouched. The columns landed now because adding them later means a *second* hand-run DDL
+  migration against a branch with no down path.
+- **Nothing was applied to production.** The deliverable is
+  `prisma/migrations/manual/20260922_community_bulletins/migration.sql` plus
+  `npm run db:migrate:bulletins`, for the owner to run. `npm run db:push` must NOT be used: it
+  reconciles the whole schema and three destructive statements still stand between master and the
+  production branch. Until the owner applies it, the live feeds serve the committed fixture
+  through the repository's outage fallback — which is the same content visitors see today, so
+  there is no window where the site is worse than before.
+- **No `displayOrder` column**, and no reordering UI. Pinned-first-then-newest is the feed's real
+  ordering; a manual column would be a second one to keep in step by hand. If staff ask to hand-
+  order notices, that is a new column and a new decision, not an oversight.
+- **The `/bulletins` archive is unpaginated.** Marked with a `ceiling:` comment. Fine at shelter
+  scale; page it if the archive outgrows a few hundred, which is also when the page stops being
+  readable.
+- **No component test for `BulletinFeed`.** It is now a pure Server Component with no branching
+  beyond media type, and the repository tests already pin the data it receives. A render test
+  would assert that React renders props.
+- **`src/actions/faqs.ts` still gates on a legacy role list** rather than `MANAGE_CONTENT`. Left
+  alone deliberately — the 2026-09-18 decision kept it there, and changing it is not this task.
+
+**One thing a reviewer should look at hardest:** this change *raises* the stakes. Before it, the
+public editor could only damage the visitor's own browser. Now there is a real store behind real
+pages, so the `requirePermission` calls in `src/actions/bulletins.ts` are the only thing standing
+between an anonymous POST and the shelter's public notices. That is where the denial tests point.
+
+
+
 # Donation receipts wait for reconciliation
 
 **Branch:** `worktree-donation-receipt-reconciliation-boundary` · opened 2026-09-22

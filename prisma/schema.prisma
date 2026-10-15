@@ -935,3 +935,150 @@ model Faq {
   @@index([category, displayOrder])
   @@map("faqs")
 }
+
+/// Category vocabulary for community bulletins.
+///
+/// Deliberately identical to the `BulletinCategory` union in src/types/bulletin.ts
+/// and to the keys of BULLETIN_CATEGORY_PRESENTATION in
+/// src/lib/presentation/bulletinPresentation.ts, which remains the single
+/// declaration of the labels and tones. The three are held in step by a
+/// compile-time assertion in src/lib/server/bulletinRepository.ts, following the
+/// FaqCategory precedent above: adding a member here without adding it there is a
+/// type error, not a category that silently renders as its own raw slug.
+enum BulletinCategory {
+  announcement
+  urgent_need
+  event
+  happy_tail
+  clinic
+}
+
+/// Which scoped public feed carries a bulletin, in addition to the archive.
+///
+/// Every published notice appears on `/bulletins`, the full archive, which
+/// reads with no target filter. `all` adds it to both scoped feeds; `home` and
+/// `pets` add it to one, so a clinic date can run on /pets without crowding the
+/// home page; `bulletins` keeps it to the archive alone. The scoped readers
+/// resolve this with `targetPage IN ('all', <page>)` rather than an equality
+/// test, which is why the composite index below carries it.
+enum BulletinTargetPage {
+  all
+  home
+  pets
+  bulletins
+}
+
+/// What media, if any, a bulletin card renders above its text.
+enum BulletinMediaType {
+  none
+  image
+  video
+}
+
+/// Staff-editable community bulletins behind /, /pets, /bulletins and /admin/bulletins.
+///
+/// Replaces src/lib/client/bulletinStore.ts, a localStorage hook that let any
+/// visitor edit the feed in their own browser while nothing staff posted ever
+/// reached anyone else. The committed src/data/bulletins.json is retained as the
+/// offline fallback fixture, the same arrangement faqs.json has behind Faq.
+///
+/// Two deliberate departures from the Faq model next door, both load-bearing:
+///
+///  1. **No `displayOrder`.** FAQ needs manual ordering because its answers have
+///     no natural sequence. A bulletin feed does: pinned first, then newest, which
+///     `isPinned` + `publishedAt` already express. A `displayOrder` column here
+///     would be a second, conflicting ordering that staff would have to keep in
+///     step with the dates by hand.
+///  2. **`publishedAt` is separate from `createdAt`.** The card shows a notice
+///     date, and an editor must be able to correct it or post-date a clinic
+///     announcement without lying about when the row was written. `createdAt` is
+///     the row's birth and is never editable. `ExpenseItem.date` splits the same
+///     way for the same reason.
+model Bulletin {
+  id         String             @id @default(cuid())
+  category   BulletinCategory
+  targetPage BulletinTargetPage @default(all)
+
+  title   String
+  content String @db.Text
+
+  /// Bahasa Malaysia copy. Nullable because staff may publish an English notice
+  /// and translate it later. Storing the null rather than a copy of the English
+  /// means a later edit to the English still shows through instead of leaving a
+  /// stale duplicate behind — the same reasoning as Faq.questionMs.
+  ///
+  /// Unlike Faq, **nothing resolves these yet**: the `Bulletin` type carries no
+  /// Malay fields and the public feed is English-only. Whoever settles
+  /// tasks/open/home-page-text-stays-english-on-the-malay-site.md adds the
+  /// fields and the `titleMs ?? title` fallback in bulletinRepository together.
+  ///
+  /// These columns are written by the editor but not yet rendered: the public
+  /// feed is English-only until
+  /// tasks/open/home-page-text-stays-english-on-the-malay-site.md is settled,
+  /// which owns the render side. They exist now because adding them later would
+  /// mean a second DDL migration against a production branch that has no Prisma
+  /// down path — TARGET_SCHEMA_TYPE_INTEGRITY P-C's warning about baking a
+  /// violation into columns, applied in the cheap direction.
+  titleMs   String?
+  contentMs String? @db.Text
+
+  mediaType BulletinMediaType @default(none)
+
+  /// Absolute https URL on a host in next.config.ts `images.remotePatterns`.
+  /// Validated on write by bulletinFormSchema and again on read by
+  /// src/lib/domain/bulletinMedia.ts, because a row can reach this table without
+  /// passing the action — the seed and the manual migration both insert directly.
+  mediaUrl String?
+
+  /// Absolute https embed URL on a host in BULLETIN_EMBED_HOSTS. This value is
+  /// interpolated into an <iframe src>, so an unvalidated host here is an
+  /// arbitrary third-party frame on three public pages. Same two-sided check as
+  /// mediaUrl, and the render-side one is the enforcing half.
+  videoEmbedUrl String?
+
+  isPinned    Boolean @default(false)
+  isPublished Boolean @default(true)
+
+  /// Byline shown on the card. A point-in-time snapshot of the editor's display
+  /// name at the moment of writing, captured by the action from the verified
+  /// session — never accepted from the form, which would let any CONTENT_EDITOR
+  /// publish under another person's name.
+  ///
+  /// Denormalised on purpose, in the same way AdoptionApplication.petName is: the
+  /// byline on a published notice must survive the staff member's row being
+  /// deleted, and must not silently change when someone is renamed. Accountability
+  /// for *who actually wrote it* lives in the audit log, which records actorId.
+  authorName String
+
+  /// The notice date the card shows. Editable; see the model comment above.
+  publishedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Serves the PREDICATE of the two scoped public reads — `/` and `/pets`,
+  /// which pass `targetPage IN ('all', <page>)`. It does not serve the sort:
+  /// the feed orders by isPinned, publishedAt, createdAt, id, and the last two
+  /// are not in the index, so Postgres sorts after filtering either way.
+  ///
+  /// It does little for `/bulletins`, which calls `getPublicBulletins("all")`
+  /// and so leaves the predicate as `isPublished = true` alone — a column
+  /// defaulting to true that nearly every row satisfies, so the planner will
+  /// seq-scan there much as the admin list does. Two of the three reads is
+  /// still worth one index; claiming it narrowed all three was not true.
+  @@index([isPublished, targetPage, isPinned, publishedAt])
+  ///
+  /// There is deliberately NO second index for the admin list. That list has no
+  /// predicate at all — it reads every row — so an index could only serve its
+  /// ordering, and an index on publishedAt alone (which an earlier revision of
+  /// this model carried, with a comment claiming it served that query) cannot:
+  /// the sort leads with isPinned. So it narrowed nothing and ordered nothing,
+  /// which is the difference from the index above, and it cost a write on every
+  /// create, edit, pin and publish.
+  ///
+  /// ceiling: a sequential scan of the whole table on each admin page load.
+  /// Correct at shelter scale (tens of notices). If the archive reaches a few
+  /// thousand, add @@index([isPinned, publishedAt]) — and add the matching
+  /// CREATE INDEX to prisma/migrations/manual/, or db:check-drift reports drift.
+  @@map("bulletins")
+}
