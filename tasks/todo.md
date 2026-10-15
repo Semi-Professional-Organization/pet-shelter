@@ -1883,7 +1883,7 @@ database) and driven with Playwright from a script outside the repo:
 The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
 closed there, so its links were not collected; none of them carries a fragment (read from
 `Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
-comparison cannot see. *(From "and all but" to the end of the `#volunteer` sentence,
+comparison cannot see. *(From "and all but" to the end of the `#volunteer` sentence, this was
 rewritten after round eleven by the fixes for rounds twelve, thirteen and fourteen.)*
 Four of those are in the drift table above (`/pets` twice, `/donate`,
 `/applications/track`). `/faq` and the `/get-involved` page are not: the footer has no `/faq` link,
@@ -1902,7 +1902,7 @@ Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a fa
 
 **Corrected 2026-10-15.** The paragraph that stood here stopped the loop on a false premise, and
 `deea461`'s commit message repeats it; history is not rewritten. The owner then asked for round
-thirteen, and review continued. Each round since:
+thirteen, and review continued. Rounds ten to seventeen:
 
 | Round | Reviewed | Findings | Disposition |
 |---|---|---|---|
@@ -1911,8 +1911,9 @@ thirteen, and review continued. Each round since:
 | 12 | `457b791` (ledger) | Said each mobile label renders behind an emoji, but one button has none; said its labels are inline ternaries, but bulletins reads its key | Fixed (`deea461`) |
 | 13 | `deea461` (ledger) | Loop-stop premise false, also in its commit message; a sentence implied every inline mobile label is in the drift table | Two fixed (`3d455db`); commit message recorded only |
 | 14 | `3d455db` (ledger) | Round twelve misdescribed; an unmarked in-place edit; a finding count that called a recorded item fixed; an ambiguous sentence about footer links | Fixed (`0fff8b5`) |
-| 15 | `0fff8b5` (ledger) | The table sorted rounds eleven and twelve by different standards; an in-place edit marker named the wrong rounds; round fourteen had no dispositions; the code-defect sentence did not say only round ten had code in scope | Fixed (`5b149c3`) |
-| 16 | `5b149c3` (ledger) | A causal sentence omitted the owner's request; a motive claim; a claim the record no longer labels rounds; row 15 misdescribed; the lesson labelled findings and paraphrased inside quotation marks; long lines | Fixed by this commit, which removes the characterising prose rather than rewording it |
+| 15 | `0fff8b5` (ledger) | The table sorted rounds eleven and twelve by different standards; an in-place edit marker omitted round twelve and the `#volunteer` sentence; round fourteen had no dispositions; the code-defect sentence did not say only round ten had code in scope | Fixed (`5b149c3`) |
+| 16 | `5b149c3` (ledger) | A causal sentence omitted the owner's request; a motive claim; a claim the record no longer labels rounds; row 15 misdescribed; the lesson labelled findings and paraphrased inside quotation marks; long lines | Fixed (`78aa18c`) |
+| 17 | `78aa18c` (ledger) | Each round since was said of rounds ten to sixteen; row 15 misdescribed again; the lesson quoted a phrase not in the record; a rewrap dropped two words; row 16 had no hash; that commit's message counts four rewrites where the record shows three | Fixed by the commit after `78aa18c`; the commit message recorded only |
 
 Only round ten had code in scope, and that code was correct.
 

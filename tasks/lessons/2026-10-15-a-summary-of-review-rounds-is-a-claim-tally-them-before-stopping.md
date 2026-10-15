@@ -8,6 +8,6 @@ next three corrections each replaced it with another sentence characterising the
 fourteen, fifteen and sixteen each found that sentence inaccurate in turn.
 
 **Rule:** before stopping a review loop, or writing any sentence that characterises several rounds
-at once ("only nits", "never code", "all fixed"), list each round's findings and dispositions from
+at once, such as *never code* or *all fixed*, list each round's findings and dispositions from
 the record and let the list stand on its own. Put text in quotation marks only when it is verbatim.
 A ledger fix is not exempt from review because it is prose.
