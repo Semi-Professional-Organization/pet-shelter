@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect, useSyncExternalStore, useMemo } from "react";
-import { Language, TranslationDictionary, translations } from "@/lib/i18n/translations";
+import { Language, TranslationDictionary, TranslationKey, translations } from "@/lib/i18n/translations";
 
 interface LanguageContextValue {
   language: Language;
@@ -37,6 +37,66 @@ function getStoredLanguage(): Language | null {
 
 function getServerSnapshot(): Language | null {
   return null;
+}
+
+/**
+ * Resolves a dictionary path for a language: the active dictionary, then
+ * English, then the caller's fallback text, then the path itself; then fills
+ * `{name}` placeholders from `params`.
+ *
+ * One implementation for both `t`s. The provider's and the no-provider
+ * fallback in `useLanguage` used to be separate copies, and they had
+ * diverged: outside a provider a fallback string was returned *ahead of* the
+ * dictionary — the reverse of the real `t` — and params were never
+ * interpolated, so `Footer` rendered without a provider printed
+ * "ROS Reg: {regNo}" in place of the shelter's registration number.
+ */
+function translate(
+  language: Language,
+  path: string,
+  fallbackOrParams?: string | Record<string, string | number>,
+  params?: Record<string, string | number>,
+): string {
+  let fallbackText = "";
+  let interpolationParams: Record<string, string | number> | undefined = undefined;
+
+  if (typeof fallbackOrParams === "string") {
+    fallbackText = fallbackOrParams;
+    interpolationParams = params;
+  } else if (typeof fallbackOrParams === "object") {
+    interpolationParams = fallbackOrParams;
+  }
+
+  const dict = translations[language] || translations.en;
+  const fallbackDict = translations.en;
+
+  const keys = path.split(".");
+  let current: unknown = dict;
+  let currentFallback: unknown = fallbackDict;
+
+  for (const k of keys) {
+    if (current && typeof current === "object" && k in current) {
+      current = (current as Record<string, unknown>)[k];
+    } else {
+      current = undefined;
+    }
+
+    if (currentFallback && typeof currentFallback === "object" && k in currentFallback) {
+      currentFallback = (currentFallback as Record<string, unknown>)[k];
+    } else {
+      currentFallback = undefined;
+    }
+  }
+
+  let result = typeof current === "string" ? current : typeof currentFallback === "string" ? currentFallback : fallbackText || path;
+
+  if (interpolationParams) {
+    Object.entries(interpolationParams).forEach(([paramKey, paramVal]) => {
+      result = result.replace(new RegExp(`{${paramKey}}`, "g"), String(paramVal));
+    });
+  }
+
+  return result;
 }
 
 export function LanguageProvider({
@@ -79,48 +139,7 @@ export function LanguageProvider({
       path: string,
       fallbackOrParams?: string | Record<string, string | number>,
       params?: Record<string, string | number>
-    ): string => {
-      let fallbackText = "";
-      let interpolationParams: Record<string, string | number> | undefined = undefined;
-
-      if (typeof fallbackOrParams === "string") {
-        fallbackText = fallbackOrParams;
-        interpolationParams = params;
-      } else if (typeof fallbackOrParams === "object") {
-        interpolationParams = fallbackOrParams;
-      }
-
-      const dict = translations[language] || translations.en;
-      const fallbackDict = translations.en;
-
-      const keys = path.split(".");
-      let current: unknown = dict;
-      let currentFallback: unknown = fallbackDict;
-
-      for (const k of keys) {
-        if (current && typeof current === "object" && k in current) {
-          current = (current as Record<string, unknown>)[k];
-        } else {
-          current = undefined;
-        }
-
-        if (currentFallback && typeof currentFallback === "object" && k in currentFallback) {
-          currentFallback = (currentFallback as Record<string, unknown>)[k];
-        } else {
-          currentFallback = undefined;
-        }
-      }
-
-      let result = typeof current === "string" ? current : typeof currentFallback === "string" ? currentFallback : fallbackText || path;
-
-      if (interpolationParams) {
-        Object.entries(interpolationParams).forEach(([paramKey, paramVal]) => {
-          result = result.replace(new RegExp(`{${paramKey}}`, "g"), String(paramVal));
-        });
-      }
-
-      return result;
-    },
+    ): string => translate(language, path, fallbackOrParams, params),
     [language]
   );
 
@@ -151,22 +170,56 @@ export function useLanguage(): LanguageContextValue {
     return {
       language: fallbackLang,
       setLanguage: () => {},
-      t: (path: string, fallbackOrParams?: string | Record<string, string | number>) => {
-        if (typeof fallbackOrParams === "string") return fallbackOrParams;
-        const keys = path.split(".");
-        let cur: unknown = dict;
-        for (const k of keys) {
-          if (cur && typeof cur === "object" && k in cur) {
-            cur = (cur as Record<string, unknown>)[k];
-          } else {
-            return path;
-          }
-        }
-        return typeof cur === "string" ? cur : path;
-      },
+      t: (path, fallbackOrParams, params) => translate(fallbackLang, path, fallbackOrParams, params),
       dictionary: dict,
       isMs: false,
     };
   }
   return context;
+}
+
+/**
+ * `t`, restricted to keys that exist in the dictionary.
+ *
+ * `useLanguage().t` takes a plain `string` and, as its last resort, returns
+ * the path it was handed. So a key that is renamed, misspelled or never added
+ * type-checks clean and renders as literal text — `home.step1Title` as a card
+ * heading. Calling through this hook makes that a compile error instead.
+ *
+ * Why a second hook rather than typing `t` itself: typing `t` was tried and
+ * produced 38 errors in nine files when measured. Twenty were dynamic keys
+ * that need threading through as `TranslationKey`; the rest were keys that
+ * exist in neither dictionary, and so render English on the Malay site. The
+ * live list, not a count to keep in step here, is
+ * `tasks/open/translation-keys-the-dictionary-does-not-have.md`. Components
+ * move to this hook one at a time; once nothing still needs the untyped form,
+ * `t` itself should take `TranslationKey` and this hook should go.
+ */
+export function useTypedTranslation(): {
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string;
+  isMs: boolean;
+} {
+  // Returns `isMs` too, so a component reads the context once rather than
+  // calling `useLanguage()` again beside this. Params pass through, so a key
+  // with `{placeholders}` — `footer.rosReg` — can use the typed form.
+  //
+  // ceiling: `params` is optional for every key, so `t("footer.rosReg")` with
+  // no params type-checks and renders "ROS Reg: {regNo}". Requiring params for
+  // exactly the keys that contain a placeholder needs the dictionary's values
+  // visible to the type system, and `TranslationDictionary` types them as
+  // `string`. Two upgrade paths. The cheaper one needs no type change: have
+  // `translate()` detect a `{name}` still present after interpolation and
+  // throw under test. It covers both `t` paths in one place, but only for
+  // keys some test renders, does nothing in production, and would misfire on
+  // a param value that itself contains braces — a net, not a proof. The
+  // thorough one is to declare the
+  // dictionaries `as const satisfies TranslationDictionary` and derive a
+  // placeholder map from the values, making the omission a compile error.
+  const { t, isMs } = useLanguage();
+  const typed = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>) =>
+      params ? t(key, params) : t(key),
+    [t],
+  );
+  return { t: typed, isMs };
 }

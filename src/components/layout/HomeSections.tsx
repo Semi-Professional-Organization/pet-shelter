@@ -7,27 +7,69 @@ import {
   FileText, 
   Users, 
   HomeIcon, 
-  Phone,
-  Clock,
-  MapPin,
-  MessageCircle,
-  Calendar,
-  Truck,
   Heart,
   ShieldCheck,
   ArrowRight,
   Stethoscope,
   GraduationCap,
-  Sparkles,
+  Loader2,
   Scissors,
   CheckCircle2,
   Package
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
+import type { TranslationKey } from "@/lib/i18n/translations";
 
-export function HomeGalleryHeader() {
-  return null;
+/**
+ * The two strings `src/app/page.tsx` used to render itself.
+ *
+ * They live here because `page.tsx` is a Server Component under
+ * `revalidate = 300`, and the reader's language is client state —
+ * `LanguageProvider` reads `localStorage`, and its `getServerSnapshot` returns
+ * `null`, so a server render can only ever produce English. Reading the
+ * language cookie in the page would make it render per request and give up
+ * ISR, which is the trade `src/app/api/sponsor/pet-media/[petId]/route.ts`
+ * already declined. Moving the literals across the client boundary costs
+ * nothing and lets them call `t()`.
+ *
+ * Like every other Malay string on the site, these switch after hydration: the
+ * **served HTML** is English, because the server cannot know the language. The
+ * `<html lang>` attribute takes the same path rather than being simply wrong —
+ * `layout.tsx` serves `lang="en"` and `LanguageProvider` corrects
+ * `document.documentElement.lang` in an effect — so the mismatch exists only
+ * in the server-rendered document, which is what a crawler reads. Closing it
+ * means deciding whether `/` gives up ISR, a larger change than this one; it is
+ * tracked in `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`.
+ */
+export function HomeGalleryLoading() {
+  const { t } = useTypedTranslation();
+
+  return (
+    <div className="flex items-center justify-center py-20 text-muted-foreground">
+      <Loader2 className="size-6 animate-spin mr-2" />
+      <span>{t("home.galleryLoading")}</span>
+    </div>
+  );
+}
+
+export function HomeViewAllPetsLink() {
+  const { t } = useTypedTranslation();
+
+  return (
+    <div className="flex justify-center pt-6">
+      <Link
+        href="/pets"
+        className={buttonVariants({
+          variant: "outline",
+          className: "text-sm font-semibold uppercase tracking-wider focus-visible:ring-2 rounded-xl gap-2",
+        })}
+      >
+        {t("home.viewAllPets")}
+        <ArrowRight className="size-4" />
+      </Link>
+    </div>
+  );
 }
 
 /**
@@ -42,6 +84,11 @@ export function HomeOurWorkSection() {
   const pillars = [
     {
       icon: Scissors,
+      // `/faq` explains TNRM ("Answers on TNRM and community animals"); its
+      // category is internal state, so the page is as deep as a link can go.
+      // This used to be `/#how-it-works`, the three-step *adoption* journey —
+      // harmless while that anchor rendered nowhere, misleading once restored.
+      href: "/faq",
       tagEn: "Pillar 1: Population Control",
       tagMs: "Teras 1: Kawalan Populasi",
       titleEn: "TNRM (Trap-Neuter-Return-Manage)",
@@ -65,6 +112,7 @@ export function HomeOurWorkSection() {
     },
     {
       icon: GraduationCap,
+      href: "/get-involved",
       tagEn: "Pillar 2: Community Coexistence",
       tagMs: "Teras 2: Kewujudan Bersama",
       titleEn: "Education & Coexistence",
@@ -88,6 +136,7 @@ export function HomeOurWorkSection() {
     },
     {
       icon: Stethoscope,
+      href: "/needs",
       tagEn: "Pillar 3: Clinical Care",
       tagMs: "Teras 3: Rawatan Klinikal",
       titleEn: "Sanctuary & Rehabilitation",
@@ -169,7 +218,11 @@ export function HomeOurWorkSection() {
 
                 <div className="pt-4 border-t border-border/60">
                   <Link
-                    href={idx === 0 ? "/#how-it-works" : idx === 1 ? "/get-involved" : "/needs"}
+                    // From the pillar itself, not its position. Choosing by
+                    // array index is how the TNRM card came to point at the
+                    // adoption steps: reorder the array and every link after
+                    // the change would silently point somewhere else.
+                    href={pillar.href}
                     className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
                   >
                     <span>{isMs ? "Ketahui Lebih Lanjut" : "Learn More"}</span>
@@ -264,50 +317,73 @@ export function HomeQuickActionsSection() {
   );
 }
 
+/**
+ * The three-step adoption journey, and the `#how-it-works` anchor.
+ *
+ * The copy comes from `home.step*` rather than inline ternaries. Those keys
+ * exist in both locales and had no reader: `1137d3e` unmounted this section,
+ * and the two copies then drifted apart unobserved — the dictionary said
+ * "Semak & Hantar Permohonan" where this file said "Pilih Haiwan & Hantar
+ * Permohonan". AGENTS.md, "Boundaries and duplication": once two copies have
+ * diverged, that is the defect. The copy *lives* in the dictionary, because
+ * that is where a translator can reach it.
+ *
+ * Where it lives did not decide what it says. Step 3 is the case that proved
+ * it: the dictionary's "no hidden fees" implied visible fees, and the inline
+ * "zero adoption fees" over-promised, since fees are admin-configurable. It now
+ * says "no commercial adoption fees" — the qualified claim this section's own
+ * subtitle and the standards section below already make. Each string was read
+ * against what the organisation states, not settled by which file held it.
+ *
+ * No English fallback is passed to `t()` — the provider already falls through
+ * to the `en` dictionary, so a literal here could only ever be a third copy,
+ * unreachable and free to drift.
+ *
+ * The heading, eyebrow and subtitle read from the dictionary too. They were
+ * left inline at first, on the grounds that `home.howItWorksTitle`/`Subtitle`
+ * hold different sentences rather than second copies — true, but it left half
+ * of one component translator-reachable and half not, which is the same
+ * split-source defect one level down. Adopting the keys does change the
+ * visible wording; this section had rendered nowhere since `1137d3e`, so there
+ * was no shipped copy to preserve, and the dictionary's version names the
+ * three-step process the cards below actually show.
+ */
 export function HomeProcessSection() {
-  const { isMs } = useLanguage();
+  const { t } = useTypedTranslation();
 
-  const steps = [
+  const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey; icon: typeof FileText }[] = [
     {
       num: "01",
-      title: isMs ? "Pilih Haiwan & Hantar Permohonan" : "Browse & Submit Application",
-      description: isMs
-        ? "Lihat profil anjing & kucing reskue kami secara dalam talian atau kunjungi santuari PJ. Hantar borang ringkas untuk mendaftar minat keluarga anda."
-        : "Browse our adoptable dogs and cats online or visit our Petaling Jaya sanctuary. Submit a straightforward application to register your household interest.",
+      titleKey: "home.step1Title",
+      descKey: "home.step1Desc",
       icon: FileText,
     },
     {
       num: "02",
-      title: isMs ? "Sesi Suai Kenal di Santuari" : "Meet & Socialize",
-      description: isMs
-        ? "Luangkan masa berinteraksi dengan haiwan di laman luar atau bilik kucing santuari. Kami mengatur pengenalan berstruktur jika anda mempunyai haiwan sedia ada."
-        : "Spend time interacting with the animal in our outdoor play yard or cat room. If you have resident pets, we arrange a structured, supervised introduction.",
+      titleKey: "home.step2Title",
+      descKey: "home.step2Desc",
       icon: Users,
     },
     {
       num: "03",
-      title: isMs ? "Lengkapkan Adopsi (100% Percuma)" : "Finalize & Welcome Home",
-      description: isMs
-        ? "Tandatangani perjanjian adopsi standard tanpa sebarang yuran tersembunyi. Semua haiwan telah divaksin, dimikrocip, dan dimandulkan sepenuhnya."
-        : "Sign our standard adoption agreement with zero adoption fees. All animals are already vaccinated, microchipped, and spayed or neutered.",
+      titleKey: "home.step3Title",
+      descKey: "home.step3Desc",
       icon: HomeIcon,
     },
   ];
 
   return (
-    <section id="how-it-works" className="border-t border-border bg-background py-14 sm:py-18">
+    <section id="how-it-works" className="border-t border-border bg-background py-14 sm:py-18 scroll-mt-24">
       <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
         <div className="max-w-2xl mb-10">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-            {isMs ? "Protokol Adopsi Santuari" : "Adoption Protocol"}
+            {t("home.howItWorksEyebrow")}
           </span>
           <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
-            {isMs ? "Bagaimana Proses Adopsi Berfungsi" : "How Adoption Works"}
+            {t("home.howItWorksTitle")}
           </h2>
           <p className="text-base text-muted-foreground mt-2 leading-relaxed">
-            {isMs
-              ? "Proses berstruktur kami memastikan padanan yang bertanggungjawab antara haiwan reskue dan keluarga di seluruh Lembah Klang."
-              : "Our structured adoption process ensures responsible matching between animals and families across Selangor and the Klang Valley."}
+            {t("home.howItWorksSubtitle")}
           </p>
         </div>
 
@@ -329,10 +405,10 @@ export function HomeProcessSection() {
                     </div>
                   </div>
                   <h3 className="font-heading text-lg font-bold tracking-tight text-foreground">
-                    {step.title}
+                    {t(step.titleKey)}
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {step.description}
+                    {t(step.descKey)}
                   </p>
                 </div>
               </div>
@@ -416,208 +492,6 @@ export function HomeStandardsSection() {
                 </p>
               </div>
             ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export function HomeCommunitySection() {
-  const { isMs } = useLanguage();
-
-  return (
-    <section id="support" className="border-t border-border bg-background py-14 sm:py-18">
-      <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-        {/* Section Header */}
-        <div className="max-w-3xl mb-8 space-y-2">
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-            {isMs ? "Tindakan Komuniti" : "Community Action"}
-          </span>
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            {isMs ? "Sukarelawan, Penjaga Sementara & Penajaan" : "Volunteer, Foster, or Sponsor Care"}
-          </h2>
-          <p className="text-base text-muted-foreground leading-relaxed">
-            {isMs
-              ? "Tiada pengalaman lampau diperlukan. Kami menyediakan 100% makanan haiwan, kelengkapan perubatan, sangkar, dan rawatan veterinar bagi semua penjaga sementara."
-              : "No prior shelter experience is required. We provide 100% of pet food, medical supplies, crates, and veterinary care for all temporary foster parents."}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Volunteer & Foster Care Opportunities */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="border border-border bg-card p-6 sm:p-7 space-y-5 rounded-2xl shadow-xs">
-              <div className="flex items-center gap-2.5 pb-3 border-b border-border">
-                <div className="flex size-8 items-center justify-center bg-foreground text-background rounded-lg">
-                  <Users className="size-4" />
-                </div>
-                <div>
-                  <h3 className="font-heading text-lg font-bold text-foreground">
-                    {isMs ? "Peranan Sukarelawan & Penjaga Aktif" : "Active Volunteer & Foster Roles"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {isMs ? "Slot fleksibel dibuka setiap minggu di santuari Petaling Jaya kami." : "Flexible slots available weekly at our Petaling Jaya sanctuary."}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="border border-border bg-background p-4 space-y-1.5 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <Heart className="size-4 text-foreground shrink-0" />
-                    <h4 className="text-sm font-bold text-foreground">
-                      {isMs ? "Berjalan Bersama Anjing Hujung Minggu" : "Weekend Dog Walking"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {isMs ? "Sabtu & Ahad, 10:00 pagi – 12:00 tgh hari. Senaman & sosialisasi anjing di laman luar." : "Saturdays & Sundays, 10:00 AM – 12:00 PM. Exercise and socialize dogs in our outdoor yard."}
-                  </p>
-                </div>
-
-                <div className="border border-border bg-background p-4 space-y-1.5 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="size-4 text-foreground shrink-0" />
-                    <h4 className="text-sm font-bold text-foreground">
-                      {isMs ? "Hari Mandian & Penjagaan Bulu" : "Bath & Grooming Days"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {isMs ? "Setiap Sabtu ke-2 & ke-4. Mandian berubat, memberus bulu, dan penjagaan rapi." : "Every 2nd & 4th Saturday. Medicated baths, brush-outs, and gentle care for recovering strays."}
-                  </p>
-                </div>
-
-                <div className="border border-border bg-background p-4 space-y-1.5 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <Truck className="size-4 text-foreground shrink-0" />
-                    <h4 className="text-sm font-bold text-foreground">
-                      {isMs ? "Pengangkutan Klinik Veterinar" : "Clinic Transport"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {isMs ? "Pengangkutan hari bekerja untuk pemeriksaan kesihatan dan pembedahan mandul." : "Weekday transport for veterinary health checkups and spay/neuter clinic appointments."}
-                  </p>
-                </div>
-
-                <div className="border border-border bg-background p-4 space-y-1.5 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <HomeIcon className="size-4 text-foreground shrink-0" />
-                    <h4 className="text-sm font-bold text-foreground">
-                      {isMs ? "Rumah Asuhan Sementara" : "Temporary Foster Homes"}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {isMs ? "Penjagaan jangka pendek anak haiwan atau pasca pembedahan. Makanan & bil vet ditanggung sepenuhnya." : "Short-term care for nursing litters, kittens, or post-op recovery. All food and vet bills covered."}
-                  </p>
-                </div>
-              </div>
-
-              {/* Pre-filled Direct WhatsApp Action Buttons */}
-              <div className="pt-2 border-t border-border flex flex-wrap gap-3">
-                <a
-                  href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20would%20like%20to%20volunteer%20for%20weekend%20dog%20walking%20and%20sanctuary%20care!"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonVariants({
-                    size: "sm",
-                    className: "text-xs sm:text-sm font-semibold uppercase tracking-wider focus-visible:ring-2 px-4 py-2.5 gap-2 bg-success-solid text-white hover:bg-success-solid dark:hover:bg-success-solid rounded-xl",
-                  })}
-                >
-                  <MessageCircle className="size-4" />
-                  {isMs ? "WhatsApp Penyelaras Sukarelawan" : "WhatsApp Volunteer Coordinator"}
-                </a>
-
-                <a
-                  href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20am%20interested%20in%20becoming%20a%20temporary%20foster%20parent%20for%20a%20rescue%20pet!"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonVariants({
-                    variant: "outline",
-                    size: "sm",
-                    className: "text-xs sm:text-sm font-semibold uppercase tracking-wider focus-visible:ring-2 px-4 py-2.5 gap-2 rounded-xl",
-                  })}
-                >
-                  <MessageCircle className="size-4" />
-                  {isMs ? "WhatsApp Pasukan Asuhan" : "WhatsApp Foster Team"}
-                </a>
-
-                <Link
-                  href="/get-involved"
-                  className={buttonVariants({
-                    variant: "outline",
-                    size: "sm",
-                    className: "text-xs sm:text-sm font-semibold uppercase tracking-wider focus-visible:ring-2 px-4 py-2.5 gap-2 rounded-xl",
-                  })}
-                >
-                  <Users className="size-4" />
-                  {isMs ? "Semua Laluan Penglibatan" : "Get Involved Page"}
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Walk-in Sanctuary Hours & Physical Drop-off */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Visiting Hours Card */}
-            <div className="border border-border bg-card p-6 space-y-4 rounded-2xl shadow-xs">
-              <div className="flex items-center gap-2 pb-2 border-b border-border">
-                <Clock className="size-4 text-foreground" />
-                <h3 className="font-heading text-base font-bold text-foreground uppercase tracking-wider">
-                  {isMs ? "Waktu Lawatan Santuari Walk-In" : "Walk-in Sanctuary Visiting Hours"}
-                </h3>
-              </div>
-
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center py-1 border-b border-border/40">
-                  <span className="font-semibold text-foreground">{isMs ? "Selasa – Ahad" : "Tuesday – Sunday"}</span>
-                  <span className="font-mono font-medium text-foreground">{isMs ? "10:00 Pagi – 5:00 Petang" : "10:00 AM – 5:00 PM"}</span>
-                </div>
-                <div className="flex justify-between items-center py-1 text-muted-foreground">
-                  <span className="font-medium">{isMs ? "Isnin" : "Mondays"}</span>
-                  <span className="text-xs italic">{isMs ? "Tutup (Sanitasi Santuari & Lawatan Vet)" : "Closed (Sanctuary Cleaning & Vet Rounds)"}</span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 text-xs text-muted-foreground pt-1">
-                <MapPin className="size-4 text-foreground shrink-0 mt-0.5" />
-                <span>No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia</span>
-              </div>
-
-              <div className="pt-2">
-                <a
-                  href="tel:+60378765432"
-                  className={buttonVariants({
-                    variant: "outline",
-                    size: "sm",
-                    className: "w-full text-xs font-semibold uppercase tracking-wider gap-1.5 rounded-xl",
-                  })}
-                >
-                  <Phone className="size-3.5" />
-                  {isMs ? "Hubungi Santuari: 03-7876 5432" : "Call Sanctuary: 03-7876 5432"}
-                </a>
-              </div>
-            </div>
-
-            {/* In-Kind Shelter Wishlist Banner */}
-            <div className="border border-border bg-muted/30 p-5 space-y-3 rounded-2xl">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                  <Package className="size-3.5 text-primary" />
-                  {isMs ? "Keperluan Rumah Pemulihan" : "Rehab House Wishlist"}
-                </h4>
-                <Link
-                  href="/needs"
-                  className="text-2xs font-bold text-primary hover:underline"
-                >
-                  {isMs ? "Lihat Senarai Penuh →" : "View Full List →"}
-                </Link>
-              </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {isMs
-                  ? "Sokong rawatan 40+ haiwan reskue dengan menyumbang makanan berkhasiat, ubat cuci F10, alas serap kencing, dan perangkap sangkar TNRM."
-                  : "Support 40+ recovering rescues with clinical diet foods, F10 disinfectant, pee pads, and humane TNRM trap cages."}
-              </p>
-            </div>
           </div>
         </div>
       </div>

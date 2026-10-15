@@ -3,7 +3,9 @@ import Image from "next/image";
 import { Pin, Calendar } from "lucide-react";
 
 import { Bulletin } from "@/types/bulletin";
+import type { TranslationKey } from "@/lib/i18n/translations";
 import { presentBulletinCategory } from "@/lib/presentation/bulletinPresentation";
+import { Translated } from "@/components/providers/Translated";
 
 interface BulletinFeedProps {
   /**
@@ -15,7 +17,12 @@ interface BulletinFeedProps {
    * rather than serialising a second round trip behind it.
    */
   bulletins: Bulletin[];
-  title?: string;
+  /**
+   * Dictionary key for the heading, not the heading itself, so the Malay site
+   * reads Malay. Required: a default would let a shared component own one
+   * page's heading, and any caller that forgot the prop would be headed with it.
+   */
+  titleKey: TranslationKey;
   compact?: boolean;
 }
 
@@ -33,10 +40,16 @@ interface BulletinFeedProps {
  * admin affordance on this component at all: not a hidden one, not a
  * session-gated one. A staff control on a public page is how the previous
  * version went wrong, and a feed that only ever reads cannot repeat it.
+ *
+ * Its fixed labels — heading, category chip, "Pinned", "Posted by", the empty
+ * state — go through `Translated`, a client leaf per string, so the feed stays
+ * a Server Component. The notices themselves render in English: `titleMs` and
+ * `contentMs` are stored and editable, but the public `Bulletin` does not carry
+ * them yet: `tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md`.
  */
 export function BulletinFeed({
   bulletins,
-  title = "Shelter Bulletins & Updates",
+  titleKey,
   compact = false,
 }: BulletinFeedProps) {
   return (
@@ -44,7 +57,7 @@ export function BulletinFeed({
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 mb-6">
         <div>
           <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            {title}
+            <Translated k={titleKey} />
           </h2>
         </div>
       </div>
@@ -102,12 +115,12 @@ export function BulletinFeed({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className={`tone-chip px-3 py-1 ${catInfo.toneClass}`}>
-                          {catInfo.label}
+                          <Translated k={catInfo.labelKey} />
                         </span>
 
                         {bulletin.isPinned && (
                           <span className="tone-chip tone-warning px-3 py-1">
-                            <Pin className="size-3" /> Pinned
+                            <Pin className="size-3" /> <Translated k="bulletins.pinned" />
                           </span>
                         )}
                       </div>
@@ -130,7 +143,7 @@ export function BulletinFeed({
 
                 <div className="p-6 pt-0 border-t border-border/40 mt-3 flex items-center justify-between text-sm text-muted-foreground">
                   <span>
-                    Posted by:{" "}
+                    <Translated k="bulletins.postedBy" />{" "}
                     <strong className="text-foreground">{bulletin.authorName}</strong>
                   </span>
                 </div>
@@ -146,7 +159,9 @@ export function BulletinFeed({
             repository serves no notices rather than stale ones — and `/` and
             `/bulletins` cache this render for up to five minutes.
           */}
-          <p className="text-sm text-muted-foreground">No updates to show right now.</p>
+          <p className="text-sm text-muted-foreground">
+            <Translated k="bulletins.noUpdates" />
+          </p>
         </div>
       )}
     </section>

@@ -42,7 +42,9 @@ writer.
 
 **`titleMs`/`contentMs` are added now although nothing renders them.** The public feed stays
 English-only — that half belongs to
-`tasks/open/home-page-text-stays-english-on-the-malay-site.md`, which owns the render side. The
+`tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md`, which owns the render side. *(Repointed 2026-10-15: this named
+`tasks/open/home-page-text-stays-english-on-the-malay-site.md`, which PR #104 settled and deleted; the render side
+moved to its own entry.)* The
 columns exist now because adding them later means a *second* hand-run DDL migration against a
 production branch with no Prisma down path, and P-C in the same target doc warns specifically
 about baking a violation into columns. The editor writes them; **nothing reads them yet**, and

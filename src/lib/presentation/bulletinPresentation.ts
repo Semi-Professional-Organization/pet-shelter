@@ -1,7 +1,16 @@
 import { BulletinCategory, BulletinTargetPage } from "@/types/bulletin";
+import type { TranslationKey } from "@/lib/i18n/translations";
 
 export interface BulletinCategoryPresentation {
+  /** The admin editor's label. Staff tooling is English-only. */
   label: string;
+  /**
+   * The public feed's label, as a dictionary key so the Malay site reads Malay.
+   * Kept in this one table beside `label` rather than in a second map in the
+   * feed, for the reason this module exists: two tables of the same categories
+   * drift the moment one gains a member.
+   */
+  labelKey: TranslationKey;
   /**
    * The design-system tone class (`tone-danger`, `tone-success`, …) declared in
    * `globals.css`. On its own it only remaps the local `--tone-*` group, so it
@@ -30,11 +39,11 @@ export const BULLETIN_CATEGORY_PRESENTATION: Record<
   BulletinCategory,
   BulletinCategoryPresentation
 > = {
-  urgent_need: { label: "Urgent Foster / Need", toneClass: "tone-danger" },
-  clinic: { label: "Clinic / Vaccine", toneClass: "tone-success" },
-  event: { label: "Event", toneClass: "tone-info" },
-  happy_tail: { label: "Adoption Update", toneClass: "tone-highlight" },
-  announcement: { label: "Notice", toneClass: "tone-neutral" },
+  urgent_need: { label: "Urgent Foster / Need", labelKey: "bulletins.categoryUrgentNeed", toneClass: "tone-danger" },
+  clinic: { label: "Clinic / Vaccine", labelKey: "bulletins.categoryClinic", toneClass: "tone-success" },
+  event: { label: "Event", labelKey: "bulletins.categoryEvent", toneClass: "tone-info" },
+  happy_tail: { label: "Adoption Update", labelKey: "bulletins.categoryHappyTail", toneClass: "tone-highlight" },
+  announcement: { label: "Notice", labelKey: "bulletins.categoryAnnouncement", toneClass: "tone-neutral" },
 };
 
 /**
