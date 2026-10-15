@@ -1767,11 +1767,12 @@ describe("corrections from the ninth and tenth reviews", () => {
   });
 
   it("hides a future-dated notice on the fallback path, judging one day per pass", async () => {
-    // 16:30 UTC on the 12th is the 13th in Kuala Lumpur, so bulletin-001
-    // (dated the 14th) is scheduled and the other three are live. Dropping or
-    // inverting the date check serves the wrong set.
+    // 16:30 UTC on the 11th is the 12th in Kuala Lumpur. So bulletin-002
+    // (dated the 12th) is live only if the day is the shelter's — a UTC day
+    // would hide it — and bulletin-001 (the 14th) is scheduled either way.
+    // Dropping, inverting or de-zoning the date check serves the wrong set.
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-08-12T16:30:00.000Z"));
+    vi.setSystemTime(new Date("2026-08-11T16:30:00.000Z"));
     const schedule = await import("@/lib/domain/bulletinSchedule");
     const today = vi.mocked(schedule.shelterToday);
     prismaMock.bulletin.findMany.mockRejectedValue(new Error("connection refused"));

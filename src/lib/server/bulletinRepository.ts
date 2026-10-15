@@ -383,9 +383,6 @@ export async function getPublicBulletins(
     }
   }
 
-  // Slice before projecting: `toBulletin` runs the URL allow-list, which builds
-  // a `URL` per field, and there is no reason to do that for rows about to be
-  // discarded. The query path already gets this right by pushing `take` down.
   // Its own day, not the query's: this path runs only when the query threw, so
   // no response ever mixes the two.
   const today = shelterToday();
@@ -398,6 +395,9 @@ export async function getPublicBulletins(
         matchesTarget(b, targetPage)
     )
   );
+  // Slice before projecting: `toBulletin` runs the URL allow-list, which builds
+  // a `URL` per field, and there is no reason to do that for rows about to be
+  // discarded. The query path already gets this right by pushing `take` down.
   const limited = limit !== undefined ? ordered.slice(0, limit) : ordered;
   return limited.map(toBulletin);
 }
