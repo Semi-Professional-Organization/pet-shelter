@@ -82,8 +82,9 @@ fails a check that cannot be fooled by a stale copy — once someone runs it, si
 
 **Mixed-language strings were a separate defect, found and fixed the same day.** `/code-review`
 on the PR adding this check measured `1 tahun 6 months` stored as six months by the backfill while
-the app reads one year, with no refusal. The backfill now refuses any age containing a unit it does
-not read, anywhere in the string, and any age containing a non-ASCII character; the same check
+the app reads one year, with no refusal. The backfill now refuses any age containing, anywhere in the
+string, a unit the app reads and it does not (a word neither side reads, such as `mons`, is not
+refused), and any age containing a non-ASCII character; the same check
 reproduces expand's J1 and J3 over eight mixed strings and four non-ASCII ones to show the
 pre-check agrees with the file, verdict by verdict. Settled in
 `tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md` and

@@ -14,9 +14,10 @@ and agree. The app results were re-run on 2026-10-16 against `master` at `d6dd03
 runs only for a record with no `birthDate`: chiefly a pet saved to browser `localStorage` before
 #94, on first render. That is narrow, and widens the moment the known `petStore.ts` mount-effect
 defect is fixed. Since PR #113 merged on 2026-10-15, the contract rehearsal also imports this
-function and compares the backfill against it. It does so only on fixed lists of spellings, and
-none of the shapes below is among them, because the backfill refuses every one. So these defects
-do not reach that comparison today. A spelling added to its lists would.
+function and compares the backfill against it. It does so only on fixed lists of spellings. None
+of the misread shapes in the table or the decimal list below is on them, so those defects do not
+reach that comparison today; a spelling added to the lists would. (The lists do include
+`1 tahun 6 months`, the mixed-language case below, which the backfill now refuses.)
 
 ## Regressions PR #42 introduced
 
@@ -42,7 +43,8 @@ refuses it.
 **All of these are fixable in the app alone — today.** The backfill refuses every one, so changing
 what the app computes for them changes nothing the migration stores. Since #113 its refusals run
 in this order: a non-ASCII age (`migration.sql`, the `RAISE` at line 544 on `master` at
-`d6dd030`), then "cannot be derived" (line 556), then "fractional" (line 572). `1y2w`, `6 mons`
+`d6dd030`), then "cannot be derived" (line 556), then "fractional" (line 572), then "not a
+plausible animal age", over sixty years (line 583). `1y2w`, `6 mons`
 and the rest have no unit it reads and stop at "cannot be derived". `2y3m`, `5yrs8mths` and
 `1y6m` *do* get a unit — the trailing `3m`, `8mths`, `6m` — and are stopped only at "fractional".
 
@@ -88,7 +90,8 @@ from reading as months.
   Invalid time value`; `12345678 wks` returns `-234583-03-21`; `61 years` returns 1965. PR #119
   removes **the throw only**. An age-side overflow now clamps to the earliest date a `Date` holds
   (`-271821-04-20`). With an intake that is itself out of range, it returns the intake as given,
-  which reads as a newborn. In-range junk such as `-234583-03-21` and `61 years` keeps its old
+  a newborn, only when the derived date overflows too; otherwise it returns the computed date,
+  which can lie far in the future (`250000 years` before `300000-01-01` gives `+050000-01-01`). In-range junk such as `-234583-03-21` and `61 years` keeps its old
   reading, deliberately: a sixty-year cap was tried and withdrawn, because it turned `61 years`
   from a senior into a newborn. A plausibility check needs the same "age unknown" result as
   decimals.
@@ -96,7 +99,8 @@ from reading as months.
 - **The return type can lie** — confirmed with `tsc`, since no runtime probe sees a type.
   `withDerivedAge({ …, birthDateIsEstimate: false })` with no `birthDate` is typed `false` but
   returns `true`; an explicitly `undefined` flag collapses the result to `never`. **Fixed by PR
-  #119**, with exactly this `Omit<…> & { … }` signature and two `expectTypeOf` tests.
+  #119 once it is on `master`**, with exactly this `Omit<…> & { … }` signature and two
+  `expectTypeOf` tests.
 
 - **Three copies of the estimate rule disagree** on a row with `birthDate: ''` — which satisfies
   `NOT NULL` — **and a stored `birthDateIsEstimate: false`**. Then `withDerivedAge` and
@@ -131,5 +135,6 @@ The first version of this entry said compact compounds and unlisted spellings we
 the app alone, because the backfill's `\M` "fails the same way" so app and SQL "currently agree,
 both wrong". That was accepted from another session after only the app half was checked, with the
 SQL half reasoned rather than read. The backfill's fractional check aborts on `2y3m`, so nothing is
-stored wrong — though it runs second, after the no-unit check, which `2y3m` passes. It also presented these as standing limits rather than as
+stored wrong — though it runs after the no-unit check, which `2y3m` passes (third of four
+stages since #113; see the order above). It also presented these as standing limits rather than as
 regressions #42 introduced, and implied the decimal defect was new and Malay-only.
