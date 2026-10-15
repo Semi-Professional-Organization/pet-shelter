@@ -232,4 +232,51 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(computeAgeCategory(born, "2024-02-29")).toBe("puppy_kitten");
     });
   });
+
+  /**
+   * Ages `approximateBirthDate` refuses — falling through to the intake date — rather than misread.
+   * Kept in its own block, away from the spelling tests, so it stands apart from the vocabulary.
+   */
+  describe("approximateBirthDate refuses what it cannot read faithfully", () => {
+    const intake = "2026-06-12";
+
+    // A decimal, fraction or range beside the unit. The pattern reads the digits next to the unit,
+    // so these used to come out as the wrong whole number: `0,5 tahun` — a six-month kitten — as
+    // five years, `0,75 tahun` as seventy-five, `3-4 years` as four. The backfill refuses them too.
+    it.each([
+      "0.5 years", "1.5 months", "2.5 weeks",
+      "0,5 tahun", "0,75 tahun", "1.5 bulan", "1,5 minggu",
+      "1/2 tahun", "1 / 2 tahun", "0 , 5 years",
+      "3-4 years", "3–4 years", "18-24 months",
+      "1.5 years 3 months",
+    ])("refuses the fractional age %j", (age) => {
+      expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
+    });
+
+    // Only the number the unit reads counts. A decimal elsewhere — a weight — must not trigger it.
+    it.each([
+      ["2 years, 12.5 kg", "2024-06-12"],
+      ["12.5 kg 2 years", "2024-06-12"],
+    ])("reads %j despite a decimal elsewhere in it", (age, expected) => {
+      expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+    });
+
+    // Past the sixty-year ceiling the backfill enforces. An unbounded count was worse than wrong:
+    // `15000000 weeks` made `toISOString()` throw `RangeError`.
+    it.each(["61 years", "500 years", "721 months", "3131 weeks", "15000000 weeks", "12345678 wks"])(
+      "refuses the over-ceiling age %j",
+      (age) => {
+        expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
+      },
+    );
+
+    // The ceiling is inclusive, as the backfill's `> 60` refusal is.
+    it.each([
+      ["60 years", "1966-06-12"],
+      ["720 months", "1966-06-12"],
+      ["3130 weeks", "1966-06-17"],
+    ])("still derives %j, exactly at the ceiling", (age, expected) => {
+      expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+    });
+  });
 });
