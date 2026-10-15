@@ -98,6 +98,12 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       fixture's file order already is feed order. It is now a set derived from the fixture,
       with ordering left to the ordering tests, as its comment says. The table spec freezes the
       clock. All six scheduling mutants re-run and still killed.
+- [x] Round 14: seven findings, no correctness bug. One was refuted by a probe: removing the
+      fallback's sort fails two existing tests, which the comment now names. Fixed: the
+      named-row assertions, the instant and day as one pair, the six mutants tabulated in the
+      decision entry, and strikethrough claims reworded in past tense. Two declined. **The
+      review loop stops here**, for the reasons the decision entry states: test-only rounds,
+      no correctness finding, every rule mutant-pinned.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.

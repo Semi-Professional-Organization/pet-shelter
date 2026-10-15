@@ -339,9 +339,10 @@ Fixed:
 
 - `isScheduledForLater` now **requires** `today`. The default made the per-row call (the
   footgun round eight set out to remove) the easy one to write, so the compiler now refuses it.
-- ~~`getPublicBulletins` takes one instant per request.~~ **Reverted in round ten.** The query
-  path and the fallback path are mutually exclusive: the fallback runs only after the query
-  threw, so no response mixes their two days. I accepted the finding without checking that.
+- Round nine also made `getPublicBulletins` take one instant per request. **That was wrong,
+  and round ten reverted it.** The query path and the fallback path are mutually exclusive:
+  the fallback runs only after the query threw, so no response mixes their two days. I
+  accepted the finding without checking that.
 - A test now fails if "today" goes back into the per-row filter. Before it, reverting round
   eight's headline fix left the suite green. (Round ten rewrote it to check behaviour.)
 - Console spies are restored in the file's `afterEach`, so a failing assertion can no longer
@@ -353,10 +354,10 @@ Declined, with reasons:
   was the point: one call fails instead of every importer. In production the read logs that
   error and serves an empty feed, which is the contained outcome. A Node runtime without full
   ICU is not one this app supports.
-- ~~**The admin table's `today` is per render, so a server render and its hydration can
-  straddle midnight.**~~ Declined here, then **fixed in round ten**: under React 19 that
-  mismatch is a recoverable error that discards the server HTML, not a warning, and the fix was
-  one prop.
+- Round nine declined the finding that **the admin table computed `today` per render**, so a
+  server render and its hydration could straddle midnight. That decline was wrong, and round
+  ten fixed it: under React 19 the mismatch is a recoverable error that discards the server
+  HTML, not a warning, and the fix was one prop.
 - **Destroying versus releasing the seed's client has no effect before `pool.end()`**, and a
   ROLLBACK on a half-open connection could hang. The first point is true and harmless. The hang
   applies to every query in the script, not just ROLLBACK, and the operator can interrupt it.
@@ -415,24 +416,57 @@ Declined, with reasons:
 Round eleven's first review returned empty after one tool call. It was retried, per the lesson
 from round nine, and the retry found no correctness bug and three test gaps, all fixed. The
 table spec now has a boundary case (a notice dated the server's day is live, which kills a
-`>=` mutant). Its row is dated 2099, so its stated reason holds past 2030. ~~The fallback test
-pins the exact served list in feed order.~~ Corrected in round thirteen.
+`>=` mutant). Its row is dated 2099, so its stated reason holds past 2030. Round twelve also
+claimed the fallback test pinned the served list in feed order. It did not, and round thirteen
+corrects that.
 
-## Round thirteen: an assertion that claimed more than it tested
+## Rounds thirteen and fourteen: an assertion that claimed more than it tested
 
 Round twelve's "exact list in feed order" could not detect a broken sort, because the
 fixture's file order already *is* feed order. It also tied a scheduling test to the fixture's
 whole contents. The fallback test now derives its expected set from the fixture (every
 published row dated on or before the shelter's 12th) and compares it as a set. Extra or missing
-rows still fail it, and a launch notice added to the fixture does not. **Fallback ordering is
-covered by `sortBulletinsForFeed`'s own tests, not by this one**, and the comment beside the
-assertion now says so.
+rows still fail it, and a launch notice added to the fixture does not. It also names its two
+load-bearing rows outright (`bulletin-002` served, `bulletin-001` hidden), so it keeps its
+teeth if the fixture changes, and its clock instant and shelter day sit side by side as one
+pair. **Fallback ordering is covered by two other tests, not by this one**: "sorts pinned
+first, then newest, and applies the limit afterwards" and "breaks a same-day tie on the
+fixture path". A probe that removed the fallback's sort failed exactly those two, and the
+comment beside the assertion now names them.
 
-The table spec freezes the clock in 2026, so it stays discriminating even after the real
-clock passes 2099. All six scheduling mutants were re-run against the new assertions and all
-are still killed.
+The table spec freezes the clock in 2026, so a day the table computed for itself would be
+2026 even after the real clock passes 2099.
 
-Thirteen review rounds, 35 mutants killed. The review history above is the most useful thing in this
+All six scheduling mutants were re-run against the final assertions, and each failed its
+target test:
+
+| Mutant | Killed by |
+|---|---|
+| "today" computed per row in the fallback filter | the fallback test's call count |
+| date check inverted | the fallback test |
+| date check removed | the fallback test |
+| shelter zone swapped for UTC | the fallback test (`bulletin-002`) |
+| `>` replaced by `>=` | the table's boundary spec |
+| table computes its own day instead of the prop | two of the three table specs |
+
+Declined, with reasons:
+
+- **The test's oracle restates the rule it tests.** It does, for the derived set. That is why
+  the two named rows are asserted first, as facts independent of the rule.
+- **Freezing `Date` does not freeze a bare `Intl.DateTimeFormat#format()`**, which reads the
+  clock through an intrinsic. True. A mutant would have to reach the schedule module's private
+  formatter from the table, and the table imports only `isScheduledForLater`. That is not a
+  regression path worth a test.
+
+**Where the loop stopped, and why.** Rounds twelve to fourteen changed no product code. Each
+review found no correctness bug and a new angle on the same assertion, and each fix invited
+the opposite critique (pin the exact list, then don't tie it to the fixture). The loop ends at
+round fourteen on that basis: no product code changed, no correctness finding, and every
+scheduling rule has a named test that a recorded mutant fails. Round fourteen's own edits are
+comments, one test's assertions, and this entry. They are covered by the mutant re-run in the
+table above, not by a fifteenth review.
+
+Fourteen review rounds, 35 mutants killed. The review history above is the most useful thing in this
 entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
 took four attempts, and the seeding rule that one round reversed are each a pattern with its own
 lesson file.

@@ -1771,8 +1771,13 @@ describe("corrections from the ninth and tenth reviews", () => {
     // (dated the 12th) is live only if the day is the shelter's — a UTC day
     // would hide it — and bulletin-001 (the 14th) is scheduled either way.
     // Dropping, inverting or de-zoning the date check serves the wrong set.
+    // A pair: move one, move the other. The day is written out rather than
+    // derived with `shelterToday`, because deriving it would check the zone
+    // against itself.
+    const INSTANT = "2026-08-11T16:30:00.000Z";
+    const SHELTER_DAY = "2026-08-12";
     vi.useFakeTimers({ toFake: ["Date"] });
-    vi.setSystemTime(new Date("2026-08-11T16:30:00.000Z"));
+    vi.setSystemTime(new Date(INSTANT));
     const schedule = await import("@/lib/domain/bulletinSchedule");
     const today = vi.mocked(schedule.shelterToday);
     prismaMock.bulletin.findMany.mockRejectedValue(new Error("connection refused"));
@@ -1781,14 +1786,18 @@ describe("corrections from the ninth and tenth reviews", () => {
     today.mockClear();
 
     const ids = (await getPublicBulletins("all")).map((b) => b.id);
-    // Exactly the published fixture rows dated on or before the shelter's
-    // 12th, derived from the fixture so adding a launch notice does not break a
-    // scheduling test. Compared as a set: ordering is `sortBulletinsForFeed`'s,
-    // pinned by its own tests, and the fixture's file order already matches it.
+    // Named facts first, so the test keeps its teeth if the fixture changes:
+    // 002 is the row that tells the shelter's day from UTC, 001 the row a
+    // dropped date check would serve.
+    expect(ids).toContain("bulletin-002");
+    expect(ids).not.toContain("bulletin-001");
+    // Then exactly the published fixture rows dated on or before the shelter's
+    // day, derived so a new launch notice does not break a scheduling test.
+    // Compared as a set: fallback ordering is pinned by "sorts pinned first,
+    // then newest" and "breaks a same-day tie on the fixture path", above.
     const expected = (fixtureJson as { id: string; publishedAt: string; isPublished: boolean }[])
-      .filter((r) => r.isPublished && r.publishedAt <= "2026-08-12")
+      .filter((r) => r.isPublished && r.publishedAt <= SHELTER_DAY)
       .map((r) => r.id);
-    expect(expected).toContain("bulletin-002"); // the row that tells KL from UTC
     expect([...ids].sort()).toEqual([...expected].sort());
     // And "today" was asked once for the pass, not once per row: per row, a
     // pass crossing the shelter's midnight judges rows against different days.
