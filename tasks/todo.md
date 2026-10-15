@@ -91,6 +91,9 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       component test for the `today` prop, a fallback test that now separates the shelter's day
       from UTC, and a comment moved back to its line. Two mutants killed. Three declined with
       reasons in the decision entry. 34 mutants in all.
+- [x] Round 12: round 11's `low` review returned empty (one tool call) and was retried at
+      `medium`. No correctness bug. Three test gaps fixed: a boundary spec, a far-future row,
+      and an exact feed list. One `>=` mutant killed; 35 in all.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.

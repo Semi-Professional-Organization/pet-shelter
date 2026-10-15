@@ -1781,8 +1781,8 @@ describe("corrections from the ninth and tenth reviews", () => {
     today.mockClear();
 
     const ids = (await getPublicBulletins("all")).map((b) => b.id);
-    expect(ids).not.toContain("bulletin-001");
-    expect(ids).toEqual(expect.arrayContaining(["bulletin-002", "bulletin-003", "bulletin-004"]));
+    // Exactly these, in feed order: the pinned notice first, then newest.
+    expect(ids).toEqual(["bulletin-002", "bulletin-003", "bulletin-004"]);
     // And "today" was asked once for the pass, not once per row: per row, a
     // pass crossing the shelter's midnight judges rows against different days.
     // A clock cannot be made to cross midnight mid-pass, so the call count is

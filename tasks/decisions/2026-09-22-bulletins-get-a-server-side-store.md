@@ -410,7 +410,15 @@ Declined, with reasons:
 - **The call-count assertion depends on `startOfNextShelterDay` calling a module-local
   `shelterToday`.** True, and stated in the test beside the assertion.
 
-Eleven review rounds, 34 mutants killed. The review history above is the most useful thing in this
+## Round twelve: tests only
+
+Round eleven's first review returned empty after one tool call. It was retried, per the lesson
+from round nine, and the retry found no correctness bug and three test gaps, all fixed. The
+table spec now has a boundary case (a notice dated the server's day is live, which kills a
+`>=` mutant). Its row is dated 2099, so its stated reason holds past 2030. The fallback test
+pins the exact served list in feed order.
+
+Twelve review rounds, 35 mutants killed. The review history above is the most useful thing in this
 entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
 took four attempts, and the seeding rule that one round reversed are each a pattern with its own
 lesson file.

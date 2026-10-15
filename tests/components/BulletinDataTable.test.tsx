@@ -21,12 +21,12 @@ vi.mock("@/actions/bulletins", () => ({
  * day lets a server render and its hydration disagree across the shelter's
  * midnight, and under React 19 that discards the server HTML.
  *
- * The row is dated 2030, so any day computed from the real clock calls it
+ * The row is dated 2099, so any day computed from the real clock calls it
  * scheduled. Only a component that honours the prop can say it is live.
  */
 const ROW: BulletinRecord = {
   id: "bulletin-test-1",
-  title: "A notice dated 2030",
+  title: "A notice dated 2099",
   content: "Body",
   titleMs: null,
   contentMs: null,
@@ -38,20 +38,28 @@ const ROW: BulletinRecord = {
   isPinned: false,
   isPublished: true,
   authorName: "Shelter Team",
-  publishedAt: "2030-01-01",
+  publishedAt: "2099-01-01",
   createdAt: "2026-10-15T00:00:00.000Z",
   updatedAt: "2026-10-15T00:00:00.000Z",
 };
 
 describe("BulletinDataTable's scheduling day", () => {
   it("calls a notice live when the server's day has reached it", () => {
-    renderWithLanguage(<BulletinDataTable initialBulletins={[ROW]} today="2030-01-02" />);
+    renderWithLanguage(<BulletinDataTable initialBulletins={[ROW]} today="2099-01-02" />);
+    expect(screen.queryByText("Scheduled")).toBeNull();
+    expect(screen.getByText(/1 live · 0 scheduled/)).toBeTruthy();
+  });
+
+  it("calls a notice dated the server's day itself live", () => {
+    // The boundary: "scheduled" means strictly after today. A `>=` here would
+    // badge today's notice while the public feed is already serving it.
+    renderWithLanguage(<BulletinDataTable initialBulletins={[ROW]} today="2099-01-01" />);
     expect(screen.queryByText("Scheduled")).toBeNull();
     expect(screen.getByText(/1 live · 0 scheduled/)).toBeTruthy();
   });
 
   it("badges a notice scheduled when the server's day is before it", () => {
-    renderWithLanguage(<BulletinDataTable initialBulletins={[ROW]} today="2029-12-31" />);
+    renderWithLanguage(<BulletinDataTable initialBulletins={[ROW]} today="2098-12-31" />);
     expect(screen.getByText("Scheduled")).toBeTruthy();
     expect(screen.getByText(/0 live · 1 scheduled/)).toBeTruthy();
   });
