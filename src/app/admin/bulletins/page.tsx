@@ -5,6 +5,7 @@ import { getVerifiedSession } from "@/lib/security/dal";
 import { hasPermission } from "@/lib/security/rbac";
 import { PERMISSIONS } from "@/lib/security/permissions";
 import { listBulletinsAction } from "@/actions/bulletins";
+import { shelterToday } from "@/lib/domain/bulletinSchedule";
 import type { BulletinRecord } from "@/types/bulletin";
 
 export const dynamic = "force-dynamic";
@@ -101,7 +102,7 @@ export default async function AdminBulletinsPage() {
         </p>
       </div>
 
-      <BulletinDataTable initialBulletins={bulletins} />
+      <BulletinDataTable initialBulletins={bulletins} today={shelterToday()} />
     </div>
   );
 }

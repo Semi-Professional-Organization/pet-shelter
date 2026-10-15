@@ -336,16 +336,13 @@ export async function getPublicBulletins(
   targetPage: BulletinTargetPage = "all",
   limit?: number
 ): Promise<Bulletin[]> {
-  // One instant for the whole request, so the query's bound and the fixture
-  // path's "today" cannot straddle the shelter's midnight between them.
-  const now = new Date();
   try {
     const rows = await prisma.bulletin.findMany({
       where: {
         isPublished: true,
         // A future notice date schedules the notice; see
         // `@/lib/domain/bulletinSchedule` for why "today" is the shelter's day.
-        publishedAt: { lt: startOfNextShelterDay(now) },
+        publishedAt: { lt: startOfNextShelterDay() },
         targetPage:
           targetPage === "all"
             ? undefined
@@ -389,7 +386,9 @@ export async function getPublicBulletins(
   // Slice before projecting: `toBulletin` runs the URL allow-list, which builds
   // a `URL` per field, and there is no reason to do that for rows about to be
   // discarded. The query path already gets this right by pushing `take` down.
-  const today = shelterToday(now);
+  // Its own day, not the query's: this path runs only when the query threw, so
+  // no response ever mixes the two.
+  const today = shelterToday();
   const ordered = sortBulletinsForFeed(
     serverBulletins.filter(
       (b) =>

@@ -41,7 +41,7 @@ import {
 } from "@/lib/presentation/bulletinPresentation";
 import { BULLETIN_CATEGORIES, BulletinFormInput } from "@/lib/validations/bulletin";
 import { BulletinRecord } from "@/types/bulletin";
-import { isScheduledForLater, shelterToday } from "@/lib/domain/bulletinSchedule";
+import { isScheduledForLater } from "@/lib/domain/bulletinSchedule";
 import { cn } from "@/lib/utils";
 
 type CategoryFilter = (typeof BULLETIN_CATEGORIES)[number] | "all";
@@ -85,6 +85,13 @@ function matches(bulletin: BulletinRecord, query: string): boolean {
 
 interface BulletinDataTableProps {
   initialBulletins: BulletinRecord[];
+  /**
+   * The shelter's day, `YYYY-MM-DD`, computed once by the server page. A prop
+   * rather than computed here, so the server render and its hydration judge
+   * "Scheduled" against the same day even across the shelter's midnight; a
+   * mismatch there is a recoverable error that discards the server HTML.
+   */
+  today: string;
 }
 
 /**
@@ -101,7 +108,7 @@ interface BulletinDataTableProps {
  * client-side optimistic copy, so the table cannot disagree with the database
  * about what is published — which is precisely the failure the old store had.
  */
-export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) {
+export function BulletinDataTable({ initialBulletins, today }: BulletinDataTableProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -162,14 +169,11 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
     [bulletins, category, published, search]
   );
 
-  // One "today" for the whole render, shared by the count and every row's badge,
-  // so the two cannot disagree across the shelter's midnight.
-  // ceiling: computed per render, so a server render and its hydration that
-  // straddle midnight disagree (a React hydration warning), and an idle tab keeps
-  // last night's badges until anything re-renders it. Admin-only and cosmetic —
-  // what the public sees is the server's query. Tick it on a timer if staff ever
-  // rely on the badge at midnight.
-  const today = shelterToday();
+  // `today` (a prop) is shared by the count and every row's badge, so the two
+  // cannot disagree. ceiling: it is the day the page was served, so a tab left
+  // open past the shelter's midnight keeps last night's badges until the next
+  // write or reload refreshes it. Admin-only; the public feed is the server's
+  // query. Tick it on a timer if staff ever rely on the badge at midnight.
   const publishedCount = bulletins.filter((b) => b.isPublished).length;
   // Published but dated in the future: on no public feed yet. Counted apart so
   // "published" in the summary line means what a visitor can actually see.

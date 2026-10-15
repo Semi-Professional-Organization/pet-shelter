@@ -69,15 +69,11 @@ const prismaMock = vi.hoisted(() => {
 
 vi.mock("@/lib/server/prisma", () => ({ prisma: prismaMock }));
 
-// The real schedule functions, wrapped so a test can see how often and with
-// what the repository asks for "today". Behaviour is unchanged.
+// The real `shelterToday`, wrapped so a test can count how often the repository
+// asks for "today". Behaviour is unchanged.
 vi.mock("@/lib/domain/bulletinSchedule", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/domain/bulletinSchedule")>();
-  return {
-    ...actual,
-    shelterToday: vi.fn(actual.shelterToday),
-    startOfNextShelterDay: vi.fn(actual.startOfNextShelterDay),
-  };
+  return { ...actual, shelterToday: vi.fn(actual.shelterToday) };
 });
 
 const sessionMock = vi.hoisted(() => ({ getCurrentSession: vi.fn() }));
@@ -1765,25 +1761,32 @@ describe("corrections from the sixth review", () => {
   });
 });
 
-describe("corrections from the ninth review", () => {
-  it("judges a fallback pass against one shelter day, the query's own", async () => {
-    // Round eight hoisted "today" out of the per-row filter, and nothing failed
-    // if it went back in. Per row is N calls and, across the shelter's midnight,
-    // N possibly different days. And the day must come from the same instant
-    // the query's bound used, or one request straddles midnight between them.
+describe("corrections from the ninth and tenth reviews", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("hides a future-dated notice on the fallback path, judging one day per pass", async () => {
+    // 16:30 UTC on the 12th is the 13th in Kuala Lumpur, so bulletin-001
+    // (dated the 14th) is scheduled and the other three are live. Dropping or
+    // inverting the date check serves the wrong set.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-08-12T16:30:00.000Z"));
     const schedule = await import("@/lib/domain/bulletinSchedule");
     const today = vi.mocked(schedule.shelterToday);
-    const nextDay = vi.mocked(schedule.startOfNextShelterDay);
     prismaMock.bulletin.findMany.mockRejectedValue(new Error("connection refused"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
     today.mockClear();
-    nextDay.mockClear();
 
-    const served = await getPublicBulletins("all");
-    expect(served.length).toBeGreaterThan(1); // a real multi-row pass
+    const ids = (await getPublicBulletins("all")).map((b) => b.id);
+    expect(ids).not.toContain("bulletin-001");
+    expect(ids).toEqual(expect.arrayContaining(["bulletin-002", "bulletin-003", "bulletin-004"]));
+    // And "today" was asked once for the pass, not once per row: per row, a
+    // pass crossing the shelter's midnight judges rows against different days.
+    // A clock cannot be made to cross midnight mid-pass, so the call count is
+    // the observable stand-in. It counts only calls through the export, which
+    // the repository makes; `startOfNextShelterDay` calls its module-local copy.
     expect(today).toHaveBeenCalledTimes(1);
-    expect(nextDay).toHaveBeenCalledTimes(1);
-    expect(today.mock.calls[0][0]).toBe(nextDay.mock.calls[0][0]);
   });
 });
