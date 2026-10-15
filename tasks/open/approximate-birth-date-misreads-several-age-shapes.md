@@ -12,9 +12,9 @@ and agree.
 **Where it reaches today.** Since #94 the pet form collects a birthday directly, so this function
 runs only for a record with no `birthDate`: chiefly a pet saved to browser `localStorage` before
 #94, on first render. That is narrow, and widens the moment the known `petStore.ts` mount-effect
-defect is fixed. It also matters as a reference: at the time of writing, open PR #113 would have
-the contract rehearsal import this function and compare the backfill against it, so if #113
-merges, every wrong answer here becomes a wrong answer from that harness's oracle.
+defect is fixed. It also matters as a reference: since PR #113 merged on 2026-10-15, the
+contract rehearsal imports this function and compares the backfill against it, so every wrong
+answer here is a wrong answer from that harness's oracle.
 
 ## Regressions PR #42 introduced
 
@@ -71,14 +71,23 @@ from reading as months.
   derived" exception, not the "fractional" one. The trap is already a lesson:
   `tasks/lessons/2026-09-22-a-regex-that-finds-a-number-beside-a-unit-does-not-find-the-number.md`.
 
+  **"Fixable in the app alone" turned out to be wrong for this one.** PR #119 tried refusing these
+  in the app and withdrew it: this function must return a date, so a refusal is the intake date,
+  which shows a newborn. `3-4 years` went from four years to a newborn, and a list such as
+  `Born 2022, 3 yrs` was caught too. The decision, and what would let it be reversed (an "age
+  unknown" result), is `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`,
+  which arrives with #119.
+
 - **An unbounded count crashes it.** `15000000 weeks` throws `RangeError: Invalid time value`;
-  `12345678 wks` returns `-234583-03-21`. A cap mirroring the backfill's sixty years / 720 months
-  (about 3,130 weeks) closes all three branches.
+  `12345678 wks` returns `-234583-03-21`. **Addressed by PR #119 if it merges**, though not with
+  the sixty-year cap suggested here. A cap turned `61 years` from a senior into a newborn, and was
+  withdrawn. Instead an overflowing date clamps to the earliest date a `Date` holds, and every
+  input that did not throw reads as before.
 
 - **The return type can lie** — confirmed with `tsc`, since no runtime probe sees a type.
   `withDerivedAge({ …, birthDateIsEstimate: false })` with no `birthDate` is typed `false` but
-  returns `true`; an explicitly `undefined` flag collapses the result to `never`. Fix:
-  `Omit<T, 'birthDate' | 'birthDateIsEstimate' | 'age' | 'ageCategory'> & { … }`.
+  returns `true`; an explicitly `undefined` flag collapses the result to `never`. **Fixed by PR
+  #119 if it merges**, with exactly this `Omit<…> & { … }` signature and two `expectTypeOf` tests.
 
 - **Three copies of the estimate rule disagree** on a row with `birthDate: ''` — which satisfies
   `NOT NULL` — **and a stored `birthDateIsEstimate: false`**. Then `withDerivedAge` and
@@ -94,13 +103,14 @@ year (2025-06-12). The backfill reads English units only, skips `tahun`, finds `
 **stores** six months (2025-12-12) — no refusal, because the string has a unit it reads and is not
 fractional. `2 tahun 3 months` does the same. Confirmed against a real Postgres (pglite) in an
 earlier review and again with the pattern emulator. The expand migration on `master` is queued for
-an owner to apply, so this is a silent wrong write waiting to happen. Open PR #113 closes it by
-refusing any age that contains a unit the backfill does not read; until #113 lands, an age mixing
-Malay and English units is the one case where the backfill does *not* fail closed.
+an owner to apply, so this was a silent wrong write waiting to happen. **Closed by PR #113,
+merged 2026-10-15:** the backfill now refuses any age containing a unit it does not read,
+anywhere in the string
+(`tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`).
 
-**Settles when:** the defects above are fixed and pinned by tests — after open PR #113 lands or is
-withdrawn, since it also edits `petAge.ts` — and the mixed-language case is closed, by #113 or
-otherwise, before the expand migration is applied.
+**Settles when:** the remaining defects are fixed and pinned by tests: the compact compounds and
+unlisted spellings, decimals and ranges (which need an "age unknown" result first), and the
+estimate-rule copies. The unbounded count and the return type are settled when #119 merges.
 
 ## Correction
 
