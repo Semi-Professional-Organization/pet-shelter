@@ -15,6 +15,7 @@ two checkouts, within ninety minutes on 2026-09-22; run 7 is three weeks later:
 | 5 | branch tree merged with `origin/master` after #88 | `8 failed \| 90 passed` · `8 failed (1582)` |
 | 6 | **the same merged tree as run 5, four commits of prose later** | `98 passed (98)` · `1582 passed (1582)` |
 | 7 | 2026-10-13, branch off `master` `e99ebf8` + a three-line repository fix | **`59 failed \| 40 passed (99)`** · `77 failed (1589)` |
+| 8 | 2026-10-14, the #77/#78/#80 branch merged with `master` `e99ebf8` | `16 failed \| 84 passed (100)` · `17 failed (1593)` |
 
 **Run 7 is the worst by a wide margin, and it spread to a second project.** The same tree's
 component suite, which gave `170 passed (170)` on 2026-09-22, gave `3 failed | 8 passed` ·
@@ -190,6 +191,38 @@ second is the more worrying of the two — it means a local run can be red on a 
 so neither environment can be trusted alone. Not diagnosed; `resolveDatabaseSsl` and
 `resolveDatabaseUrl` failures in run 7 point the same way, since both read env the runner sets
 differently.
+
+## Run 8 confirms the components spread, and that the repro still holds there
+
+Run 7 found the component suite affected but did not re-run its failures together. Run 8 did, on a
+different tree and day, and the isolation repro behaves exactly as it does for the unit project:
+
+- `npx vitest run --project components` → **`10 failed | 3 passed (13)`** · `12 failed (195)`.
+  One failure per file across ten unrelated files: `AdminLoginPage`, `AdoptionForm`,
+  `DonationDeepLink`, `DonationReceiptIntegrity`, `home`, `homeMalay`, `PetCard`,
+  `PetChooserCarousel`, `SponsorshipModal`, `usePetGalleryController`.
+- **The same ten files, re-run together: `10 passed (10)` · `168 passed (168)`.**
+- Unit, same tree: `16 failed | 84 passed`; **those sixteen files alone: `369 passed (369)`.**
+
+**Every one of run 8's 29 failures was a timeout, and not one was an assertion.** Applying the
+`AssertionError` triage rule above to the captured output:
+
+| Tier | Failures | `AssertionError` | `Hook timed out in 10000ms` | `Test timed out in 20000ms` |
+|---|---|---|---|---|
+| unit | 17 | 0 | 17 — one shared block, `tests/setup/nextMocks.ts:284` | 0 |
+| components | 12 | 0 | 10 — one shared block | 2 |
+
+Read the counts off the *test* list, not the error blocks: Vitest prints identical failures once,
+beneath every test that hit them, so `grep -c "timed out"` counts blocks. An earlier version of this
+section made exactly that mistake and reported "three of the twelve component failures" as hook
+timeouts, which understated the mechanism's reach and wrongly implied an assertion-shaped remainder.
+There is no remainder in this run.
+
+Two consequences for job 1 below. Setting `hookTimeout` for the components project would clear 10
+of its 12, not all of them: the other two are test *bodies* overrunning the 20s `testTimeout`
+under the same load, so the fix there is load, not a setting. And `npm run test:all` runs all three
+projects in one invocation — the most loaded schedule this repo has, and the command the close-out
+asks for.
 
 **Settles when:** all three are addressed, and they are probably three jobs rather than one:
 

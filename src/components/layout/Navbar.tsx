@@ -23,7 +23,7 @@ import { ThemeToggle } from "@/components/providers/ThemeToggle";
 import { LanguageToggle } from "@/components/providers/LanguageToggle";
 import { PetMatchQuiz } from "@/components/features/pets/PetMatchQuiz";
 import { SponsorshipModal } from "@/components/features/pets/SponsorshipModal";
-import { useLanguage } from "@/components/providers/LanguageProvider";
+import { useTypedTranslation } from "@/components/providers/LanguageProvider";
 import {
   Sheet,
   SheetContent,
@@ -34,7 +34,7 @@ import {
 
 export function Navbar() {
   const pathname = usePathname();
-  const { isMs } = useLanguage();
+  const { isMs, t } = useTypedTranslation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [isSponsorshipOpen, setIsSponsorshipOpen] = useState(false);
@@ -52,7 +52,10 @@ export function Navbar() {
     {
       href: "/#how-it-works",
       label: isMs ? "Proses & Syarat Adopsi" : "Adoption Process & Criteria",
-      desc: isMs ? "Panduan 4-langkah adopsi percuma 100%" : "Step-by-step 100% free adoption guide",
+      // "3-langkah", not "4-langkah": `HomeProcessSection` renders steps 01-03.
+      // The link pointed at an unrendered anchor until 2026-09-22, so the
+      // mismatch was invisible — restoring the destination is what exposed it.
+      desc: isMs ? "Panduan 3-langkah adopsi percuma 100%" : "Step-by-step 100% free adoption guide",
       icon: Sparkles,
     },
     {
@@ -66,7 +69,7 @@ export function Navbar() {
   const getInvolvedLinks = [
     {
       href: "/sponsors",
-      label: isMs ? "Dinding Penaja Awam" : "Public Sponsor Wall",
+      label: t("nav.sponsorWall"),
       desc: isMs
         ? "Penyokong Gangsa, Perak & Emas kami"
         : "Our Bronze, Silver & Gold supporters",
@@ -111,6 +114,15 @@ export function Navbar() {
               <span className="font-heading text-base sm:text-lg font-bold tracking-tight text-foreground leading-tight">
                 Hope for Strays <span className="text-primary text-xs font-bold uppercase tracking-wider">UM</span>
               </span>
+              {/*
+                The English here is verbatim the hero's `<h1>`, while the Malay
+                is a shortened form — one string in two places, translated
+                twice, differently. Shortening the English to match was tried
+                and reverted: it dropped "& Education", one of the three
+                pillars this org names in `HomeOurWorkSection`, which is a
+                content decision rather than a deduplication. Tracked in
+                `tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`.
+              */}
               <span className="text-3xs text-muted-foreground font-medium uppercase tracking-wider hidden sm:block">
                 {isMs ? "Kewujudan Bersama melalui TNRM" : "Coexistence through TNRM & Education"}
               </span>
@@ -145,7 +157,7 @@ export function Navbar() {
                 aria-expanded={openDropdown === "adoption"}
                 onClick={() => setOpenDropdown((prev) => (prev === "adoption" ? null : "adoption"))}
                 className={`inline-flex items-center gap-1 text-sm font-semibold transition-colors hover:text-foreground cursor-pointer ${
-                  pathname.startsWith("/applications") || pathname === "/#how-it-works"
+                  pathname.startsWith("/applications")
                     ? "text-foreground font-bold"
                     : "text-muted-foreground"
                 }`}
@@ -379,7 +391,7 @@ export function Navbar() {
                       onClick={() => setIsMobileOpen(false)}
                       className="block text-sm font-bold py-2 hover:text-primary transition-colors"
                     >
-                      📰 {isMs ? "Berita & Buletin" : "Updates & News"}
+                      📰 {t("nav.bulletins")}
                     </Link>
                   </div>
 

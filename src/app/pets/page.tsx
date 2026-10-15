@@ -79,7 +79,7 @@ export default async function PetsDirectoryPage() {
       <section className="w-full px-6 sm:px-8 lg:px-12 pt-10 border-t border-border mt-10">
         <BulletinFeed
           bulletins={bulletins}
-          title="Adoption Notices & Clinic Updates"
+          titleKey="bulletins.petsFeedTitle"
           compact={true}
         />
       </section>
