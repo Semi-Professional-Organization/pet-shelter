@@ -329,7 +329,39 @@ crosses the shelter's midnight cannot badge a notice scheduled while counting it
 Declined: decoupling the log-once flag from `resetBulletins`. That reset is test-only, and clearing
 the flag there is what stops one test's warning from silencing the next.
 
-Eight review rounds, 29 mutants killed. The review history above is the most useful thing in this
+## Round nine: round eight's fixes, reviewed properly
+
+The first review of round eight's fixes returned nothing after one tool call, and the hand
+review that stood in for it found nothing. Retried, it found seven. That gap is
+`tasks/lessons/2026-10-15-an-empty-review-is-a-review-that-did-not-run.md`.
+
+Fixed:
+
+- `isScheduledForLater` now **requires** `today`. The default made the per-row call (the
+  footgun round eight set out to remove) the easy one to write, so the compiler now refuses it.
+- `getPublicBulletins` takes one instant per request. The query's bound and the fallback's
+  "today" both come from it, so one request cannot straddle the shelter's midnight between them.
+- A test now fails if "today" goes back into the per-row filter or the fallback takes a second
+  instant. Before it, reverting round eight's headline fix left the suite green. Three mutants
+  killed.
+- Console spies are restored in the file's `afterEach`, so a failing assertion can no longer
+  leave `console` muted for the rest of the file.
+
+Declined, with reasons:
+
+- **The lazily built formatter "only moves" a missing-zone `RangeError`.** True, and the move
+  was the point: one call fails instead of every importer. In production the read logs that
+  error and serves an empty feed, which is the contained outcome. A Node runtime without full
+  ICU is not one this app supports.
+- **The admin table's `today` is per render, so a server render and its hydration can straddle
+  midnight.** Marked with a `ceiling:` comment instead. It is admin-only and cosmetic, and any
+  re-render clears it. Ticking on a timer is the upgrade if staff ever rely on the badge at
+  midnight.
+- **Destroying versus releasing the seed's client has no effect before `pool.end()`**, and a
+  ROLLBACK on a half-open connection could hang. The first point is true and harmless. The hang
+  applies to every query in the script, not just ROLLBACK, and the operator can interrupt it.
+
+Nine review rounds, 32 mutants killed. The review history above is the most useful thing in this
 entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
 took four attempts, and the seeding rule that one round reversed are each a pattern with its own
 lesson file.

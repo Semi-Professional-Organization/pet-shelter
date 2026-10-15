@@ -75,6 +75,12 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       rollback path was proven on embedded Postgres: a CHECK constraint rejecting the second
       fixture row made the script exit 1 with the constraint's own message, the table held 0 rows
       afterwards, and a clean re-run seeded all four.
+- [x] Round 9, 2026-10-15: the review above found nothing because it was mine. Retried at
+      `medium`, the forked `/code-review` found seven. Four fixed: `today` is required, one
+      instant per request, a test that kills three mutants of round eight's fix (none had
+      existed), and console spies restored on failure. Three declined with reasons in the
+      decision entry. Lesson:
+      `tasks/lessons/2026-10-15-an-empty-review-is-a-review-that-did-not-run.md`.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.
