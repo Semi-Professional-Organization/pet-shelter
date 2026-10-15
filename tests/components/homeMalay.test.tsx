@@ -182,7 +182,12 @@ describe("BulletinFeed on the Malay site", () => {
       language,
     });
 
+    // No links either: a staff control does not have to be a button, and a
+    // review showed an "Edit notices" link passed this case when it checked
+    // buttons only. The feed renders no link of any kind today, so any link is
+    // new and worth a look.
     expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
     expect(screen.queryByText(/Staff Admin Access|Akses Pentadbir Kakitangan/)).not.toBeInTheDocument();
   });
 
