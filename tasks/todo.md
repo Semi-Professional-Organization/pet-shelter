@@ -25,47 +25,44 @@ Record active multi-step work streams below.
 
 - [x] `approximateBirthDate` no longer throws. A count whose date leaves the `Date` range
       (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`, uncaught by
-      every caller. It now clamps to the earliest date a `Date` holds (`-271821-04-20`), so a
-      larger age is always older. An out-of-range intake is returned as given, as for an age with
-      no unit.
-- [x] `setUTCFullYear` instead of `Date.UTC`, which read years 0–99 as 1900–1999
-      (`2000 years` came out in 1926).
+      every caller. It now clamps to the earliest date a `Date` holds (`-271821-04-20`), older
+      than any age that fits. An out-of-range intake is returned as given, as for an age with no
+      unit.
 - [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
       `expectTypeOf` tests that fail `tsc` on the old signature.
 - [x] Tried and **withdrawn** after review, all for one reason: a refusal here is the intake
       date, which shows a newborn. They were a fractional/range refusal (`3-4 years` went
       from four years to newborn), a sixty-year ceiling (`61 years` went from senior to
-      newborn), and an overflow guard sending `15000000 weeks` to the intake date. An ISO
-      fall-through was also dropped, because it turned `26-06-12` into 1926. See the decision
-      and lesson.
+      newborn), and an overflow guard sending `15000000 weeks` to the intake date. Also dropped:
+      an ISO fall-through, and `setUTCFullYear` in place of `Date.UTC`, which turned a two-digit
+      intake (`26-06-12`) into 26 AD. See the decision and lesson.
 
 ## Review
 
-- `/code-review high`, four rounds: 9, 7, 8 and 8 findings, each probed. Round four made the
-  arithmetic run before the range check. A fifth round covers the final diff; see the PR.
-- Corpus: 66 inputs, master against this branch: 1 moved (`15000000 weeks`, which threw), 65
-  byte-identical, including every string PR #113's rehearsal pins.
-- Grid: 425 age × intake pairs: 272 identical, 81 master threw on, 72 differ, all with an intake
-  or derived year from 0 to 99 (the century fix). The branch throws on none.
-- The overflow and century cases fail against master's parser by name; the suite passes under
-  UTC-8 and UTC+14 too.
-- Merge-tree dry runs clean against `origin/master` and against PR #113's branch `38a7156`;
-  #113's harness feeds only ISO intakes and in-range ages, so its comparisons do not move.
-- Gates: tsc, eslint (changed files), docs:check, unit 1619, components 177, integration 92,
-  build exit 0.
+- `/code-review high`, five rounds: 9, 7, 8, 8 and 8 findings, each probed; round five dropped
+  the century change. The final diff after round five has not had a sixth review (see the PR).
+- Grid: 425 age × intake pairs, master against the branch: 344 identical, 81 where master threw,
+  0 other. Every input master read without throwing reads the same, including every string PR
+  #113's rehearsal pins.
+- Discriminating tests (fail on master by name): the four overflow clamps, the end-to-end
+  `senior` check, and the out-of-range intake. The rest of that block are guards that pass on
+  master by design.
+- The petAge suite passes at UTC-8, with `TZ` set in PowerShell and the offset confirmed as 480 in
+  the same shell. (Node ignores `TZ` set from Git Bash on this machine.)
+- Gates and merge check: see the PR, which records them on the final merged tree.
 
 **Deliberately not done.**
 - Fractional and ranged ages still misread (`0,5 tahun` gives five years). Fixing them needs an
   "unknown age" path first; see the decision.
 - A non-ISO intake (`2026/06/12`) still leaks into `birthDate` unconverted on the fall-through.
-  It is pre-existing, and the obvious fix turned `26-06-12` into 1926.
+  It is pre-existing, and the obvious fix threw on an out-of-range intake for every age.
+- `Date.UTC` still reads years 0–99 as 1900–1999 (`2000 years` gives 1926). Fixing it alone
+  moved two-digit intakes to 26 AD; it needs `isoDateSchema` and the intake format settled too.
 - Compact compounds (`2y3m`) and unlisted spellings (`6 mons`): tied to how the backfill's
   fractional check is narrowed (`expand-refuses-compound-ages-written-in-short-units.md`).
 - Three copies of the estimate rule: latent, no writer produces `''`.
 - Distributive return type for a union-typed pet: needs an `as` cast and no caller passes a
   union.
-- `isoDateSchema` still uses `Date.UTC` (`transparency.ts` has the fix). A year from 0 to 99
-  already fails the form's sixty-year rule first, so it cannot be reached from the form.
 - The `approximateBirthDate` docstring still explains rollover with `Date.UTC(2023, 1, 29)`.
   That is still true of JavaScript, and PR #113 is editing that docstring.
 - The decision cites an open entry that arrives with PR #114.

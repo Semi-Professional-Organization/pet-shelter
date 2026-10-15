@@ -276,13 +276,12 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
     });
 
-    // `Date.UTC` read a year argument of 0–99 as 1900–1999, so `2000 years` came out younger than
-    // `1900`. On the months path that argument is the intake year, so an early intake moved too.
+    // `Date.UTC` reads a year of 0–99 as 1900–1999, and that stays: "fixing" it turned a
+    // hand-typed two-digit intake into 26 AD and handed the form dates its validator rejects.
     it.each([
-      ["2000 years", intake, "0026-06-12"],
-      ["1990 years", intake, "0036-06-12"],
-      ["700 months", "0050-03-01", "-000009-11-01"],
-    ])("keeps %j from %j in the right century", (age, from, expected) => {
+      ["3 months", "26-06-12", "1926-03-12"],
+      ["2000 years", intake, "1926-06-12"],
+    ])("keeps %j from %j where master read it", (age, from, expected) => {
       expect(approximateBirthDate(age, from).birthDate).toBe(expected);
     });
   });

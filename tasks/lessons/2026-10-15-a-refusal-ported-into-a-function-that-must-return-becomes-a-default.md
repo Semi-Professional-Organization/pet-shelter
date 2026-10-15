@@ -15,8 +15,9 @@ the change was withdrawn
 Then it happened twice more on the same branch, after this lesson was drafted. A sixty-year
 ceiling copied from the same backfill turned `61 years` from a senior into a newborn. Its
 replacement, an overflow guard, sent `15000000 weeks` to the intake date too. Each took another
-review round to see. The fix that held clamps to the limit of the existing behaviour (the
-earliest representable date) instead of introducing a default.
+review round to see. The fix that held clamps an age-side overflow to the limit of the existing
+behaviour (the earliest representable date). Only an intake that is itself out of range still
+gets a default, the intake as given, because there is nothing in range to clamp it to.
 
 **Rule:** before copying "refuse" from one layer to another, write down what refusing *does* in
 the target, meaning the value a caller actually receives. If that value is a default that looks

@@ -27,22 +27,26 @@ trade: `61 years`, probably a typo for `16`, had read as a senior and now read a
 What shipped guards only the case that was actually broken. A count whose date leaves the range
 a `Date` can hold (`15000000 weeks`) threw `RangeError`. A third review rejected sending that to
 the intake date as well, because then `15000000 weeks` read as a newborn while `12345678 wks`
-read as senior. It is now clamped to the earliest date a `Date` holds (`-271821-04-20`), so a
-larger age is always older. Dates are built with `setUTCFullYear`, because `Date.UTC` put
-`2000 years` in 1926.
+read as senior. It is now clamped to the earliest date a `Date` holds (`-271821-04-20`), which is
+older than any age that fits.
 
-Measured on a 425-pair grid of ages and intakes, master against the branch: 272 identical, 81
-where master threw, and 72 that differ. Every one of the 72 has an intake year or a derived
-year from 0 to 99, so it is the century fix. No pair that master read without throwing and that
-stays in four-digit years moved.
+**Two more changes were dropped.** One built the fall-through from the parsed intake, so that a
+non-ISO intake came back as ISO. It threw on an out-of-range intake for every age. The other
+swapped `Date.UTC` for `setUTCFullYear`, because `Date.UTC` puts `2000 years` in 1926. A fifth
+review showed that it also turned a hand-typed two-digit intake (`26-06-12`) from 1926 into
+26 AD. It also put year-0026 dates into the pet form, where `isoDateSchema`, still on
+`Date.UTC`, rejects them as "not a real calendar day". Both quirks predate this branch.
 
-The clamped date (`-271821-04-20`), like master's own readings of such ages (`1926-06-12`,
-`-234583-03-21`), cannot be saved through the pet form, which refuses a birth date more than
-sixty years ago. Opening such a pet to edit asks the operator for a real date. On master the
-same pet threw before the page rendered. A third change, building the fall-through from the parsed
-intake so that a non-ISO intake comes back as ISO, was dropped too. It turned `26-06-12` into
-1926, and it threw on an out-of-range intake for every age. That leak predates this branch and
-is noted in the open entry below.
+Measured on a 425-pair grid of ages and intakes, master against the branch: 344 identical, 81
+where master threw, and none that differ otherwise. Every input master read without throwing
+reads the same here.
+
+What remains new is the date an overflow now gets. A clamped age, `-271821-04-20`, is not a
+`YYYY-MM-DD` value, so the edit form's date field shows blank and saving asks for a birth date.
+An out-of-range intake (`300000-01-01`) comes back as given, as master already did for an age
+with no unit, and reads as a newborn, the default this entry warns against. It is kept only
+because there is no in-range answer to clamp to. On master both pets threw before the page
+rendered.
 
 **What would let this be reversed.** A way for the function, or its callers, to say *unknown*
 rather than *newborn*: for example, returning no birth date and having the read path show

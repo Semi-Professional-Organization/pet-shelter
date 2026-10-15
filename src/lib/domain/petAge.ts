@@ -179,15 +179,16 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 
 /**
  * UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string — or `null` when the
- * result lies outside the range a `Date` can hold. `setUTCFullYear` rather than `Date.UTC`,
- * because `Date.UTC` reads a year argument of 0–99 as 1900–1999: `2000 years` before 2026 landed
- * in 1926, younger than `1900 years`. The argument is the derived year on the years path but the
- * intake year on the months and weeks paths, so both an intake and a result in years 0–99 now read
- * correctly. Identical whenever both are from year 100 on.
+ * result lies outside the range a `Date` can hold.
+ *
+ * `Date.UTC` reads a year argument of 0–99 as 1900–1999, so `2000 years` before 2026 lands in
+ * 1926. That is left alone deliberately. Replacing it with `setUTCFullYear` was tried and
+ * withdrawn: it fixed only junk ages, and it turned a hand-typed two-digit intake (`26-06-12`)
+ * from 1926 into 26 AD, and put year-0026 dates into the pet form, whose `isoDateSchema` still
+ * has the `Date.UTC` reading and calls them "not a real calendar day".
  */
 function isoDate(year: number, month: number, day: number): string | null {
-  const d = new Date(0);
-  d.setUTCFullYear(year, month, day);
+  const d = new Date(Date.UTC(year, month, day));
   return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
 }
 
@@ -198,9 +199,12 @@ function isoDate(year: number, month: number, day: number): string | null {
  *
  * ceiling: no plausibility check at all, deliberately. `61 years` or `15000000 weeks` is junk, but
  * the only other answer this function can give is the intake date, which shows the animal as a
- * newborn — so clamping keeps "a larger age is older", and the upgrade path is an "age unknown"
- * result the read path can show. Why:
+ * newborn. Clamping keeps an overflowing age older than any age that fits, and the upgrade path is
+ * an "age unknown" result the read path can show. Why:
  * `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`.
+ * Also known: an extended-year string such as this one does not split as `YYYY-MM-DD`, so
+ * `parseDateParts` reads it in local time and can land a day early west of UTC. That was already
+ * true of the in-range junk readings (`12345678 wks` gives `-234583-03-21`).
  */
 const EARLIEST_DATE = new Date(-8.64e15).toISOString().split("T")[0];
 
