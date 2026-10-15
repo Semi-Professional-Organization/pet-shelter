@@ -55,9 +55,12 @@ What remains new is only the date an overflow gets where master threw:
   answer to clamp to. A derived date that fits is returned as computed, as on master, and with
   such an intake that can itself be a future date (`250000 years` before `300000-01-01`).
 
-On master both threw. The throw did not crash the page: the pet repository caught it as a
-database outage and served the demo pets in place of the catalogue. That mechanism outlives
-this change, and is recorded in `tasks/open/a-pet-mapping-error-is-handled-as-a-database-outage.md`.
+On master both threw. **Where that could happen:** only for a legacy pet with an `age` and no
+`birthDate`. The `pets` table has no `age` column, so a database row never reaches this
+function. In practice that means a browser's `localStorage` copy, loaded by `usePetStore`. There
+the throw was caught, and that browser silently dropped its saved pets for the fixtures. Now the
+pet stays, and every read path shows the clamped date as an age of `273847 years` (senior). That
+is visibly absurd, which is the point: it is junk shown as junk, not hidden.
 
 **What would let this be reversed.** A way for the function, or its callers, to say *unknown*
 rather than *newborn*: for example, returning no birth date and having the read path show

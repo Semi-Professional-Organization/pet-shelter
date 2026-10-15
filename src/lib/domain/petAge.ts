@@ -196,9 +196,10 @@ function isoDate(year: number, month: number, day: number): string | null {
 
 /**
  * The earliest date a `Date` can hold. An age so large that its birth date would be earlier still
- * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError`. The pet
- * repository catches that throw as if the database were down and silently serves the demo pets
- * in place of the whole catalogue: `tasks/open/a-pet-mapping-error-is-handled-as-a-database-outage.md`.
+ * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError`. Only a legacy
+ * pet with an `age` and no `birthDate` reaches this function — the `pets` table has no `age`
+ * column, so in practice a browser's `localStorage` copy in `usePetStore`, where the throw made
+ * that browser drop its saved pets for the fixtures. Now such a pet shows as `273847 years`.
  *
  * ceiling: no plausibility check at all, deliberately. `61 years` or `15000000 weeks` is junk, but
  * the only other answer this function can give is the intake date, which shows the animal as a

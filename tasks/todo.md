@@ -24,9 +24,10 @@ Record active multi-step work streams below.
 ## Items
 
 - [x] `approximateBirthDate` no longer throws. A count whose date leaves the `Date` range
-      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. The repository
-      caught that as a database outage and served the demo pets. It now clamps to the earliest
-      date a `Date` holds (`-271821-04-20`), older than any age that fits. When the intake is out
+      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. Reachable only
+      from a browser's `localStorage` copy (the `pets` table has no `age`), where it dropped that
+      browser's saved pets for the fixtures. It now clamps to the earliest date a `Date` holds
+      (`-271821-04-20`), shown as `273847 years`, older than any age that fits. When the intake is out
       of range too, the intake is returned as given, as for an age with no unit.
 - [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
       `expectTypeOf` tests that fail `tsc` on the old signature.
@@ -39,14 +40,16 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, six rounds: 9, 7, 8, 8, 8 and 7 findings, each probed. Round five
-  dropped the century change; round six found no code defect, only wrong claims in comments
-  and ledger, which are corrected. That correction round is comments and ledger only.
+- `/code-review high`, seven rounds: 9, 7, 8, 8, 8, 7 and 9 findings, each probed. Round five
+  dropped the century change. Rounds six and seven found no code defect, only wrong claims in
+  comments and ledger. Round six's own correction was itself wrong: it said the throw made the
+  repository swap the catalogue for demo pets, but no database row has an `age`. Round seven
+  caught that, and the claim is corrected. The final correction is comments and ledger only and
+  has not had its own review.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).
-- Opened `tasks/open/a-pet-mapping-error-is-handled-as-a-database-outage.md`: the mechanism that
-  turned the old throw into a silent swap to the demo pets is still there.
+- #113's contract rehearsal, which imports the real function, passes on the merged tree (85/0).
 - Discriminating tests (fail on master by name): the four overflow clamps, the end-to-end
   `senior` check, and the out-of-range intake. The rest of that block are guards that pass on
   master by design.
@@ -68,7 +71,11 @@ Record active multi-step work streams below.
 - Distributive return type for a union-typed pet: needs an `as` cast and no caller passes a
   union.
 - The `approximateBirthDate` docstring still explains rollover with `Date.UTC(2023, 1, 29)`.
-  That is still true of JavaScript, and PR #113 is editing that docstring.
+  That is still true of JavaScript and of `isoDate`, which uses `Date.UTC`.
+- `petRepository.ts` maps rows inside the same `try` as the Prisma query, so a mapping exception
+  would be handled as a database outage. No known input makes `mapDbPetToPet` throw today, so
+  this is latent and not recorded as an open entry. A round-six entry claiming otherwise was
+  deleted before it was published.
 - The decision cites an open entry that arrives with PR #114.
 
 # The backfill rehearsal checks the real age function
