@@ -95,6 +95,27 @@ may be neither. Which property matters — or whether it is a third thing — is
 session that is one without the other. The 2026-09-08 lines in the shared log carry no uuid field at all, so the attribution
 field is newer than most of the file.
 
+## A second session, observed independently
+
+The session that built the bulletin server store (branch `worktree-bulletins-76`, merged as #103)
+filed its own entry at this same path, written without knowing of this one; the two met as an
+add/add conflict when `master` was merged into this branch on 2026-10-15. Its observation, kept
+here rather than dropped:
+
+    $ grep -c "<this session's uuid>" "$TEMP/claude-agent-drift.log"
+    0
+
+    $ tail -1 "$TEMP/claude-agent-drift.log"
+    2026-09-21T14:55:50.079Z 60c30e3b-… claude Bash M tasks/todo.md
+
+That session also wrote dozens of files, including `cat >`-style writes through Bash, the case the
+log exists to catch. It too ran **as a background job in a git worktree under
+`.claude/worktrees/`** — so both observed instances share both properties named under "Not
+established" above, and neither separates them. It added a point this entry did not make: closing
+by `git status` instead (empty, so every touched file is in a commit) is a stronger check for one
+session but does not generalise, because it cannot see a write that was made and then reverted —
+the "while I am here" edit the log is meant to surface.
+
 Related but distinct: `tasks/open/matcherless-hook-wiring-unverified.md` (only an alternation
 matcher has been observed firing — this one *is* an alternation matcher, and for this session it
 did not fire),

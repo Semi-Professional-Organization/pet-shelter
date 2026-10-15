@@ -231,10 +231,12 @@ The canonical shape of an action — each step is a different layer:
 | **L-F1** | Design primitives | `src/components/ui/` (shadcn `base-sera`, `@base-ui/react`) · `src/app/globals.css` · Tailwind v4 / PostCSS · `components.json` |
 | **L-F2** | Feature components | `src/components/features/{pets,adoptions,bulletins,donations}` · `src/components/admin/` · `src/components/layout/` |
 | **L-F3** | Client controllers | `src/hooks/use*Controller.ts` (9 files) · `src/components/providers/` (Theme, Language) |
-| **L-F4** | Client stores | `src/lib/client/{petStore,applicationStore,bulletinStore,settingsStore,sponsorshipStore,adminAuth}.ts` — plus `imageOptimization.ts`. The directory means **browser-only**, not "localStorage hook" — the guard enforces *where code may run*, mirroring `src/lib/server/`, which likewise holds non-Prisma catalogs. `tests/unit/layerBoundaries.test.ts` forbids any non-client module importing them |
+| **L-F4** | Client stores | `src/lib/client/{petStore,applicationStore,settingsStore,sponsorshipStore,adminAuth}.ts` — plus `imageOptimization.ts`. The directory means **browser-only**, not "localStorage hook" — the guard enforces *where code may run*, mirroring `src/lib/server/`, which likewise holds non-Prisma catalogs. `tests/unit/layerBoundaries.test.ts` forbids any non-client module importing them |
 | **L-F5** | i18n | `src/lib/i18n/translations.ts` (`en` + `ms`) · `useLanguage` |
 
 **Do not confuse L-F4 with L-B2.** `src/lib/server/` is the Prisma-backed repository layer; the L-F4 stores are browser-only React hooks that never touch the database. L-F4 is a standing violation of Blueprint Tenet 4 (single source of truth), tolerated because these stores drive admin/demo UI only. Treat any *new* use as a design error.
+
+`bulletinStore.ts` left this list on 2026-09-22. It was the one store backing a **public** surface rather than admin/demo UI, so the tolerance above never applied to it: the feed on `/`, `/pets` and `/bulletins` was per-browser, editable by any visitor, and unreachable by anything staff posted. It is now `src/lib/server/bulletinRepository.ts` (L-B2) behind `src/actions/bulletins.ts` (L-B4), with the editor at `/admin/bulletins`. See `tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`.
 
 ---
 

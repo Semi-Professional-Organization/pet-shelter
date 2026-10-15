@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { screen } from "@testing-library/react";
 
 import { Hero } from "@/components/layout/Hero";
@@ -22,23 +22,15 @@ import { renderWithLanguage } from "./support/render";
  * right string somewhere else on the page, satisfies a presence check.
  * Absence is what discriminates, so it is what is asserted.
  *
- * The strings covered, and the bulletin admin chrome deliberately left in
- * English, are both settled by
+ * Which strings are covered is settled by
  * `tasks/decisions/2026-09-22-home-page-malay-stops-at-the-bulletin-admin-chrome.md`.
  */
 
-const BULLETIN_STORAGE_KEY = "hope_for_strays_bulletins_v1";
-
 /**
- * Drives `useBulletins` through the storage key its initializer reads, rather
- * than mocking the store. That keeps the real read path under test and lets a
- * case state only the bulletin it is about — including none at all, which the
- * four seeded fixtures otherwise make unreachable.
+ * One notice, as `getPublicBulletins` hands it to the feed. The feed is a
+ * Server Component that takes its notices as a prop, so a case states only the
+ * bulletin it is about — including none at all.
  */
-function seedBulletins(bulletins: Bulletin[]): void {
-  localStorage.setItem(BULLETIN_STORAGE_KEY, JSON.stringify(bulletins));
-}
-
 function bulletin(overrides: Partial<Bulletin> = {}): Bulletin {
   return {
     id: "bulletin-test",
@@ -48,14 +40,11 @@ function bulletin(overrides: Partial<Bulletin> = {}): Bulletin {
     targetPage: "all",
     mediaType: "none",
     isPinned: false,
-    createdAt: "2026-09-01",
-    author: "Shelter Team",
+    publishedAt: "2026-09-01",
+    authorName: "Shelter Team",
     ...overrides,
   };
 }
-
-beforeEach(() => localStorage.clear());
-afterEach(() => localStorage.clear());
 
 describe("Hero on the Malay site", () => {
   it("translates the page's h1", () => {
@@ -101,8 +90,7 @@ describe("Home gallery chrome on the Malay site", () => {
 
 describe("BulletinFeed on the Malay site", () => {
   it("translates the home page's feed heading", () => {
-    seedBulletins([bulletin()]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed bulletins={[bulletin()]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText("Buletin Terkini")).toBeInTheDocument();
     expect(screen.queryByText("Latest Bulletins")).not.toBeInTheDocument();
@@ -111,18 +99,17 @@ describe("BulletinFeed on the Malay site", () => {
   });
 
   // The prop combinations the real call sites use, not a convenient one:
-  // `/bulletins` renders `targetPage="all"` and `/pets` renders
-  // `targetPage="pets"` with `compact` and `maxItems`.
+  // `/bulletins` renders the plain feed and `/pets` renders it `compact`.
   const siblingFeeds = [
     {
       titleKey: "bulletins.allNoticesTitle",
-      props: { targetPage: "all" } as const,
+      props: {} as const,
       malay: "Semua Buletin",
       english: "All Bulletins",
     },
     {
       titleKey: "bulletins.petsFeedTitle",
-      props: { targetPage: "pets", compact: true, maxItems: 2 } as const,
+      props: { compact: true } as const,
       malay: "Buletin Adopsi & Klinik",
       english: "Adoption & Clinic Bulletins",
     },
@@ -135,8 +122,7 @@ describe("BulletinFeed on the Malay site", () => {
       // literals. Once the chrome around them became Malay, that left those two
       // pages with a Malay feed under an English title — a worse mixed-language
       // result than before. They pass a key now, and this is what pins it.
-      seedBulletins([bulletin()]);
-      renderWithLanguage(<BulletinFeed {...props} titleKey={titleKey} />, {
+      renderWithLanguage(<BulletinFeed {...props} bulletins={[bulletin()]} titleKey={titleKey} />, {
         language: "ms",
       });
 
@@ -152,8 +138,7 @@ describe("BulletinFeed on the Malay site", () => {
       // every assertion above. The case this replaced covered the English side
       // for a caller-supplied heading; that coverage is kept here rather than
       // dropped along with the string prop.
-      seedBulletins([bulletin()]);
-      renderWithLanguage(<BulletinFeed {...props} titleKey={titleKey} />);
+      renderWithLanguage(<BulletinFeed {...props} bulletins={[bulletin()]} titleKey={titleKey} />);
 
       expect(screen.getByText(english)).toBeInTheDocument();
       expect(screen.queryByText(malay)).not.toBeInTheDocument();
@@ -167,49 +152,48 @@ describe("BulletinFeed on the Malay site", () => {
     ["happy_tail", "Perkembangan Adopsi", "Adoption Update"],
     ["announcement", "Notis", "Notice"],
   ])("translates the %s category chip", (category, malay, english) => {
-    seedBulletins([bulletin({ category })]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed bulletins={[bulletin({ category })]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText(malay)).toBeInTheDocument();
     expect(screen.queryByText(english)).not.toBeInTheDocument();
   });
 
   it("translates the pinned chip", () => {
-    seedBulletins([bulletin({ isPinned: true })]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed bulletins={[bulletin({ isPinned: true })]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText("Disemat")).toBeInTheDocument();
     expect(screen.queryByText("Pinned")).not.toBeInTheDocument();
   });
 
   it("translates the byline", () => {
-    seedBulletins([bulletin()]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed bulletins={[bulletin()]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
     expect(screen.getByText(/Dihantar oleh:/)).toBeInTheDocument();
     expect(screen.queryByText(/Posted by:/)).not.toBeInTheDocument();
   });
 
-  it("translates the staff toggle every visitor is shown", () => {
-    seedBulletins([bulletin()]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
+  it.each(["en", "ms"] as const)("shows a visitor no staff control at all in %s", (language) => {
+    // This case used to check that the "Staff Admin Access" toggle every
+    // visitor was shown read in Malay. #103 removed the toggle: editing moved
+    // behind `MANAGE_CONTENT` at `/admin/bulletins`, and the feed is read-only
+    // by design. Translating it again would bring it back, so what is pinned
+    // now is its absence, in both languages.
+    renderWithLanguage(<BulletinFeed bulletins={[bulletin({ isPinned: true })]} titleKey="home.bulletinsTitle" />, {
+      language,
+    });
 
-    expect(
-      screen.getByRole("button", { name: /Akses Pentadbir Kakitangan/i })
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Staff Admin Access")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.queryByText(/Staff Admin Access|Akses Pentadbir Kakitangan/)).not.toBeInTheDocument();
   });
 
   it("translates the empty state", () => {
-    seedBulletins([]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />, { language: "ms" });
+    renderWithLanguage(<BulletinFeed bulletins={[]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
-    expect(
-      screen.getByText("Tiada kemas kini atau buletin disiarkan untuk bahagian ini.")
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByText("No updates or bulletins posted for this section.")
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Tiada kemas kini untuk dipaparkan buat masa ini.")).toBeInTheDocument();
+    expect(screen.queryByText("No updates to show right now.")).not.toBeInTheDocument();
+    // The wording #103 replaced: false during an outage, when the repository
+    // serves no notices rather than stale ones.
+    expect(screen.queryByText(/No updates or bulletins posted/)).not.toBeInTheDocument();
   });
 });
 
@@ -307,8 +291,7 @@ describe("the home page's English is unchanged", () => {
   // The Malay assertions above would all pass if `isMs` were inverted, so the
   // English side is pinned too.
   it("keeps the English copy on the English site", () => {
-    seedBulletins([bulletin({ category: "clinic", isPinned: true })]);
-    renderWithLanguage(<BulletinFeed targetPage="home" titleKey="home.bulletinsTitle" />);
+    renderWithLanguage(<BulletinFeed bulletins={[bulletin({ category: "clinic", isPinned: true })]} titleKey="home.bulletinsTitle" />);
 
     expect(screen.getByText("Latest Bulletins")).toBeInTheDocument();
     expect(screen.getByText("Clinic / Vaccine")).toBeInTheDocument();

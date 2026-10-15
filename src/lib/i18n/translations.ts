@@ -361,8 +361,6 @@ export interface TranslationDictionary {
     pinned: string;
     postedBy: string;
     noUpdates: string;
-    staffAccess: string;
-    adminModeActive: string;
   };
   footer: {
     orgDesc: string;
@@ -739,9 +737,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       categoryAnnouncement: "Notice",
       pinned: "Pinned",
       postedBy: "Posted by:",
-      noUpdates: "No updates or bulletins posted for this section.",
-      staffAccess: "Staff Admin Access",
-      adminModeActive: "Admin Mode Active",
+      noUpdates: "No updates to show right now.",
     },
     footer: {
       orgDesc: "A registered non-profit animal rescue organisation serving Petaling Jaya and Selangor since 2016. Dedicated to rescuing, rehabilitating, and rehoming homeless dogs and cats.",
@@ -1112,9 +1108,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       categoryAnnouncement: "Notis",
       pinned: "Disemat",
       postedBy: "Dihantar oleh:",
-      noUpdates: "Tiada kemas kini atau buletin disiarkan untuk bahagian ini.",
-      staffAccess: "Akses Pentadbir Kakitangan",
-      adminModeActive: "Mod Pentadbir Aktif",
+      noUpdates: "Tiada kemas kini untuk dipaparkan buat masa ini.",
     },
     footer: {
       orgDesc: "Pertubuhan kebajikan haiwan berdaftar yang berkhidmat di Petaling Jaya dan Selangor sejak 2016. Berdedikasi untuk menyelamatkan, merawat, dan mencarikan keluarga bagi anjing dan kucing terbiar.",

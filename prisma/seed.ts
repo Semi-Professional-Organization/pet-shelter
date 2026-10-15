@@ -1,10 +1,19 @@
-import { PrismaClient, PetStatus, ApplicationStatus, FaqCategory } from "@prisma/client";
+import {
+  PrismaClient,
+  PetStatus,
+  ApplicationStatus,
+  FaqCategory,
+  BulletinCategory,
+  BulletinTargetPage,
+  BulletinMediaType,
+} from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import crypto from "node:crypto";
 import petsData from "../src/data/pets.json";
 import applicationsData from "../src/data/applications.json";
 import faqsData from "../src/data/faqs.json";
+import bulletinsData from "../src/data/bulletins.json";
 import { assertSeedTargetIsLocal, resolveDatabaseUrl } from "./env";
 import { resolveDatabaseSsl } from "../src/lib/server/databaseSsl";
 import { getSampleLedger } from "../src/lib/domain/transparencySample";
@@ -524,7 +533,52 @@ async function main() {
   }
   console.log(`  ✓ ${faqsData.length} FAQ entries seeded.`);
 
-  // 6. Initial Audit Log
+  // 6. Seed the community bulletins.
+  // Same contract as the FAQ block above: upserted by the fixture's stable ids
+  // so re-running refreshes the launch copy without duplicating rows, and
+  // `isPublished` / `isPinned` are set only on create so a re-seed cannot
+  // republish or re-pin a notice staff have deliberately taken down.
+  //
+  // `authorName` comes from the fixture rather than a session because these
+  // rows predate any editor. Notices posted through /admin/bulletins take the
+  // byline from the acting staff member instead.
+  for (const bulletin of bulletinsData) {
+    await prisma.bulletin.upsert({
+      where: { id: bulletin.id },
+      update: {
+        category: bulletin.category as BulletinCategory,
+        targetPage: bulletin.targetPage as BulletinTargetPage,
+        title: bulletin.title,
+        content: bulletin.content,
+        titleMs: bulletin.titleMs,
+        contentMs: bulletin.contentMs,
+        mediaType: bulletin.mediaType as BulletinMediaType,
+        mediaUrl: bulletin.mediaUrl,
+        videoEmbedUrl: bulletin.videoEmbedUrl,
+        authorName: bulletin.authorName,
+        publishedAt: new Date(`${bulletin.publishedAt}T00:00:00.000Z`),
+      },
+      create: {
+        id: bulletin.id,
+        category: bulletin.category as BulletinCategory,
+        targetPage: bulletin.targetPage as BulletinTargetPage,
+        title: bulletin.title,
+        content: bulletin.content,
+        titleMs: bulletin.titleMs,
+        contentMs: bulletin.contentMs,
+        mediaType: bulletin.mediaType as BulletinMediaType,
+        mediaUrl: bulletin.mediaUrl,
+        videoEmbedUrl: bulletin.videoEmbedUrl,
+        isPinned: bulletin.isPinned,
+        isPublished: bulletin.isPublished,
+        authorName: bulletin.authorName,
+        publishedAt: new Date(`${bulletin.publishedAt}T00:00:00.000Z`),
+      },
+    });
+  }
+  console.log(`  ✓ ${bulletinsData.length} community bulletins seeded.`);
+
+  // 7. Initial Audit Log
   await prisma.auditLog.create({
     data: {
       action: "DATABASE_SEEDED",
@@ -542,6 +596,7 @@ async function main() {
         seededImpactStats: seedSampleLedger ? sampleLedger.impactStats.length : 0,
         sampleLedgerSeeded: seedSampleLedger,
         seededFaqs: faqsData.length,
+        seededBulletins: bulletinsData.length,
       },
     },
   });
