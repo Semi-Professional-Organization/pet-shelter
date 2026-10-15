@@ -339,11 +339,11 @@ Fixed:
 
 - `isScheduledForLater` now **requires** `today`. The default made the per-row call (the
   footgun round eight set out to remove) the easy one to write, so the compiler now refuses it.
-- `getPublicBulletins` takes one instant per request. The query's bound and the fallback's
-  "today" both come from it, so one request cannot straddle the shelter's midnight between them.
-- A test now fails if "today" goes back into the per-row filter or the fallback takes a second
-  instant. Before it, reverting round eight's headline fix left the suite green. Three mutants
-  killed.
+- ~~`getPublicBulletins` takes one instant per request.~~ **Reverted in round ten.** The query
+  path and the fallback path are mutually exclusive: the fallback runs only after the query
+  threw, so no response mixes their two days. I accepted the finding without checking that.
+- A test now fails if "today" goes back into the per-row filter. Before it, reverting round
+  eight's headline fix left the suite green. (Round ten rewrote it to check behaviour.)
 - Console spies are restored in the file's `afterEach`, so a failing assertion can no longer
   leave `console` muted for the rest of the file.
 
@@ -353,15 +353,39 @@ Declined, with reasons:
   was the point: one call fails instead of every importer. In production the read logs that
   error and serves an empty feed, which is the contained outcome. A Node runtime without full
   ICU is not one this app supports.
-- **The admin table's `today` is per render, so a server render and its hydration can straddle
-  midnight.** Marked with a `ceiling:` comment instead. It is admin-only and cosmetic, and any
-  re-render clears it. Ticking on a timer is the upgrade if staff ever rely on the badge at
-  midnight.
+- ~~**The admin table's `today` is per render, so a server render and its hydration can
+  straddle midnight.**~~ Declined here, then **fixed in round ten**: under React 19 that
+  mismatch is a recoverable error that discards the server HTML, not a warning, and the fix was
+  one prop.
 - **Destroying versus releasing the seed's client has no effect before `pool.end()`**, and a
   ROLLBACK on a half-open connection could hang. The first point is true and harmless. The hang
   applies to every query in the script, not just ROLLBACK, and the operator can interrupt it.
 
-Nine review rounds, 32 mutants killed. The review history above is the most useful thing in this
+## Round ten: reviewing round nine's fixes
+
+Eight findings. Round nine's own fix round had two of the defects. Fixed:
+
+- **The one-instant change is reverted** (see above). It protected nothing, and it made the
+  fallback judge against an instant taken before a query that may have spent seconds failing.
+- **The admin table takes `today` as a prop** from the server page, so the server render and
+  its hydration judge "Scheduled" against the same day. The `ceiling:` comment now covers only
+  what remains: a tab left open past midnight keeps last night's badges until a write or reload.
+- **The ninth-review test checks behaviour.** It pins the shelter's day to 2026-08-13, so
+  `bulletin-001` (dated the 14th) is scheduled, and asserts that the fallback hides it and
+  serves the other three. Before, every fixture row was in the past, so a dropped `!` in the
+  fallback's date check passed. It keeps a single call-count assertion as the only observable
+  stand-in for "one day per pass", with the reason in the test. Three mutants killed: a per-row
+  day, an inverted check, and the check removed.
+- The lesson's dates are now explicit.
+
+Refuted: **"fake timers leak into every later test."** The sixth-review `describe` restores
+real timers in its own `afterEach`, which the finding missed.
+
+Round nine's count of three mutants is corrected. Two of them targeted the reverted instant
+change. The total stays at 32 (29 + per-row day, inverted check, removed check), all of them
+behaviour or the one stated stand-in.
+
+Ten review rounds, 32 mutants killed. The review history above is the most useful thing in this
 entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
 took four attempts, and the seeding rule that one round reversed are each a pattern with its own
 lesson file.

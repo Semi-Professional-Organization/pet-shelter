@@ -81,6 +81,12 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       existed), and console spies restored on failure. Three declined with reasons in the
       decision entry. Lesson:
       `tasks/lessons/2026-10-15-an-empty-review-is-a-review-that-did-not-run.md`.
+- [x] Round 10, round 9's fixes: eight findings, two against round 9 itself. The
+      one-instant change is reverted, because the two paths it "aligned" never run together.
+      The admin table takes `today` as a prop, which fixes the hydration mismatch instead of
+      documenting it. The ninth-review test now checks behaviour (a future fixture notice is
+      hidden) and kills three mutants. One finding refuted: the fake timers are restored by
+      their `describe`'s own `afterEach`.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.
