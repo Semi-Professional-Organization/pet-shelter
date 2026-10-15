@@ -34,7 +34,7 @@ sessions and copied here. `git cat-file -t 6d32df9` prints `tree`. See
 `tasks/lessons/2026-10-14-merge-tree-prints-a-tree-not-a-commit-so-never-quote-it-as-master.md`.)
 
 It is tempting to conclude the timezone problem is therefore solved. It is not, because the
-rehearsal does not call the function — `appRule` in `rehearse.mjs` (around line 663) is a
+rehearsal does not call the function — `appRule` in `rehearse.mjs` (around line 675 on `master` at `d6dd030`) is a
 hand-written copy, as its own comment says: "a transcription … a copy, and therefore capable of
 drifting from it." After #42 that copy differs from the original in **two** ways:
 
@@ -102,6 +102,12 @@ how a safe failure becomes an unsafe one — the same reasoning
 `tasks/open/expand-refuses-compound-ages-written-in-short-units.md` gives for leaving its regex
 alone. The smallest honest repair is probably to delete O1/O2 there and point at scenario 0 above,
 rather than to fix the copy — a second copy kept correct is still a second copy.
+
+(Since then the cost has fallen. #113 itself re-ran that harness in full on 2026-10-15, 92/92,
+with `npm i --no-save embedded-postgres` installed into one worktree's *own* `node_modules`, as
+`migration.sql` records around line 322. So the harness can be run without touching what other
+worktrees share, and "a harness you cannot run" no longer holds. The repair above is still
+undone.)
 
 **Settles when:** `rehearse.mjs` imports `approximateBirthDate` instead of restating it. That is
 now the only option that actually works: pinning `TZ=UTC` would fix the offset half and leave the

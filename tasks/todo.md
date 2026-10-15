@@ -57,7 +57,9 @@ Record active multi-step work streams below.
 - [x] Filed `drift-log-has-recorded-nothing-since-2026-10-13.md`. First version compared this session's
       zero lines against 161 for another and blamed how the worktree was entered. Wrong: the whole
       log is 161 lines from **one** session across 90 minutes on 2026-10-13, and nothing from anyone
-      since. Rewritten as what it is — the log went silent for every session.
+      since. Rewritten as what it is — the log went silent for every session. **Later folded
+      into** master's `drift-log-recorded-nothing-for-a-whole-session.md` (widened by #104 on
+      the same defect) and deleted, so the defect has one public issue, not two.
 
 - [x] **Reviewed this branch before opening it**, `/code-review high`, and it found ten more — six of
       them prose stating a state that was not true, in a branch whose whole purpose was correcting
