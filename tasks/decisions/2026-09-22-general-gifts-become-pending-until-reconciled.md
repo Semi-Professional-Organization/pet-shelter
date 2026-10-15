@@ -132,6 +132,27 @@ reason: the rail question is the one source of truth. It is a visible change on 
 and reversible — offering the other codes again needs a payment-method value for each on the
 pledge, the receipt and the coordinator's queue, not a tab.
 
+## Applied to production, 2026-10-15
+
+The owner ran `prisma/migrations/manual/20260922_donation_pledges/migration.sql` in the Neon SQL
+editor on the production branch, then the two confirming queries, and reported:
+
+    SELECT to_regclass('public.donation_pledges');                  -> donation_pledges
+    SELECT tgname, tgenabled FROM pg_trigger
+     WHERE tgname = 'donations_no_mutation';                         -> O
+
+So the table exists and the append-only trigger on `donations` is still enabled. Recorded from the
+owner's report: no agent session can read production, so this was not observed directly.
+
+That closes `tasks/open/donation-pledges-table-is-unapplied-in-production.md` (its text is in
+`git log` for that path). It was applied *before* the code that needs it shipped, which is the
+order that breaks nothing: the code then live never touches the new table.
+
+Two deploy steps remain and are not code: merge the PR, then edit the production FAQ answer
+"Is my donation tax-deductible in Malaysia, and how do I receive an official e-Receipt?" in
+`/admin/faqs`, which still says the receipt is "generated instantly" — production serves FAQs
+from its database, and only the committed fixture was corrected.
+
 ## What would reverse this
 
 Integrating a real payment provider. A verified, signature-checked callback is a stronger

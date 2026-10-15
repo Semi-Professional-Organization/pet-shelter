@@ -219,6 +219,11 @@ names, now marked as a `ceiling:`.
 
 This round's commit has not been reviewed.
 
+**Applied to production, 2026-10-15.** The owner ran the migration in the Neon SQL editor and
+reported both confirming queries correct: `donation_pledges` exists, `donations_no_mutation` is
+still enabled (`O`). The open entry is settled into the decision file. Left: merge, then the
+production FAQ edit in `/admin/faqs`.
+
 ### Deliberately not done
 
 - **No payment webhook.** The open entry offered it as the other fork. There is no processor
