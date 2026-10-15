@@ -955,6 +955,172 @@ The ${SHELTER_NAME} Team
   });
 }
 
+/** The subset of a recorded general gift the acknowledgement mail renders. */
+export interface DonationPledgeEmailInput {
+  pledgeRef: string;
+  donorName: string;
+  donorEmail: string;
+  tierName: string;
+  amountMYR: number;
+  frequency: "one_time" | "monthly";
+  paymentMethod: PaymentMethod;
+  targetPetName?: string;
+  reconciliationNotice: string;
+}
+
+/**
+ * 5b. Acknowledges a general gift that has been recorded but not yet reconciled.
+ *
+ * ## This is not a receipt, and says so in both halves
+ *
+ * Until 2026-09-22 the donation form sent `sendDonationReceiptEmail` immediately,
+ * so a supporter who had sent no money received an official Section 44(6) document
+ * with a live `HFS-DON-*` number on it. This mail replaces that one at submission
+ * time. The receipt still exists and is still sent — from
+ * `reconcileDonationPledgeAction`, once a coordinator has matched the transfer.
+ *
+ * Nothing here passes through `isTaxClaimable`, because there is no receipt to ask
+ * the question about. Both halves disclaim the tax status explicitly rather than
+ * merely omitting it: a donor who has had a tax document from this shelter before
+ * will otherwise assume this is one, and file it.
+ *
+ * Its audit entity is `DonationPledge`, and its details carry no `receiptNumber`.
+ * `isReceiptAuditRow` in `src/lib/domain/receiptAuditRow.ts` — the one classifier
+ * the receipts tab, the audit viewer and the CSV fallback share — calls a row a
+ * receipt on the action `DONATION_RECEIVED`, the entity `DonationReceipt`, or a
+ * non-empty `receiptNumber`. An acknowledgement that tripped any of them would put
+ * an unpaid gift back into the LHDN CSV fallback, which is the defect this whole
+ * change removes.
+ */
+export async function sendDonationPledgeEmail(
+  pledge: DonationPledgeEmailInput
+): Promise<EmailResult> {
+  const tone = EMAIL_TONE.care;
+
+  // Single source of truth for every value both halves state, for the reason
+  // `sendDonationReceiptEmail` gives: one field resolved twice by hand, in two
+  // languages, is exactly what let the two halves of that receipt disagree.
+  const fields = {
+    amount: `RM ${pledge.amountMYR.toFixed(2)}`,
+    cadence: pledge.frequency === "monthly" ? " / month" : "",
+    frequencyLabel:
+      pledge.frequency === "monthly" ? "Monthly Contribution" : "One-Time Contribution",
+    paymentRail: PAYMENT_RAIL_LABELS[pledge.paymentMethod],
+    dedication: pledge.targetPetName ?? "",
+  };
+
+  const subject = `🐾 We recorded your gift of ${fields.amount} — ${pledge.pledgeRef}`;
+
+  const plainText = `
+DONATION PLEDGE RECORDED — THIS IS NOT A RECEIPT
+===================================================
+${SHELTER_NAME}
+${SHELTER_ADDRESS}
+Phone: ${SHELTER_PHONE} | Email: ${SHELTER_EMAIL}
+
+Dear ${pledge.donorName},
+
+Thank you. We have recorded your intention to give, and your gift now sits with
+our coordinator to be matched against the shelter's bank statement.
+
+YOUR GIFT:
+- Programme: ${pledge.tierName}
+- Amount: ${fields.amount}${fields.cadence} (${fields.frequencyLabel})
+- Payment Rail: ${fields.paymentRail}
+${fields.dedication ? `- In honour of: ${fields.dedication}\n` : ""}- Pledge Reference: ${pledge.pledgeRef}
+
+WHAT HAPPENS NEXT:
+${pledge.reconciliationNotice}
+
+Please quote ${pledge.pledgeRef} in your transfer description so our coordinator
+can match your payment quickly.
+
+IMPORTANT: This email confirms that we recorded your pledge. It is NOT a receipt
+and it carries no receipt number, so it cannot be used to claim tax relief. Your
+official Section 44(6) receipt is issued and emailed separately, once your
+payment has been reconciled.
+
+With gratitude,
+The ${SHELTER_NAME} Team
+  `.trim();
+
+  const html = wrapEmailHtml(`
+    <div style="border-bottom: 2px solid ${EMAIL_BRAND.border}; padding-bottom: 16px; margin-bottom: 20px;">
+      <span class="badge" style="background:${tone.surface};color:${tone.text};">Donation Pledge Recorded</span>
+      <h2 style="margin: 8px 0 4px 0; font-size: 22px; color: ${EMAIL_BRAND.foreground};">
+        Thank you for your gift!
+      </h2>
+      <p style="margin: 0; font-size: 13px; color: ${EMAIL_BRAND.mutedForeground};">
+        Pledge Reference: <strong style="font-family: monospace; color: ${EMAIL_BRAND.foreground};">${escapeHtml(pledge.pledgeRef)}</strong>
+      </p>
+    </div>
+
+    <p>Dear <strong>${escapeHtml(pledge.donorName)}</strong>,</p>
+    <p>
+      We have recorded your intention to give. Your gift now sits with our coordinator to be
+      matched against the shelter's bank statement — once it is, it pays for the care that gets a
+      rescued animal from intake to a home.
+    </p>
+
+    <div class="card" style="background:${EMAIL_BRAND.muted}; border-left: 4px solid ${tone.accent}; padding: 18px; margin: 20px 0;">
+      <table style="width:100%; font-size: 13px; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.mutedForeground}; width: 40%;"><strong>Programme:</strong></td>
+          <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_BRAND.foreground};">${escapeHtml(pledge.tierName)}</td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.mutedForeground};"><strong>Amount:</strong></td>
+          <td style="padding: 4px 0; font-weight: 700; color: ${EMAIL_BRAND.foreground};">${fields.amount}${fields.cadence} <span style="font-weight:500; color:${EMAIL_BRAND.mutedForeground};">(${fields.frequencyLabel})</span></td>
+        </tr>
+        <tr>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.mutedForeground};"><strong>Payment Rail:</strong></td>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.foreground};">${fields.paymentRail}</td>
+        </tr>
+        ${
+          fields.dedication
+            ? `<tr>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.mutedForeground};"><strong>In honour of:</strong></td>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.foreground};">🐾 ${escapeHtml(fields.dedication)}</td>
+        </tr>`
+            : ""
+        }
+      </table>
+    </div>
+
+    <div style="background:${EMAIL_TONE.warning.surface}; border: 1px solid ${EMAIL_TONE.warning.accent}; padding: 14px; border-radius: 6px; font-size: 13px; color: ${EMAIL_TONE.warning.text}; margin: 20px 0; line-height: 1.55;">
+      <strong>What happens next</strong><br/>
+      ${escapeHtml(pledge.reconciliationNotice)}<br/><br/>
+      Please quote <strong style="font-family: monospace;">${escapeHtml(pledge.pledgeRef)}</strong> in your
+      transfer description so we can match your payment quickly.
+    </div>
+
+    <div style="background:${EMAIL_BRAND.muted}; padding: 14px; border-radius: 6px; font-size: 12px; color: ${EMAIL_BRAND.mutedForeground}; margin: 20px 0; line-height: 1.5;">
+      <em>
+        This email confirms that we recorded your pledge. It is <strong>not</strong> a receipt, it
+        carries no receipt number, and it cannot be used to claim tax relief. Your official
+        Section 44(6) receipt is issued and emailed separately once your payment has been
+        reconciled.
+      </em>
+    </div>
+
+    <p style="font-size: 13px; color: ${EMAIL_BRAND.mutedForeground}; margin-top: 24px;">
+      With gratitude,<br/>
+      <strong>The ${SHELTER_NAME} Team</strong><br/>
+      ${SHELTER_ADDRESS}
+    </p>
+  `);
+
+  return sendRawEmail({
+    to: pledge.donorEmail,
+    subject,
+    text: plainText,
+    html,
+    template: "DONATION_PLEDGE",
+    entity: "DonationPledge",
+    entityId: pledge.pledgeRef,
+  });
+}
+
 /**
  * Resolves a possibly-relative asset path into an absolute URL.
  *

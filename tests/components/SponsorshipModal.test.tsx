@@ -33,9 +33,8 @@ import { makePet, renderWithLanguage, setupUser } from "./support/render";
 const mockedSubmitDonation = vi.mocked(submitDonationPledgeAction);
 const mockedCreateSponsorship = vi.mocked(createPetSponsorshipAction);
 
-const donationReceipt = {
-  receiptNumber: "HFS-DON-202609-0042",
-  date: "14 Sep 2026, 9:30 pm",
+const donationPledge = {
+  pledgeRef: "HFS-GFT-20260914-004242",
   donorName: "Aisyah Rahman",
   donorEmail: "aisyah@example.com",
   tierId: "vaccine" as const,
@@ -43,8 +42,9 @@ const donationReceipt = {
   amountMYR: 50,
   frequency: "one_time" as const,
   paymentMethod: "duitnow_qr" as const,
-  taxDeductibleRef: "LHDN.01/35/42/51/179-6.4912",
-  shelterRegistrationNo: "PPM-021-10-18082021",
+  status: "PENDING_PAYMENT",
+  reconciliationNotice:
+    "Your official receipt is issued once our coordinator matches your transfer.",
 };
 
 const sponsorshipPledge = {
@@ -80,7 +80,10 @@ async function fillRequiredDonorDetails() {
 
 function submissionButton() {
   return screen.getByRole("button", {
-    name: /confirm sponsorship|record .*sponsorship pledge|complete .*donation/i,
+    // Both lanes record a pledge now: the general-gift button stopped saying
+    // "Complete Donation" on 2026-09-22, because completing the form no longer
+    // completes anything the shelter can receipt.
+    name: /confirm sponsorship|record .*(sponsorship|donation) pledge/i,
   });
 }
 
@@ -337,22 +340,22 @@ describe("SponsorshipModal checkout contract", () => {
     ).toBeInTheDocument();
   });
 
-  it("keeps a checkout without a target pet on the donation receipt path", async () => {
+  it("keeps a checkout without a target pet on the donation pledge path", async () => {
     mockedSubmitDonation.mockResolvedValue({
       success: true,
-      data: donationReceipt,
+      data: donationPledge,
     });
     renderWithLanguage(<SponsorshipModal open onOpenChange={vi.fn()} />);
 
     const user = await fillRequiredDonorDetails();
     await user.click(submissionButton());
 
-    expect(await screen.findByText("HFS-DON-202609-0042")).toBeInTheDocument();
+    expect(await screen.findByText("HFS-GFT-20260914-004242")).toBeInTheDocument();
     expect(screen.getByRole("status")).toBeInTheDocument();
     expect(
       screen.getByRole("heading", {
         level: 3,
-        name: /thank you.*donation was recorded/i,
+        name: /donation pledge recorded/i,
       }),
     ).toBeInTheDocument();
     expect(mockedSubmitDonation).toHaveBeenCalledTimes(1);
@@ -365,7 +368,9 @@ describe("SponsorshipModal checkout contract", () => {
       }),
     );
     expect(mockedCreateSponsorship).not.toHaveBeenCalled();
-    expect(saveDonationReceipt).toHaveBeenCalledWith(donationReceipt);
+    // The client receipt store holds receipts. A claim reference is not one, and
+    // writing it there would rebuild the confusion this boundary removed.
+    expect(saveDonationReceipt).not.toHaveBeenCalled();
   });
 
   it("blocks RM 5, then sends the exact RM 10 target-pet boundary", async () => {
@@ -481,19 +486,21 @@ describe("SponsorshipModal checkout contract", () => {
     );
   });
 
-  it("does not label an opted-out general receipt as tax-exempt", async () => {
+  it("issues no receipt number and claims no relief on a general gift", async () => {
     mockedSubmitDonation.mockResolvedValue({
       success: true,
-      data: donationReceipt,
+      data: donationPledge,
     });
     renderWithLanguage(<SponsorshipModal open onOpenChange={vi.fn()} />);
 
     const user = await fillRequiredDonorDetails();
     await user.click(submissionButton());
 
-    expect(await screen.findByText("HFS-DON-202609-0042")).toBeInTheDocument();
+    expect(await screen.findByText("HFS-GFT-20260914-004242")).toBeInTheDocument();
+    // The boundary this screen now enforces: a supporter who has sent nothing sees
+    // no HFS-DON number, no exemption reference, and no claim of relief.
+    expect(screen.queryByText(/HFS-DON-\d{6}-\d{4}/)).toBeNull();
     expect(screen.queryByText(/tax-exempt/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Section 44\(6\)/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText("LHDN.01/35/42/51/179-6.4912"),
     ).not.toBeInTheDocument();

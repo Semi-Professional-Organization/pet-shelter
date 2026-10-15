@@ -277,3 +277,36 @@ describe("SponsorshipReconciliation queue continuation", () => {
     });
   });
 });
+
+/**
+ * The queue asks the ledger for one row more than it renders, so truncation is
+ * *observed* rather than guessed -- the same contract the statutory export uses.
+ * Computing it and not showing it is what made that export silently drop receipts
+ * from an annual return, and this queue is oldest-first and fed by an
+ * unauthenticated public form, so what falls off the end is the newest genuine
+ * claims. These pin the banner in both directions.
+ */
+describe("the queue says when it is truncated", () => {
+  it("warns that older rows are shown when the lookahead found more", async () => {
+    mockedListPending.mockResolvedValue(queuePage([pendingPledge], true));
+
+    renderQueue();
+    await waitForPledge();
+
+    expect(
+      await screen.findByText(/more than 1 commitments are awaiting confirmation/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/only the oldest are shown/i)).toBeInTheDocument();
+  });
+
+  it("says nothing about truncation when the page is the whole queue", async () => {
+    mockedListPending.mockResolvedValue(queuePage([pendingPledge], false));
+
+    renderQueue();
+    await waitForPledge();
+
+    expect(
+      screen.queryByText(/awaiting confirmation/i),
+    ).not.toBeInTheDocument();
+  });
+});

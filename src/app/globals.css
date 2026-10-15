@@ -679,14 +679,18 @@
     border-color: var(--border);
     color: var(--receipt-ink);
   }
-  .receipt-accent {
-    color: var(--receipt-ink-accent);
-  }
-  .receipt-panel {
-    background-color: var(--receipt-panel);
-    border-color: var(--receipt-rule);
-    color: var(--receipt-ink-soft);
-  }
+  /* The receipt-accent (total) and receipt-panel (donor note) helpers were removed
+     on 2026-09-22 along with the two on-screen receipt dossiers they styled. The
+     donation form no longer issues a receipt — it records a pending pledge, and
+     the Section 44(6) document is emailed once a coordinator confirms the
+     transfer, from sendDonationReceiptEmail, whose HTML is inline-styled because
+     email clients do not load a stylesheet. The receipt shell above stays: the
+     sponsor certificate still renders on this paper. The design-system guard in
+     tests/unit/designSystemGuards caught both as dead CSS, which is what it is
+     for — declared and shipped to every visitor while styling nothing.
+     Write no dotted names in this comment: that guard scans the raw text of this
+     layer, so a class name or a file extension written with a leading dot reads
+     to it as a fresh declaration with no call site. */
 
   /* --- Segmented control (language / theme toggles). --- */
   .segmented {

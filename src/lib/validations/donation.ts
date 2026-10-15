@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isGiftRef } from "@/lib/domain/donationPledge";
 
 export const donationTierEnum = z.enum([
   "kibble",
@@ -68,12 +69,17 @@ export const donationPledgeSchema = z.object({
     .optional()
     .or(z.literal("")),
 }).superRefine((pledge, ctx) => {
-  // A receipt is issued for every donation either way — the ledger is the shelter's
-  // complete record of money received, so opting out of relief must not create a
-  // donation the series never saw. What the flag changes is whether the receipt can
-  // actually be claimed: without an identifier it is a thank-you, not a tax document.
-  // Marking the field required in the form while accepting it as absent here is how a
-  // donor ends up holding a "tax-deductible" receipt they cannot file.
+  // Every gift is recorded either way, and every *reconciled* gift earns a receipt —
+  // the ledger is the shelter's complete record of money received, so opting out of
+  // relief must not create a donation the series never saw. What the flag changes is
+  // whether that receipt can actually be claimed: without an identifier it is a
+  // thank-you, not a tax document. Marking the field required in the form while
+  // accepting it as absent here is how a donor ends up holding a "tax-deductible"
+  // receipt they cannot file.
+  //
+  // Since 2026-09-22 the receipt is issued at reconciliation rather than at
+  // submission, so the identifier collected here is snapshotted onto the pending
+  // pledge and copied onto the receipt when a coordinator confirms the transfer.
   if (!pledge.wantsTaxReceipt) return;
 
   if (!pledge.taxIdOrIc || pledge.taxIdOrIc.trim() === "") {
@@ -87,6 +93,51 @@ export const donationPledgeSchema = z.object({
 });
 
 export type DonationPledgeInput = z.infer<typeof donationPledgeSchema>;
+
+/**
+ * The reference a donor was handed at checkout, as a coordinator submits it back.
+ *
+ * Checked at the action boundary for the reason `pledgeRefSchema` gives in
+ * `sponsorship.ts`: Server Action arguments arrive deserialised and unchecked, and
+ * Prisma's `where: { pledgeRef }` accepts a filter *object* as readily as a string,
+ * so an unvalidated argument could match every row rather than one.
+ */
+export const giftRefSchema = z
+  .string({ message: "A pledge reference must be text" })
+  .trim()
+  .min(1, "A pledge reference is required")
+  .max(64, "That is not a pledge reference")
+  // Stricter than the sponsorship twin, which checks only length. This series has
+  // exactly one producer, `generateGiftRef`, so the shape is knowable — and the
+  // check is what stops a receipt number pasted into the queue's reference field
+  // reaching Prisma and coming back as an unhelpful "not found".
+  .refine(isGiftRef, "That is not a pledge reference");
+
+/**
+ * What the donor sees the moment the donation form completes.
+ *
+ * Deliberately not a `DonationReceiptDTO`. Until 2026-09-22 this flow returned
+ * one, which meant a supporter who had sent nothing walked away holding an
+ * official `HFS-DON-*` Section 44(6) number. What they get now is a claim
+ * reference to quote on their transfer, and the receipt follows reconciliation —
+ * so there is no field here for a receipt number to be smuggled into, and none of
+ * the tax-claim copy `isTaxClaimable` gates has anything to render from.
+ */
+export interface DonationPledgeDTO {
+  pledgeRef: string;
+  donorName: string;
+  donorEmail: string;
+  tierId: z.infer<typeof donationTierEnum>;
+  tierName: string;
+  amountMYR: number;
+  frequency: "one_time" | "monthly";
+  paymentMethod: "duitnow_qr" | "online_banking" | "card";
+  targetPetName?: string;
+  /** Always `PENDING_PAYMENT` here; a receipt follows reconciliation. */
+  status: string;
+  /** What the donor is told happens next, given how they said they would pay. */
+  reconciliationNotice: string;
+}
 
 export interface DonationReceiptDTO {
   receiptNumber: string;

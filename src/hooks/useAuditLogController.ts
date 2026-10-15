@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { fetchAuditLogsAction } from "@/actions/audit";
 import { fetchDonationReceiptsAction } from "@/actions/donations";
 import { AuditEntry } from "@/lib/domain/auditLog";
+import { isReceiptAuditRow } from "@/lib/domain/receiptAuditRow";
 import { exportReceiptsToCsv, exportAuditLogsToCsv } from "@/lib/presentation/exportCsv";
 
 export type AuditTabFilter = "all" | "receipts" | "adoptions" | "system";
@@ -65,12 +66,7 @@ export function useAuditLogController() {
   }, []);
 
   const receiptLogs = useMemo(() => {
-    return logs.filter(
-      (log) =>
-        log.action === "DONATION_RECEIVED" ||
-        log.entity === "DonationReceipt" ||
-        (log.details && typeof log.details === "object" && "receiptNumber" in log.details)
-    );
+    return logs.filter(isReceiptAuditRow);
   }, [logs]);
 
   const adoptionLogs = useMemo(() => {
