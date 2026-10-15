@@ -391,7 +391,8 @@ if (HAS_EXPAND) {
     const oneErr = await tryExec(one, EXPAND);
     check(
       `  ...and the backfill refuses it, naming the row`,
-      /cannot be derived/.test(oneErr) && /app-only-row/.test(oneErr),
+      // The no-break-space entry is refused by the non-ASCII stage, which runs first.
+      (age.includes(NBSP) ? /non-ASCII/ : /cannot be derived/).test(oneErr) && /app-only-row/.test(oneErr),
       oneErr ? oneErr.split("\n")[0].slice(0, 160) : "the backfill accepted it"
     );
     await one.close();
@@ -419,26 +420,43 @@ if (HAS_EXPAND) {
     "2 years 3 weeks",
   ];
 
-  // Non-ASCII strings that carry an English unit the backfill reads, so they get past the unit
-  // stage and are refused by the non-ASCII stage. Every one of these stored a different birthday
-  // from the app's, with no error, under some earlier version of the file:
-  //   - a no-break space: JS `\s` matches it, Postgres `[[:space:]]` does not, so the app read the
-  //     year and the backfill the month (measured: app 2025-06-12, backfill 2025-12-12);
-  //   - U+0085: the reverse, Postgres `[[:space:]]` matches it and JS `\s` does not;
-  //   - an n-tilde glued to an English unit: JS `\b` ends the word there, Postgres `\M` does not.
+  // Non-ASCII strings, refused by the file's first stage before any regex reads them. The first
+  // three each stored a different birthday from the app's, with no error, under an earlier
+  // version of the file. Measured on pglite (UTF8, ctype C.UTF-8) on 2026-10-15, intake
+  // 2026-06-12, by matching the file's own unit patterns:
+  //   - no-break space: the app reads one year (JS `\s` matches it); Postgres `[[:space:]]` does
+  //     not, so it found only the months;
+  //   - U+0085: the reverse. The app reads six months (JS `\s` does not match it); Postgres
+  //     `[[:space:]]` does, so it found the year first;
+  //   - an n-tilde after "year": the app reads one year (JS `\b` ends the word there); Postgres
+  //     `\M` does not, so it found only the months.
+  // The app's half of each is asserted below, so a change to the app's reading shows up here.
   const NEL = String.fromCharCode(0x85);
   const NTILDE = String.fromCharCode(0xf1);
-  const NON_ASCII = [
-    "1" + NBSP + "year 6 months",
-    "1" + NBSP + "tahun 6 months",
-    "1" + NEL + "year 6 months",
-    "1 year" + NTILDE + " 6 months",
-  ];
-  // The non-ASCII stage sits after the fractional check, so a dash range is still refused under
-  // the name that says what to fix, and a vulgar fraction, which carries no digit-unit pair the
-  // backfill reads, is still refused as unparseable at the stage before both.
   const EN_DASH = String.fromCharCode(0x2013);
   const HALF = String.fromCharCode(0xbd);
+  const NON_ASCII = [
+    "1" + NBSP + "year 6 months",
+    "1" + NEL + "year 6 months",
+    "1 year" + NTILDE + " 6 months",
+    "1" + NBSP + "tahun 6 months",
+    "2" + NNBSP + "yo 3 months",
+    "2" + NBSP + "years",
+    // Expand's own M1 and N1 range shapes and its L3 vulgar fraction: refused by this stage now,
+    // rather than as fractional or unparseable, because it runs first.
+    "3" + EN_DASH + "4 years",
+    "3 " + EN_DASH + " 4 years",
+    "2" + String.fromCharCode(0x2014) + "3 years",
+    "1" + HALF + " years",
+  ];
+  for (const [age, want] of [
+    [NON_ASCII[0], "2025-06-12"],
+    [NON_ASCII[1], "2025-12-12"],
+    [NON_ASCII[2], "2025-06-12"],
+  ]) {
+    const got = approximateBirthDate(age, intake).birthDate;
+    check(`the app reads ${JSON.stringify(age)} as ${want}`, got === want, `got ${got}`);
+  }
 
   // ---- expand's own J1 and J3, reproduced here so they can actually run -----------------------
   //
@@ -447,8 +465,8 @@ if (HAS_EXPAND) {
   // harness needs embedded-postgres; this one does not. Changing the file's refusal set means the
   // pre-check had to change with it, so the pairing is re-checked here: same extraction, same eight
   // fixtures and expected labels, same two assertions — plus the mixed strings above, which must
-  // read `unparseable age`, the non-ASCII ones, which must read `non-ASCII age`, and the dash,
-  // fraction and tab cases that pin where the non-ASCII stage sits.
+  // read `unparseable age`, the non-ASCII ones, which must read `non-ASCII age`, and a tab and a
+  // bad-date case that pin where the non-ASCII stage sits.
   const lines = EXPAND.split("\n");
   const from = lines.findIndex((l) => l.includes("SELECT * FROM ("));
   const to = lines.findIndex((l) => l.includes(`ORDER BY (verdict LIKE 'ok:%'), verdict, "id";`));
@@ -466,14 +484,10 @@ if (HAS_EXPAND) {
       ["j-8", "1.5 years", "2026-06-12", "fractional age"],
       ...MIXED.map((age, k) => [`j-mixed-${k}`, age, "2026-06-12", "unparseable age"]),
       ...NON_ASCII.map((age, k) => [`j-nonascii-${k}`, age, "2026-06-12", "non-ASCII age"]),
-      // Expand's own M1 and N1 shapes, which that harness asserts as "fractional" and cannot run here.
-      ["j-endash", "3" + EN_DASH + "4 years", "2026-06-12", "fractional age"],
-      ["j-endash-spaced", "3 " + EN_DASH + " 4 years", "2026-06-12", "fractional age"],
-      ["j-emdash", "2" + String.fromCharCode(0x2014) + "3 years", "2026-06-12", "fractional age"],
-      // A digit, four non-digits, then "3 months": the fractional shape, caught one stage earlier.
-      ["j-nnbsp-yo", "2" + NNBSP + "yo 3 months", "2026-06-12", "fractional age"],
-      ["j-half", "1" + HALF + " years", "2026-06-12", "unparseable age"],
+      // ASCII whitespace other than a space: both engines read it as a space, so it is accepted.
       ["j-tab", "2\tyears", "2026-06-12", "ok: years"],
+      // Non-ASCII in the age is checked before a bad intake date, in the file and the pre-check.
+      ["j-nonascii-baddate", "2" + NBSP + "years", "not-a-date", "non-ASCII age"],
       ["j-tahun", "2 tahun", "2026-06-12", "unparseable age"],
       ["j-weeks", "3 weeks", "2026-06-12", "unparseable age"],
     ];

@@ -212,6 +212,9 @@
 --   SELECT * FROM (
 --        SELECT "id", "name", "age", "intakeDate",
 --          CASE
+--            WHEN current_setting('server_encoding') <> 'UTF8' THEN 'database not UTF8'
+--            WHEN octet_length(coalesce("age",'')) <> char_length(coalesce("age",''))
+--                 THEN 'non-ASCII age'
 --            WHEN left(coalesce("intakeDate",''),10)
 --                 !~ '^[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$' THEN 'bad intakeDate'
 --            WHEN substr(left("intakeDate",10),9,2)::int
@@ -226,17 +229,13 @@
 --                 THEN 'fractional age'
 --            -- Years first and each bound tested only for the unit it belongs to, because that is
 --            -- what the file does. Testing both bounds independently made "2 years 800 months"
---            -- read implausible here and backfill as 2 years there. Non-ASCII is tested inside
---            -- each branch, ahead of the bound, for the same reason: the file refuses it only
---            -- once a unit has been found, and before it tests plausibility.
+--            -- read implausible here and backfill as 2 years there.
 --            WHEN lower(coalesce("age",'')) ~ '[0-9]+[[:space:]]*(years|year|yrs|yr|y)\M'
---                 THEN CASE WHEN octet_length("age") <> char_length("age") THEN 'non-ASCII age'
---                      WHEN (regexp_match(lower("age"),
+--                 THEN CASE WHEN (regexp_match(lower("age"),
 --                       '([0-9]+)[[:space:]]*(?:years|year|yrs|yr|y)\M'))[1]::numeric > 60
 --                      THEN 'implausible age' ELSE 'ok: years' END
 --            WHEN lower(coalesce("age",'')) ~ '[0-9]+[[:space:]]*(months|month|mths|mth|mos|mo|m)\M'
---                 THEN CASE WHEN octet_length("age") <> char_length("age") THEN 'non-ASCII age'
---                      WHEN (regexp_match(lower("age"),
+--                 THEN CASE WHEN (regexp_match(lower("age"),
 --                       '([0-9]+)[[:space:]]*(?:months|month|mths|mth|mos|mo|m)\M'))[1]::numeric > 720
 --                      THEN 'implausible age' ELSE 'ok: months' END
 --            ELSE 'unparseable age'
@@ -246,14 +245,17 @@
 --    ORDER BY (verdict LIKE 'ok:%'), verdict, "id";
 --
 -- Every row should read `ok: years` or `ok: months`. The other five verdicts are the five things
--- this file refuses, and each is a row to correct by hand first, or it will abort naming that row:
+-- this file refuses, and each is a row to correct by hand first, or it will abort naming that row
+-- (a sixth, `database not UTF8`, is on every row or none, and means this file will not run here):
 --
+--   non-ASCII age     a no-break space, an accented letter, an en dash, a vulgar fraction -- any
+--                     character outside plain ASCII, which the app and this file can read
+--                     differently; retype it in plain ASCII, as one whole number and unit.
+--                     Checked first, so every check after it reads ASCII only.
 --   bad intakeDate    not a real calendar date; fix the date
 --   fractional age    "1.5 years" reads as 5 and "3-4 years" reads as 4; pick one whole
 --                     number -- "18 months", "3 years" -- or say which bound you mean
 --   implausible age   over 60 years or 720 months; a typo, not an animal
---   non-ASCII age     a no-break space, an accented letter or any other non-ASCII character,
---                     which the app and this file read differently; retype it in plain ASCII
 --   unparseable age   no number-and-unit the rule recognises; rewrite as "2 years", "4 months"
 --
 -- **Read the `age` column itself, not only the verdict.** The rule reads a number and a unit; it
@@ -384,13 +386,6 @@ BEGIN
   -- later read of the table behind it, the live site's included.
   PERFORM set_config('lock_timeout', '5s', true);
 
-  -- The non-ASCII refusal below compares bytes to characters, which means "non-ASCII" only under
-  -- UTF8. Neon databases are UTF8; this makes that an enforced fact rather than a belief.
-  IF current_setting('server_encoding') <> 'UTF8' THEN
-    RAISE EXCEPTION 'this file assumes a UTF8 database, and this one is %. Nothing has been changed.',
-      current_setting('server_encoding');
-  END IF;
-
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
      WHERE table_schema = 'public' AND table_name = 'pets'
@@ -449,6 +444,15 @@ BEGIN
     -- the year away from 0 and the month to 01-12, so make_date below cannot raise either: for
     -- a row that fails any part of this, every expression yields NULL and the row is named by
     -- the check that follows.
+    --
+    -- The non-ASCII refusal below compares bytes to characters, which means "non-ASCII" only
+    -- under UTF8. Neon databases are UTF8; this makes that an enforced fact rather than a belief.
+    -- Here, not at the top, so a non-UTF8 database that only needs the NOT NULL relax still gets it.
+    IF current_setting('server_encoding') <> 'UTF8' THEN
+      RAISE EXCEPTION 'this file assumes a UTF8 database, and this one is %. Nothing has been changed.',
+        current_setting('server_encoding');
+    END IF;
+
     CREATE TEMP TABLE _pets_birth_backfill ON COMMIT DROP AS
     SELECT s.*,
            CASE WHEN substr(s.intake_txt, 9, 2)::int
@@ -486,7 +490,7 @@ BEGIN
                  -- six months while the app reads one year: a different birthday, no error. #42
                  -- taught the app these units; this keeps the backfill to "store what the app
                  -- computes, or refuse". Checked first, so it wins over an English unit later on.
-                 -- Non-ASCII text is refused separately, after the fractional check -- see there.
+                 -- Non-ASCII text is refused separately, before any of this is consulted.
                  --
                  -- ceiling: a deny list, kept by hand beside petAge.ts's AGE_*_PATTERNs, so a unit
                  -- added there and not here reopens the silent divergence, and nothing in `npm test`
@@ -516,6 +520,27 @@ BEGIN
 
     SELECT count(*) INTO total FROM _pets_birth_backfill;
 
+    -- Any character outside ASCII, refused whole, and first. The app's patterns are JS regexes and
+    -- this file's are Postgres ones, and outside ASCII they can disagree in either direction: JS
+    -- `\s` matches a no-break space where Postgres `[[:space:]]` (under the ctypes measured) does
+    -- not, so "1<NBSP>year 6 months" was one year to the app and six months here; Postgres
+    -- `[[:space:]]` matches U+0085 under some ctypes where JS `\s` never does; and a non-ASCII
+    -- letter after a unit ends a word for JS `\b` but not for Postgres `\M`. An earlier version
+    -- listed whitespace code points one by one, and a review found the next case the same day.
+    -- First, so that every check below reads ASCII only, where the two engines agree under any
+    -- ctype -- which no one has measured on production. The cost: an en-dash range or a vulgar
+    -- fraction is named here rather than as fractional, so the message below says so.
+    SELECT string_agg(
+             format('%L (age=%L)', "id", "age"), E'\n    ' ORDER BY "id")
+      INTO offenders
+      FROM _pets_birth_backfill
+     WHERE non_ascii;
+
+    IF offenders IS NOT NULL THEN
+      RAISE EXCEPTION E'pets rows whose "age" contains a non-ASCII character, which this file will not interpret:\n    %\nA no-break space, an accented letter, an en dash or a vulgar fraction can be read one way by the app and another way here, and is invisible or near enough in this listing. Retype each in plain ASCII as one whole number and unit -- "2 years", "18 months" -- then re-run. Nothing has been changed.',
+        offenders;
+    END IF;
+
     SELECT string_agg(
              format('%L (age=%L, intakeDate=%L)', "id", "age", "intakeDate"),
              E'\n    ' ORDER BY "id")
@@ -541,28 +566,6 @@ BEGIN
 
     IF offenders IS NOT NULL THEN
       RAISE EXCEPTION E'pets rows whose "age" is fractional, which this file will not round:\n    %\nThe rule reads the digits next to the unit, so "1.5 years" would be stored as 5 years before intake. Rewrite each in whole units -- "18 months" for "1.5 years" -- then re-run. Nothing has been changed.',
-        offenders;
-    END IF;
-
-    -- Any character outside ASCII, refused whole. The app's patterns are JS regexes and this
-    -- file's are Postgres ones, and outside ASCII they disagree in both directions: JS `\s`
-    -- matches a no-break space and Postgres `[[:space:]]` does not, so "1<NBSP>year 6 months" is
-    -- one year to the app and six months here; Postgres `[[:space:]]` matches U+0085 and JS `\s`
-    -- does not, so "1<U+0085>year 6 months" is the reverse; and a non-ASCII letter glued to a unit
-    -- ("1 year" then an n-tilde) ends a word for JS `\b` but not for Postgres `\M`. Each stored a
-    -- different birthday from the app's with no error. An earlier version listed the whitespace
-    -- code points one by one, and a review found the next one the same day. On ASCII alone the
-    -- two engines agree whatever the database's ctype, which no one has measured on production.
-    -- Placed after the fractional check, so an en-dash range ("3<en-dash>4 years") is still
-    -- refused as fractional, which says better what to fix.
-    SELECT string_agg(
-             format('%L (age=%L)', "id", "age"), E'\n    ' ORDER BY "id")
-      INTO offenders
-      FROM _pets_birth_backfill
-     WHERE non_ascii;
-
-    IF offenders IS NOT NULL THEN
-      RAISE EXCEPTION E'pets rows whose "age" contains a non-ASCII character, which this file will not interpret:\n    %\nA no-break space or an accented letter is read one way by the app and another way here. Retype each in plain ASCII -- "2 years", "4 months" -- then re-run. Nothing has been changed.',
         offenders;
     END IF;
 
