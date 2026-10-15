@@ -27,8 +27,9 @@ Record active multi-step work streams below.
       (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. It now clamps
       to the earliest date a `Date` holds (`-271821-04-20`), older than any age that fits. When
       the intake is out of range too, the intake is returned as given, as for an age with no
-      unit. **Defensive today:** the Prisma model has no `age`, and `usePetStore`'s mount effect
-      replaces the derived pets with the raw saved ones, so nothing user-visible changes.
+      unit. **Mostly defensive today:** the Prisma model has no `age`, and `usePetStore`'s
+      mount effect replaces the derived pets with the raw saved ones. Rendered, only the first
+      render differs: master showed the fixtures, the branch shows the saved pets.
 - [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
       `expectTypeOf` tests that fail `tsc` on the old signature.
 - [x] Tried and **withdrawn** after review, all for one reason: a refusal here is the intake
@@ -40,12 +41,13 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, eight rounds: 9, 7, 8, 8, 8, 7, 9 and 7 findings, each probed. Round five
-  dropped the century change. Rounds six to eight found no code defect, only wrong claims about
-  what master's throw did downstream. The first wrong claim was a database swap to demo pets; no
-  Prisma row has an `age`. The second was a browser losing its saved pets; the mount effect
-  restores them. Both claims are now cut back to what the code shows. That last correction is
-  comments and ledger only and has not had its own review.
+- `/code-review high`, nine rounds: 9, 7, 8, 8, 8, 7, 9, 7 and 4 findings, each probed. Round
+  five dropped the century change. Rounds six to nine found no code defect, only wrong claims
+  about what master's throw did downstream. The first wrong claim was a database swap to demo
+  pets; no Prisma row has an `age`. The second was a browser losing its saved pets; the mount
+  effect restores them. The third said nothing user-visible changes; the first render does.
+  Round nine rendered `usePetStore` against both parsers. Its wording fixes are comments and
+  ledger only, and were not reviewed again.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).

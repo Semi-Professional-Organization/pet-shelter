@@ -53,15 +53,20 @@ What remains new is only the date an overflow gets where master threw:
   answer to clamp to. A derived date that fits is returned as computed, as on master, and with
   such an intake that can itself be a future date (`250000 years` before `300000-01-01`).
 
-**This is defensive today; nothing user-visible changes.** Only a pet with an `age` and no
-`birthDate` reaches `approximateBirthDate`. The Prisma `Pet` model has no `age` field, so no
-database read does, even though production's `pets` table still has the column until the
-birth-date migration is applied. What remains is a browser's `localStorage` copy, derived in
-`usePetStore`'s initializer. There master's throw was caught, and the fixtures showed for one
-render. Then the store's mount effect (`petStore.ts`, `setPets(JSON.parse(saved))`) replaced
-them with the saved pets as stored, without deriving anything. That same effect discards the
-clamped value on this branch. The clamp matters once that mount effect derives ages too, or once
-a new caller passes an age.
+**This is mostly defensive today.** At runtime only a pet with an `age` and no `birthDate`
+reaches `approximateBirthDate`. The Prisma `Pet` model has no `age` field, so no database read
+does, even though production's `pets` table keeps the column until the *contract* migration
+drops it; the expand half only adds `birthDate`. What remains is a browser's `localStorage`
+copy, derived in `usePetStore`'s initializer. (The contract rehearsal also calls the function
+directly.)
+
+Rendered with such a pet saved, the store differs for one render only. On master the throw was
+caught, so the first render showed the ten fixtures. On this branch the first render shows the
+saved pets, the overflow one as `273847 years`, senior. Whether that frame is painted was
+reasoned, not traced. From the second render on, both are identical. The mount effect
+(`petStore.ts`, `setPets(JSON.parse(saved))`) replaces the pets with the saved ones as stored,
+deriving nothing, and that discards the clamped value too. The clamp matters fully once that
+mount effect derives ages too, or once a new caller passes an age.
 
 Two earlier versions of this paragraph described consequences that were never traced. One was a
 database swap to demo pets, the other a browser losing its saved pets. Both were wrong. See

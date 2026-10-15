@@ -196,10 +196,10 @@ function isoDate(year: number, month: number, day: number): string | null {
 
 /**
  * The earliest date a `Date` can hold. An age so large that its birth date would be earlier still
- * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError`. Defensive
- * today: only a pet with an `age` and no `birthDate` reaches this function, and the Prisma `Pet`
- * model has no `age` field, so no database read does. What remains is a legacy `localStorage`
- * copy, in `usePetStore`'s initializer.
+ * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError`. At runtime
+ * only a pet with an `age` and no `birthDate` reaches this function, and the Prisma `Pet` model has
+ * no `age` field, so no database read does. What remains is a legacy `localStorage` copy, in
+ * `usePetStore`'s initializer. The contract migration's rehearsal also calls it directly.
  *
  * ceiling: no plausibility check at all, deliberately. `61 years` or `15000000 weeks` is junk, but
  * the only other answer this function can give is the intake date, which shows the animal as a
