@@ -3,7 +3,8 @@ import { donationPledgeSchema } from "@/lib/validations/donation";
 import { submitDonationPledgeAction } from "@/actions/donations";
 import { sendDonationReceiptEmail } from "@/lib/email";
 import { getAuditLogs } from "@/lib/domain/auditLog";
-import { findDonationByReceiptNumber, listDonations } from "@/lib/server/donationLedger";
+import { listDonations } from "@/lib/server/donationLedger";
+import { findDonationPledgeByRef } from "@/lib/server/donationPledgeLedger";
 import {
   LHDN_TAX_DEDUCTIBLE_REF,
   STATUTORY_ROS_REGISTRATION_NO,
@@ -82,7 +83,7 @@ describe("Donation & Sponsorship Validation Schema", () => {
 });
 
 describe("Donation Server Action (submitDonationPledgeAction)", () => {
-  it("should process a donation pledge, generate LHDN receipt, and record an audit log", async () => {
+  it("records a pledge and audits it as a claim, not as money received", async () => {
     const result = await submitDonationPledgeAction({
       donorName: "Kenneth Lee",
       donorEmail: "kenneth.lee@example.com",
@@ -100,22 +101,26 @@ describe("Donation Server Action (submitDonationPledgeAction)", () => {
     expect(result.data).toBeDefined();
 
     if (result.data) {
-      expect(result.data.receiptNumber).toMatch(/^HFS-DON-\d{6}-\d{4}$/);
+      expect(result.data.pledgeRef).toMatch(/^HFS-GFT-\d{8}-\d{6}$/);
       expect(result.data.donorName).toBe("Kenneth Lee");
       expect(result.data.donorEmail).toBe("kenneth.lee@example.com");
       expect(result.data.amountMYR).toBe(250);
       expect(result.data.targetPetName).toBe("Barnaby");
-      expect(result.data.taxDeductibleRef).toBe(LHDN_TAX_DEDUCTIBLE_REF);
-      expect(result.data.shelterRegistrationNo).toBe(STATUTORY_ROS_REGISTRATION_NO);
+      expect(result.data.status).toBe("PENDING_PAYMENT");
       expect(result.data.tierName).toBe("Emergency Medical & Trauma Care");
+      expect(result.data.reconciliationNotice).toMatch(/coordinator matches your transfer/i);
     }
 
-    // Verify audit log
+    // `DONATION_PLEDGED`, never `DONATION_RECEIVED`: no money has been observed.
     const logs = getAuditLogs(10);
-    const donationLog = logs.find((l) => l.action === "DONATION_RECEIVED");
-    expect(donationLog).toBeDefined();
-    expect(donationLog?.actorRole).toBe("DONOR");
-    expect(donationLog?.actorEmail).toBe("kenneth.lee@example.com");
+    expect(logs.find((l) => l.action === "DONATION_RECEIVED")).toBeUndefined();
+
+    const pledgeLog = logs.find((l) => l.action === "DONATION_PLEDGED");
+    expect(pledgeLog).toBeDefined();
+    expect(pledgeLog?.entity).toBe("DonationPledge");
+    expect(pledgeLog?.entityId).toBe(result.data!.pledgeRef);
+    expect(pledgeLog?.actorRole).toBe("DONOR");
+    expect(pledgeLog?.actorEmail).toBe("kenneth.lee@example.com");
   });
 
   it("should handle custom amounts and default to custom tier name", async () => {
@@ -174,7 +179,7 @@ describe("Donation Receipt Transactional Email Dispatcher", () => {
   });
 });
 
-describe("Donation persistence (the ledger is the system of record)", () => {
+describe("Donation persistence (the pledge table is the system of record until reconciliation)", () => {
   const basePledge = {
     donorName: "Nurul Aisyah",
     donorEmail: "nurul.aisyah@example.com",
@@ -184,42 +189,39 @@ describe("Donation persistence (the ledger is the system of record)", () => {
     paymentMethod: "duitnow_qr" as const,
   };
 
-  it("writes a retrievable receipt rather than only emailing one", async () => {
-    // The defect this closes: the action previously minted a receipt number,
-    // emailed it, and stored nothing. The number existed only in the donor's
-    // inbox and an audit-log string, so it could not back an LHDN claim.
+  it("writes a retrievable pledge rather than only emailing one", async () => {
+    // The original defect this file guarded: the action minted a receipt number,
+    // emailed it, and stored nothing. The one it guards now is the opposite end —
+    // it stored a *receipt* for money nobody had counted. What is durable at this
+    // point is a claim, and it must still be readable back.
     const result = await submitDonationPledgeAction(basePledge);
     expect(result.success).toBe(true);
 
-    const stored = await findDonationByReceiptNumber(result.data!.receiptNumber);
+    const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
     expect(stored).not.toBeNull();
     expect(stored?.donorName).toBe("Nurul Aisyah");
     expect(stored?.tierName).toBe("1-Week Nutrition & Kibble Fund");
+    expect(stored?.status).toBe("PENDING_PAYMENT");
+    expect(stored?.receiptNumber).toBeNull();
   });
 
-  it("issues gapless, contiguous receipt numbers across donations", async () => {
-    const first = await submitDonationPledgeAction(basePledge);
-    const second = await submitDonationPledgeAction({
-      ...basePledge,
-      donorEmail: "second.donor@example.com",
-    });
-    const third = await submitDonationPledgeAction({
-      ...basePledge,
-      donorEmail: "third.donor@example.com",
-    });
+  it("draws no receipt number, however many gifts are submitted", async () => {
+    await submitDonationPledgeAction(basePledge);
+    await submitDonationPledgeAction({ ...basePledge, donorEmail: "second@example.com" });
+    await submitDonationPledgeAction({ ...basePledge, donorEmail: "third@example.com" });
 
-    const serials = [first, second, third].map(
-      (r) => Number(r.data!.receiptNumber.split("-").pop())
-    );
-    expect(serials).toEqual([1, 2, 3]);
-
-    const ledger = await listDonations();
-    expect(ledger).toHaveLength(3);
+    // The gapless HFS-DON series is untouched by submission. Three supporters
+    // saying they paid must not consume three statutory receipt numbers.
+    expect(await listDonations()).toHaveLength(0);
   });
 
-  it("keeps the receipt-number format the email template and CSV export expect", async () => {
+  it("hands the donor a claim reference that cannot be mistaken for a receipt", async () => {
     const result = await submitDonationPledgeAction(basePledge);
-    expect(result.data!.receiptNumber).toMatch(/^HFS-DON-\d{6}-\d{4}$/);
+
+    expect(result.data!.pledgeRef).toMatch(/^HFS-GFT-/);
+    expect(result.data!.pledgeRef).not.toMatch(/HFS-DON/);
+    // Nothing on the DTO can carry a receipt number: the type has no such field.
+    expect(result.data).not.toHaveProperty("receiptNumber");
   });
 
   it("stores the amount as exact sen while the DTO still exposes ringgit", async () => {
@@ -228,7 +230,7 @@ describe("Donation persistence (the ledger is the system of record)", () => {
     expect(result.success).toBe(true);
     expect(result.data!.amountMYR).toBe(19.9);
 
-    const stored = await findDonationByReceiptNumber(result.data!.receiptNumber);
+    const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
     expect(stored?.amountSen).toBe(1990);
   });
 
@@ -240,25 +242,25 @@ describe("Donation persistence (the ledger is the system of record)", () => {
     expect(await listDonations()).toHaveLength(0);
   });
 
-  it("snapshots the issuer identity onto the row, not just the emailed DTO", async () => {
+  it("snapshots the tier name onto the pledge, so a later rename cannot rewrite it", async () => {
     const result = await submitDonationPledgeAction(basePledge);
-    const stored = await findDonationByReceiptNumber(result.data!.receiptNumber);
+    const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
 
-    // Correcting the ROS number later (P2) must not retroactively rewrite
-    // receipts already filed with LHDN, so each row carries its own copy.
-    expect(stored?.shelterRegistrationNo).toBe(STATUTORY_ROS_REGISTRATION_NO);
-    expect(stored?.taxDeductibleRef).toBe("LHDN.01/35/42/51/179-6.4912");
+    // The issuer identity is snapshotted onto the *receipt* at reconciliation; what
+    // the pledge owns is what the donor was shown when they gave.
+    expect(stored?.tierName).toBe("1-Week Nutrition & Kibble Fund");
+    expect(stored?.currency).toBe("MYR");
   });
 
-  it("links the audit entry to the ledger row it describes", async () => {
+  it("links the audit entry to the pledge row it describes", async () => {
     const result = await submitDonationPledgeAction(basePledge);
 
-    const donationLog = getAuditLogs(10).find((l) => l.action === "DONATION_RECEIVED");
-    const stored = await findDonationByReceiptNumber(result.data!.receiptNumber);
+    const pledgeLog = getAuditLogs(10).find((l) => l.action === "DONATION_PLEDGED");
+    const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
 
-    expect(donationLog?.entity).toBe("Donation");
-    expect(donationLog?.entityId).toBe(result.data!.receiptNumber);
-    expect((donationLog?.details as Record<string, unknown>).donationId).toBe(stored?.id);
+    expect(pledgeLog?.entity).toBe("DonationPledge");
+    expect(pledgeLog?.entityId).toBe(result.data!.pledgeRef);
+    expect((pledgeLog?.details as Record<string, unknown>).pledgeId).toBe(stored?.id);
   });
 
   it("records nothing at all when validation fails", async () => {
@@ -271,7 +273,7 @@ describe("Donation persistence (the ledger is the system of record)", () => {
     expect(await listDonations()).toHaveLength(0);
   });
 
-  it("refuses the unsupported card rail without issuing a receipt", async () => {
+  it("refuses the unsupported card rail without recording anything", async () => {
     const result = await submitDonationPledgeAction({
       ...basePledge,
       paymentMethod: "card",
@@ -347,15 +349,18 @@ describe("LHDN Section 44(6) relief is opt-in, and opting in requires an identif
     expect(result.data!.wantsTaxReceipt).toBeUndefined();
   });
 
-  it("issues a receipt for a gift that declined relief — the ledger stays complete", async () => {
+  it("records a gift that declined relief — the pledge queue stays complete", async () => {
     const result = await submitDonationPledgeAction({ ...pledge, wantsTaxReceipt: false });
 
-    // Declining relief must not create a donation the gapless series never saw:
-    // the ledger is the shelter's record of money received, not of claims made.
+    // Declining relief must not create a gift the shelter never recorded: the
+    // ledger is the shelter's record of money received, not of claims made. What
+    // changed in 2026-09-22 is *when* the receipt half of that record is written.
     expect(result.success).toBe(true);
-    expect(result.data!.receiptNumber).toMatch(/^HFS-DON-\d{6}-\d{4}$/);
-    expect(result.data!.taxIdOrIc).toBeUndefined();
-    expect(await listDonations()).toHaveLength(1);
+    expect(result.data!.pledgeRef).toMatch(/^HFS-GFT-\d{8}-\d{6}$/);
+
+    const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
+    expect(stored?.taxIdOrIc).toBeUndefined();
+    expect(await listDonations()).toHaveLength(0);
   });
 
   it("hands the donor the message, not a serialised ZodError", async () => {

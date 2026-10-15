@@ -262,7 +262,7 @@ export default async function GetInvolvedPage() {
               </p>
               <div className="space-y-1.5 pt-2 text-xs text-foreground/90 font-medium">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-3.5 text-primary" /> Official e-receipt generated instantly
+                  <CheckCircle2 className="size-3.5 text-primary" /> Official e-receipt emailed once your transfer is confirmed
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="size-3.5 text-primary" /> Brand logo credited in shelter bulletin

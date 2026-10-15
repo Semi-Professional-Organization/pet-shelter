@@ -8,6 +8,7 @@ import {
   getServerFaqsAsync,
   getServerFaqCategoriesAsync,
 } from "@/lib/server/faqRepository";
+import { getPublicBulletins } from "@/lib/server/bulletinRepository";
 import { Loader2 } from "lucide-react";
 
 /**
@@ -48,9 +49,11 @@ export default async function PetsDirectoryPage() {
   // cannot offer a filter that matches nothing. Both reads hit the same source
   // and are independent, so they run together rather than making this page's
   // TTFB the sum of two round trips.
-  const [initialFaqs, initialFaqCategories] = await Promise.all([
+  const [initialFaqs, initialFaqCategories, bulletins] = await Promise.all([
     getServerFaqsAsync(),
     getServerFaqCategoriesAsync(),
+    // Notices targeted at this page, plus the ones targeted at every feed.
+    getPublicBulletins("pets", 2),
   ]);
 
   return (
@@ -75,10 +78,9 @@ export default async function PetsDirectoryPage() {
       {/* Directory Bulletins / Notices */}
       <section className="w-full px-6 sm:px-8 lg:px-12 pt-10 border-t border-border mt-10">
         <BulletinFeed
-          targetPage="pets"
+          bulletins={bulletins}
           title="Adoption Notices & Clinic Updates"
           compact={true}
-          maxItems={2}
         />
       </section>
 

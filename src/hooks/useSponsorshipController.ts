@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Pet } from "@/types/pet";
 import { SponsorshipTier, DonationReceipt, SponsorshipTierId } from "@/types/sponsorship";
-import { SPONSORSHIP_TIERS, useSponsorshipStore } from "@/lib/client/sponsorshipStore";
+import { SPONSORSHIP_TIERS } from "@/lib/client/sponsorshipStore";
 import { tierAmountFor } from "@/lib/domain/sponsorshipTiers";
 import { MIN_SPONSORSHIP_SEN } from "@/lib/domain/petSponsorship";
 import { ringgitFromSen } from "@/lib/domain/money";
@@ -13,6 +13,7 @@ import {
   safeContributionFailureMessage,
 } from "@/lib/domain/contributionFailure";
 import { submitDonationPledgeAction } from "@/actions/donations";
+import type { DonationPledgeDTO } from "@/lib/validations/donation";
 import {
   createPetSponsorshipAction,
   type SponsorshipPledgeDTO,
@@ -25,9 +26,19 @@ export interface UseSponsorshipControllerProps {
   initialTierId?: SponsorshipTierId;
 }
 
+/**
+ * What checkout produced. Both arms are now pledges, not receipts.
+ *
+ * `donation_receipt` was the general-gift arm until 2026-09-22, when the donation
+ * form stopped issuing an official `HFS-DON-*` number from a supporter's word that
+ * they had paid. Both lanes now end at a claim reference, and the Section 44(6)
+ * receipt is issued from the coordinator's queue in `/admin/donations`. The two
+ * arms remain distinct because the money lands in two tables and the two
+ * references are drawn from different series.
+ */
 export type CheckoutOutcome =
   | { type: "sponsorship_pledge"; data: SponsorshipPledgeDTO }
-  | { type: "donation_receipt"; data: DonationReceipt };
+  | { type: "donation_pledge"; data: DonationPledgeDTO };
 
 type PaymentMethod = Exclude<DonationReceipt["paymentMethod"], "card">;
 
@@ -38,8 +49,6 @@ export function useSponsorshipController({
   targetPet,
   initialTierId,
 }: UseSponsorshipControllerProps) {
-  const { saveDonationReceipt } = useSponsorshipStore();
-
   const initialTier =
     SPONSORSHIP_TIERS.find((t) => t.id === initialTierId) || SPONSORSHIP_TIERS[1]; // Default to Vaccine (RM 50)
 
@@ -160,8 +169,10 @@ export function useSponsorshipController({
       });
 
       if (result.success && result.data) {
-        saveDonationReceipt(result.data);
-        setCompletedCheckout({ type: "donation_receipt", data: result.data });
+        // `saveDonationReceipt` is deliberately not called. That store holds
+        // receipts, and this is a claim reference for money nobody has counted;
+        // putting it there would rebuild the confusion this change removed.
+        setCompletedCheckout({ type: "donation_pledge", data: result.data });
       } else {
         // No local fallback, deliberately. A receipt number is allocated inside
         // the transaction that writes the Donation row, so one invented here
@@ -195,12 +206,6 @@ export function useSponsorshipController({
     setTaxIdOrIc("");
     setNotes("");
     setErrorMessage(null);
-  };
-
-  const handlePrintReceipt = () => {
-    if (typeof window !== "undefined") {
-      window.print();
-    }
   };
 
   return {
@@ -239,7 +244,6 @@ export function useSponsorshipController({
       handleCopyMaybank,
       handleCompleteDonation,
       handleReset,
-      handlePrintReceipt,
     },
   };
 }

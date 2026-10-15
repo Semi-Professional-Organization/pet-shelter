@@ -6,6 +6,12 @@ import {
   LHDN_TAX_DEDUCTIBLE_REF,
   STATUTORY_ROS_REGISTRATION_NO,
 } from "@/lib/domain/shelterIdentity";
+import {
+  auditDetails,
+  formatAmountCell,
+  isReceiptAuditRow,
+  resolveAuditAmountMYR,
+} from "@/lib/domain/receiptAuditRow";
 
 /**
  * Escapes a single CSV field following RFC-4180:
@@ -209,8 +215,20 @@ export function generateReceiptsCsvString(
     if ("receiptNumber" in item && "donorName" in item) {
       // Standard DonationReceipt object
       const r = item as DonationReceipt;
-      const formattedAmount =
-        typeof r.amountMYR === "number" ? r.amountMYR.toFixed(2) : String(r.amountMYR);
+      // A ledger receipt's amount is a number the ledger computed, so any finite
+      // one is printed — including a zero or a negative, which is what an
+      // offsetting correction would look like and must be visible on the filed
+      // document. A negative is emitted as a *number*, not as text: `formatCsvField`
+      // prefixes any string starting with `-` with an apostrophe to defuse formula
+      // injection, which would turn the correction into a text cell that a SUM over
+      // the column silently skips. Anything that is not a finite number goes
+      // through the stricter reader, so this can never print `NaN` or `undefined`.
+      const formattedAmount: string | number =
+        typeof r.amountMYR === "number" && Number.isFinite(r.amountMYR)
+          ? r.amountMYR < 0
+            ? Number(r.amountMYR.toFixed(2))
+            : r.amountMYR.toFixed(2)
+          : formatAmountCell(r.amountMYR);
 
       rows.push([
         r.receiptNumber,
@@ -230,16 +248,13 @@ export function generateReceiptsCsvString(
     } else if ("action" in item) {
       // AuditEntry representing a donation
       const entry = item as AuditEntry;
-      const d = (entry.details || {}) as Record<string, unknown>;
-      const isDonation =
-        entry.action === "DONATION_RECEIVED" ||
-        entry.entity === "DonationReceipt" ||
-        Boolean(d.receiptNumber);
+      const d = auditDetails(entry);
 
-      if (isDonation) {
-        const rawAmount = (d.amountMYR as number | string | undefined) ?? 0;
-        const formattedAmount =
-          typeof rawAmount === "number" ? rawAmount.toFixed(2) : String(rawAmount);
+      // Classified and priced by `src/lib/domain/receiptAuditRow.ts`, which the
+      // audit viewer and the receipts tab use too. An unresolvable amount is an
+      // empty cell, never `0.00`.
+      if (isReceiptAuditRow(entry)) {
+        const formattedAmount = formatAmountCell(resolveAuditAmountMYR(d));
 
         const formattedDate = entry.createdAt.includes("T")
           ? entry.createdAt.replace("T", " ").slice(0, 19)
@@ -248,8 +263,20 @@ export function generateReceiptsCsvString(
         rows.push([
           (d.receiptNumber as string) || entry.entityId || "N/A",
           formattedDate,
-          (d.donorName as string) || "Anonymous Donor",
-          entry.actorEmail || (d.donorEmail as string) || "",
+          (d.donorName as string) || (d.sponsorName as string) || "Anonymous Donor",
+          // The supporter's own address first, the actor's only as a last resort.
+          // The two were the same value while a contribution was audited by the
+          // person who made it. They no longer are: a reconciled row is written by
+          // the coordinator who confirmed the transfer, so preferring `actorEmail`
+          // prints staff addresses in the "Donor Email" column of a tax export.
+          //
+          // Both spellings are checked because both kinds of row land here — a
+          // general gift's `DONATION_RECEIVED` carries `donorEmail`, and a
+          // `SPONSORSHIP_RECONCILED` row is classified as a donation by the
+          // `receiptNumber` test above and carries `sponsorEmail`. Rows older than
+          // 2026-09-22 carry neither and still resolve to `actorEmail`, which for
+          // them is correct.
+          (d.donorEmail as string) || (d.sponsorEmail as string) || entry.actorEmail || "",
           (d.donorPhone as string) || "",
           (d.taxIdOrIc as string) || "",
           formattedAmount,

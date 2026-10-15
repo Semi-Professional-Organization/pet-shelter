@@ -40,6 +40,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:local": "cross-env DATABASE_URL=\"postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public\" tsx prisma/seed.ts",
     "db:migrate:faqs": "tsx scripts/migrate-faqs.ts",
+    "db:migrate:bulletins": "tsx scripts/migrate-bulletins.ts",
+    "db:migrate:bulletins:local": "cross-env DATABASE_URL=\"postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public\" tsx scripts/migrate-bulletins.ts",
     "db:check-drift": "tsx scripts/check-drift.ts",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
