@@ -1883,8 +1883,9 @@ database) and driven with Playwright from a script outside the repo:
 The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
 closed there, so its links were not collected; none of them carries a fragment (read from
 `Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
-comparison cannot see. *(From "and all but" to the end of the `#volunteer` sentence, this was
-rewritten after round eleven — by the fixes for rounds twelve, thirteen and fourteen.)* Four of those are in the drift table above (`/pets` twice, `/donate`,
+comparison cannot see. *(From "and all but" to the end of the `#volunteer` sentence,
+rewritten after round eleven by the fixes for rounds twelve, thirteen and fourteen.)*
+Four of those are in the drift table above (`/pets` twice, `/donate`,
 `/applications/track`). `/faq` and the `/get-involved` page are not: the footer has no `/faq` link,
 and links that page only at `#volunteer`, which is a table row of its own. What
 this does not cover: a real screen reader, and
@@ -1899,26 +1900,21 @@ button has no emoji (its six text links do), and its bulletins link reads `nav.b
 than an inline ternary. Both re-checked by listing every emoji-bearing line of `Navbar.tsx` with a
 Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a false negative.
 
-**Corrected 2026-10-15 — the reason first given here for stopping was false.** It said rounds ten,
-eleven and twelve each found only wording, never code. Two corrections of that sentence each sorted
-the rounds into "fact" and "wording" again, and each sort was overturned by the next review: the
-line between the two is a judgment, and it was drawn each time where it supported the paragraph's
-point. So this record no longer sorts them. Each round, what it reviewed, what it found, and what
-happened:
+**Corrected 2026-10-15.** The paragraph that stood here stopped the loop on a false premise, and
+`deea461`'s commit message repeats it; history is not rewritten. The owner then asked for round
+thirteen, and review continued. Each round since:
 
 | Round | Reviewed | Findings | Disposition |
 |---|---|---|---|
-| 10 | `6a92009` (tests), `72a0fd3` (ledger) | Tests correct. Drift table: `/bulletins` missed as a shared link; two of `/pets`' five labels missing; "the other three" under a table of five; one English partial match named out of two | Table rebuilt from a grep (`9c0bebe`) |
-| 11 | `9c0bebe` (ledger) | "Five wordings" for `/pets` (three in English); the mobile emoji prefix unmentioned | Both fixed (`457b791`) |
-| 12 | `457b791` (ledger) | "Every mobile label behind an emoji" (one button has none); "the labels are inline ternaries" (bulletins reads its key) | Both fixed (`deea461`) |
-| 13 | `deea461` (ledger) | Loop-stop premise false; the same premise in its commit message; a sentence implying every inline mobile label is in the drift table | Two fixed (`3d455db`); the commit message recorded, not rewritten |
-| 14 | `3d455db` (ledger) | The correction called round twelve wording-only; an unmarked in-place edit; "three findings, all fixed" when one was only recorded; "the footer links neither" ambiguous | All four fixed (`0fff8b5`) |
-| 15 | `0fff8b5` (ledger) | The table above it sorted rounds eleven and twelve by different standards; an earlier in-place edit still unmarked; round fourteen had no dispositions; "no code defect" hid that only round ten had code in scope | All four fixed by this rewrite |
+| 10 | `6a92009` (tests), `72a0fd3` (ledger) | Tests correct. Drift table missed the shared `/bulletins` link and two of `/pets`' five labels, said the other three under a table of five, and named one English partial match out of two | Table rebuilt from a grep (`9c0bebe`) |
+| 11 | `9c0bebe` (ledger) | Five `/pets` wordings claimed, three in English; mobile emoji prefix not mentioned | Fixed (`457b791`) |
+| 12 | `457b791` (ledger) | Said each mobile label renders behind an emoji, but one button has none; said its labels are inline ternaries, but bulletins reads its key | Fixed (`deea461`) |
+| 13 | `deea461` (ledger) | Loop-stop premise false, also in its commit message; a sentence implied every inline mobile label is in the drift table | Two fixed (`3d455db`); commit message recorded only |
+| 14 | `3d455db` (ledger) | Round twelve misdescribed; an unmarked in-place edit; a finding count that called a recorded item fixed; an ambiguous sentence about footer links | Fixed (`0fff8b5`) |
+| 15 | `0fff8b5` (ledger) | The table sorted rounds eleven and twelve by different standards; an in-place edit marker named the wrong rounds; round fourteen had no dispositions; the code-defect sentence did not say only round ten had code in scope | Fixed (`5b149c3`) |
+| 16 | `5b149c3` (ledger) | A causal sentence omitted the owner's request; a motive claim; a claim the record no longer labels rounds; row 15 misdescribed; the lesson labelled findings and paraphrased inside quotation marks; long lines | Fixed by this commit, which removes the characterising prose rather than rewording it |
 
-What is countable: only round ten had code in scope, and that code was correct. Every round from ten
-to fifteen found at least one inaccurate statement in ledger text written to fix the round before.
-That is why the loop did not stop where `deea461` said it would; its message keeps the original
-premise, and history is not rewritten.
+Only round ten had code in scope, and that code was correct.
 
 ## Round thirteen, and an accessibility-tree check
 
