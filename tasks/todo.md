@@ -41,13 +41,23 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, nine rounds: 9, 7, 8, 8, 8, 7, 9, 7 and 4 findings, each probed. Round
-  five dropped the century change. Rounds six to nine found no code defect, only wrong claims
-  about what master's throw did downstream. The first wrong claim was a database swap to demo
-  pets; no Prisma row has an `age`. The second was a browser losing its saved pets; the mount
-  effect restores them. The third said nothing user-visible changes; the first render does.
-  Round nine rendered `usePetStore` against both parsers. Its wording fixes are comments and
-  ledger only, and were not reviewed again.
+- `/code-review high`, rounds tallied from each round's report (each finding probed):
+
+  | round | findings | outcome |
+  |---|---|---|
+  | 1 | 9 — the fractional refusal's design; two parity claims; non-ISO leak; duplication; wrong level; no `ceiling:` marker; weeks claim | refusal withdrawn; ceiling and ISO fall-through added |
+  | 2 | 7 — eager `isoDate` throw on intake; cap makes a newborn; wrong depth; `Date.UTC` 0–99; `Omit` union; weeks cap 5 days short; eager allocation | cap and ISO fall-through replaced by an overflow guard; union declined |
+  | 3 | 8 — overflow becomes the intake date; century; union; untracked decision; non-monotonic; raw intake; no marker; closure | clamp, `setUTCFullYear`, marker; union declined |
+  | 4 | 8 — range check before the arithmetic (code); `isoDateSchema`; 0–99 scope; form; docstring; decision cite; wording; stream | arithmetic moved first; others corrected or declined |
+  | 5 | 8 — stale merge claim; wrong `isoDateSchema` reason; two-digit intake to 26 AD (code); copy divergence; extended-year zone; lesson; discrimination overstated; `TZ` unverified | `setUTCFullYear` reverted; `TZ` checked in PowerShell |
+  | 6 | 7 — wrong "list render" claim; `petRepository` maps inside its `try` (altitude); unconditioned intake claim; unprobed form claim; third validator; closure; literal | claims corrected; an open entry written on the repository claim; style declined |
+  | 7 | 9 — that repository path is unreachable (no `age` field), plus claims built on it and a stale #113 reason | entry deleted unpublished; claims corrected |
+  | 8 | 7 — `usePetStore`'s mount effect discards derivation (a pre-existing code defect, outside the diff); "lost saved pets" and four more claims false | claims corrected; mount effect listed as not done |
+  | 9 | 4 — "nothing user-visible" (the first render differs); another caller exists; expand vs contract migration | corrected in `d282e11` |
+
+  The branch's code last changed in round five's fix (`da58f3b`). The commits after it are
+  comments and ledger. Each later round was asked to review them and, by its own report, found
+  nothing wrong in the branch's code.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).
