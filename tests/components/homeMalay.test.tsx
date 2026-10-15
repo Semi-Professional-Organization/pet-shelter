@@ -197,8 +197,12 @@ describe("BulletinFeed on the Malay site", () => {
     renderWithLanguage(<BulletinFeed bulletins={notices} titleKey="home.bulletinsTitle" />, {
       language,
     });
+    // Each media branch must actually render, or a control inside it is never
+    // looked at: every notice renders an article, so the count alone proves
+    // nothing about the iframe or the image.
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(document.querySelector("iframe")).not.toBeNull();
+    expect(document.querySelector("img")).not.toBeNull();
 
     // No links either: a staff control does not have to be a button, and a
     // review showed an "Edit notices" link passed this case when it checked
