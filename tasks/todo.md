@@ -1883,7 +1883,9 @@ database) and driven with Playwright from a script outside the repo:
 The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
 closed there, so its links were not collected; none of them carries a fragment (read from
 `Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
-comparison cannot see — they are the navbar half of the drift table above. What this does not cover: a real screen reader, and
+comparison cannot see. Four of those are in the drift table above (`/pets` twice, `/donate`,
+`/applications/track`); `/faq` and `/get-involved` are not, because the footer links neither. What
+this does not cover: a real screen reader, and
 production data — with no database, the bulletin and pet content is whatever the fallback serves.
 
 ## Round twelve, and why the loop stops
@@ -1895,10 +1897,31 @@ button has no emoji (its six text links do), and its bulletins link reads `nav.b
 than an inline ternary. Both re-checked by listing every emoji-bearing line of `Navbar.tsx` with a
 Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a false negative.
 
-**No round thirteen.** Rounds ten, eleven and twelve each found only wording in the previous round's
-ledger text, never code, and each fix was a phrase. Reviewing a two-phrase correction that a direct
-source read has already checked repeats that regress. This deliberately departs from "review every
-fix round". It is stated here so the owner can overrule it rather than discover it.
+**Corrected 2026-10-15 — the reason first given here for stopping was false.** It said rounds ten,
+eleven and twelve each found only wording, never code. Round ten found wrong *facts*: an `href`
+list built from memory that missed a shared link, two of `/pets`' labels missing, and a wrong count.
+Its fix rebuilt the table. Only rounds eleven and twelve were wording-only. `deea461`'s commit
+message repeats the false premise, and history is not rewritten for it; this paragraph is the
+correction. The owner asked for round thirteen anyway, and it found exactly this.
+
+## Round thirteen, and an accessibility-tree check
+
+Reviewed `deea461`. No code defect; every Navbar claim held when re-derived (six emoji lines, the
+button without one, bulletins on its key, no mobile fragment). Three findings, all fixed: the false
+loop-stop premise above, the same premise in that commit's message (recorded, not rewritten), and a
+sentence implying every inline mobile label is in the drift table (`/faq` and `/get-involved` are not).
+
+A real screen reader was not available, so the production build was served locally again and
+Playwright's accessibility snapshot — what assistive technology is handed — was read on `/` and
+`/bulletins` with Malay chosen. `lang` is `ms` after hydration on both. Every heading is Malay, in
+order (`/`: one h1, then h2/h3 sections; `/bulletins`: h1 "Buletin Pusat Perlindungan", h2 "Semua
+Buletin"), except the bulletin's own title — content, which has no Malay column, already out of
+scope. No English dictionary value is in either tree, and no link lacks an accessible name. This is
+the tree a screen reader reads from, not a screen reader's behaviour: announcement order, and how a
+pre-hydration `lang="en"` is spoken, remain unverified.
+
+**What still needs the owner:** the Vercel preview is behind Vercel's login, and no browser tool
+here carries that login, so the branch has not been seen against real data.
 
 ## Verification
 
