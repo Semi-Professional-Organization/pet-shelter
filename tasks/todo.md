@@ -1883,8 +1883,8 @@ database) and driven with Playwright from a script outside the repo:
 The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
 closed there, so its links were not collected; none of them carries a fragment (read from
 `Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
-comparison cannot see. *(This sentence and the next were corrected in rounds thirteen and fourteen,
-after round eleven.)* Four of those are in the drift table above (`/pets` twice, `/donate`,
+comparison cannot see. *(From "and all but" to the end of the `#volunteer` sentence, this was
+rewritten after round eleven — by the fixes for rounds twelve, thirteen and fourteen.)* Four of those are in the drift table above (`/pets` twice, `/donate`,
 `/applications/track`). `/faq` and the `/get-involved` page are not: the footer has no `/faq` link,
 and links that page only at `#volunteer`, which is a table row of its own. What
 this does not cover: a real screen reader, and
@@ -1900,22 +1900,25 @@ than an inline ternary. Both re-checked by listing every emoji-bearing line of `
 Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a false negative.
 
 **Corrected 2026-10-15 — the reason first given here for stopping was false.** It said rounds ten,
-eleven and twelve each found only wording, never code. "Never code" holds for every late round; "only
-wording" holds for round eleven alone. The first correction of this paragraph said "eleven and
-twelve", which was the same mistake one round later, found by round fourteen. So the per-round
-record, read from each round's section rather than summarised from memory:
+eleven and twelve each found only wording, never code. Two corrections of that sentence each sorted
+the rounds into "fact" and "wording" again, and each sort was overturned by the next review: the
+line between the two is a judgment, and it was drawn each time where it supported the paragraph's
+point. So this record no longer sorts them. Each round, what it reviewed, what it found, and what
+happened:
 
-| Round | Reviewed | What it found in the previous round's text |
-|---|---|---|
-| 10 | `72a0fd3` | **False facts:** a shared link missed (`/bulletins`), two of `/pets`' five labels missing, "the other three" under a table of five, one English partial match named out of two. The fix rebuilt the table |
-| 11 | `9c0bebe` | **Wording only:** "five wordings" true only in Malay; the mobile emoji prefix not mentioned |
-| 12 | `457b791` | **False facts about the source:** every mobile label behind an emoji (one button has none); every mobile label an inline ternary (bulletins reads its key) |
-| 13 | `deea461` | **False claims about the record:** the loop-stop premise, repeated in that commit's message; a sentence implying every inline mobile label is in the drift table |
-| 14 | `3d455db` | **False claim about the record:** round twelve called wording-only. Also an unmarked in-place edit, a miscount, an ambiguous "links neither" |
+| Round | Reviewed | Findings | Disposition |
+|---|---|---|---|
+| 10 | `6a92009` (tests), `72a0fd3` (ledger) | Tests correct. Drift table: `/bulletins` missed as a shared link; two of `/pets`' five labels missing; "the other three" under a table of five; one English partial match named out of two | Table rebuilt from a grep (`9c0bebe`) |
+| 11 | `9c0bebe` (ledger) | "Five wordings" for `/pets` (three in English); the mobile emoji prefix unmentioned | Both fixed (`457b791`) |
+| 12 | `457b791` (ledger) | "Every mobile label behind an emoji" (one button has none); "the labels are inline ternaries" (bulletins reads its key) | Both fixed (`deea461`) |
+| 13 | `deea461` (ledger) | Loop-stop premise false; the same premise in its commit message; a sentence implying every inline mobile label is in the drift table | Two fixed (`3d455db`); the commit message recorded, not rewritten |
+| 14 | `3d455db` (ledger) | The correction called round twelve wording-only; an unmarked in-place edit; "three findings, all fixed" when one was only recorded; "the footer links neither" ambiguous | All four fixed (`0fff8b5`) |
+| 15 | `0fff8b5` (ledger) | The table above it sorted rounds eleven and twelve by different standards; an earlier in-place edit still unmarked; round fourteen had no dispositions; "no code defect" hid that only round ten had code in scope | All four fixed by this rewrite |
 
-No late round found a code defect. But four of the five found something false in text written to
-fix the previous round, so each ledger fix round has been worth reviewing — the opposite of the
-premise the loop was stopped on. `deea461`'s message keeps that premise; history is not rewritten.
+What is countable: only round ten had code in scope, and that code was correct. Every round from ten
+to fifteen found at least one inaccurate statement in ledger text written to fix the round before.
+That is why the loop did not stop where `deea461` said it would; its message keeps the original
+premise, and history is not rewritten.
 
 ## Round thirteen, and an accessibility-tree check
 
