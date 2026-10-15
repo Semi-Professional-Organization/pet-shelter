@@ -195,6 +195,12 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
  * did not, and stored six months where this function reads one year.) The decision and what it
  * does and does not verify: `tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`.
  *
+ * They also disagree outside ASCII, because this function's patterns are JS regexes and the SQL's
+ * are Postgres ones: `\s`, `\b` and `[[:space:]]`, `\M` treat a no-break space, U+0085 and accented
+ * letters differently. So the backfill refuses any `age` containing a non-ASCII character, before
+ * any of its patterns read it — widening this function to read Unicode (`\p{Zs}`, normalisation)
+ * changes nothing there. `tasks/decisions/2026-10-15-the-backfill-refuses-any-non-ascii-age.md`.
+ *
  * It is not a licence to treat the arithmetic as independent. Adding a unit HERE widens the gap, so
  * the backfill must refuse it — `20260922_pets_birth_date_contract/rehearse.mjs` imports this
  * function and compares it against the backfill's SQL. But only when someone runs it with

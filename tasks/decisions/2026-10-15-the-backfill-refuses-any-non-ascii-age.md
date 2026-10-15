@@ -1,64 +1,72 @@
-# The birth-date backfill refuses any age containing a non-ASCII character
+# The birth-date backfill refuses any age containing a non-ASCII character, first
 
 **Decided:** 2026-10-15 · reverses one paragraph of
 `2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`, which stands otherwise
 
 That entry refused ages containing Unicode *whitespace*, listed code point by code point, and said
-"whitespace only, deliberately not every non-ASCII character". The same day's next review found
-two more silent divergences the list could not see:
+"whitespace only, deliberately not every non-ASCII character". The next review found two more
+silent divergences the list could not see. Measured on pglite (UTF8, ctype C.UTF-8), intake
+2026-06-12, matching the file's own unit patterns against the real `approximateBirthDate`:
 
-- **U+0085 (NEL).** Postgres `[[:space:]]` matches it and JS `\s` does not, the reverse of the
-  no-break space. `1<NEL>year 6 months` was one year to the backfill and six months to the app.
-- **A non-ASCII letter glued to an English unit.** `1 year` followed by an n-tilde, then
-  ` 6 months`: JS `\b` ends the word at the n-tilde, Postgres `\M` does not, so the app read one
-  year and the backfill six months. The old entry recorded this as a residual and called it
-  Malay-only; it is not.
+| age | app | Postgres patterns |
+|---|---|---|
+| `1<NBSP>year 6 months` | one year (`2025-06-12`) | sees only the months |
+| `1<U+0085>year 6 months` | six months (`2025-12-12`) | sees the year first |
+| `1 year` + n-tilde + ` 6 months` | one year (`2025-06-12`) | sees only the months |
 
-Each stored a different birthday from the app's with no error. A deny list of code points was
-found incomplete twice in two reviews, so it is replaced rather than extended.
+The second runs in the *opposite* direction from the first: JS `\s` does not match U+0085, and
+Postgres `[[:space:]]` does under that ctype. The third is a word-boundary disagreement, not
+whitespace at all; the 2026-10-14 entry listed it as a Malay-only residual, and it is not. A deny
+list found incomplete twice in two reviews is replaced, not extended.
 
 **Decided:** `prisma/migrations/manual/20260922_pets_birth_date/migration.sql` refuses any `age`
-containing a character outside ASCII, in a stage of its own, with its own message and a
-`non-ASCII age` verdict in the header's pre-check.
+containing a character outside ASCII, **as its first refusal**, with its own message and a
+`non-ASCII age` verdict that the header's pre-check also tests first.
 
 - **Tested as `octet_length(age) <> char_length(age)`**, which under UTF8 is true exactly when a
-  non-ASCII character is present. No regex and no escape: nothing for the editor to decode (the
-  trap that put a literal byte-order mark into this file's regex once), and nothing for the
-  database's ctype to reinterpret.
-- **The file refuses a non-UTF8 database outright**, since the test means "non-ASCII" only there.
-  Neon is UTF8; this makes it checked rather than believed.
-- **Placed after the fractional check.** The old entry's reason for not refusing all non-ASCII
-  was that an en-dash range must still be refused *as fractional*. Ordering keeps that: a range
-  is refused under the name that says what to fix, and only what survives reaches this stage.
-- **Locale question closed rather than measured.** Production's `datctype` has never been read.
-  On ASCII alone, `[[:space:]]`, `\M` and `lower()` behave the same under every ctype, so the
-  backfill's reading no longer depends on it.
+  non-ASCII character is present. It uses no regex and no escape, so no editor can decode it and
+  no ctype can reinterpret it.
+- **First, not after the fractional check.** A first version of this change, reviewed the same
+  day, placed the stage after the unit and fractional checks so an en-dash range would keep the
+  "fractional" message. That left every earlier regex reading non-ASCII text. A no-break-space age
+  was then named "cannot be derived" or "fractional" depending on the ctype, and some invisible
+  separators were told to "pick one whole number". Placed first, every regex stage reads ASCII
+  only, where `[[:space:]]`, `\M` and `lower()` agree under any ctype. **Production's ctype has
+  never been measured, and this makes that unnecessary rather than measured.** The cost is that
+  dash ranges and vulgar fractions are now named as non-ASCII, so that message says to retype as
+  one whole number and unit.
+- **A non-UTF8 database is refused** where the backfill runs, since the byte test means
+  "non-ASCII" only under UTF8. The pre-check reports `database not UTF8` on every row in that
+  case. Neon is UTF8. The guard sits inside the backfill branch, so a database that only needs
+  the NOT NULL relax still gets it.
 
 **Accepted cost:** an otherwise-plain age with an accented word in it ("2 years, très calme") is
-refused and has to be retyped. One manual correction, named before anything runs.
+refused and has to be retyped. That is one manual correction, named before anything runs.
 
 ## Verified
 
-`prisma/migrations/manual/20260922_pets_birth_date_contract/rehearse.mjs`, scenario 0, runs the
-real SQL on pglite and imports the real `approximateBirthDate`. Its reproduced J1 and J3 now
-cover the no-break space, NEL and glued-letter strings (`non-ASCII age`), en-dash, spaced en-dash
-and em-dash ranges (still `fractional age`), a vulgar fraction (still `unparseable age`), and a
-tab (still `ok: years`, since both sides read ASCII whitespace alike). J3 matches each verdict
-to the file's own message and the row id.
-
-Mutation-tested, each run once and reverted: disabling the file's stage fails J3 with four
-non-ASCII strings silently stored; removing it from the pre-check fails J1 with four reading
-`ok`; giving it precedence over the fractional stage fails J3 on the two dash ranges.
-
-**Not verified:** expand's own 92-check harness still cannot run (it needs `embedded-postgres`).
-Its L3, M1, M2 and N1 fixtures were read and reasoned through: each is refused at a stage before
-this one, under the same message. The M1 and N1 range shapes are reproduced in the contract
-harness above, so that part is measured.
+- **Contract harness** (`20260922_pets_birth_date_contract/rehearse.mjs`, scenario 0, pglite,
+  real SQL, real `approximateBirthDate`):
+  - The app's half of the three divergences above is asserted by exact date.
+  - The reproduced J1 and J3 run ten non-ASCII strings: no-break space, NEL, n-tilde, narrow
+    no-break space, en-dash and em-dash ranges, and a vulgar fraction. All read `non-ASCII age`
+    and are refused under that message, naming the row.
+  - A non-ASCII age with a bad intake date also reads `non-ASCII age`.
+  - A tab still reads `ok: years`.
+- **Expand's own harness**: its M1, N1, L3 and M2 expectations were updated for the new stage, and
+  its J1 and J3 gained a non-ASCII and an app-only fixture, with J3 now checking the file's
+  message for each verdict, not just "it failed". **Run in full, 92/92**, with `embedded-postgres`
+  installed into the worktree's own `node_modules`. That also retires the 2026-10-14 entry's
+  "expand's own harness was not re-run". Its O1 and O2 still compare against the hand copy
+  `appRule`; that is the open timezone entry, unchanged here.
+- **Mutation-tested** for the final placement: disabling the file's stage fails J3, with the
+  non-ASCII strings accepted silently; dropping the pre-check's verdict fails J1, with them read
+  as `ok`.
 
 ## Corrections to the 2026-10-14 entry
 
-Its "What is verified" list miscounts: the agreeing corpus is nineteen strings in total, which
-include the rollover cases, the compound and `pet-008`; and the single-unit app-only list has eight
-entries, not seven, one of them a no-break-space string. Its count of 93 checks is now 82: the
-eleven-string mixed loop was removed because the reproduced J1 and J3 already assert the same
-refusals more strictly.
+Its "What is verified" list miscounts. The agreeing corpus is nineteen strings in total, and those
+include the rollover cases, the compound and `pet-008`. The single-unit app-only list has eight
+entries, not seven, one of them a no-break-space string. Its count of 93 checks is out of date:
+the eleven-string mixed loop was removed because the reproduced J1 and J3 assert the same refusals
+more strictly. The script prints the current count.

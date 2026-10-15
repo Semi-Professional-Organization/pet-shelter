@@ -85,21 +85,33 @@ Record active multi-step work streams below.
       asserts the same, stricter); stale prose fixed in the header, the harness, the TZ entry. The
       2026-10-14 decision is reversed in part by a new entry rather than rewritten. 82/82 in four
       timezones.
+- [x] `/code-review medium` on that round: no correctness defect, but the stage sat *after* the
+      unit and fractional regexes, so a pasted `2<NBSP>years` got "cannot be derived" or
+      "fractional" depending on ctype. **Moved the non-ASCII refusal to the first stage**, in the
+      file and the pre-check (one WHEN, not two copies); encoding guard moved inside the backfill
+      branch and mirrored in the pre-check as `database not UTF8`. The three divergences are now
+      **measured** on pglite C.UTF-8 rather than asserted, and the app's half pinned by date.
+      `petAge.ts` docstring points at the new decision.
+- [x] **Ran expand's own harness for the first time this session**, after `npm ci` plus
+      `npm i --no-save embedded-postgres` in this worktree's own `node_modules`: 92/92. Its M1, N1
+      and L3 expectations updated for the new stage; J1/J3 gained non-ASCII and app-only fixtures
+      and J3 now checks each verdict's own message. Contract harness 85/85 in four timezones.
+      Mutations re-run for the new placement, each caught. Gates: typecheck, lint (0 errors),
+      docs:check, unit 1605/1605, components 177/177, integration 92/92, build.
 
 ## Review
 
-**Not done, deliberately:** expand's own harness was not edited. It still restates the function,
-so its O1/O2 still report green against a drifted copy, and the timezone entry stays open for that
-reason. Fixing it needs `embedded-postgres`, which this session did not install into a shared
-`node_modules`; editing a harness you cannot run is how a safe failure becomes an unsafe one. The
-suggested repair in the entry is to retire O1/O2 there and point at the new check, not to correct
-the copy.
+**Not done, deliberately:** expand's harness still restates the function as `appRule`, so its
+O1/O2 still report green against a drifted copy, and the timezone entry stays open for that
+reason. On 2026-10-15 that harness was installed and run here (92/92) and its refusal checks were
+updated for the non-ASCII stage, but O1/O2 were left alone: retiring them in favour of the
+contract harness's comparison is the entry's own suggested repair, and a separate change.
 
 **The mixed-string defect is fixed** — after this stream had first recorded it as deliberately
 not fixed, on the grounds that expand's harness could not be run. That reasoning did not survive
 review: the two checks the change touches were reproducible. Lesson filed. Expand's own 92-check
-harness is still not re-run here, which the decision entry states, along with exactly which of its
-checks were reproduced and why the rest are unaffected.
+harness was later run in full, 92/92, once installed into this worktree's own `node_modules` --
+which was possible all along, and is what "could not be run" should have prompted.
 
 **What was wrong in this session, briefly:** it asserted that #42 closed the timezone entry without
 checking what the rehearsal compares against; gave a spec built on master while the branch had moved
