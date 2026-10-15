@@ -164,6 +164,11 @@ export function BulletinDataTable({ initialBulletins }: BulletinDataTableProps) 
 
   // One "today" for the whole render, shared by the count and every row's badge,
   // so the two cannot disagree across the shelter's midnight.
+  // ceiling: computed per render, so a server render and its hydration that
+  // straddle midnight disagree (a React hydration warning), and an idle tab keeps
+  // last night's badges until anything re-renders it. Admin-only and cosmetic —
+  // what the public sees is the server's query. Tick it on a timer if staff ever
+  // rely on the badge at midnight.
   const today = shelterToday();
   const publishedCount = bulletins.filter((b) => b.isPublished).length;
   // Published but dated in the future: on no public feed yet. Counted apart so

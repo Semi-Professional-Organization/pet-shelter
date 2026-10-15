@@ -69,6 +69,17 @@ const prismaMock = vi.hoisted(() => {
 
 vi.mock("@/lib/server/prisma", () => ({ prisma: prismaMock }));
 
+// The real schedule functions, wrapped so a test can see how often and with
+// what the repository asks for "today". Behaviour is unchanged.
+vi.mock("@/lib/domain/bulletinSchedule", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/domain/bulletinSchedule")>();
+  return {
+    ...actual,
+    shelterToday: vi.fn(actual.shelterToday),
+    startOfNextShelterDay: vi.fn(actual.startOfNextShelterDay),
+  };
+});
+
 const sessionMock = vi.hoisted(() => ({ getCurrentSession: vi.fn() }));
 vi.mock("@/lib/security/session", () => sessionMock);
 
@@ -220,6 +231,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  // Restores every `vi.spyOn(console, ...)` even when the test failed before
+  // its own `mockRestore()`, so one failure cannot mute console for the rest
+  // of the file. Since Vitest 3 this leaves `vi.fn()` mocks — Prisma's — alone.
+  vi.restoreAllMocks();
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1747,5 +1762,28 @@ describe("corrections from the sixth review", () => {
     );
     expect(tableWarnings).toHaveLength(1);
     warnSpy.mockRestore();
+  });
+});
+
+describe("corrections from the ninth review", () => {
+  it("judges a fallback pass against one shelter day, the query's own", async () => {
+    // Round eight hoisted "today" out of the per-row filter, and nothing failed
+    // if it went back in. Per row is N calls and, across the shelter's midnight,
+    // N possibly different days. And the day must come from the same instant
+    // the query's bound used, or one request straddles midnight between them.
+    const schedule = await import("@/lib/domain/bulletinSchedule");
+    const today = vi.mocked(schedule.shelterToday);
+    const nextDay = vi.mocked(schedule.startOfNextShelterDay);
+    prismaMock.bulletin.findMany.mockRejectedValue(new Error("connection refused"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { getPublicBulletins } = await import("@/lib/server/bulletinRepository");
+    today.mockClear();
+    nextDay.mockClear();
+
+    const served = await getPublicBulletins("all");
+    expect(served.length).toBeGreaterThan(1); // a real multi-row pass
+    expect(today).toHaveBeenCalledTimes(1);
+    expect(nextDay).toHaveBeenCalledTimes(1);
+    expect(today.mock.calls[0][0]).toBe(nextDay.mock.calls[0][0]);
   });
 });

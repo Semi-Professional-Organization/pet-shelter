@@ -75,12 +75,14 @@ export function startOfNextShelterDay(now: Date = new Date()): Date {
 /**
  * True when a published notice is dated after the shelter's today.
  *
- * Pass `today` when checking many rows. Computing it per row is not just slower:
- * a pass that runs across the shelter's midnight would judge earlier rows
- * against yesterday and later rows against today, so one render could badge a
- * notice dated today as scheduled while counting it as live.
+ * `today` is required, not defaulted: compute it once per pass with
+ * `shelterToday()` and hand the same value to every row. Computing it per row
+ * is not just slower — a pass that runs across the shelter's midnight would
+ * judge earlier rows against yesterday and later rows against today, so one
+ * render could badge a notice dated today as scheduled while counting it live.
+ * A default made the per-row call the easy one to write.
  */
-export function isScheduledForLater(publishedAt: string, today: string = shelterToday()): boolean {
+export function isScheduledForLater(publishedAt: string, today: string): boolean {
   // Day strings compare correctly as text because both are `YYYY-MM-DD`.
   return publishedAt.slice(0, 10) > today;
 }
