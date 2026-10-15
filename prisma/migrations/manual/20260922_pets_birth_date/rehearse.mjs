@@ -53,7 +53,9 @@ const PORT = Number(process.env.REHEARSAL_PORT || 55000 + Math.floor(Math.random
 // UTF-8 ctype, so the word-boundary and whitespace results below are taken under a ctype
 // production does not have. glibc excludes U+00A0 from `space` under C, C.UTF-8 and en_US.UTF-8
 // alike, so the M2 result should hold there too -- but that is reasoning, not measurement, and
-// anyone re-taking it on a Linux host should pin LC_CTYPE 'C.UTF-8' and say so.
+// anyone re-taking it on a Linux host should pin LC_CTYPE 'C.UTF-8' and say so. Since 2026-10-15
+// the file also refuses any non-ASCII age once a unit is found, so M2's row is refused under any
+// ctype: at the unit stage where U+00A0 is not a space, at the non-ASCII stage where it is.
 const BOOTSTRAP_URL = `postgresql://postgres:rehearsal@127.0.0.1:${PORT}/postgres`;
 const DB_URL = `postgresql://postgres:rehearsal@127.0.0.1:${PORT}/rehearsal_utf8`;
 

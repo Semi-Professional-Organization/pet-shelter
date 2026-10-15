@@ -401,9 +401,8 @@ if (HAS_EXPAND) {
   // refused — the app read the Malay year first and stopped, the backfill skipped it and read the
   // English unit further along, and the two stored different dates with no error. Measured, at
   // intake 2026-06-12: "1 tahun 6 months" app 2025-06-12, backfill 2025-12-12. The backfill now
-  // treats any app-only unit anywhere as underivable. Each case asserts both that the app reads it
-  // to a definite date AND that the backfill refuses it — so a row can never be stored as a
-  // different birthday from the one the app would compute, which is the whole invariant.
+  // treats any app-only unit anywhere as underivable. Their refusal is asserted by J1 and J3 below,
+  // by verdict, message and row id; this list only feeds them.
   //
   // `3 minggu 2 months` and `2 years 3 weeks` used to AGREE (both sides read the English unit).
   // They are refused now too. That is a deliberate, conservative regression: refusing a row costs
@@ -418,25 +417,28 @@ if (HAS_EXPAND) {
     "2 thn 1 year",
     "3 minggu 2 months",
     "2 years 3 weeks",
-    // Found by a `high` review after the Malay fix: the same divergence through whitespace. The app
-    // reads the year (JS `\s`); without the whitespace clause the backfill skipped it and stored
-    // the English month. Measured: app 2025-06-12, backfill 2025-12-12, no error.
+  ];
+
+  // Non-ASCII strings that carry an English unit the backfill reads, so they get past the unit
+  // stage and are refused by the non-ASCII stage. Every one of these stored a different birthday
+  // from the app's, with no error, under some earlier version of the file:
+  //   - a no-break space: JS `\s` matches it, Postgres `[[:space:]]` does not, so the app read the
+  //     year and the backfill the month (measured: app 2025-06-12, backfill 2025-12-12);
+  //   - U+0085: the reverse, Postgres `[[:space:]]` matches it and JS `\s` does not;
+  //   - an n-tilde glued to an English unit: JS `\b` ends the word there, Postgres `\M` does not.
+  const NEL = String.fromCharCode(0x85);
+  const NTILDE = String.fromCharCode(0xf1);
+  const NON_ASCII = [
     "1" + NBSP + "year 6 months",
     "1" + NBSP + "tahun 6 months",
-    "2" + NNBSP + "yo 3 months",
+    "1" + NEL + "year 6 months",
+    "1 year" + NTILDE + " 6 months",
   ];
-  for (const age of MIXED) {
-    const one = new PGlite();
-    await one.exec(PROD_SCHEMA);
-    await insertPreExpand(one, ["mixed-row", age, "adult", intake]);
-    const oneErr = await tryExec(one, EXPAND);
-    check(
-      `mixed "${age}" is refused rather than stored differently from the app`,
-      /cannot be derived/.test(oneErr) && /mixed-row/.test(oneErr),
-      oneErr ? oneErr.split("\n")[0].slice(0, 160) : "the backfill stored it"
-    );
-    await one.close();
-  }
+  // The non-ASCII stage sits after the fractional check, so a dash range is still refused under
+  // the name that says what to fix, and a vulgar fraction, which carries no digit-unit pair the
+  // backfill reads, is still refused as unparseable at the stage before both.
+  const EN_DASH = String.fromCharCode(0x2013);
+  const HALF = String.fromCharCode(0xbd);
 
   // ---- expand's own J1 and J3, reproduced here so they can actually run -----------------------
   //
@@ -445,7 +447,8 @@ if (HAS_EXPAND) {
   // harness needs embedded-postgres; this one does not. Changing the file's refusal set means the
   // pre-check had to change with it, so the pairing is re-checked here: same extraction, same eight
   // fixtures and expected labels, same two assertions — plus the mixed strings above, which must
-  // read `unparseable age` and be refused.
+  // read `unparseable age`, the non-ASCII ones, which must read `non-ASCII age`, and the dash,
+  // fraction and tab cases that pin where the non-ASCII stage sits.
   const lines = EXPAND.split("\n");
   const from = lines.findIndex((l) => l.includes("SELECT * FROM ("));
   const to = lines.findIndex((l) => l.includes(`ORDER BY (verdict LIKE 'ok:%'), verdict, "id";`));
@@ -462,6 +465,15 @@ if (HAS_EXPAND) {
       ["j-7", "900 months", "2026-06-12", "implausible age"],
       ["j-8", "1.5 years", "2026-06-12", "fractional age"],
       ...MIXED.map((age, k) => [`j-mixed-${k}`, age, "2026-06-12", "unparseable age"]),
+      ...NON_ASCII.map((age, k) => [`j-nonascii-${k}`, age, "2026-06-12", "non-ASCII age"]),
+      // Expand's own M1 and N1 shapes, which that harness asserts as "fractional" and cannot run here.
+      ["j-endash", "3" + EN_DASH + "4 years", "2026-06-12", "fractional age"],
+      ["j-endash-spaced", "3 " + EN_DASH + " 4 years", "2026-06-12", "fractional age"],
+      ["j-emdash", "2" + String.fromCharCode(0x2014) + "3 years", "2026-06-12", "fractional age"],
+      // A digit, four non-digits, then "3 months": the fractional shape, caught one stage earlier.
+      ["j-nnbsp-yo", "2" + NNBSP + "yo 3 months", "2026-06-12", "fractional age"],
+      ["j-half", "1" + HALF + " years", "2026-06-12", "unparseable age"],
+      ["j-tab", "2\tyears", "2026-06-12", "ok: years"],
       ["j-tahun", "2 tahun", "2026-06-12", "unparseable age"],
       ["j-weeks", "3 weeks", "2026-06-12", "unparseable age"],
     ];
@@ -485,6 +497,7 @@ if (HAS_EXPAND) {
       "bad intakeDate": /cannot be derived/,
       "implausible age": /not a plausible/,
       "fractional age": /fractional/,
+      "non-ASCII age": /non-ASCII/,
     };
     const disagree = [];
     for (const [id, age, intakeDate, want] of J) {

@@ -98,8 +98,8 @@
 -- scenario 0, run with `npx tsx`. It runs this file's SQL against the REAL `approximateBirthDate`,
 -- imported rather than copied, on every spelling above, the four rollover cases and a compound, in
 -- any timezone; it asserts that each single-unit app-only spelling is read by the app and refused
--- here; and it pins the three mixed-string divergences above at their exact values as a known
--- defect, so they cannot widen or change unnoticed. It is not wired into `npm test` or CI -- it runs
+-- here; and it re-runs this file's own pre-check pairing on the mixed and non-ASCII strings, so
+-- each is refused under the verdict the pre-check gives it. It is not wired into `npm test` or CI -- it runs
 -- when someone runs it. This file's own `rehearse.mjs` compares against `appRule`, a hand copy
 -- that has drifted from the function on both timezone and vocabulary since #42 -- see
 -- `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
@@ -220,20 +220,23 @@
 --                                     + interval '1 month' - interval '1 day')) THEN 'bad intakeDate'
 --            WHEN lower(coalesce("age",''))
 --                 ~ '[0-9]+[[:space:]]*(tahun|thn|bulan|bln|minggu|mggu|weeks|week|wks|wk|mnths|mnth|yo)\M'
---              OR coalesce("age",'') ~ '[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]'
 --                 THEN 'unparseable age'
 --            WHEN lower(coalesce("age",''))
 --                 ~ '[0-9][^0-9]{1,5}[0-9]+[[:space:]]*(years|year|yrs|yr|y|months|month|mths|mth|mos|mo|m)\M'
 --                 THEN 'fractional age'
 --            -- Years first and each bound tested only for the unit it belongs to, because that is
 --            -- what the file does. Testing both bounds independently made "2 years 800 months"
---            -- read implausible here and backfill as 2 years there.
+--            -- read implausible here and backfill as 2 years there. Non-ASCII is tested inside
+--            -- each branch, ahead of the bound, for the same reason: the file refuses it only
+--            -- once a unit has been found, and before it tests plausibility.
 --            WHEN lower(coalesce("age",'')) ~ '[0-9]+[[:space:]]*(years|year|yrs|yr|y)\M'
---                 THEN CASE WHEN (regexp_match(lower("age"),
+--                 THEN CASE WHEN octet_length("age") <> char_length("age") THEN 'non-ASCII age'
+--                      WHEN (regexp_match(lower("age"),
 --                       '([0-9]+)[[:space:]]*(?:years|year|yrs|yr|y)\M'))[1]::numeric > 60
 --                      THEN 'implausible age' ELSE 'ok: years' END
 --            WHEN lower(coalesce("age",'')) ~ '[0-9]+[[:space:]]*(months|month|mths|mth|mos|mo|m)\M'
---                 THEN CASE WHEN (regexp_match(lower("age"),
+--                 THEN CASE WHEN octet_length("age") <> char_length("age") THEN 'non-ASCII age'
+--                      WHEN (regexp_match(lower("age"),
 --                       '([0-9]+)[[:space:]]*(?:months|month|mths|mth|mos|mo|m)\M'))[1]::numeric > 720
 --                      THEN 'implausible age' ELSE 'ok: months' END
 --            ELSE 'unparseable age'
@@ -242,13 +245,15 @@
 --        ) v
 --    ORDER BY (verdict LIKE 'ok:%'), verdict, "id";
 --
--- Every row should read `ok: years` or `ok: months`. The other four verdicts are the four things
+-- Every row should read `ok: years` or `ok: months`. The other five verdicts are the five things
 -- this file refuses, and each is a row to correct by hand first, or it will abort naming that row:
 --
 --   bad intakeDate    not a real calendar date; fix the date
 --   fractional age    "1.5 years" reads as 5 and "3-4 years" reads as 4; pick one whole
 --                     number -- "18 months", "3 years" -- or say which bound you mean
 --   implausible age   over 60 years or 720 months; a typo, not an animal
+--   non-ASCII age     a no-break space, an accented letter or any other non-ASCII character,
+--                     which the app and this file read differently; retype it in plain ASCII
 --   unparseable age   no number-and-unit the rule recognises; rewrite as "2 years", "4 months"
 --
 -- **Read the `age` column itself, not only the verdict.** The rule reads a number and a unit; it
@@ -379,6 +384,13 @@ BEGIN
   -- later read of the table behind it, the live site's included.
   PERFORM set_config('lock_timeout', '5s', true);
 
+  -- The non-ASCII refusal below compares bytes to characters, which means "non-ASCII" only under
+  -- UTF8. Neon databases are UTF8; this makes that an enforced fact rather than a belief.
+  IF current_setting('server_encoding') <> 'UTF8' THEN
+    RAISE EXCEPTION 'this file assumes a UTF8 database, and this one is %. Nothing has been changed.',
+      current_setting('server_encoding');
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
      WHERE table_schema = 'public' AND table_name = 'pets'
@@ -462,6 +474,11 @@ BEGIN
                lower(coalesce(p."age", ''))
                  ~ '[0-9][^0-9]{1,5}[0-9]+[[:space:]]*(years|year|yrs|yr|y|months|month|mths|mth|mos|mo|m)\M'
                  AS fractional,
+               -- Under UTF8 a string is longer in bytes than in characters exactly when it holds
+               -- a character outside ASCII. No regex and no escape, so no locale and no editor
+               -- can change what this matches.
+               octet_length(coalesce(p."age", '')) <> char_length(coalesce(p."age", ''))
+                 AS non_ascii,
                CASE
                  -- Any unit the app reads and this file does not, ANYWHERE in the string, makes
                  -- the row underivable -- not only when it is the unit that would have matched.
@@ -469,27 +486,17 @@ BEGIN
                  -- six months while the app reads one year: a different birthday, no error. #42
                  -- taught the app these units; this keeps the backfill to "store what the app
                  -- computes, or refuse". Checked first, so it wins over an English unit later on.
-                 --
-                 -- And any Unicode whitespace, for the same reason in a different costume. JS `\s`
-                 -- matches a non-breaking space; Postgres `[[:space:]]` does not, under UTF8. So
-                 -- "1<NBSP>year 6 months" -- what pasting from Word or a web page produces -- is
-                 -- one year to the app and, without this, six months here: the year is invisible
-                 -- to this file and the month is not. Whitespace only, not every non-ASCII
-                 -- character: an en-dash range or a vulgar fraction must still reach the
-                 -- fractional check below and be refused under that name.
+                 -- Non-ASCII text is refused separately, after the fractional check -- see there.
                  --
                  -- ceiling: a deny list, kept by hand beside petAge.ts's AGE_*_PATTERNs, so a unit
                  -- added there and not here reopens the silent divergence, and nothing in `npm test`
                  -- or CI compares them -- only contract/rehearse.mjs scenario 0, run by hand. It
                  -- over-refuses by design ("3 minggu 2 months" agreed by luck and is now refused).
-                 -- It does not cover a non-ASCII LETTER glued to a unit, e.g. tahun followed by an n-tilde,
-                 -- where JS `\b` and Postgres `\M` disagree on word boundaries. Upgrade path: a
-                 -- vitest test that extracts both alternations and asserts the app's vocabulary is
-                 -- a subset of this file's accept list plus this deny list, run in CI.
+                 -- Upgrade path: a vitest test that extracts both alternations and asserts the
+                 -- app's vocabulary is a subset of this file's accept list plus this deny list,
+                 -- run in CI.
                  WHEN lower(coalesce(p."age", ''))
                         ~ '[0-9]+[[:space:]]*(tahun|thn|bulan|bln|minggu|mggu|weeks|week|wks|wk|mnths|mnth|yo)\M'
-                      OR coalesce(p."age", '')
-                        ~ '[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]'
                    THEN NULL
                  WHEN lower(coalesce(p."age", '')) ~ '[0-9]+[[:space:]]*(years|year|yrs|yr|y)\M'
                    THEN 'years'
@@ -534,6 +541,28 @@ BEGIN
 
     IF offenders IS NOT NULL THEN
       RAISE EXCEPTION E'pets rows whose "age" is fractional, which this file will not round:\n    %\nThe rule reads the digits next to the unit, so "1.5 years" would be stored as 5 years before intake. Rewrite each in whole units -- "18 months" for "1.5 years" -- then re-run. Nothing has been changed.',
+        offenders;
+    END IF;
+
+    -- Any character outside ASCII, refused whole. The app's patterns are JS regexes and this
+    -- file's are Postgres ones, and outside ASCII they disagree in both directions: JS `\s`
+    -- matches a no-break space and Postgres `[[:space:]]` does not, so "1<NBSP>year 6 months" is
+    -- one year to the app and six months here; Postgres `[[:space:]]` matches U+0085 and JS `\s`
+    -- does not, so "1<U+0085>year 6 months" is the reverse; and a non-ASCII letter glued to a unit
+    -- ("1 year" then an n-tilde) ends a word for JS `\b` but not for Postgres `\M`. Each stored a
+    -- different birthday from the app's with no error. An earlier version listed the whitespace
+    -- code points one by one, and a review found the next one the same day. On ASCII alone the
+    -- two engines agree whatever the database's ctype, which no one has measured on production.
+    -- Placed after the fractional check, so an en-dash range ("3<en-dash>4 years") is still
+    -- refused as fractional, which says better what to fix.
+    SELECT string_agg(
+             format('%L (age=%L)', "id", "age"), E'\n    ' ORDER BY "id")
+      INTO offenders
+      FROM _pets_birth_backfill
+     WHERE non_ascii;
+
+    IF offenders IS NOT NULL THEN
+      RAISE EXCEPTION E'pets rows whose "age" contains a non-ASCII character, which this file will not interpret:\n    %\nA no-break space or an accented letter is read one way by the app and another way here. Retype each in plain ASCII -- "2 years", "4 months" -- then re-run. Nothing has been changed.',
         offenders;
     END IF;
 
