@@ -2477,6 +2477,11 @@ was compared with `master`'s. Three findings, each confirmed and fixed:
 | The no-staff-control test checked buttons only; an "Edit notices" link passed it | Also asserts no link. Probed: that link now fails both languages |
 | The admin's English category `label` and the dictionary's English could drift apart | `tests/unit/bulletinPresentation.test.ts` pins them equal and the Malay distinct. Probed: relabelling one fails it |
 
+Its fixes were reviewed in turn. One finding: the no-link case rendered only a text notice, so a link
+added inside the video or image branch passed it. It now renders one notice of each media type;
+probed with a link in each branch, and both fail. That review also confirmed every claim in the new
+open entry and that the schema change is comments only (`prisma validate` passes).
+
 ## Verification
 
 As of round seven, on the tree merged with `master` at `187593c` (current figures are in the

@@ -178,9 +178,27 @@ describe("BulletinFeed on the Malay site", () => {
     // behind `MANAGE_CONTENT` at `/admin/bulletins`, and the feed is read-only
     // by design. Translating it again would bring it back, so what is pinned
     // now is its absence, in both languages.
-    renderWithLanguage(<BulletinFeed bulletins={[bulletin({ isPinned: true })]} titleKey="home.bulletinsTitle" />, {
+    // One notice of each media type, because each renders its own branch of
+    // markup: a control added only beside the video iframe or the image would
+    // be invisible to a text-only notice. A review showed exactly that.
+    const notices = [
+      bulletin({ id: "text", isPinned: true }),
+      bulletin({
+        id: "video",
+        mediaType: "video",
+        videoEmbedUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+      }),
+      bulletin({
+        id: "image",
+        mediaType: "image",
+        mediaUrl: "https://images.unsplash.com/photo-1628009368231-7bb7cfcb0def",
+      }),
+    ];
+    renderWithLanguage(<BulletinFeed bulletins={notices} titleKey="home.bulletinsTitle" />, {
       language,
     });
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(document.querySelector("iframe")).not.toBeNull();
 
     // No links either: a staff control does not have to be a button, and a
     // review showed an "Edit notices" link passed this case when it checked
