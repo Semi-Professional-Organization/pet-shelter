@@ -78,10 +78,12 @@ fails a check that cannot be fooled by a stale copy — once someone runs it, si
 **Mixed-language strings were a separate defect, found and fixed the same day.** `/code-review`
 on the PR adding this check measured `1 tahun 6 months` stored as six months by the backfill while
 the app reads one year, with no refusal. The backfill now refuses any age containing a unit it does
-not read, anywhere in the string; the same check now asserts eight mixed strings are refused, and
-reproduces expand's J1 and J3 to show the pre-check agrees with the file. Settled in
-`tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`. Current
-count: **88/88**.
+not read, anywhere in the string, and any age containing a non-ASCII character; the same check
+reproduces expand's J1 and J3 over eight mixed strings and four non-ASCII ones to show the
+pre-check agrees with the file, verdict by verdict. Settled in
+`tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md` and
+`tasks/decisions/2026-10-15-the-backfill-refuses-any-non-ascii-age.md`. The count is printed by
+the script; it is not restated here, because the last two restatements went stale within a day.
 
 **Why this does not close the entry.** The condition below names *expand's* `rehearse.mjs`, and
 that file still restates the function as `appRule`, still with local setters and the old unanchored

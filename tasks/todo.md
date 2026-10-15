@@ -75,6 +75,16 @@ Record active multi-step work streams below.
       measured against the file, the backfill's fractional check refuses `2y3m`, `5yrs8mths` and
       `1y6m` outright, and `1y2w`, `6 mons` match no unit and are refused too — so the app side can
       be fixed alone. A fifth unrun claim about regex behaviour from this session tonight.
+- [x] 2026-10-15, `/code-review high` on `38a7156`: ten findings. **U+0085** splits the engines in
+      the opposite direction from the no-break space, and a non-ASCII letter glued to an *English*
+      unit splits their word boundaries; both stored a wrong birthday silently. The whitespace
+      deny list is replaced by a stage of its own refusing **any non-ASCII age**, tested as
+      `octet_length <> char_length` (no regex, no escape), placed after the fractional check so
+      dash ranges keep their message, plus a refusal of any non-UTF8 database. Pre-check gains a
+      `non-ASCII age` verdict. Three mutations, each caught. The redundant MIXED loop is gone (J3
+      asserts the same, stricter); stale prose fixed in the header, the harness, the TZ entry. The
+      2026-10-14 decision is reversed in part by a new entry rather than rewritten. 82/82 in four
+      timezones.
 
 ## Review
 
