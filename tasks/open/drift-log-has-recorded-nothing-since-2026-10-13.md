@@ -82,3 +82,26 @@ remaining candidate lives where git does not look — uncommitted `.claude/setti
 user-level settings, the environment the harness gives the hook process, or how the harness loads
 and feeds project hooks. A session that can inspect its own active hook configuration and
 environment is better placed to check than one reading files after the fact.
+
+## Checked from a live session, 2026-10-15
+
+A session that made dozens of matched tool calls on 2026-10-15 looked from the inside:
+
+- **No settings layer disables hooks.** `.claude/settings.json` wires `PostToolUse` to
+  `agent-guard.mjs` for `Edit|Write|NotebookEdit|Bash|PowerShell|BashOutput|KillShell`. Neither
+  `.claude/settings.local.json` (last changed 2026-09-05) nor the user-level settings has a `hooks`
+  key or `disableAllHooks`. So the uncommitted settings layers are ruled out as well.
+- **The hook did not write for that session either.** The liveness log was still last written at
+  2026-10-13T16:57Z, and there was no state file for the session.
+- **In that session's shell, `TEMP` was the standard path and `AGENT_GUARD_LOG`, `AGENT_DRIFT_LOG`
+  and `AGENT_DRIFT_STATE` were all unset.** That weakens the "moved temp directory" and
+  "variable set" candidates without ruling them out, because the harness spawns the hook in its own
+  process, whose environment was not observed.
+- **The missing history is not part of the fault.** The oldest top-level file anywhere in `TEMP` is
+  dated 2026-10-01, so the directory is cleaned periodically; the log's September contents were
+  swept away with everything else of that age. That explains why the log *begins* on 2026-10-13. It
+  does not explain why it *stopped* there, which is still the open question.
+
+What is left, in effect, is the harness: whether it invokes project hooks for these sessions, and
+with what payload and environment. That needs a view of the hook process itself — for instance a
+one-line wrapper that records its own argv, environment and stdin before running the script.
