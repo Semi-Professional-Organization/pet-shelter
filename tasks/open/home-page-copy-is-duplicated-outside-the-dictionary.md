@@ -65,8 +65,9 @@ special-casing this entry argues against.
 - `home.*` — **13 of 25** have no reader: `bulletinsSubtitle`, `availableTitle`,
   `availableSubtitle`, `protocolsTitle`, `protocolsSubtitle`, and all eight of `protocol1Title`
   … `protocol4Desc` — which are the diverged duplicates of `HomeStandardsSection` above.
-- `bulletins.*` — **8 of 22**: `badge`, the five `filter*` keys, `urgentBadge` and
-  `contactCoordinator`.
+- `bulletins.*` — **8 of 20**: `badge`, the five `filter*` keys, `urgentBadge` and
+  `contactCoordinator`. Recounted 2026-10-15 after `staffAccess` and `adminModeActive` were
+  deleted with the admin toggle #103 removed; the same eight remain.
 
 A key built at runtime would not be found by that search, so these are candidates, not proof. An
 earlier count in this entry was an estimate ("roughly 14 of 24 … 11 of 23") and named

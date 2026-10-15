@@ -2,6 +2,12 @@
 
 **Decided:** 2026-09-22
 
+**Changed by #103, 2026-10-15.** #103 replaced the per-browser bulletin store with a server-side
+one and made `BulletinFeed` a read-only Server Component with no admin controls; editing moved to
+`/admin/bulletins` behind `MANAGE_CONTENT`. Merging it into this branch removed the one exception
+this decision is named for: there is no admin chrome on the public feed left to keep English. The
+sections below are corrected where they described the old feed, and each correction says so.
+
 Settles `tasks/open/home-page-text-stays-english-on-the-malay-site.md`. That entry allowed each row
 of its inventory to be either translated or "accepted as intentionally English and that acceptance
 written to `tasks/decisions/`". Every row is translated except one group, which is accepted here.
@@ -16,7 +22,7 @@ page rendered itself moved across the client boundary instead:
 
 | Was | Now |
 |---|---|
-| `page.tsx` `<BulletinFeed title="Latest news and updates">` | prop dropped; `BulletinFeed` falls back to `t("home.bulletinsTitle")` |
+| `page.tsx` `<BulletinFeed title="Latest news and updates">` | `titleKey="home.bulletinsTitle"` (see "The heading prop takes a key") |
 | `page.tsx` Suspense fallback, "Loading rescue animals…" | `HomeGalleryLoading` in `HomeSections.tsx` |
 | `page.tsx` "View All Animals" link | `HomeViewAllPetsLink` in `HomeSections.tsx` |
 
@@ -86,7 +92,10 @@ languages instead, and `common.loading` remains unused.
 
 `BulletinFeed`'s `title?: string` became a **required** `titleKey: TranslationKey`. Every caller is
 a Server Component that cannot resolve its own heading without giving up ISR, so each hands over a
-key and the feed — already a client component — resolves it. `/bulletins` passes
+key. *(Corrected 2026-10-15.)* Since #103 the feed is itself a Server Component, so it resolves the
+key through `Translated` (`src/components/providers/Translated.tsx`), a client leaf that renders one
+dictionary string — the boundary sits at the string, and the feed's markup and data stay on the
+server. `/bulletins` passes
 `bulletins.allNoticesTitle`, `/pets` passes `bulletins.petsFeedTitle`, and `/` passes
 `home.bulletinsTitle`. It was optional at first, defaulting to `home.bulletinsTitle`, which meant a
 shared feature component quietly owned a home-page string and a new caller that forgot the prop
@@ -98,37 +107,35 @@ literal above them left `/bulletins` and `/pets` in a worse mixed-language state
 change that improves one page by degrading two is not an improvement.
 
 The same typing rule applies to the category chips. `labelKey` is a `TranslationKey` rather than
-`string`, and the component reads it through `useTypedTranslation()`, so renaming a key is a
-compile error instead of a chip silently falling back to English on the Malay site. (It began as a
+`string`, so renaming a key is a compile error instead of a chip silently falling back to English
+on the Malay site. *(Corrected 2026-10-15.)* It now lives in #103's shared
+`BULLETIN_CATEGORY_PRESENTATION` table beside the admin editor's English `label`, not in a second
+map inside the feed: #103 lifted that table out precisely so two copies could not drift. (It began as a
 per-namespace `BulletinKey` alias; the aliases were dropped for one dictionary-derived type —
 `tasks/open/translation-keys-the-dictionary-does-not-have.md` explains why `t` itself is not yet
-typed.) **No `t()` call in `BulletinFeed` passes an English fallback**:
+typed.) **No string in `BulletinFeed` carries an English fallback**:
 `LanguageProvider` already falls through to the `en` dictionary when a key is missing from the
 active one, so a literal argument could only ever be a second copy of the label — unreachable, and
 free to drift from the one a translator edits.
 
-## What stays English: the bulletin admin chrome
+## What stayed English: the bulletin admin chrome — removed by #103
 
-Everything gated on `isAdminMode` in `BulletinFeed.tsx` keeps its English literal:
+Until 2026-10-15 everything gated on `isAdminMode` in `BulletinFeed.tsx` kept its English literal,
+because `tasks/open/bulletins-are-a-per-browser-demo-anyone-can-edit.md` was due to delete that
+editor, and translating it would have polished a control that was itself the defect: the toggle had
+no session check, so every visitor got it and it worked. The line drawn was what a visitor sees
+before clicking anything, so the toggle's own label, `Staff Admin Access`, was translated.
 
-`Post Update / Media` · `title="Reset to sample announcements"` · the "Admin Editing Mode…" banner ·
-`title="Unpin notice"` / `"Pin notice to top"` · `title="Edit bulletin"` · `title="Delete bulletin"` ·
-`Post First Update`
+#103 settled that entry and deleted the editor. Its two keys, `bulletins.staffAccess` and
+`bulletins.adminModeActive`, were left with no reader and are deleted. The Malay test that
+translated the toggle now asserts the opposite, in both languages: the public feed renders no button
+at all. Translating the control again would only mean it had come back.
 
-Because `tasks/open/bulletins-are-a-per-browser-demo-anyone-can-edit.md` settles by deleting it.
-Its settle condition is a server-side store behind a `MANAGE_CONTENT`-guarded action "with the
-public toggle gone — or the feeds come off the public pages until they do". Either branch removes
-this editor. Translating it now would commission Malay for copy that entry deletes, and would
-polish a control that is itself the defect: that toggle has no session check, so every visitor gets
-it and it works.
-
-The line drawn is **what a visitor sees before clicking anything**. That includes the toggle's own
-label, so `Staff Admin Access` *is* translated, along with the category chips, `Pinned`,
-`Posted by:` and the empty state. `Admin Mode Active` is translated only because it is the other
-branch of the same ternary; splitting a ternary across two policies would be worse than either.
-
-A comment at the `isAdminMode` block in `BulletinFeed.tsx` points here, so the next reader does not
-"finish the job" by hand.
+`bulletins.noUpdates` took #103's empty-state wording, "No updates to show right now." /
+"Tiada kemas kini untuk dipaparkan buat masa ini.". #103 changed it because the previous "No updates
+or bulletins posted for this section." is false during a database outage, when the repository
+serves no notices rather than stale ones; a translation of the old sentence would have reintroduced
+that.
 
 ## Not in scope, and still true
 
@@ -137,15 +144,17 @@ A comment at the `isAdminMode` block in `BulletinFeed.tsx` points here, so the n
   crawler reads, and what a screen reader announces the language of. Translating the `<h1>` makes
   this worse in one narrow sense: the document now declares English over Malay text. Fixing it is a
   different change from this one, and the entry recorded it as not owned by itself.
-- **Bulletin and Pet content columns have no Malay field.** `title`, `content`, `breed`,
-  `description` and `tags` are single-column English. That is a schema question, not a literal.
+- **Notice and pet content renders in English.** *(Corrected 2026-10-15.)* Bulletins now store
+  `titleMs` and `contentMs` (#103), but the public `Bulletin` does not carry them yet, by #103's
+  own decision (`tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`). Pet `breed`,
+  `description` and `tags` are still single-column English. Both are data questions, not literals.
 - **`/pets` and `/bulletins` still have untranslated chrome of their own**, outside this entry's
   inventory. Their `BulletinFeed` headings are no longer part of it — see "The heading prop takes a
   key" above — but the rest of each page is unchanged.
 
 ## Verification
 
-`tests/components/homeMalay.test.tsx`, 23 cases as of 2026-10-14 (18 when first written). Every Malay case asserts the **English is absent**
+`tests/components/homeMalay.test.tsx`, 25 cases as of 2026-10-15 (18 when first written). Every Malay case asserts the **English is absent**
 rather than that the Malay is present, which is the gap the entry names: the existing
 `home.test.tsx` asserted presence and passed for sixteen days beside a hardcoded English `<h1>`.
 Two further cases pin the English side, because an inverted `isMs` would satisfy every Malay

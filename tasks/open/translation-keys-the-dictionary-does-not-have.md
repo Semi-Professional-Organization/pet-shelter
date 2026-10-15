@@ -62,8 +62,9 @@ fallback**; "the fallback is unreachable" is true per key, not per file.
 Fixing all 38 inside a home-page PR would have meant authoring Malay for most of an application
 form. Instead the home-page branch added `useTypedTranslation()` to `LanguageProvider`, which
 returns `{ t, isMs }` with `t` restricted to `TranslationKey` (and accepting interpolation
-params), and moved the components it touched onto it — `Hero`, `HomeSections`, `BulletinFeed`,
-`BulletinsPageIntro`, `Navbar` and `Footer`. A probe confirmed the effect: renaming
+params), and moved the components it touched onto it — `Hero`, `HomeSections`, `BulletinsPageIntro`, `Navbar`
+and `Footer`, and `BulletinFeed` through `Translated`, a client leaf that wraps it, since #103 made
+the feed a Server Component. A probe confirmed the effect: renaming
 `hero.tnrmHeadline` in the dictionary is now a compile error at `Hero.tsx`, where before it would
 have rendered the literal path as the page's `<h1>`.
 

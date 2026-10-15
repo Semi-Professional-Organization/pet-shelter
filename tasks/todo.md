@@ -2441,9 +2441,35 @@ pre-hydration `lang="en"` is spoken, remain unverified.
 **What still needs the owner:** the Vercel preview is behind Vercel's login, and no browser tool
 here carries that login, so the branch has not been seen against real data.
 
+## Merged with #109, #103 and #113 (2026-10-15)
+
+#109 merged cleanly (`940f6d7`); none of this branch's ledger line citations moved. Then, as the
+owner asked for the PR to be merged, #103 and #113 landed and the PR went conflicting, so it was not
+merged; `master` was merged in first (`2a618b6`).
+
+#103 rebuilt the bulletin feed this branch had translated: a read-only Server Component fed by a
+server store, no admin controls, category labels lifted into a shared presentation table. The
+resolution keeps all of that and translates through it — a `Translated` client leaf per fixed
+string, `labelKey` added to #103's table rather than a second map, master's server-read
+`bulletins` plus this branch's `titleKey` on each page, master's admin sidebar unchanged, #103's
+outage-safe empty-state wording in both languages, and the removed toggle's two keys deleted. The
+Malay test of that toggle now pins its absence. Two probes: an English chip label fails five cases,
+an added button fails two.
+
+Records corrected for it: the bulletin admin-chrome decision (its named exception no longer
+exists), two open entries describing the old feed, and the same drift-log entry filed by both
+branches, now one entry with the second session's observation kept. Bulletins now store Malay text
+(#103) that the public feed does not yet render, by #103's decision; the out-of-scope note says so.
+
+On the merged tree: `npm run check` 0 errors and 13 warnings, the new one in #103's
+`BulletinFormDialog.tsx`; unit 104 files, 1820 tests; components 18 files, 228; integration 92;
+build compiled with `/` and `/bulletins` static. The served-build browser checks passed unchanged,
+plus a new one: `/pets`' feed heading in both languages, with no button in the feed.
+
 ## Verification
 
-Final, on the tree merged with `master` at `187593c`:
+As of round seven, on the tree merged with `master` at `187593c` (current figures are in the
+section above):
 
 - `npm run check` — 0 errors, 12 pre-existing warnings, one fewer than at the base.
 - `npx vitest run --project unit` — 100 files, **1614 tests**; 0 assertion errors, 0 timeouts.
