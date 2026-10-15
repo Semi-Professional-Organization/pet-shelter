@@ -385,7 +385,32 @@ Round nine's count of three mutants is corrected. Two of them targeted the rever
 change. The total stays at 32 (29 + per-row day, inverted check, removed check), all of them
 behaviour or the one stated stand-in.
 
-Ten review rounds, 32 mutants killed. The review history above is the most useful thing in this
+## Round eleven: converged on the code, tightened the tests
+
+The reviewer found no correctness bug in round ten and six weaker points. Fixed:
+
+- **The `today` prop had no test.** `tests/components/BulletinDataTable.test.tsx` renders a
+  notice dated 2030, so any day the table computed for itself would call it scheduled. Only a
+  table that honours the prop can call it live.
+- **The fallback test could not tell the shelter's day from UTC.** Its clock now sits where
+  the two differ (16:30 UTC on the 11th of August is the 12th in Kuala Lumpur), so
+  `bulletin-002` is live only under the shelter's zone.
+- A comment that had drifted two statements from the `slice` it explains is back above it.
+
+Two mutants killed: the zone swapped for UTC, and the table computing its own day.
+
+Declined, with reasons:
+
+- **The create dialog still takes its default date from the client's `shelterToday()`**, so
+  in a tab left open past midnight it can disagree with the table's server-supplied day. That
+  is deliberate. The dialog's date is what gets posted, and the server judges it at save time,
+  so it should be the current day. The table's day is stale by design, which its `ceiling:`
+  comment states.
+- **The missing-zone `RangeError`**, as in round nine.
+- **The call-count assertion depends on `startOfNextShelterDay` calling a module-local
+  `shelterToday`.** True, and stated in the test beside the assertion.
+
+Eleven review rounds, 34 mutants killed. The review history above is the most useful thing in this
 entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
 took four attempts, and the seeding rule that one round reversed are each a pattern with its own
 lesson file.

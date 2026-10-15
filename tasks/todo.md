@@ -87,6 +87,10 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
       documenting it. The ninth-review test now checks behaviour (a future fixture notice is
       hidden) and kills three mutants. One finding refuted: the fake timers are restored by
       their `describe`'s own `afterEach`.
+- [x] Round 11, round 10's fixes: no correctness bug. Of six findings, three were fixed: a
+      component test for the `today` prop, a fallback test that now separates the shelter's day
+      from UTC, and a comment moved back to its line. Two mutants killed. Three declined with
+      reasons in the decision entry. 34 mutants in all.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.
