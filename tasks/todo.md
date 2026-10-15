@@ -24,10 +24,10 @@ Record active multi-step work streams below.
 ## Items
 
 - [x] `approximateBirthDate` no longer throws. A count whose date leaves the `Date` range
-      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`, uncaught by
-      every caller. It now clamps to the earliest date a `Date` holds (`-271821-04-20`), older
-      than any age that fits. An out-of-range intake is returned as given, as for an age with no
-      unit.
+      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. The repository
+      caught that as a database outage and served the demo pets. It now clamps to the earliest
+      date a `Date` holds (`-271821-04-20`), older than any age that fits. When the intake is out
+      of range too, the intake is returned as given, as for an age with no unit.
 - [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
       `expectTypeOf` tests that fail `tsc` on the old signature.
 - [x] Tried and **withdrawn** after review, all for one reason: a refusal here is the intake
@@ -39,11 +39,14 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, five rounds: 9, 7, 8, 8 and 8 findings, each probed; round five dropped
-  the century change. The final diff after round five has not had a sixth review (see the PR).
-- Grid: 425 age × intake pairs, master against the branch: 344 identical, 81 where master threw,
+- `/code-review high`, six rounds: 9, 7, 8, 8, 8 and 7 findings, each probed. Round five
+  dropped the century change; round six found no code defect, only wrong claims in comments
+  and ledger, which are corrected. That correction round is comments and ledger only.
+- Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
-  #113's rehearsal pins.
+  #113's rehearsal pins (the three non-ASCII ones added at its request).
+- Opened `tasks/open/a-pet-mapping-error-is-handled-as-a-database-outage.md`: the mechanism that
+  turned the old throw into a silent swap to the demo pets is still there.
 - Discriminating tests (fail on master by name): the four overflow clamps, the end-to-end
   `senior` check, and the out-of-range intake. The rest of that block are guards that pass on
   master by design.
@@ -57,7 +60,8 @@ Record active multi-step work streams below.
 - A non-ISO intake (`2026/06/12`) still leaks into `birthDate` unconverted on the fall-through.
   It is pre-existing, and the obvious fix threw on an out-of-range intake for every age.
 - `Date.UTC` still reads years 0–99 as 1900–1999 (`2000 years` gives 1926). Fixing it alone
-  moved two-digit intakes to 26 AD; it needs `isoDateSchema` and the intake format settled too.
+  moved two-digit intakes to 26 AD; it needs `isoDateSchema`, `transparency.ts`'s `isIsoDate`
+  (which already reads 0–99 literally) and the intake format settled together.
 - Compact compounds (`2y3m`) and unlisted spellings (`6 mons`): tied to how the backfill's
   fractional check is narrowed (`expand-refuses-compound-ages-written-in-short-units.md`).
 - Three copies of the estimate rule: latent, no writer produces `''`.

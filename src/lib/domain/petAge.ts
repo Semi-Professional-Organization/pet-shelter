@@ -185,7 +185,9 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
  * 1926. That is left alone deliberately. Replacing it with `setUTCFullYear` was tried and
  * withdrawn: it fixed only junk ages, and it turned a hand-typed two-digit intake (`26-06-12`)
  * from 1926 into 26 AD, and put year-0026 dates into the pet form, whose `isoDateSchema` still
- * has the `Date.UTC` reading and calls them "not a real calendar day".
+ * has the `Date.UTC` reading and calls them "not a real calendar day". A third copy, `isIsoDate`
+ * in `transparency.ts`, already reads years 0–99 literally, so the copies disagree today; a fix
+ * for the century reading has to settle all three together.
  */
 function isoDate(year: number, month: number, day: number): string | null {
   const d = new Date(Date.UTC(year, month, day));
@@ -194,8 +196,9 @@ function isoDate(year: number, month: number, day: number): string | null {
 
 /**
  * The earliest date a `Date` can hold. An age so large that its birth date would be earlier still
- * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError` at a caller
- * that does not catch it, which took down the whole list render.
+ * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError`. The pet
+ * repository catches that throw as if the database were down and silently serves the demo pets
+ * in place of the whole catalogue: `tasks/open/a-pet-mapping-error-is-handled-as-a-database-outage.md`.
  *
  * ceiling: no plausibility check at all, deliberately. `61 years` or `15000000 weeks` is junk, but
  * the only other answer this function can give is the intake date, which shows the animal as a
@@ -254,10 +257,11 @@ export function approximateBirthDate(
   }
 
   const intakeOnly = intakeDateStr.split("T")[0];
-  // The arithmetic first; only when it overflows does it matter which side did. An age can only
-  // reach into the past, so with an intake inside the range the overflow is the age's and clamps.
-  // An intake itself out of range leaves nothing to reckon from: returned as given, as it is for
-  // an age with no unit.
+  // The arithmetic first, so any date that fits is returned exactly as before, even from an
+  // intake that is itself out of range. Only when the result overflows does it matter which side
+  // did: an age can only reach into the past, so with an intake inside the range the overflow is
+  // the age's and clamps. With the intake out of range too there is nothing to reckon from, and it
+  // is returned as given, as it is for an age with no unit.
   const derived = (birthDate: string | null) => ({
     birthDate: birthDate ?? (isoDate(parts.year, parts.month, parts.day) ? EARLIEST_DATE : intakeOnly),
     isEstimate: true,

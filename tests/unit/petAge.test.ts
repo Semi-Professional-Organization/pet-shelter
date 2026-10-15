@@ -235,7 +235,8 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
 
   /**
    * A count so large the derived date leaves the range a `Date` can hold. These threw `RangeError`
-   * from `toISOString()`, and no caller catches it. Kept in its own block, away from the spellings.
+   * from `toISOString()`, which the pet repository caught as a database outage and answered with
+   * the demo pets. Kept in its own block, away from the spellings.
    */
   describe("approximateBirthDate when the derived date overflows", () => {
     const intake = "2026-06-12";
@@ -256,8 +257,9 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(pet.ageCategory).toBe("senior");
     });
 
-    // An intake outside the range leaves nothing to reckon from: returned as given, exactly as it
-    // is for an age with no unit.
+    // When the intake is out of range and the derived date overflows too, there is nothing to
+    // reckon from: the intake is returned as given, as for an age with no unit. (A derived date that
+    // fits is returned as computed, even from such an intake; see the next test.)
     it("does not throw when the intake date itself is out of range", () => {
       expect(approximateBirthDate("2 years", "300000-01-01").birthDate).toBe("300000-01-01");
     });

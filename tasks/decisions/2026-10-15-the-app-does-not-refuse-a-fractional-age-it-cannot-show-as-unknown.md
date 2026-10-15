@@ -35,18 +35,29 @@ non-ISO intake came back as ISO. It threw on an out-of-range intake for every ag
 swapped `Date.UTC` for `setUTCFullYear`, because `Date.UTC` puts `2000 years` in 1926. A fifth
 review showed that it also turned a hand-typed two-digit intake (`26-06-12`) from 1926 into
 26 AD. It also put year-0026 dates into the pet form, where `isoDateSchema`, still on
-`Date.UTC`, rejects them as "not a real calendar day". Both quirks predate this branch.
+`Date.UTC`, rejects them as "not a real calendar day". Both quirks predate this branch. A third
+date validator, `isIsoDate` in `transparency.ts`, already reads years 0–99 literally, so a
+century fix has to settle all three copies together.
 
-Measured on a 425-pair grid of ages and intakes, master against the branch: 344 identical, 81
-where master threw, and none that differ otherwise. Every input master read without throwing
-reads the same here.
+Measured on a grid of ages and intakes, master against the branch, later extended with the three
+non-ASCII strings PR #113's harness pins: 476 pairs, 389 identical, 87 where master threw, none
+that differ otherwise. Every input master read without throwing reads the same here.
 
-What remains new is the date an overflow now gets. A clamped age, `-271821-04-20`, is not a
-`YYYY-MM-DD` value, so the edit form's date field shows blank and saving asks for a birth date.
-An out-of-range intake (`300000-01-01`) comes back as given, as master already did for an age
-with no unit, and reads as a newborn, the default this entry warns against. It is kept only
-because there is no in-range answer to clamp to. On master both pets threw before the page
-rendered.
+What remains new is only the date an overflow gets where master threw:
+
+- **An age-side overflow** with an in-range intake clamps to `-271821-04-20`. That is not a
+  `YYYY-MM-DD` value, so the edit form's date input renders blank. The form state probably still
+  holds the clamped string and saving shows a format error rather than "required". That was
+  reasoned from the code, and not checked in a browser.
+- **An intake that is itself out of range**, where the derived date also overflows, comes back
+  as given (`300000-01-01`), as master already did for an age with no unit. It reads as a
+  newborn, the default this entry warns against, and is kept only because there is no in-range
+  answer to clamp to. A derived date that fits is returned as computed, as on master, and with
+  such an intake that can itself be a future date (`250000 years` before `300000-01-01`).
+
+On master both threw. The throw did not crash the page: the pet repository caught it as a
+database outage and served the demo pets in place of the catalogue. That mechanism outlives
+this change, and is recorded in `tasks/open/a-pet-mapping-error-is-handled-as-a-database-outage.md`.
 
 **What would let this be reversed.** A way for the function, or its callers, to say *unknown*
 rather than *newborn*: for example, returning no birth date and having the read path show
