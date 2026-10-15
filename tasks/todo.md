@@ -15,6 +15,41 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Bulletins, after the merge: the review round that was skipped
+
+**Branch:** `fix/bulletins-round-15` · opened 2026-10-15 · base `bd20b26` (#103, squash-merged)
+
+The #76 stream below ends at round 14 with "the review loop stops here". That stop was wrong
+under CLAUDE.md step 6, and #103 merged with round 14 unreviewed. This stream is the late
+review and what it changed.
+
+- [x] Late review of round 14, then of each fix to it, ending by the rule in the decision
+      entry. No product defect was found. The findings were test comments and ledger lines
+      claiming more than they showed, and the fixes cut those claims down.
+- [x] Net change: the fallback test's comments state what each half checks and what it relies
+      on in the fixture; the assertions are unchanged from `bd20b26`. The decision entry
+      withdraws round 14's stop and states when the loop ends.
+- [x] Lesson:
+      `tasks/lessons/2026-10-15-when-reviews-flip-flop-on-a-test-shrink-the-claim-not-the-loop.md`.
+
+## Review
+
+**Verified, 2026-10-15, at this branch's tip** (nothing under `src/` changed):
+
+- `npm run check` (typecheck, lint, docs:check): 0 errors.
+- `npm run test:all`: 2092/2092 passed. This runs the unit, components and integration
+  projects, but without `STRICT_PERSISTENCE`.
+- `npm run test:integration` (strict): 92/92 passed.
+- `npm run build`: exit 0.
+
+**Not opened as a PR.** The branch changes no assertion and no product code, and AGENTS.md
+says never to open a docs-only PR. It should ride with the next branch that carries bulletin
+code.
+
+**Deliberately not done:** no product code changes; every finding was in tests or the ledger.
+The stream below is left as written, including round 14's stop, so the record shows what was
+concluded at the time. The correction is here and in the decision entry, not edited into it.
+
 # Bulletins get a server-side store (#76)
 
 **Branch:** `worktree-bulletins-76` · opened 2026-09-22 · GRAVE lane

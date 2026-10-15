@@ -432,7 +432,8 @@ teeth if the fixture changes, and its clock instant and shelter day sit side by 
 pair. **Fallback ordering is covered by two other tests, not by this one**: "sorts pinned
 first, then newest, and applies the limit afterwards" and "breaks a same-day tie on the
 fixture path". A probe that removed the fallback's sort failed exactly those two, and the
-comment beside the assertion now names them.
+comment beside the assertion named them. (Round fifteen replaced the titles with a
+description.)
 
 The table spec freezes the clock in 2026, so a day the table computed for itself would be
 2026 even after the real clock passes 2099.
@@ -458,6 +459,8 @@ Declined, with reasons:
   formatter from the table, and the table imports only `isScheduledForLater`. That is not a
   regression path worth a test.
 
+*(Withdrawn: see "Round fifteen" below.)*
+
 **Where the loop stopped, and why.** Rounds twelve to fourteen changed no product code. Each
 review found no correctness bug and a new angle on the same assertion, and each fix invited
 the opposite critique (pin the exact list, then don't tie it to the fixture). The loop ends at
@@ -466,7 +469,59 @@ scheduling rule has a named test that a recorded mutant fails. Round fourteen's 
 comments, one test's assertions, and this entry. They are covered by the mutant re-run in the
 table above, not by a fifteenth review.
 
-Fourteen review rounds, 35 mutants killed. The review history above is the most useful thing in this
-entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
-took four attempts, and the seeding rule that one round reversed are each a pattern with its own
-lesson file.
+## Round fifteen: the round I tried to skip
+
+The paragraph above, "Where the loop stopped, and why", is **withdrawn**. It treated a mutant
+re-run as a stand-in for reviewing round fourteen's fixes, which contradicts CLAUDE.md "Closing
+a session", step 6: every commit that fixes an earlier review's findings gets its own review.
+PR #103 merged as `bd20b26` with round fourteen unreviewed. Round fifteen reviewed it after the
+merge, and its fixes ship in a follow-up PR. The paragraph stays above as the record of what
+round fourteen concluded. This section is the correction.
+
+Fixed:
+
+- **The derived set's comment claimed more than it does.** That half of the test restates the
+  date rule, so it cannot check the rule. It catches extra or missing rows, and the named rows
+  check the rule. The comment now says so. Two attempts on the way there were wrong, and the
+  reviews caught both. Calling `isScheduledForLater` from the oracle made the set half blind to
+  a mutated rule. Slicing the date "to match the product" guarded a case that cannot happen:
+  "dates every notice as a plain calendar day" pins the fixture to `YYYY-MM-DD`. That test is
+  the guard, and the only one: an earlier draft of this entry also said a timestamped row
+  "would break `freshBulletins()` first", which is false, because it only concatenates the
+  string and never parses it. The plain string compare is unchanged from `bd20b26`.
+- **The mutant table above understates one row.** The `>=` mutant is also killed by the
+  fallback test, through `bulletin-002`, which is dated the shelter's day. The table is left as
+  round fourteen wrote it; this is the correction.
+- The test comment now says what the test relies on in the fixture: `bulletin-002` published
+  and dated exactly the shelter's day, and `bulletin-001` published and dated after it. It
+  points at the ordering and format tests by what they cover, not by title, so it has no
+  title to go stale.
+
+Re-run against the final test. Each mutant failed its target test, and every file was
+restored afterwards:
+
+```
+per-row today: KILLED — Tests  1 failed | 149 skipped (150)
+inverted date check: KILLED — Tests  1 failed | 149 skipped (150)
+date check removed: KILLED — Tests  1 failed | 149 skipped (150)
+>= at the boundary: KILLED — Tests  1 failed | 2 passed (3)          (table spec)
+UTC day instead of the shelter's: KILLED — Tests  1 failed | 149 skipped (150)
+table computes its own day: KILLED — Tests  2 failed | 1 passed (3)
+>= at the boundary: KILLED — Tests  1 failed | 149 skipped (150)     (fallback test)
+```
+
+## After round fifteen
+
+Further rounds reviewed the follow-up branch. None found a product defect. Their findings were
+about this entry's and the test comment's own claims, and each fix cut a claim down. An
+attempt to tabulate every finding produced the next round's findings, so the table was
+removed. The lesson
+`tasks/lessons/2026-10-15-when-reviews-flip-flop-on-a-test-shrink-the-claim-not-the-loop.md`
+records the pattern.
+
+**When the review loop ends:** at a round where every finding, after verification, is refuted
+or declined with a written reason. Not when I judge the remaining findings small.
+
+The patterns worth taking to the next content type are in the rounds before fourteen: the
+fallback copied from FAQ, the tiebreaker that took four attempts, and the seeding rule that one
+round reversed. Each has its own lesson file.
