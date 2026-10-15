@@ -67,6 +67,407 @@ Record active multi-step work streams below.
   That is still true of JavaScript, and PR #113 is editing that docstring.
 - The decision cites an open entry that arrives with PR #114.
 
+# Bulletins get a server-side store (#76)
+
+**Branch:** `worktree-bulletins-76` · opened 2026-09-22 · GRAVE lane
+**Settles:** `tasks/open/bulletins-are-a-per-browser-demo-anyone-can-edit.md` (issue #76),
+and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
+
+## Items
+
+- [x] Audit the brief against `origin/master` 8d36ace before building. Every line of the ledger
+      entry's evidence re-verified at that commit; no in-flight PR overlaps (only #42, birth-date).
+- [x] Put P-D to the owner with three costed options, including one the brief did not name
+      (server-render the fixture read-only). Owner chose (a), the full model. Recorded in
+      `tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`.
+- [x] Claim and five kill conditions written before the spike (`tasks/open/CLAIM-bulletins-76.md`).
+- [x] K1: the embedded-postgres rung recovered and `npm run db:push:local` run verbatim against
+      real PostgreSQL 18.4. Did not fire — the migration is rehearsed, not asserted.
+- [x] Migration rehearsed: hand-written DDL produces objects identical to `prisma db push`,
+      is idempotent, and the enum rejects an out-of-vocabulary category.
+- [x] `Bulletin` model, three enums, one index; `src/lib/server/bulletinRepository.ts`;
+      `src/actions/bulletins.ts` behind `requirePermission(MANAGE_CONTENT)`.
+- [x] `/admin/bulletins` editor; admin nav repointed and the `permissions: null` opt-out removed.
+- [x] K2: `BulletinFeed` is a Server Component with zero client state. Did not fire.
+- [x] Public "Staff Admin Access" toggle, `AdminBulletinModal` and `bulletinStore.ts` deleted.
+- [x] Media host allow-lists, enforced on write *and* on read.
+- [x] `src/data/bulletins.json` reshaped; the `dQw4w9WgXcQ` embed removed from shipped content.
+- [x] Test suite: 114 cases, eight claims checked against mutants.
+- [x] Merge `origin/master` 4782ff2 (#88's AST guard) and re-run every gate.
+- [x] `/code-review`, **four rounds**, because each fix round is new code:
+      round 1 (whole diff) fourteen findings — ten fixed, one declined with a reason;
+      round 2 (the fix commit) thirteen, **two worse than what they replaced**;
+      round 3 (that fix) thirteen, one of them the tiebreaker still being dead;
+      round 4 (after merging #93) fourteen, of which five are master-side and already
+      filed by the session that wrote them. Migration re-rehearsed after every change
+      that touched its SQL.
+- [x] Round 5, the whole PR against master `187593c` before merge: fifteen findings, verified
+      one by one since the reviewer probed none. The public read no longer serves the launch
+      fixture on a production outage (it resurrected deleted notices and ISR cached them);
+      future-dated notices are scheduled against the shelter's day; the migration script seeds
+      only on the run that creates the table. Rehearsed on a real Postgres on port 5433, clear
+      of another session's server on 5432 — which is how the "(remote)" label on a local URL
+      was found and fixed in both migration scripts.
+- [x] Round 6, round 5's fixes on their own: fifteen findings. Round 5's seeding rule had broken
+      the launch (a table created by `prisma db execute` was never seeded, and production stops
+      serving the fixture once the table exists); reversed to "seed an empty table". Rehearsed
+      both ways on a real Postgres. The fixture question now asks whether a database exists
+      before asking `NODE_ENV`; the form's default date is the shelter's; P2022 has its own
+      message; the third copy of the migration-target label, in `check-drift.ts`, is fixed.
+- [x] Twenty-seven mutants across six rounds, all killed (4 + 4 + 5 + 2 + 6 + 6).
+- [x] Round 7: ten findings, all small — the review is converging. Three declined with reasons in
+      the decision entry. Filed for the shelter: the launch notices are from August and two are
+      pinned.
+- [x] Round 8: converged — "no correctness bugs serious enough to block". Seven low-severity
+      fixes, including a factual error in the public launch-notices entry; one decline.
+- [x] Round 8's fixes reviewed on their own (`ec8fbce..b9ffbba`), by hand: the forked
+      `/code-review` returned empty after one tool call, so it is not counted as a review. No
+      findings — every `isScheduledForLater` caller passes the shared day, and the emptied form
+      default cannot post because the schema's `YYYY-MM-DD` regex rejects `""`. The seed's new
+      rollback path was proven on embedded Postgres: a CHECK constraint rejecting the second
+      fixture row made the script exit 1 with the constraint's own message, the table held 0 rows
+      afterwards, and a clean re-run seeded all four.
+- [x] Round 9, 2026-10-15: the review above found nothing because it was mine. Retried at
+      `medium`, the forked `/code-review` found seven. Four fixed: `today` is required, one
+      instant per request, a test that kills three mutants of round eight's fix (none had
+      existed), and console spies restored on failure. Three declined with reasons in the
+      decision entry. Lesson:
+      `tasks/lessons/2026-10-15-an-empty-review-is-a-review-that-did-not-run.md`.
+- [x] Round 10, round 9's fixes: eight findings, two against round 9 itself. The
+      one-instant change is reverted, because the two paths it "aligned" never run together.
+      The admin table takes `today` as a prop, which fixes the hydration mismatch instead of
+      documenting it. The ninth-review test now checks behaviour (a future fixture notice is
+      hidden) and kills three mutants. One finding refuted: the fake timers are restored by
+      their `describe`'s own `afterEach`.
+- [x] Round 11, round 10's fixes: no correctness bug. Of six findings, three were fixed: a
+      component test for the `today` prop, a fallback test that now separates the shelter's day
+      from UTC, and a comment moved back to its line. Two mutants killed. Three declined with
+      reasons in the decision entry. 34 mutants in all.
+- [x] Round 12: round 11's `low` review returned empty (one tool call) and was retried at
+      `medium`. No correctness bug. Three test gaps fixed: a boundary spec, a far-future row,
+      and an exact feed list. One `>=` mutant killed; 35 in all.
+- [x] Round 13: round 12's "feed order" assertion could not detect a broken sort, because the
+      fixture's file order already is feed order. It is now a set derived from the fixture,
+      with ordering left to the ordering tests, as its comment says. The table spec freezes the
+      clock. All six scheduling mutants re-run and still killed.
+- [x] Round 14: seven findings, no correctness bug. One was refuted by a probe: removing the
+      fallback's sort fails two existing tests, which the comment now names. Fixed: the
+      named-row assertions, the instant and day as one pair, the six mutants tabulated in the
+      decision entry, and strikethrough claims reworded in past tense. Two declined. **The
+      review loop stops here**, for the reasons the decision entry states: test-only rounds,
+      no correctness finding, every rule mutant-pinned.
+- [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
+      branch had filed; the duplicate open entry was deleted rather than left to mirror a
+      second issue.
+
+## Review
+
+**Verified.** `npm run check` clean (typecheck, lint 0 errors, docs:check OK). `npm run build`
+run in the worktree after `npm ci`, with throwaway secrets inline. The migration was rehearsed
+against real PostgreSQL 18.4, not reasoned: its DDL produces objects identical to
+`prisma db push`, re-running it is a no-op, the enum rejects an out-of-vocabulary category, and on
+a database seeded with the index this branch later retired, a re-run clears it.
+
+**CI settled the test question: PR #103 is green on every job**, including "Unit, integration &
+component tests" (run `38428838326`, commit `af0fc2c`). That is the same tree that gave two
+different local answers, so the local readings were both wrong about the code — recorded against
+the order-dependence entry, which this stream also widened.
+
+**Locally, `npm run test:all` could not be quoted as a single number, and this stream did not
+pretend otherwise.** Two runs of the same tree, nothing changed between them: `65 failed`, then
+`4 failed | 1964 passed (1968)`. The second run's four were one test each in four unrelated
+non-bulletin files across two projects, and **all four pass in isolation**. That is
+`tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, which records the same shape on
+plain `master` — and which this stream has now widened, because that entry describes the `unit`
+project and these failures were in `components` and `integration`. `tests/unit/bulletins.test.ts`
+is **126 passed** run on its own.
+
+**The reviews are the story of this branch.** Round 2 found that round 1's fix had made an
+ordering bug deterministic rather than fixing it. Round 3 found that round 2's fix for it was
+still dead. Round 4 found that round 3's fix was *also* still dead, for a third reason. One
+ordering rule, four attempts, each one claiming in a comment to have fixed it — which is the
+lesson `tasks/lessons/2026-10-13-a-comment-asserting-a-mechanism-is-a-claim-to-run.md` is about,
+and the strongest argument for the standing order in CLAUDE.md step 6 that this repo has produced.
+
+**The tests were checked against mutants, not trusted.** Dropping the `MANAGE_CONTENT` gate,
+returning `videoEmbedUrl` unfiltered, treating an empty result as an outage, and taking the byline
+from anywhere but the session — all four failed the suite. A suite that passes proves nothing
+about code nobody broke on purpose.
+
+**Deliberately not done:**
+
+- **The feed is still English-only.** `titleMs`/`contentMs` exist, the editor writes them, the
+  reader resolves English into them — but nothing renders them.
+  `tasks/open/home-page-text-stays-english-on-the-malay-site.md` owns the render side and is
+  untouched. The columns landed now because adding them later means a *second* hand-run DDL
+  migration against a branch with no down path.
+- **Nothing was applied to production.** The deliverable is
+  `prisma/migrations/manual/20260922_community_bulletins/migration.sql` plus
+  `npm run db:migrate:bulletins`, for the owner to run. `npm run db:push` must NOT be used: it
+  reconciles the whole schema and three destructive statements still stand between master and the
+  production branch. Until the owner applies it, the live feeds serve the committed fixture
+  through the repository's outage fallback — which is the same content visitors see today, so
+  there is no window where the site is worse than before.
+- **No `displayOrder` column**, and no reordering UI. Pinned-first-then-newest is the feed's real
+  ordering; a manual column would be a second one to keep in step by hand. If staff ask to hand-
+  order notices, that is a new column and a new decision, not an oversight.
+- **The `/bulletins` archive is unpaginated.** Marked with a `ceiling:` comment. Fine at shelter
+  scale; page it if the archive outgrows a few hundred, which is also when the page stops being
+  readable.
+- **No component test for `BulletinFeed`.** It is now a pure Server Component with no branching
+  beyond media type, and the repository tests already pin the data it receives. A render test
+  would assert that React renders props.
+- **`src/actions/faqs.ts` still gates on a legacy role list** rather than `MANAGE_CONTENT`. Left
+  alone deliberately — the 2026-09-18 decision kept it there, and changing it is not this task.
+
+**One thing a reviewer should look at hardest:** this change *raises* the stakes. Before it, the
+public editor could only damage the visitor's own browser. Now there is a real store behind real
+pages, so the `requirePermission` calls in `src/actions/bulletins.ts` are the only thing standing
+between an anonymous POST and the shelter's public notices. That is where the denial tests point.
+
+
+
+# Donation receipts wait for reconciliation
+
+**Branch:** `worktree-donation-receipt-reconciliation-boundary` · opened 2026-09-22
+**Settles:** `tasks/open/general-donations-issue-receipts-before-payment-is-reconciled.md` (issue #56)
+
+## The brief, and where it was wrong
+
+The brief asked to "store the donation record in a pending status without assigning an official
+receipt number" — i.e. a `status` column on `Donation`. That is unimplementable against
+production and forbidden by this repo's own schema:
+
+- `donations_no_mutation` has been live on the production branch since 2026-09-21
+  (`tasks/decisions/2026-09-21-production-receipts-are-append-only.md`). It refuses every UPDATE
+  and DELETE on `donations`. A pending row inserted there could never be updated to attach its
+  receipt number, so the reconciliation step would fail in production and nowhere else.
+- `prisma/schema.prisma` already rejects the idea in prose, where `PetSponsorship` explains why it
+  is not a `Donation`: "Modelling it as a mutable `Donation` would have meant putting a status
+  column on a statutory document, which is exactly what that model's comment forbids."
+
+So the pending state goes in a new `donation_pledges` table, mirroring the shipped
+`PetSponsorship` → `settleSponsorship` pattern. This makes the brief's item 4 stronger than it
+asked for: the LHDN export reads `donations`, so an unconfirmed pledge is structurally invisible
+to it. There is no filter to forget.
+
+The brief's "or webhook callback" is **not built**. No payment processor is integrated, `card` is
+refused before rate limiting, and `grep -ril webhook src/ prisma/` returns nothing. Adding a
+public POST endpoint that mints statutory receipts, with no signature to verify, would be a worse
+hazard than the one being closed. Staff reconciliation is the boundary; the webhook is recorded
+as the deferred option.
+
+## Items
+
+- [x] `DonationPledge` model + hand-written idempotent migration (never `db push`), with
+      `rollback.sql`. **Applied nowhere** - see the new open entry.
+- [x] `src/lib/server/donationPledgeLedger.ts`: pledge, settle, reject, pending queue
+- [x] `submitDonationPledgeAction` returns a pledge, not a receipt
+- [x] Staff actions: list / reconcile / reject, behind the existing reconciliation permission
+- [x] Audit: `DONATION_PLEDGED` at submit (no `receiptNumber` in details), `DONATION_RECEIVED`
+      moves to reconciliation
+- [x] Tax-neutral acknowledgement email at pledge; receipt email only at reconciliation
+- [x] Admin queue renders pending gifts beside pending sponsorships, via one extracted
+      `ReconciliationQueue` rather than a second copy
+- [x] Donor-facing acknowledgement replaces the receipt screen (EN + MS)
+- [x] Tests: no receipt before reconciliation, idempotent double-confirm, export blind to pledges
+- [x] Settle the open entry into `tasks/decisions/`
+
+## Review
+
+**Verification.** `typecheck` clean. `test` (unit) 99 files / 1596 tests, all green. `test:components`
+11 / 170 green. `test:integration` 6 / 59 green. `lint` 0 errors, 13 warnings, every one of them
+pre-existing and in a file this branch never touched. `docs:check` and the layer graph both OK.
+`build` succeeded with throwaway secrets inline, after `npm ci` in the worktree.
+
+**`npm run test:db` could not run on 2026-09-22 and did run on 2026-10-13.** Docker still will
+not start here, but `tasks/lessons/2026-09-14-a-missing-docker-is-not-a-missing-database-tier.md`
+already named the second route and this stream had not read it: `embedded-postgres` in the job
+scratch directory, on the credentials `docker-compose.yml` uses. Tier 3b: **5 files / 42 tests
+green**, including the three-way settle race, the dismissal transaction, and both reference
+collisions against a real P2002. `migration.sql` and `rollback.sql` were rehearsed on the same
+server — 7 checks, and the hand-written table is identical in columns and indexes to the one
+`prisma db push` builds from the schema.
+
+**A transient local Postgres made an earlier run look far worse than it was.** Midway through the
+session a native server was listening on `localhost:5432`; `src/lib/server/prisma.ts` falls back to
+a hardcoded localhost URL when `DATABASE_URL` is unset, so unit suites written for the in-memory
+branch hit it and failed on leftover rows - 65 tests across 16 files, reproduced identically in the
+pristine main checkout at `b44f857` before concluding anything. It had stopped by the final run,
+which is green. Worth knowing before anyone reads a red unit run here as a regression.
+
+### Code review, and the fix round
+
+`/code-review high` over the whole branch diff returned six findings, each verified by probe
+before it was accepted. One was medium and the rest low; all six are fixed:
+
+1. `assertGiftRefString` ran inside `withReceiptTransaction` on the Postgres path, so a malformed
+   reference came back as `ReceiptIssuanceError` rather than `TypeError` — an outage message for a
+   programming error, and a disagreement between the two storage modes. Hoisted above the mode
+   branch. `tests/unit/donationPledgeRefGuard.test.ts` is the new guard; it was confirmed to fail
+   against the unfixed code before being kept.
+2. The LHDN CSV fallback fills "Donor Email" from `entry.actorEmail`, which is now the coordinator
+   rather than the donor. `exportCsv.ts` prefers `details.donorEmail` and keeps `actorEmail` as the
+   fallback for older rows.
+3. The migration's advisory lock used `4210771004` while every sibling uses `4210771001`, so its
+   own comment about queueing against them was false. Aligned.
+4. `isGiftRef` was dead and its docstring claimed a boundary it did not enforce. Wired into
+   `giftRefSchema`, so a receipt number pasted into the queue is rejected on shape.
+5. `useSponsorshipStore`'s contract still said `submitDonationPledgeAction` returns a
+   `DonationReceipt`. Corrected, including why the hook is kept rather than deleted.
+6. `prisma/schema.prisma` and the boundary test cited the open entry this branch deletes. Both now
+   point at the decision file.
+
+A second `/code-review high` over the fix commit returned six more, again each probed:
+
+1. **Receipt dating.** The receipt now carries the confirmation date, not the gift date, so a
+   year-end gift can land in the next tax year. Kept — it matches `settleSponsorship`, and
+   back-dating would grow a month's gapless series after it was filed — but named as a `ceiling:`
+   and written into the decision file rather than left to be discovered by a donor.
+2. **`hasMore` was computed and never rendered**, so both queues truncated silently at 200 on a
+   queue fed by an unauthenticated form. Now surfaced, which fixes the sponsorship lane too.
+3. **`/donate` hardcodes `duitnow_qr`** while publishing the Maybank account, so a bank-transfer
+   donor's receipt and queue row both name the wrong rail. Pre-existing; this change gives it a
+   second consumer. Not fixed here — it needs a rail selector on the public form — and recorded as
+   its own open entry.
+4. **A `pledgeRef` collision lost the gift.** The reference is a 6-digit daily random, so ~200
+   gifts a day carries roughly a 2% daily chance of a collision, which surfaced as "we could not
+   confirm" — losing a real submission and telling the donor not to retry. Now redraws once, with
+   three tests covering the retry, the second collision, and the `receiptNumber` unique that must
+   *not* be retried.
+5. **The donor-email fix was incomplete**: `SPONSORSHIP_RECONCILED` rows are classified as
+   donations by the `receiptNumber` test and carry `sponsorEmail`, so they still exported the
+   coordinator. Both spellings are now checked, and `sponsorName` was added to that audit row so
+   the export stops calling reconciled sponsors "Anonymous Donor".
+6. **Deploy ordering** — already tracked; see the open entry and the PR description.
+
+A third `/code-review high`, over the second fix commit, returned four more:
+
+1. **The sponsorship export fix was itself half a fix, and the half it left was the money.**
+   `exportCsv` reads `amountMYR` and nothing else for the amount column, and the
+   `SPONSORSHIP_RECONCILED` audit row carried only `amountSen`/`amountDisplay`. So the previous
+   commit gave those rows a real supporter name and address — making them look authoritative —
+   while the LHDN amount column still read `0.00`. The row now carries `amountMYR`, plus the tier,
+   frequency, rail and dedication the exporter was otherwise inventing as "Rescue Donation" and
+   "DuitNow QR". `taxIdOrIc` is deliberately still absent: an audit row is not somewhere to widen
+   where an NRIC is stored.
+2. **The collision retry was gated on `meta.modelName`**, which nothing in this repo has observed
+   Prisma populating for a `donationPledge.create`. If it is absent the predicate returns false,
+   the retry never fires, and the donor loses the gift exactly as before — silently. The call site
+   is the discriminator (this only ever wraps one `create`), so the check is now on `meta.target`
+   alone, with tests for the no-`modelName` and index-name shapes.
+3. **The truncation banner had no test.** Two added, both directions.
+4. A collision case was added to the Postgres suite, since that tier is the only place the *real*
+   P2002 shape is observable — still unrun here.
+
+A fourth and a fifth round followed, each over the previous round's fix commit:
+
+- **Round four** found that the amount fix reached only rows written from then on: every
+  reconciled sponsorship already in audit history carries `amountSen` and no `amountMYR`, so they
+  still exported RM 0.00. The exporter now reads the sen, and an unknowable amount is an empty
+  cell rather than a claimed zero. It also filed two pre-existing defects as open entries — the
+  sponsorship lane's identical reference collision, and the two lanes disagreeing about an NRIC
+  in the audit row.
+- **Round five** found the collision predicate keyed on a field this client never sets. On Prisma
+  7 with `@prisma/adapter-pg` a P2002 has no `meta.target`; the columns are at
+  `meta.driverAdapterError.cause.constraint.fields`. So the `receiptNumber` guard was dead code
+  and its tests passed on a fabricated error. `uniqueViolationColumns` now reads the real shape,
+  with tests on it, one of which was confirmed to fail against the old code. The audit viewer and
+  the CSV exporter also now share one amount resolver, which prefers the exact sen.
+
+Not fixed from round five, and why: a receipted row whose amount cannot be resolved is still
+exported, with an empty amount cell and no operator notice. Dropping a receipted row from a tax
+export is worse than showing it incomplete, and a notice is a UI change to `useAuditLogController`.
+
+**Round six, 2026-10-13/14** closed the review of round five and three filed follow-ups:
+
+- **One reader for "which unique did this hit".** Round five's fixture was still transcribed from
+  `node_modules`. The error was captured from a live server instead, and
+  `src/lib/server/uniqueViolation.ts` now serves all three call sites. It returns `true`, `false`
+  or `"unnamed"`, because the third is a different fact and each caller must decide what it may
+  do with it.
+- **The sponsorship lane's collision retry exists now**, and `isReferenceCodeCollision` in
+  `applications.ts` — which read `meta.target` and so never retried — reads the real shape.
+- **The audit-row rules moved to `src/lib/domain/receiptAuditRow.ts`.** One classifier and one
+  amount resolver for the receipts tab, the viewer badge and the CSV fallback, which had been
+  testing key *presence* in two places and *truthiness* in the third. A zero, negative or
+  fractional `amountSen` is "no answer", so it can no longer mask a real `amountMYR`.
+- **`/donate` asks which rail the donor used.**
+- **An NRIC is no longer copied into the audit log** by either lane; see the 2026-10-13 decision.
+
+**A second environmental trap, worth knowing.** Stopping the embedded server's Node wrapper left
+one orphaned `postgres.exe` holding port 5432: it accepted connections and never answered. The
+global `beforeEach` then timed out at 10 s in whichever file a worker opened first, so *different*
+pure-logic suites failed on each run. That is distinct from the leftover-rows failure above, and
+from plain contention — nine other sessions' Postgres processes were running, and the suite needed
+`--maxWorkers=3` to go green (102 files / 1635 tests) even with the port closed.
+
+**Round seven, 2026-10-14**, the review of round six's four commits, found nine and all are
+fixed. The ones that changed behaviour: the QR panel's channel switcher was a second rail
+selector the payload could not see, so it now moves the rail question (native radios, and copying
+the account number no longer flips it); the sponsorship ledger's collision redraw and its
+foreign-key recovery could not follow one another, and are now one loop; `uniqueViolationOn`
+matched by substring and now matches exactly; and a ledger receipt's zero or negative amount is
+printed rather than blanked, since that is what an offsetting correction looks like. Tier 3b was
+re-run against a live server after these changes.
+
+**Round eight, 2026-10-14**, the review of round seven, found ten; seven are fixed, three are
+not. CI would also have failed: the Playwright golden path asserted an `HFS-DON` e-receipt on
+submission — it pinned the defect this branch removes. It now asserts the pledge and the absence
+of a receipt, and passes locally against a dev server with no database (5/5). Rewriting it
+surfaced four public claims that a receipt is "generated instantly", on `/donate`, `/get-involved`
+and in the FAQ fixture, now corrected; the production FAQ row is database data and needs an edit
+in `/admin/faqs` at deploy time.
+
+Fixed: the QR switcher sync was withdrawn and `/donate` shows only the DuitNow code, as the
+modal does; `uniqueViolationOn` decides by the column list whenever there is one and reads an
+index name inside a legacy `target` array; a negative ledger amount is exported as a number so a
+spreadsheet SUM counts it; a double sponsorship collision has its own error message; and a
+decimal string under `amountSen` is refused, because `"250.00"` is likelier misfiled ringgit than
+250 sen. Not fixed: the foreign-key recovery is spent even when its lookup finds both referents
+(pre-existing behaviour, not a regression); the two ledgers still implement the redraw in
+different shapes (two copies; AGENTS.md waits for a third); and the suffix fallback for constraint
+names, now marked as a `ceiling:`.
+
+This round's commit has not been reviewed.
+
+**Applied to production, 2026-10-15.** The owner ran the migration in the Neon SQL editor and
+reported both confirming queries correct: `donation_pledges` exists, `donations_no_mutation` is
+still enabled (`O`). The open entry is settled into the decision file. Left: merge, then the
+production FAQ edit in `/admin/faqs`.
+
+### Deliberately not done
+
+- **No payment webhook.** The open entry offered it as the other fork. There is no processor
+  integrated anywhere, `card` is refused before rate limiting, and `grep -ril webhook src/ prisma/`
+  is empty. An unauthenticated public POST that mints statutory receipts, with no signature to
+  verify, is a worse hazard than the one being closed. `settleDonationPledge` is the single funnel
+  a callback would later call.
+- **`pet_sponsorships` was not generalised to carry general gifts.** It was the smaller-looking
+  option and it is rejected in the decision file with the reasons: `petName` is `NOT NULL` and read
+  across ~10 files in the sponsor portal, and a sentinel pet name would land in
+  `Donation.targetPetName`, which is a dedication.
+- **No in-app view of an issued receipt.** Both printable dossiers rendered at *submission* time,
+  which was the defect, so both are gone rather than relocated. The receipt now arrives by email,
+  exactly as the sponsorship lane has always worked. A donor-facing receipt view belongs behind the
+  sponsor portal, keyed on a receipt that exists; that is not built.
+- **`--receipt-panel` is left declared with no consumer.** Removing the two dead component classes
+  orphaned that one token. The repo's own guard polices `@layer components`, not `@theme` tokens,
+  and the rest of the `receipt-*` family is still in use by the sponsor certificate; pulling one
+  token out of a coherent family is churn into the design system for ~40 bytes.
+- **Year-end receipt dating is still a `ceiling:`.** A gift sent on 30 December and confirmed on
+  2 January is receipted in January. Back-dating would grow a month's gapless series after it was
+  filed. The fix needs the bank statement's value date and a shelter policy, not a default.
+- **`useSponsorshipStore.saveDonationReceipt` now has no caller.** Left in place: it is the client
+  receipt store, and the right fix is a portal receipt view, not deleting the store on the way past.
+- **The idempotency `ceiling:` is inherited, not closed.** A same-actor retry after a lost commit
+  acknowledgement still reports uncertainty rather than guessing. Closing it needs an operation id
+  on the row, and it should be closed for `settleSponsorship` at the same time - both functions
+  carry the note.
+
+
+
+
 # Pet form birth date — critique PR #42, then yield it to PR #94
 
 **Branch:** `feat/pet-form-birth-date` · PR #42 · picked up 2026-09-22

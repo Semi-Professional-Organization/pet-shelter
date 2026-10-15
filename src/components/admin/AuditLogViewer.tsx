@@ -19,6 +19,11 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAuditLogController, AuditTabFilter } from "@/hooks/useAuditLogController";
+import {
+  auditDetails,
+  isReceiptAuditRow,
+  resolveAuditAmountMYR,
+} from "@/lib/domain/receiptAuditRow";
 
 export function AuditLogViewer() {
   const { state, handlers } = useAuditLogController();
@@ -177,12 +182,10 @@ export function AuditLogViewer() {
               </thead>
               <tbody className="divide-y divide-border">
                 {filteredLogs.map((log) => {
-                  const isDonation =
-                    log.action === "DONATION_RECEIVED" ||
-                    log.entity === "DonationReceipt" ||
-                    Boolean(log.details && typeof log.details === "object" && "receiptNumber" in log.details);
+                  const isDonation = isReceiptAuditRow(log);
 
-                  const details = (log.details || {}) as Record<string, unknown>;
+                  const details = auditDetails(log);
+                  const donationAmountMYR = resolveAuditAmountMYR(details);
 
                   return (
                     <tr key={log.id} className={`hover:bg-muted/20 transition-colors ${isDonation ? "bg-success-surface " : ""}`}>
@@ -216,9 +219,9 @@ export function AuditLogViewer() {
                         }`}>
                           {log.action}
                         </span>
-                        {isDonation && details.amountMYR !== undefined && (
+                        {isDonation && donationAmountMYR !== undefined && (
                           <span className="block mt-1 font-mono text-2xs font-bold text-success-text ">
-                            RM {Number(details.amountMYR).toFixed(2)}
+                            RM {donationAmountMYR.toFixed(2)}
                           </span>
                         )}
                       </td>

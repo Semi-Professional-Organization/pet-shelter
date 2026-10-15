@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  STATUTORY_ROS_REGISTRATION_NO,
-  isTaxClaimable,
-} from "@/lib/domain/shelterIdentity";
+import { STATUTORY_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +17,6 @@ import {
   QrCode,
   CheckCircle2,
   Copy,
-  Printer,
   ShieldCheck,
   ArrowRight,
   RotateCcw,
@@ -177,14 +173,12 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
     handleCopyMaybank,
     handleCompleteDonation,
     handleReset,
-    handlePrintReceipt,
   } = handlers;
 
   const completedPledge =
     completedCheckout?.type === "sponsorship_pledge" ? completedCheckout.data : null;
-  const completedReceipt =
-    completedCheckout?.type === "donation_receipt" ? completedCheckout.data : null;
-  const taxClaimable = completedReceipt ? isTaxClaimable(completedReceipt) : false;
+  const completedGift =
+    completedCheckout?.type === "donation_pledge" ? completedCheckout.data : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -578,8 +572,8 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                       ? "Recording Sponsorship Pledge..."
                       : `Record Sponsorship Pledge - RM ${finalAmount.toFixed(2)}`
                     : isProcessing
-                      ? "Issuing Official Receipt..."
-                      : `Complete Donation - RM ${finalAmount.toFixed(2)}`}
+                      ? "Recording Donation Pledge..."
+                      : `Record Donation Pledge - RM ${finalAmount.toFixed(2)}`}
                   <ArrowRight className="size-4" />
                 </Button>
               </div>
@@ -647,8 +641,12 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                 </Button>
               </div>
             </div>
-          ) : completedReceipt ? (
-            /* E-Receipt View */
+          ) : completedGift ? (
+            /* General-gift acknowledgement. Deliberately not a receipt, and not a
+               printable dossier: until 2026-09-22 this branch rendered an official
+               Section 44(6) e-Receipt with a live HFS-DON number, issued from the
+               donor's word that they had paid. The receipt is now emailed after a
+               coordinator matches the transfer. */
             <div className="space-y-6">
               <div
                 role="status"
@@ -658,130 +656,55 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                 <CheckCircle2 className="size-5 text-success-accent shrink-0 mt-0.5" />
                 <div>
                   <h3 className="font-heading text-sm font-bold text-foreground">
-                    Thank you - your donation was recorded.
+                    Donation pledge recorded
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {taxClaimable ? (
-                      <>
-                        An official tax-exemption receipt for{" "}
-                        <strong className="text-foreground">
-                          RM {completedReceipt.amountMYR.toFixed(2)}
-                        </strong>{" "}
-                        is ready below.
-                      </>
-                    ) : (
-                      <>
-                        An official receipt for{" "}
-                        <strong className="text-foreground">
-                          RM {completedReceipt.amountMYR.toFixed(2)}
-                        </strong>{" "}
-                        is ready below. It carries no tax identifier, so it cannot be claimed
-                        against a return.
-                      </>
-                    )}
+                    We recorded your RM {completedGift.amountMYR.toFixed(2)} gift towards{" "}
+                    <strong className="text-foreground">{completedGift.tierName}</strong>. The
+                    pledge reference below is your on-screen acknowledgement.
                   </p>
                 </div>
               </div>
 
-              {/* Printable Official Receipt Dossier */}
-              <div id="donation-receipt-print" className="receipt p-6 sm:p-8 space-y-5 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-receipt-ink pb-4">
-                  <div>
-                    <h3 className="font-heading text-xl sm:text-2xl font-extrabold uppercase tracking-tight text-receipt-ink">
-                      Hope for Strays Animal Sanctuary
-                    </h3>
-                    <p className="text-xs text-receipt-ink-muted">
-                      No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia
-                    </p>
-                    <p className="text-2xs text-receipt-ink-faint">
-                      ROS Reg: {completedReceipt.shelterRegistrationNo}
-                      {taxClaimable && (
-                        <> &bull; Tax Exemption: {completedReceipt.taxDeductibleRef}</>
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="text-left sm:text-right">
-                    <span className="inline-block px-2.5 py-1 bg-receipt-ink text-receipt-paper font-mono text-xs font-bold uppercase rounded-sm">
-                      Official e-Receipt
-                    </span>
-                    <div className="font-mono text-xs font-bold text-receipt-ink-soft mt-1">
-                      {completedReceipt.receiptNumber}
-                    </div>
-                    <div className="text-2xs text-receipt-ink-faint">{completedReceipt.date}</div>
+              <div className="tone-soft tone-warning space-y-3 rounded-xl border p-4">
+                <div>
+                  <div className="text-3xs font-bold uppercase tracking-wider">Pledge reference</div>
+                  <div className="mt-1 font-mono text-base font-bold text-foreground">
+                    {completedGift.pledgeRef}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <div className="text-3xs uppercase font-bold text-receipt-ink-faint">Issued To</div>
-                    <div className="font-bold text-receipt-ink text-sm">{completedReceipt.donorName}</div>
-                    <div className="text-receipt-ink-muted">{completedReceipt.donorEmail}</div>
-                    {completedReceipt.donorPhone && <div className="text-receipt-ink-muted">{completedReceipt.donorPhone}</div>}
-                    {completedReceipt.taxIdOrIc && <div className="text-receipt-ink-muted font-mono">IC/SSM: {completedReceipt.taxIdOrIc}</div>}
-                  </div>
-
-                  <div>
-                    <div className="text-3xs uppercase font-bold text-receipt-ink-faint">Sponsorship Allocation</div>
-                    <div className="font-bold text-receipt-ink text-sm">{completedReceipt.tierName}</div>
-                    {completedReceipt.targetPetName && (
-                      <div className="text-receipt-ink-soft font-medium">🐾 Dedicated Pet: {completedReceipt.targetPetName}</div>
-                    )}
-                    <div className="text-receipt-ink-faint">
-                      Payment:{" "}
-                      {completedReceipt.paymentMethod === "online_banking"
-                        ? "Maybank Transfer"
-                        : completedReceipt.paymentMethod === "card"
-                          ? "Card"
-                          : "DuitNow QR"}
-                    </div>
-                    {completedReceipt.frequency && (
-                      <div className="text-receipt-ink-faint uppercase text-3xs">Type: {completedReceipt.frequency.replace("_", " ")}</div>
-                    )}
-                  </div>
-                </div>
-
-                {completedReceipt.notes && (
-                  <div className="p-3 receipt-panel border rounded-md text-xs italic">
-                    &ldquo;{completedReceipt.notes}&rdquo;
-                  </div>
-                )}
-
-                <div className="border-t border-b border-receipt-rule py-3 flex items-center justify-between font-heading">
-                  <span className="text-sm font-bold text-receipt-ink">Total Contribution Received</span>
-                  <span className="text-2xl font-extrabold receipt-accent">
-                    RM {completedReceipt.amountMYR.toFixed(2)}
-                  </span>
-                </div>
-
-                <div className="text-3xs text-receipt-ink-faint leading-relaxed italic">
-                  {taxClaimable
-                    ? "* This receipt is computer-generated and valid for income tax deduction under Subsection 44(6) of the Malaysian Income Tax Act 1967."
-                    : "* This receipt carries no NRIC, passport or SSM number, so it cannot be filed for a tax deduction."}
-                </div>
+                <p className="text-xs leading-relaxed">
+                  Quote this reference in your DuitNow or bank-transfer description so the
+                  coordinator can match your payment. If you already transferred, keep it for any
+                  follow-up with the shelter.
+                </p>
+                <p className="text-xs font-semibold leading-relaxed">
+                  {completedGift.reconciliationNotice}
+                </p>
               </div>
 
-              {/* Actions */}
+              <SelectedPaymentInstructions
+                paymentMethod={completedGift.paymentMethod}
+                copiedBank={copiedBank}
+                onCopyBank={handleCopyMaybank}
+                petCustomQrUrl={targetPet?.customQrUrl}
+                petName={completedGift.targetPetName}
+              />
+
+              <p className="text-xs text-muted-foreground">
+                Status: <strong className="text-foreground">Pending payment verification</strong>.
+                This acknowledgement is not a receipt and cannot be filed for tax relief. Your
+                official Section 44(6) receipt is emailed once the transfer is confirmed.
+              </p>
+
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <Button variant="outline" size="sm" onClick={handleReset} className="gap-1.5">
                   <RotateCcw className="size-3.5" />
                   Make Another Contribution
                 </Button>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handlePrintReceipt}
-                    className="gap-1.5"
-                  >
-                    <Printer className="size-3.5" />
-                    Print / Save Receipt
-                  </Button>
-                  <Button size="sm" onClick={() => onOpenChange(false)}>
-                    Done
-                  </Button>
-                </div>
+                <Button size="sm" onClick={() => onOpenChange(false)}>
+                  Done
+                </Button>
               </div>
             </div>
           ) : null}

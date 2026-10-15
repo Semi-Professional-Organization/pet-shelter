@@ -94,6 +94,47 @@ makes it slow enough to matter under parallel load — the import is deliberate 
 instantiate Prisma before a test file's own `vi.mock` registers), so the fix is more likely
 raising `hookTimeout` than removing the work.
 
+**Observed in `components` and `integration` too, 2026-10-13.** The title says "unit suite"; it is
+wider than that. On the bulletins branch (`worktree-bulletins-76`, master merged at `e99ebf8`),
+with six other sessions running on the same machine:
+
+| Run | Result |
+|---|---|
+| `npm run test:all`, a review sub-agent running concurrently | `65 failed \| 1903 passed (1968)` |
+| `npm run test:all`, same tree, nothing else changed | `4 failed \| 1964 passed (1968)` |
+
+The second run's four were one test each in four unrelated files, two projects:
+`integration/softDeleteFiltering`, `components/home`, `components/PetCard`,
+`components/PetChooserCarousel`. **All four pass in isolation** — 25 passed for the three component
+files together, 17 for the integration one. So the one-failure-per-file shape this entry already
+describes is not confined to the `unit` project, and the recommendation at the bottom applies to
+all three.
+
+**CI is green on the same commit, which narrows this to the local environment.** PR #103's run
+`38428838326` on `af0fc2c` — the exact tree that gave `65 failed` and then `4 failed` locally —
+passed every job: "Unit, integration & component tests" in 2m46s, plus strict-persistence,
+Playwright and static analysis. So whatever this is, it does not reproduce on a clean single-job
+runner, and the two local readings were both wrong about the code.
+
+It rules out the source and anything in the committed tree, and points at the developer machine:
+concurrent sessions sharing one checkout, several vitest processes competing, a shared `.vite`
+cache under `node_modules/`.
+
+**It also corroborates the `hookTimeout` mechanism proposed above**, and was measured before that
+entry was read, so the two are independent. A hook that times out under load is exactly what would
+pass on a single-job runner with a cold cache and fail on a laptop running seven sessions — and it
+predicts the one-failure-per-file shape, which is what both of these local runs produced. If the
+hook timeout is raised, this pair is the cheap regression check: the same commit must stay green on
+CI and stop varying locally.
+
+Practical consequence meanwhile: a red local run is weak evidence and a green CI run is the one to
+trust, which inverts the usual order.
+
+Load looks like a factor rather than the cause: the 65-failure run had a review sub-agent issuing
+its own `vitest` commands against the same working tree. That is worth separating from the
+order-dependence proper, because the two have different fixes — one is a scheduling bug, the other
+is concurrent processes sharing a checkout.
+
 **Why this is worth an entry rather than a shrug.** A suite that reports `1580 passed` under one
 schedule and 54 red under another gates nothing, and every session here runs `npm test` before
 closing. The honest reading of a green run today is "green, or not yet unlucky". It also costs
