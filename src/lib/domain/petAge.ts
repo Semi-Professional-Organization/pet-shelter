@@ -180,8 +180,10 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 /**
  * UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string — or `null` when the
  * result lies outside the range a `Date` can hold. `setUTCFullYear` rather than `Date.UTC`,
- * because `Date.UTC` reads a year of 0–99 as 1900–1999: `2000 years` before 2026 landed in 1926,
- * younger than `1900 years`. Identical for every year from 100 on.
+ * because `Date.UTC` reads a year argument of 0–99 as 1900–1999: `2000 years` before 2026 landed
+ * in 1926, younger than `1900 years`. The argument is the derived year on the years path but the
+ * intake year on the months and weeks paths, so both an intake and a result in years 0–99 now read
+ * correctly. Identical whenever both are from year 100 on.
  */
 function isoDate(year: number, month: number, day: number): string | null {
   const d = new Date(0);
@@ -248,22 +250,25 @@ export function approximateBirthDate(
   }
 
   const intakeOnly = intakeDateStr.split("T")[0];
-  // An intake itself outside the `Date` range leaves nothing to reckon from: returned as given,
-  // as it is for an age with no unit. Past this check an overflow can only be an age too large.
-  if (!isoDate(parts.year, parts.month, parts.day)) {
-    return { birthDate: intakeOnly, isEstimate: true };
-  }
+  // The arithmetic first; only when it overflows does it matter which side did. An age can only
+  // reach into the past, so with an intake inside the range the overflow is the age's and clamps.
+  // An intake itself out of range leaves nothing to reckon from: returned as given, as it is for
+  // an age with no unit.
+  const derived = (birthDate: string | null) => ({
+    birthDate: birthDate ?? (isoDate(parts.year, parts.month, parts.day) ? EARLIEST_DATE : intakeOnly),
+    isEstimate: true,
+  });
 
   const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    return { birthDate: isoDate(parts.year - years, parts.month, parts.day) ?? EARLIEST_DATE, isEstimate: true };
+    return derived(isoDate(parts.year - years, parts.month, parts.day));
   }
 
   const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    return { birthDate: isoDate(parts.year, parts.month - months, parts.day) ?? EARLIEST_DATE, isEstimate: true };
+    return derived(isoDate(parts.year, parts.month - months, parts.day));
   }
 
   // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
@@ -272,7 +277,7 @@ export function approximateBirthDate(
   const weekMatch = norm.match(AGE_WEEKS_PATTERN);
   if (weekMatch) {
     const weeks = parseInt(weekMatch[1], 10);
-    return { birthDate: isoDate(parts.year, parts.month, parts.day - weeks * 7) ?? EARLIEST_DATE, isEstimate: true };
+    return derived(isoDate(parts.year, parts.month, parts.day - weeks * 7));
   }
 
   return { birthDate: intakeOnly, isEstimate: true };

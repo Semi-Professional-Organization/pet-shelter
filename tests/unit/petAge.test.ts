@@ -262,6 +262,12 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(approximateBirthDate("2 years", "300000-01-01").birthDate).toBe("300000-01-01");
     });
 
+    // The arithmetic runs before any range check, so an intake just past the maximum still yields
+    // a birth date that fits, exactly as master computed it — not the intake date.
+    it("derives a date that fits even when the intake alone is past the maximum", () => {
+      expect(approximateBirthDate("1 week", "275760-09-14").birthDate).toBe("+275760-09-07");
+    });
+
     // Inside the range nothing changes, odd as the readings are. No plausibility ceiling.
     it.each([
       ["61 years", "1965-06-12"],
@@ -270,12 +276,14 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
     });
 
-    // `Date.UTC` read a year of 0–99 as 1900–1999, so `2000 years` came out younger than `1900`.
+    // `Date.UTC` read a year argument of 0–99 as 1900–1999, so `2000 years` came out younger than
+    // `1900`. On the months path that argument is the intake year, so an early intake moved too.
     it.each([
-      ["2000 years", "0026-06-12"],
-      ["1990 years", "0036-06-12"],
-    ])("keeps %j in the right century", (age, expected) => {
-      expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+      ["2000 years", intake, "0026-06-12"],
+      ["1990 years", intake, "0036-06-12"],
+      ["700 months", "0050-03-01", "-000009-11-01"],
+    ])("keeps %j from %j in the right century", (age, from, expected) => {
+      expect(approximateBirthDate(age, from).birthDate).toBe(expected);
     });
   });
 
