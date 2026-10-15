@@ -1882,9 +1882,23 @@ database) and driven with Playwright from a script outside the repo:
 
 The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
 closed there, so its links were not collected; none of them carries a fragment (read from
-`Navbar.tsx`), and its labels are inline ternaries the dictionary comparison cannot see — they are
-the navbar half of the drift table above. What this does not cover: a real screen reader, and
+`Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
+comparison cannot see — they are the navbar half of the drift table above. What this does not cover: a real screen reader, and
 production data — with no database, the bulletin and pet content is whatever the fallback serves.
+
+## Round twelve, and why the loop stops
+
+Round twelve reviewed `457b791` and confirmed every source claim — the `/pets` labels, no fragment in
+the mobile menu, `lang` set client-side, `STAFF_INVITE_SECRET` required by the startup guard, the
+storage key. Two overstatements in my wording, both fixed: the mobile menu's "Browse All Animals"
+button has no emoji (its six text links do), and its bulletins link reads `nav.bulletins` rather
+than an inline ternary. Both re-checked by listing every emoji-bearing line of `Navbar.tsx` with a
+Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a false negative.
+
+**No round thirteen.** Rounds ten, eleven and twelve each found only wording in the previous round's
+ledger text, never code, and each fix was a phrase. Reviewing a two-phrase correction that a direct
+source read has already checked repeats that regress. This deliberately departs from "review every
+fix round". It is stated here so the owner can overrule it rather than discover it.
 
 ## Verification
 

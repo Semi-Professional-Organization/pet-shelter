@@ -37,8 +37,9 @@ inline, so the two English strings remain identical by coincidence rather than b
 navbar mostly inlines its own pairs. Measured on 2026-10-14 by listing every `href` literal in
 `Navbar.tsx` and `Footer.tsx` with `grep` and intersecting the two lists: they share **seven**.
 Two match, because the navbar reads the same key — `/sponsors` (`nav.sponsorWall`) and
-`/bulletins` (`nav.bulletins`). **Five drift.** Every navbar label for each is listed, as its source string — the mobile menu
-renders each behind an emoji ("🔍 Track Application"), so an accessible name is not the string alone:
+`/bulletins` (`nav.bulletins`). **Five drift.** Every navbar label for each is listed, as its source string — the mobile menu's
+six text links render behind an emoji ("🔍 Track Application"; its "Browse All Animals" button
+has none), so an accessible name is not always the string alone:
 
 | Link | Navbar labels (en / ms) | Footer key (en / ms) |
 |---|---|---|
