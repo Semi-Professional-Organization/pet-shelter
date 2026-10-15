@@ -1883,8 +1883,10 @@ database) and driven with Playwright from a script outside the repo:
 The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
 closed there, so its links were not collected; none of them carries a fragment (read from
 `Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
-comparison cannot see. Four of those are in the drift table above (`/pets` twice, `/donate`,
-`/applications/track`); `/faq` and `/get-involved` are not, because the footer links neither. What
+comparison cannot see. *(This sentence and the next were corrected in rounds thirteen and fourteen,
+after round eleven.)* Four of those are in the drift table above (`/pets` twice, `/donate`,
+`/applications/track`). `/faq` and the `/get-involved` page are not: the footer has no `/faq` link,
+and links that page only at `#volunteer`, which is a table row of its own. What
 this does not cover: a real screen reader, and
 production data — with no database, the bulletin and pet content is whatever the fallback serves.
 
@@ -1898,18 +1900,29 @@ than an inline ternary. Both re-checked by listing every emoji-bearing line of `
 Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a false negative.
 
 **Corrected 2026-10-15 — the reason first given here for stopping was false.** It said rounds ten,
-eleven and twelve each found only wording, never code. Round ten found wrong *facts*: an `href`
-list built from memory that missed a shared link, two of `/pets`' labels missing, and a wrong count.
-Its fix rebuilt the table. Only rounds eleven and twelve were wording-only. `deea461`'s commit
-message repeats the false premise, and history is not rewritten for it; this paragraph is the
-correction. The owner asked for round thirteen anyway, and it found exactly this.
+eleven and twelve each found only wording, never code. "Never code" holds for every late round; "only
+wording" holds for round eleven alone. The first correction of this paragraph said "eleven and
+twelve", which was the same mistake one round later, found by round fourteen. So the per-round
+record, read from each round's section rather than summarised from memory:
+
+| Round | Reviewed | What it found in the previous round's text |
+|---|---|---|
+| 10 | `72a0fd3` | **False facts:** a shared link missed (`/bulletins`), two of `/pets`' five labels missing, "the other three" under a table of five, one English partial match named out of two. The fix rebuilt the table |
+| 11 | `9c0bebe` | **Wording only:** "five wordings" true only in Malay; the mobile emoji prefix not mentioned |
+| 12 | `457b791` | **False facts about the source:** every mobile label behind an emoji (one button has none); every mobile label an inline ternary (bulletins reads its key) |
+| 13 | `deea461` | **False claims about the record:** the loop-stop premise, repeated in that commit's message; a sentence implying every inline mobile label is in the drift table |
+| 14 | `3d455db` | **False claim about the record:** round twelve called wording-only. Also an unmarked in-place edit, a miscount, an ambiguous "links neither" |
+
+No late round found a code defect. But four of the five found something false in text written to
+fix the previous round, so each ledger fix round has been worth reviewing — the opposite of the
+premise the loop was stopped on. `deea461`'s message keeps that premise; history is not rewritten.
 
 ## Round thirteen, and an accessibility-tree check
 
 Reviewed `deea461`. No code defect; every Navbar claim held when re-derived (six emoji lines, the
-button without one, bulletins on its key, no mobile fragment). Three findings, all fixed: the false
-loop-stop premise above, the same premise in that commit's message (recorded, not rewritten), and a
-sentence implying every inline mobile label is in the drift table (`/faq` and `/get-involved` are not).
+button without one, bulletins on its key, no mobile fragment). Three findings: two fixed — the false
+loop-stop premise above, and a sentence implying every inline mobile label is in the drift table —
+and one recorded but not fixed, the same premise in `deea461`'s commit message.
 
 A real screen reader was not available, so the production build was served locally again and
 Playwright's accessibility snapshot — what assistive technology is handed — was read on `/` and
