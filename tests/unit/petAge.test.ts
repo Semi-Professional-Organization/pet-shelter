@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   computeAgeInMonths,
   computeAgeCategory,
@@ -277,6 +277,32 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       ["3130 weeks", "1966-06-17"],
     ])("still derives %j, exactly at the ceiling", (age, expected) => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+    });
+  });
+
+  /**
+   * `withDerivedAge` recomputes four fields, so their types must come from it, not from the input.
+   * `expectTypeOf` is checked by `tsc` (`npm run typecheck`), not at runtime; the `expect` beside
+   * each covers the runtime half.
+   */
+  describe("withDerivedAge's return type", () => {
+    it("types the flag it computes as boolean, not as the literal it was given", () => {
+      const r = withDerivedAge(
+        { intakeDate: "2026-06-12", age: "2 years", birthDateIsEstimate: false },
+        "2026-06-12",
+      );
+      // No birthDate, so the flag is forced to true at runtime — its type must not stay `false`.
+      expectTypeOf(r.birthDateIsEstimate).toEqualTypeOf<boolean>();
+      expect(r.birthDateIsEstimate).toBe(true);
+    });
+
+    it("does not collapse to never when the flag is passed as undefined", () => {
+      const r = withDerivedAge(
+        { intakeDate: "2026-06-12", age: "2 years", birthDateIsEstimate: undefined },
+        "2026-06-12",
+      );
+      expectTypeOf(r.age).toEqualTypeOf<string>();
+      expect(r.age).toBe("2 years");
     });
   });
 });

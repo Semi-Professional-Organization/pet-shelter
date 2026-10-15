@@ -99,7 +99,14 @@ export function withDerivedAge<T extends {
   intakeDate: string;
   age?: string;
   ageCategory?: string;
-}>(pet: T, asOf: Date | string = new Date()): T & {
+}>(
+  pet: T,
+  asOf: Date | string = new Date()
+  // `Omit` first, then the four fields this function decides. A plain `T & { … }` intersected the
+  // caller's types with the computed ones, so a literal `birthDateIsEstimate: false` survived as
+  // the type `false` while the runtime returned `true`, and a flag typed `undefined` collapsed the
+  // whole result to `never`. These four are recomputed here, so the input's types must not leak.
+): Omit<T, "birthDate" | "birthDateIsEstimate" | "age" | "ageCategory"> & {
   birthDate: string;
   birthDateIsEstimate: boolean;
   age: string;
