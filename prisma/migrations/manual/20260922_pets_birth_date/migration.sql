@@ -246,12 +246,13 @@
 --
 -- Every row should read `ok: years` or `ok: months`. The other five verdicts are the five things
 -- this file refuses, and each is a row to correct by hand first, or it will abort naming that row
--- (a sixth, `database not UTF8`, is on every row or none, and means this file will not run here):
+-- (a sixth, `database not UTF8`, is on every row or none, and means the backfill will refuse
+-- here; the file still relaxes NOT NULL and leaves an already-migrated table alone, so apply it):
 --
 --   non-ASCII age     a no-break space, an accented letter, an en dash, a vulgar fraction -- any
 --                     character outside plain ASCII, which the app and this file can read
 --                     differently; retype it in plain ASCII, as one whole number and unit.
---                     Checked first, so every check after it reads ASCII only.
+--                     Checked first, so every verdict after it is about ASCII text.
 --   bad intakeDate    not a real calendar date; fix the date
 --   fractional age    "1.5 years" reads as 5 and "3-4 years" reads as 4; pick one whole
 --                     number -- "18 months", "3 years" -- or say which bound you mean
@@ -317,9 +318,9 @@
 -- tasks/decisions/2026-09-22-pets-birth-date-backfills-from-intake-date.md. **Two of them, O1 and
 -- O2, have since stopped meaning what they say**: they compare against `appRule`, a copy of
 -- approximateBirthDate that #42 left behind, so they still pass against a rule the app no longer
--- uses. The live comparison is in the contract harness (see the invariant bullet above). Not
--- re-run after the 2026-10-14 refusal change -- this harness needs embedded-postgres; the parts of
--- it that change touches, J1 and J3, are reproduced and pass in the contract harness. In summary:
+-- uses. The live comparison is in the contract harness (see the invariant bullet above). Re-run
+-- in full on 2026-10-15 after the non-ASCII refusal, 92/92, with `npm i --no-save
+-- embedded-postgres` in a worktree's own node_modules. In summary:
 --   * The ten src/data/pets.json animals backfill to the exact `birthDate` that file carries,
 --     10/10, which is the independent check on the rule -- that fixture was written by hand and
 --     this SQL was not derived from it.
@@ -346,8 +347,8 @@
 --     column somebody else added is left alone and said so, because dropping it would destroy
 --     birthdays this pair never wrote.
 --   * The rehearsal database is created UTF8, as Neon is, rather than inheriting the host
---     locale: [[:space:]] and \M are encoding-dependent, and a non-breaking space between the
---     number and the unit parses under WIN1252 and is refused under UTF8.
+--     locale: the non-ASCII refusal compares bytes to characters, which means "non-ASCII" only
+--     under UTF8, and this file refuses to backfill on any other encoding.
 --   * The pre-check in this header returns the right verdict for each of those, and each
 --     verdict matches what the file then actually does -- so a clean pre-check is not
 --     followed by an abort.
@@ -527,9 +528,12 @@ BEGIN
     -- `[[:space:]]` matches U+0085 under some ctypes where JS `\s` never does; and a non-ASCII
     -- letter after a unit ends a word for JS `\b` but not for Postgres `\M`. An earlier version
     -- listed whitespace code points one by one, and a review found the next case the same day.
-    -- First, so that every check below reads ASCII only, where the two engines agree under any
-    -- ctype -- which no one has measured on production. The cost: an en-dash range or a vulgar
-    -- fraction is named here rather than as fractional, so the message below says so.
+    -- First, so that every check below acts only on ASCII rows, where the two engines agree under
+    -- any ctype -- which no one has measured on production. (The regexes above still run on every
+    -- row while the scratch table is built; for a non-ASCII row their results are never used.
+    -- Nothing in that SELECT raises on text -- every non-ASCII fixture in both rehearsals passes
+    -- through it and is named here.) The cost: an en-dash range or a vulgar fraction is named
+    -- here rather than as fractional, so the message below says so.
     SELECT string_agg(
              format('%L (age=%L)', "id", "age"), E'\n    ' ORDER BY "id")
       INTO offenders

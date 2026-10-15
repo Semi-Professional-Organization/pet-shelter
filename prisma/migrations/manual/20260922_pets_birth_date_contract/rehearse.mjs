@@ -371,8 +371,8 @@ if (HAS_EXPAND) {
   const NBSP = String.fromCharCode(0xa0); //  no-break space: what pasting from Word produces
   const NNBSP = String.fromCharCode(0x202f); // narrow no-break space
   const APP_ONLY = [
-    // JS `\s` matches a no-break space and Postgres `[[:space:]]` does not, so the app reads this
-    // as a year and the backfill cannot see the unit at all. Refused, not guessed.
+    // The app reads this as a year (JS `\s` matches a no-break space). The backfill refuses it at
+    // its non-ASCII stage, before any of its regex results are used. Refused, not guessed.
     ["1" + NBSP + "year", "a unit after a no-break space", "2025-06-12"],
     ["3 minggu", "weeks, Malay", "2026-05-22"],
     ["3 weeks", "weeks", "2026-05-22"],
@@ -391,8 +391,10 @@ if (HAS_EXPAND) {
     const oneErr = await tryExec(one, EXPAND);
     check(
       `  ...and the backfill refuses it, naming the row`,
-      // The no-break-space entry is refused by the non-ASCII stage, which runs first.
-      (age.includes(NBSP) ? /non-ASCII/ : /cannot be derived/).test(oneErr) && /app-only-row/.test(oneErr),
+      // A non-ASCII entry is refused by the non-ASCII stage, which runs first. Same predicate as
+      // expand's harness uses: any code point above 0x7F.
+      ([...age].every((ch) => ch.codePointAt(0) < 128) ? /cannot be derived/ : /non-ASCII/).test(oneErr) &&
+        /app-only-row/.test(oneErr),
       oneErr ? oneErr.split("\n")[0].slice(0, 160) : "the backfill accepted it"
     );
     await one.close();
@@ -420,7 +422,7 @@ if (HAS_EXPAND) {
     "2 years 3 weeks",
   ];
 
-  // Non-ASCII strings, refused by the file's first stage before any regex reads them. The first
+  // Non-ASCII strings, refused by the file's first stage before any regex result is used. The first
   // three each stored a different birthday from the app's, with no error, under an earlier
   // version of the file. Measured on pglite (UTF8, ctype C.UTF-8) on 2026-10-15, intake
   // 2026-06-12, by matching the file's own unit patterns:

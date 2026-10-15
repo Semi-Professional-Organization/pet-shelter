@@ -198,7 +198,7 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
  * They also disagree outside ASCII, because this function's patterns are JS regexes and the SQL's
  * are Postgres ones: `\s`, `\b` and `[[:space:]]`, `\M` treat a no-break space, U+0085 and accented
  * letters differently. So the backfill refuses any `age` containing a non-ASCII character, before
- * any of its patterns read it — widening this function to read Unicode (`\p{Zs}`, normalisation)
+ * any of its pattern results is used — widening this function to read Unicode (`\p{Zs}`, normalisation)
  * changes nothing there. `tasks/decisions/2026-10-15-the-backfill-refuses-any-non-ascii-age.md`.
  *
  * It is not a licence to treat the arithmetic as independent. Adding a unit HERE widens the gap, so

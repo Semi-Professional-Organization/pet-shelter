@@ -54,13 +54,15 @@ const PORT = Number(process.env.REHEARSAL_PORT || 55000 + Math.floor(Math.random
 // production does not have. glibc excludes U+00A0 from `space` under C, C.UTF-8 and en_US.UTF-8
 // alike, so the M2 result should hold there too -- but that is reasoning, not measurement, and
 // anyone re-taking it on a Linux host should pin LC_CTYPE 'C.UTF-8' and say so. Since 2026-10-15
-// the file refuses any non-ASCII age before any regex reads it, so every regex stage sees ASCII
-// only and the ctype question no longer changes a result.
+// the file refuses any non-ASCII age before any regex result is used (the regexes still run on it
+// while the scratch table is built; only their verdicts are discarded), so the ctype question no
+// longer changes an outcome.
 const BOOTSTRAP_URL = `postgresql://postgres:rehearsal@127.0.0.1:${PORT}/postgres`;
 const DB_URL = `postgresql://postgres:rehearsal@127.0.0.1:${PORT}/rehearsal_utf8`;
 
-let failures = 0;
 const isAscii = (s) => [...s].every((ch) => ch.codePointAt(0) < 128);
+
+let failures = 0;
 let skipped = 0;
 const check = (name, ok, detail = "") => {
   if (!ok) failures++;
@@ -594,7 +596,7 @@ for (const [name, rows, expect] of REFUSALS) {
   const r = await expectFail(c, MIGRATION);
   check(
     "L3 a vulgar-fraction age is refused, not read as its leading digit",
-    r.failed && /l-7/.test(r.message),
+    r.failed && /l-7/.test(r.message) && /non-ASCII/.test(r.message),
     r.failed ? r.message.split("\n")[0].slice(0, 70) : "it was accepted"
   );
 }
@@ -618,10 +620,12 @@ for (const [name, rows, expect] of REFUSALS) {
 }
 {
   // A non-breaking space in the age is refused rather than guessed at. Since 2026-10-15 by the
-  // non-ASCII stage, before any regex reads it, so the result no longer depends on ctype.
+  // non-ASCII stage, before any regex result is used, so the outcome no longer depends on ctype.
+  // The message is asserted, not just the row id: a refusal through "cannot be derived" would
+  // mean the stage had moved back below the regex stages.
   await fresh(c, [["m-7", "2 years", "2026-06-12"]]);
   const r = await expectFail(c, MIGRATION);
-  check("M2 a non-breaking space in the age is refused under UTF8", r.failed && /m-7/.test(r.message), r.failed ? "" : "it was accepted");
+  check("M2 a non-breaking space in the age is refused by the non-ASCII stage", r.failed && /m-7/.test(r.message) && /non-ASCII/.test(r.message), r.failed ? r.message.split("\n")[0].slice(0, 90) : "it was accepted");
 }
 {
   // The pre-check's job is to put what the owner must act on where they will see it. Sorting the
@@ -803,6 +807,8 @@ function appRule(ageStr, intakeStr) {
   // The non-ASCII and app-only-unit rows were added on 2026-10-15 for the same reason.
   const J = [
     ["j-9", "2" + String.fromCharCode(0xa0) + "years", "2026-06-12", "non-ASCII age"],
+    // Both wrong at once: the non-ASCII stage runs first in the file and the pre-check alike.
+    ["j-11", "2" + String.fromCharCode(0xa0) + "years", "not-a-date", "non-ASCII age"],
     ["j-10", "1 tahun 6 months", "2026-06-12", "unparseable age"],
     ["j-1", "2 years", "2026-06-12", "ok: years"],
     ["j-2", "unknown", "2026-06-12", "unparseable age"],

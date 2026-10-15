@@ -30,8 +30,10 @@ containing a character outside ASCII, **as its first refusal**, with its own mes
   day, placed the stage after the unit and fractional checks so an en-dash range would keep the
   "fractional" message. That left every earlier regex reading non-ASCII text. A no-break-space age
   was then named "cannot be derived" or "fractional" depending on the ctype, and some invisible
-  separators were told to "pick one whole number". Placed first, every regex stage reads ASCII
-  only, where `[[:space:]]`, `\M` and `lower()` agree under any ctype. **Production's ctype has
+  separators were told to "pick one whole number". Placed first, every later verdict is about an
+  ASCII row, where `[[:space:]]`, `\M` and `lower()` agree under any ctype. (The regexes still run
+  on every row while the scratch table is built; a non-ASCII row's results are simply never used,
+  and nothing there raises on text, which every non-ASCII fixture in both harnesses exercises.) **Production's ctype has
   never been measured, and this makes that unnecessary rather than measured.** The cost is that
   dash ranges and vulgar fractions are now named as non-ASCII, so that message says to retype as
   one whole number and unit.
@@ -54,7 +56,8 @@ refused and has to be retyped. That is one manual correction, named before anyth
   - A non-ASCII age with a bad intake date also reads `non-ASCII age`.
   - A tab still reads `ok: years`.
 - **Expand's own harness**: its M1, N1, L3 and M2 expectations were updated for the new stage, and
-  its J1 and J3 gained a non-ASCII and an app-only fixture, with J3 now checking the file's
+  its J1 and J3 gained non-ASCII, non-ASCII-with-bad-date and app-only fixtures. M1, N1, L3 and
+  M2 assert the non-ASCII message itself, not only the row id, and J3 now checks the file's
   message for each verdict, not just "it failed". **Run in full, 92/92**, with `embedded-postgres`
   installed into the worktree's own `node_modules`. That also retires the 2026-10-14 entry's
   "expand's own harness was not re-run". Its O1 and O2 still compare against the hand copy
