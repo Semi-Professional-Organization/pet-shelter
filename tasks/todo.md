@@ -2466,6 +2466,17 @@ On the merged tree: `npm run check` 0 errors and 13 warnings, the new one in #10
 build compiled with `/` and `/bulletins` static. The served-build browser checks passed unchanged,
 plus a new one: `/pets`' feed heading in both languages, with no button in the feed.
 
+## Review of the merge resolution
+
+Reviewed `2a618b6` and `95679b7`: nothing from #103 or #113 lost or altered — every conflicted file
+was compared with `master`'s. Three findings, each confirmed and fixed:
+
+| Finding | Disposition |
+|---|---|
+| #103 handed the render side of the Malay bulletin columns to the entry this branch settles and deletes. The delete merged silently, leaving four pointers to a missing file and no owner | New entry `tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md`; the four pointers in `schema.prisma`, `bulletinRepository.ts` and #103's decision now name it. The two mentions in other sessions' streams are left as written |
+| The no-staff-control test checked buttons only; an "Edit notices" link passed it | Also asserts no link. Probed: that link now fails both languages |
+| The admin's English category `label` and the dictionary's English could drift apart | `tests/unit/bulletinPresentation.test.ts` pins them equal and the Malay distinct. Probed: relabelling one fails it |
+
 ## Verification
 
 As of round seven, on the tree merged with `master` at `187593c` (current figures are in the

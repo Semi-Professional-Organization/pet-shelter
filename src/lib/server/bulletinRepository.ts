@@ -283,7 +283,7 @@ function mapDbBulletin(row: DbBulletinRow): BulletinRecord {
  * **There is no Malay resolution in this function, and `Bulletin` carries no
  * Malay fields.** `titleMs`/`contentMs` are stored and editable but not yet
  * read by anything; the public feed is English-only until
- * `tasks/open/home-page-text-stays-english-on-the-malay-site.md` is settled.
+ * `tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md` is settled.
  * Whoever settles it adds the fields to `Bulletin` **and** the
  * `titleMs ?? title` fallback here at the same time — `Faq`'s `toFaqItem` is
  * the shape to copy. Adding the field without the fallback ships a blank Malay

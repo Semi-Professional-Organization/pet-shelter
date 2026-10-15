@@ -45,8 +45,7 @@ interface BulletinFeedProps {
  * state — go through `Translated`, a client leaf per string, so the feed stays
  * a Server Component. The notices themselves render in English: `titleMs` and
  * `contentMs` are stored and editable, but the public `Bulletin` does not carry
- * them yet — `tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`
- * says why they ship together with their fallback or not at all.
+ * them yet: `tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md`.
  */
 export function BulletinFeed({
   bulletins,

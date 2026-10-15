@@ -146,7 +146,8 @@ that.
   different change from this one, and the entry recorded it as not owned by itself.
 - **Notice and pet content renders in English.** *(Corrected 2026-10-15.)* Bulletins now store
   `titleMs` and `contentMs` (#103), but the public `Bulletin` does not carry them yet, by #103's
-  own decision (`tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`). Pet `breed`,
+  own decision (`tasks/decisions/2026-09-22-bulletins-get-a-server-side-store.md`); settling this
+  decision's entry would have left that with no owner, so it is `tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md`. Pet `breed`,
   `description` and `tags` are still single-column English. Both are data questions, not literals.
 - **`/pets` and `/bulletins` still have untranslated chrome of their own**, outside this entry's
   inventory. Their `BulletinFeed` headings are no longer part of it — see "The heading prop takes a
