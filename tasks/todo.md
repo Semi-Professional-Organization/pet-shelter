@@ -24,11 +24,11 @@ Record active multi-step work streams below.
 ## Items
 
 - [x] `approximateBirthDate` no longer throws. A count whose date leaves the `Date` range
-      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. Reachable only
-      from a browser's `localStorage` copy (the `pets` table has no `age`), where it dropped that
-      browser's saved pets for the fixtures. It now clamps to the earliest date a `Date` holds
-      (`-271821-04-20`), shown as `273847 years`, older than any age that fits. When the intake is out
-      of range too, the intake is returned as given, as for an age with no unit.
+      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. It now clamps
+      to the earliest date a `Date` holds (`-271821-04-20`), older than any age that fits. When
+      the intake is out of range too, the intake is returned as given, as for an age with no
+      unit. **Defensive today:** the Prisma model has no `age`, and `usePetStore`'s mount effect
+      replaces the derived pets with the raw saved ones, so nothing user-visible changes.
 - [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
       `expectTypeOf` tests that fail `tsc` on the old signature.
 - [x] Tried and **withdrawn** after review, all for one reason: a refusal here is the intake
@@ -40,12 +40,12 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, seven rounds: 9, 7, 8, 8, 8, 7 and 9 findings, each probed. Round five
-  dropped the century change. Rounds six and seven found no code defect, only wrong claims in
-  comments and ledger. Round six's own correction was itself wrong: it said the throw made the
-  repository swap the catalogue for demo pets, but no database row has an `age`. Round seven
-  caught that, and the claim is corrected. The final correction is comments and ledger only and
-  has not had its own review.
+- `/code-review high`, eight rounds: 9, 7, 8, 8, 8, 7, 9 and 7 findings, each probed. Round five
+  dropped the century change. Rounds six to eight found no code defect, only wrong claims about
+  what master's throw did downstream. The first wrong claim was a database swap to demo pets; no
+  Prisma row has an `age`. The second was a browser losing its saved pets; the mount effect
+  restores them. Both claims are now cut back to what the code shows. That last correction is
+  comments and ledger only and has not had its own review.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).
@@ -72,6 +72,10 @@ Record active multi-step work streams below.
   union.
 - The `approximateBirthDate` docstring still explains rollover with `Date.UTC(2023, 1, 29)`.
   That is still true of JavaScript and of `isoDate`, which uses `Date.UTC`.
+- `usePetStore`'s mount effect (`setPets(JSON.parse(saved))`) undoes the initializer's
+  `withDerivedAge`, so saved pets keep their stale stored `age`/`ageCategory`. Already named in
+  #114's parser entry as a known defect; not fixed here, because fixing it changes what every
+  returning browser shows and wants its own test.
 - `petRepository.ts` maps rows inside the same `try` as the Prisma query, so a mapping exception
   would be handled as a database outage. No known input makes `mapDbPetToPet` throw today, so
   this is latent and not recorded as an open entry. A round-six entry claiming otherwise was

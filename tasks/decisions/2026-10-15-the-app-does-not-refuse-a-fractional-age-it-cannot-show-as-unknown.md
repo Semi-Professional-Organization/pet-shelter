@@ -45,22 +45,27 @@ that differ otherwise. Every input master read without throwing reads the same h
 
 What remains new is only the date an overflow gets where master threw:
 
-- **An age-side overflow** with an in-range intake clamps to `-271821-04-20`. That is not a
-  `YYYY-MM-DD` value, so the edit form's date input renders blank. The form state probably still
-  holds the clamped string and saving shows a format error rather than "required". That was
-  reasoned from the code, and not checked in a browser.
+- **An age-side overflow** with an in-range intake clamps to `-271821-04-20`, which
+  `withDerivedAge` reads as `273847 years`, senior.
 - **An intake that is itself out of range**, where the derived date also overflows, comes back
   as given (`300000-01-01`), as master already did for an age with no unit. It reads as a
   newborn, the default this entry warns against, and is kept only because there is no in-range
   answer to clamp to. A derived date that fits is returned as computed, as on master, and with
   such an intake that can itself be a future date (`250000 years` before `300000-01-01`).
 
-On master both threw. **Where that could happen:** only for a legacy pet with an `age` and no
-`birthDate`. The `pets` table has no `age` column, so a database row never reaches this
-function. In practice that means a browser's `localStorage` copy, loaded by `usePetStore`. There
-the throw was caught, and that browser silently dropped its saved pets for the fixtures. Now the
-pet stays, and every read path shows the clamped date as an age of `273847 years` (senior). That
-is visibly absurd, which is the point: it is junk shown as junk, not hidden.
+**This is defensive today; nothing user-visible changes.** Only a pet with an `age` and no
+`birthDate` reaches `approximateBirthDate`. The Prisma `Pet` model has no `age` field, so no
+database read does, even though production's `pets` table still has the column until the
+birth-date migration is applied. What remains is a browser's `localStorage` copy, derived in
+`usePetStore`'s initializer. There master's throw was caught, and the fixtures showed for one
+render. Then the store's mount effect (`petStore.ts`, `setPets(JSON.parse(saved))`) replaced
+them with the saved pets as stored, without deriving anything. That same effect discards the
+clamped value on this branch. The clamp matters once that mount effect derives ages too, or once
+a new caller passes an age.
+
+Two earlier versions of this paragraph described consequences that were never traced. One was a
+database swap to demo pets, the other a browser losing its saved pets. Both were wrong. See
+`tasks/lessons/2026-10-15-probe-that-the-input-can-reach-the-path-not-just-that-the-path-exists.md`.
 
 **What would let this be reversed.** A way for the function, or its callers, to say *unknown*
 rather than *newborn*: for example, returning no birth date and having the read path show

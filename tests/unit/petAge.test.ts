@@ -235,8 +235,7 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
 
   /**
    * A count so large the derived date leaves the range a `Date` can hold. These threw `RangeError`
-   * from `toISOString()`; in `usePetStore` that made a browser drop its saved pets for the fixtures.
-   * Kept in its own block, away from the spellings.
+   * from `toISOString()`. Kept in its own block, away from the spellings.
    */
   describe("approximateBirthDate when the derived date overflows", () => {
     const intake = "2026-06-12";
