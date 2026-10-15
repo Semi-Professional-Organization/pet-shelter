@@ -415,10 +415,24 @@ Declined, with reasons:
 Round eleven's first review returned empty after one tool call. It was retried, per the lesson
 from round nine, and the retry found no correctness bug and three test gaps, all fixed. The
 table spec now has a boundary case (a notice dated the server's day is live, which kills a
-`>=` mutant). Its row is dated 2099, so its stated reason holds past 2030. The fallback test
-pins the exact served list in feed order.
+`>=` mutant). Its row is dated 2099, so its stated reason holds past 2030. ~~The fallback test
+pins the exact served list in feed order.~~ Corrected in round thirteen.
 
-Twelve review rounds, 35 mutants killed. The review history above is the most useful thing in this
+## Round thirteen: an assertion that claimed more than it tested
+
+Round twelve's "exact list in feed order" could not detect a broken sort, because the
+fixture's file order already *is* feed order. It also tied a scheduling test to the fixture's
+whole contents. The fallback test now derives its expected set from the fixture (every
+published row dated on or before the shelter's 12th) and compares it as a set. Extra or missing
+rows still fail it, and a launch notice added to the fixture does not. **Fallback ordering is
+covered by `sortBulletinsForFeed`'s own tests, not by this one**, and the comment beside the
+assertion now says so.
+
+The table spec freezes the clock in 2026, so it stays discriminating even after the real
+clock passes 2099. All six scheduling mutants were re-run against the new assertions and all
+are still killed.
+
+Thirteen review rounds, 35 mutants killed. The review history above is the most useful thing in this
 entry for whoever builds the next content type: the fallback copied from FAQ, the tiebreaker that
 took four attempts, and the seeding rule that one round reversed are each a pattern with its own
 lesson file.

@@ -94,6 +94,10 @@ and P-D for `Bulletin` in `docs/tasks/TARGET_SCHEMA_TYPE_INTEGRITY.md:193`.
 - [x] Round 12: round 11's `low` review returned empty (one tool call) and was retried at
       `medium`. No correctness bug. Three test gaps fixed: a boundary spec, a far-future row,
       and an exact feed list. One `>=` mutant killed; 35 in all.
+- [x] Round 13: round 12's "feed order" assertion could not detect a broken sort, because the
+      fixture's file order already is feed order. It is now a set derived from the fixture,
+      with ordering left to the ordering tests, as its comment says. The table spec freezes the
+      clock. All six scheduling mutants re-run and still killed.
 - [x] Merge `origin/master` `e99ebf8` (#93), which fixed the adoption-submission defect this
       branch had filed; the duplicate open entry was deleted rather than left to mirror a
       second issue.

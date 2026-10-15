@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 
 import { BulletinDataTable } from "@/components/admin/BulletinDataTable";
@@ -21,8 +21,9 @@ vi.mock("@/actions/bulletins", () => ({
  * day lets a server render and its hydration disagree across the shelter's
  * midnight, and under React 19 that discards the server HTML.
  *
- * The row is dated 2099, so any day computed from the real clock calls it
- * scheduled. Only a component that honours the prop can say it is live.
+ * The clock is frozen in 2026 and the row is dated 2099, so any day the table
+ * computed for itself would call it scheduled. Only a component that honours
+ * the prop can say it is live.
  */
 const ROW: BulletinRecord = {
   id: "bulletin-test-1",
@@ -44,6 +45,14 @@ const ROW: BulletinRecord = {
 };
 
 describe("BulletinDataTable's scheduling day", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-15T04:00:00.000Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("calls a notice live when the server's day has reached it", () => {
     renderWithLanguage(<BulletinDataTable initialBulletins={[ROW]} today="2099-01-02" />);
     expect(screen.queryByText("Scheduled")).toBeNull();

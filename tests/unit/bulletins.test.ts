@@ -1781,8 +1781,15 @@ describe("corrections from the ninth and tenth reviews", () => {
     today.mockClear();
 
     const ids = (await getPublicBulletins("all")).map((b) => b.id);
-    // Exactly these, in feed order: the pinned notice first, then newest.
-    expect(ids).toEqual(["bulletin-002", "bulletin-003", "bulletin-004"]);
+    // Exactly the published fixture rows dated on or before the shelter's
+    // 12th, derived from the fixture so adding a launch notice does not break a
+    // scheduling test. Compared as a set: ordering is `sortBulletinsForFeed`'s,
+    // pinned by its own tests, and the fixture's file order already matches it.
+    const expected = (fixtureJson as { id: string; publishedAt: string; isPublished: boolean }[])
+      .filter((r) => r.isPublished && r.publishedAt <= "2026-08-12")
+      .map((r) => r.id);
+    expect(expected).toContain("bulletin-002"); // the row that tells KL from UTC
+    expect([...ids].sort()).toEqual([...expected].sort());
     // And "today" was asked once for the pass, not once per row: per row, a
     // pass crossing the shelter's midnight judges rows against different days.
     // A clock cannot be made to cross midnight mid-pass, so the call count is
