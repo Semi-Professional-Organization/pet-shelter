@@ -1771,9 +1771,10 @@ describe("corrections from the ninth and tenth reviews", () => {
     // (dated the 12th) is live only if the day is the shelter's — a UTC day
     // would hide it — and bulletin-001 (the 14th) is scheduled either way.
     // Dropping, inverting or de-zoning the date check serves the wrong set.
-    // A pair: move one, move the other. The day is written out rather than
-    // derived with `shelterToday`, because deriving it would check the zone
-    // against itself.
+    // This relies on the fixture: bulletin-002 published and dated exactly
+    // SHELTER_DAY (INSTANT is the UTC day before), bulletin-001 published and
+    // dated after it. Change either row or the clock and re-check both. The
+    // day is written out because deriving it would check the zone with itself.
     const INSTANT = "2026-08-11T16:30:00.000Z";
     const SHELTER_DAY = "2026-08-12";
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -1791,10 +1792,10 @@ describe("corrections from the ninth and tenth reviews", () => {
     // dropped date check would serve.
     expect(ids).toContain("bulletin-002");
     expect(ids).not.toContain("bulletin-001");
-    // Then exactly the published fixture rows dated on or before the shelter's
-    // day, derived so a new launch notice does not break a scheduling test.
-    // Compared as a set: fallback ordering is pinned by "sorts pinned first,
-    // then newest" and "breaks a same-day tie on the fixture path", above.
+    // Then no extra or missing rows. This half restates the date rule, so the
+    // named rows above are what check it. Order is left to the fixture-path
+    // ordering tests above; the fixture's YYYY-MM-DD format test is what makes
+    // the string compare exact. No target filter: this reads "all".
     const expected = (fixtureJson as { id: string; publishedAt: string; isPublished: boolean }[])
       .filter((r) => r.isPublished && r.publishedAt <= SHELTER_DAY)
       .map((r) => r.id);
