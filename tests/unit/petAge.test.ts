@@ -234,33 +234,33 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
   });
 
   /**
-   * Ages `approximateBirthDate` treats as unreadable — the intake date — rather than turn into a
-   * birthday. Kept in its own block, away from the spelling tests.
+   * A count so large the derived date leaves the range a `Date` can hold. These threw `RangeError`
+   * from `toISOString()`, and no caller catches it. Kept in its own block, away from the spellings.
    */
-  describe("approximateBirthDate past the age ceiling", () => {
+  describe("approximateBirthDate when the derived date overflows", () => {
     const intake = "2026-06-12";
 
-    // Past sixty years, in any unit. An unbounded count was worse than wrong: `15000000 weeks` and
-    // `300000 years` made `toISOString()` throw `RangeError`.
-    it.each([
-      "61 years", "500 years", "300000 years", "721 months", "3131 weeks", "15000000 weeks", "12345678 wks",
-    ])("treats the over-ceiling age %j as unreadable", (age) => {
-      expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
+    // Unreadable, like an age with no unit: the intake date. The compound case must not fall on to
+    // its smaller unit and come back as two months.
+    it.each(["300000 years", "99999999 months", "15000000 weeks", "300000 years 2 months"])(
+      "treats %j as unreadable instead of throwing",
+      (age) => {
+        expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
+      },
+    );
+
+    // The overflow can come from the intake side too. Returned as given, as an unparsed age is.
+    it("does not throw when the intake date itself puts the result out of range", () => {
+      expect(approximateBirthDate("2 years", "300000-01-01").birthDate).toBe("300000-01-01");
     });
 
-    // The ceiling is inclusive, as the backfill's `> 60` refusal is.
+    // Only an overflow changes. A large count still inside the range keeps its old reading, odd as
+    // it is: the alternative is the intake date, which shows a newborn. No plausibility ceiling.
     it.each([
-      ["60 years", "1966-06-12"],
-      ["720 months", "1966-06-12"],
-      ["3130 weeks", "1966-06-17"],
-    ])("still derives %j, exactly at the ceiling", (age, expected) => {
+      ["61 years", "1965-06-12"],
+      ["12345678 wks", "-234583-03-21"],
+    ])("still derives %j, which stays inside the date range", (age, expected) => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
-    });
-
-    // The fall-through used to slice the intake string as given, so a non-ISO intake leaked into
-    // `birthDate` unconverted. It is now built from the parsed date, like every derived date.
-    it.each(["no idea", "61 years"])("returns an ISO date for %j with a non-ISO intake", (age) => {
-      expect(approximateBirthDate(age, "2026/06/12").birthDate).toBe("2026-06-12");
     });
   });
 

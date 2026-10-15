@@ -178,20 +178,20 @@ const AGE_MONTHS_PATTERN = /(\d+)\s*(?:months?|mths?|mnths?|mos?|bulan|bln|m)\b/
 const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 
 /**
- * Sixty years, the ceiling past which the backfill refuses a row (`qty > 60` years, `> 720`
- * months), expressed in each unit. The backfill does not read weeks at all; the weeks ceiling is
- * the same sixty years, so all three units agree on what is too old to be an age. Past it the
- * count is a typo or junk, and an unbounded count is worse than a wrong date: `15000000 weeks`
- * made `toISOString()` throw `RangeError`. Such an age is treated as unreadable — the intake date,
- * as for any age this function cannot parse.
+ * UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string — or `null` when the
+ * result lies outside the range a `Date` can hold. An unbounded age count reaches that range:
+ * `15000000 weeks` made `toISOString()` throw `RangeError`, and every caller is unguarded, so one
+ * such row took down the whole list render. The guard sits here, on the date, rather than as a
+ * per-unit cap on the count, so it covers every unit and cannot disagree between them.
+ *
+ * Deliberately no plausibility ceiling. `61 years` is almost certainly a typo, but the only
+ * answer this function can give instead is the intake date, which shows the animal as a newborn —
+ * worse than the old reading. See
+ * `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`.
  */
-const MAX_AGE_YEARS = 60;
-const MAX_AGE_MONTHS = MAX_AGE_YEARS * 12;
-const MAX_AGE_WEEKS = Math.floor((MAX_AGE_YEARS * 365.25) / 7);
-
-/** UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string. */
-function isoDate(year: number, month: number, day: number): string {
-  return new Date(Date.UTC(year, month, day)).toISOString().split("T")[0];
+function isoDate(year: number, month: number, day: number): string | null {
+  const d = new Date(Date.UTC(year, month, day));
+  return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
 }
 
 /**
@@ -239,22 +239,23 @@ export function approximateBirthDate(
     return { birthDate: new Date().toISOString().split("T")[0], isEstimate: true };
   }
 
-  // The intake date itself, built from the parsed parts rather than sliced from the input, so a
-  // non-ISO intake such as "2026/06/12" still yields a `YYYY-MM-DD` birth date.
-  const unreadable = { birthDate: isoDate(parts.year, parts.month, parts.day), isEstimate: true };
+  // An age whose date overflows is unreadable, the same as one with no unit at all: the intake
+  // date. Returned at once rather than falling on to the next unit, which would read the wrong one.
+  const derived = (birthDate: string | null) => ({
+    birthDate: birthDate ?? intakeDateStr.split("T")[0],
+    isEstimate: true,
+  });
 
   const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    if (years > MAX_AGE_YEARS) return unreadable;
-    return { birthDate: isoDate(parts.year - years, parts.month, parts.day), isEstimate: true };
+    return derived(isoDate(parts.year - years, parts.month, parts.day));
   }
 
   const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    if (months > MAX_AGE_MONTHS) return unreadable;
-    return { birthDate: isoDate(parts.year, parts.month - months, parts.day), isEstimate: true };
+    return derived(isoDate(parts.year, parts.month - months, parts.day));
   }
 
   // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
@@ -263,9 +264,8 @@ export function approximateBirthDate(
   const weekMatch = norm.match(AGE_WEEKS_PATTERN);
   if (weekMatch) {
     const weeks = parseInt(weekMatch[1], 10);
-    if (weeks > MAX_AGE_WEEKS) return unreadable;
-    return { birthDate: isoDate(parts.year, parts.month, parts.day - weeks * 7), isEstimate: true };
+    return derived(isoDate(parts.year, parts.month, parts.day - weeks * 7));
   }
 
-  return unreadable;
+  return derived(null);
 }
