@@ -71,6 +71,110 @@ Record active multi-step work streams below.
   That is still true of JavaScript, and PR #113 is editing that docstring.
 - The decision cites an open entry that arrives with PR #114.
 
+# The backfill rehearsal checks the real age function
+
+**Branch:** `fix/rehearsal-checks-the-real-age-function` · opened 2026-10-14 · follows #94 and #42
+
+## Items
+
+- [x] Merge #42 (owner's instruction once the `minggu` revision landed). Verified its behaviour
+      change before merging: all three units now compute through `Date.UTC`, every rollover value
+      the backfill transcribes is preserved, and English spellings are unchanged.
+- [x] Verify the #42 session's finding rather than take it on trust: expand's `rehearse.mjs`
+      compares against `appRule`, a hand copy still on local setters and the old unanchored
+      patterns, and `pets.json` holds only plain English ages — so its O1 guard cannot see either
+      drift. Confirmed. This session had claimed #42 closed the timezone entry; it did not.
+- [x] Add a sound comparison to the contract harness: the real `approximateBirthDate` against the
+      real expand SQL on every spelling expand reads, the rollover cases and `pet-008`. 77/77 in
+      four timezones; mutation-tested.
+- [x] Make the containment executable: each app-only spelling is read by the app and refused by
+      the backfill.
+- [x] Correct the expand header, which still said it read "the spellings the app itself reads".
+      Comment-only, verified three ways, because the harness parses part of that header.
+- [x] ~~Settle `malay-age-units-outpace-the-backfill.md` into `decisions/`.~~ **Withdrawn.**
+      `/code-review medium` measured `1 tahun 6 months` stored as six months by the backfill while
+      the app reads one year, silently — the exact case the decision said could not happen. #42
+      opened it, and this session merged #42 having checked single-unit spellings only. The entry
+      is restored with the measured table at the top and a pre-flight query, tested on pglite
+      against thirteen strings, for the owner to run before applying expand. The decision never
+      reached master.
+- [x] Harness revised from the same review: single-unit refusals asserted by message and row id
+      rather than "any error"; app readings asserted by exact date rather than "differs from
+      intake"; the bare `y`/`mo`/`m` and no-space `5y` forms added; a clear failure under plain
+      `node`.
+- [x] **Fixed the mixed-string defect** rather than pinning it — a second review showed it was
+      broader (`2 tahun 3 years`, `5 yo and 3 years`) and that pinning a fixable defect green was
+      the wrong call. Three SQL lines in expand's unit classification, mirrored in its header
+      pre-check. Expand's own J1 and J3 reproduced in the contract harness and passing for 18
+      fixtures; mutation-tested by removing the pre-check half, which J1 caught. The only
+      executable change to expand is those three lines. 88/88. The vocabulary entry settles into
+      `decisions/` — this time with a claim that was measured, and with its residuals named.
+- [x] Corrected five stale claims in expand's header the review found, all made false by #42 or
+      b40a7d7: the app's Malay behaviour, O2's coverage, "ninety-two checks", the month-end
+      direction, and the contract "re-deriving".
+- [x] `/code-review high` found the same divergence through **whitespace**: JS `\s` matches a
+      no-break space, Postgres `[[:space:]]` does not, so `1<NBSP>year 6 months` was one year to
+      the app and six months to the SQL. The refusal now also covers Unicode whitespace — and
+      deliberately not all non-ASCII, after reading the bytes of every non-ASCII fixture in
+      expand's harness showed M1 expects en/em-dash ranges refused *as fractional*. Mutation-tested.
+      93/93.
+- [x] **Caught the editor decoding `\uXXXX` into literal characters** in the production SQL,
+      including a BOM inside a regex. Rewritten with `String.fromCharCode(92)`, as auto-memory
+      already warned; the migration now contains no non-ASCII byte.
+- [x] From the #42 session's review of #42: fixed F10 (a `petAge.ts` sentence saying both SQL
+      files do date arithmetic) and F13 (refused list now names `5 yo`, `5yo`, `mnths`). **F12 —
+      a `6d32df9` "master" ref in a public entry that is a git *tree*, not a commit — handed back
+      to that session**, which asked to own it: the line also needs rewriting now #42 has merged,
+      and two sessions editing one line of a public entry is how it gets a conflict. Agreed a split: they
+      take the app-side parsing fixes. This session first told them F5 and F6 had to land with the
+      SQL, claiming `2y3m` was read as three months on both sides. **Wrong, and corrected by them:**
+      measured against the file, the backfill's fractional check refuses `2y3m`, `5yrs8mths` and
+      `1y6m` outright, and `1y2w`, `6 mons` match no unit and are refused too — so the app side can
+      be fixed alone. A fifth unrun claim about regex behaviour from this session tonight.
+- [x] 2026-10-15, `/code-review high` on `38a7156`: ten findings. **U+0085** splits the engines in
+      the opposite direction from the no-break space, and a non-ASCII letter glued to an *English*
+      unit splits their word boundaries; both stored a wrong birthday silently. The whitespace
+      deny list is replaced by a stage of its own refusing **any non-ASCII age**, tested as
+      `octet_length <> char_length` (no regex, no escape), placed after the fractional check so
+      dash ranges keep their message, plus a refusal of any non-UTF8 database. Pre-check gains a
+      `non-ASCII age` verdict. Three mutations, each caught. The redundant MIXED loop is gone (J3
+      asserts the same, stricter); stale prose fixed in the header, the harness, the TZ entry. The
+      2026-10-14 decision is reversed in part by a new entry rather than rewritten. 82/82 in four
+      timezones.
+- [x] `/code-review medium` on that round: no correctness defect, but the stage sat *after* the
+      unit and fractional regexes, so a pasted `2<NBSP>years` got "cannot be derived" or
+      "fractional" depending on ctype. **Moved the non-ASCII refusal to the first stage**, in the
+      file and the pre-check (one WHEN, not two copies); encoding guard moved inside the backfill
+      branch and mirrored in the pre-check as `database not UTF8`. The three divergences are now
+      **measured** on pglite C.UTF-8 rather than asserted, and the app's half pinned by date.
+      `petAge.ts` docstring points at the new decision.
+- [x] **Ran expand's own harness for the first time this session**, after `npm ci` plus
+      `npm i --no-save embedded-postgres` in this worktree's own `node_modules`: 92/92. Its M1, N1
+      and L3 expectations updated for the new stage; J1/J3 gained non-ASCII and app-only fixtures
+      and J3 now checks each verdict's own message. Contract harness 85/85 in four timezones.
+      Mutations re-run for the new placement, each caught. Gates: typecheck, lint (0 errors),
+      docs:check, unit 1605/1605, components 177/177, integration 92/92, build.
+
+## Review
+
+**Not done, deliberately:** expand's harness still restates the function as `appRule`, so its
+O1/O2 still report green against a drifted copy, and the timezone entry stays open for that
+reason. On 2026-10-15 that harness was installed and run here (92/92) and its refusal checks were
+updated for the non-ASCII stage, but O1/O2 were left alone: retiring them in favour of the
+contract harness's comparison is the entry's own suggested repair, and a separate change.
+
+**The mixed-string defect is fixed** — after this stream had first recorded it as deliberately
+not fixed, on the grounds that expand's harness could not be run. That reasoning did not survive
+review: the two checks the change touches were reproducible. Lesson filed. Expand's own 92-check
+harness was later run in full, 92/92, once installed into this worktree's own `node_modules` --
+which was possible all along, and is what "could not be run" should have prompted.
+
+**What was wrong in this session, briefly:** it asserted that #42 closed the timezone entry without
+checking what the rehearsal compares against; gave a spec built on master while the branch had moved
+past it; merged #42 having verified single-unit spellings but not combinations; and then wrote a
+decision asserting containment that a `medium` review disproved in one probe. Four claims, none
+measured on the inputs that broke them.
+
 # Bulletins get a server-side store (#76)
 
 **Branch:** `worktree-bulletins-76` · opened 2026-09-22 · GRAVE lane

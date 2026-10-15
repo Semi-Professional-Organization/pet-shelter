@@ -53,9 +53,14 @@ const PORT = Number(process.env.REHEARSAL_PORT || 55000 + Math.floor(Math.random
 // UTF-8 ctype, so the word-boundary and whitespace results below are taken under a ctype
 // production does not have. glibc excludes U+00A0 from `space` under C, C.UTF-8 and en_US.UTF-8
 // alike, so the M2 result should hold there too -- but that is reasoning, not measurement, and
-// anyone re-taking it on a Linux host should pin LC_CTYPE 'C.UTF-8' and say so.
+// anyone re-taking it on a Linux host should pin LC_CTYPE 'C.UTF-8' and say so. Since 2026-10-15
+// the file refuses any non-ASCII age before any regex result is used (the regexes still run on it
+// while the scratch table is built; only their verdicts are discarded), so the ctype question no
+// longer changes an outcome.
 const BOOTSTRAP_URL = `postgresql://postgres:rehearsal@127.0.0.1:${PORT}/postgres`;
 const DB_URL = `postgresql://postgres:rehearsal@127.0.0.1:${PORT}/rehearsal_utf8`;
+
+const isAscii = (s) => [...s].every((ch) => ch.codePointAt(0) < 128);
 
 let failures = 0;
 let skipped = 0;
@@ -584,13 +589,14 @@ for (const [name, rows, expect] of REFUSALS) {
   );
 }
 {
-  // A vulgar fraction is not ASCII, so the [0-9][.,/][0-9] guard cannot see it. It has to fall
-  // out as unparseable instead of being read as its leading digit -- checked, not assumed.
+  // A vulgar fraction is not ASCII, so the [0-9][.,/][0-9] guard cannot see it. It has to be
+  // refused instead of being read as its leading digit -- checked, not assumed. Since 2026-10-15
+  // the non-ASCII stage names it, ahead of the unit stage that used to.
   await fresh(c, [["l-7", "1½ years", "2026-06-12"]]);
   const r = await expectFail(c, MIGRATION);
   check(
     "L3 a vulgar-fraction age is refused, not read as its leading digit",
-    r.failed && /l-7/.test(r.message),
+    r.failed && /l-7/.test(r.message) && /non-ASCII/.test(r.message),
     r.failed ? r.message.split("\n")[0].slice(0, 70) : "it was accepted"
   );
 }
@@ -606,15 +612,20 @@ for (const [name, rows, expect] of REFUSALS) {
   ]) {
     await fresh(c, [[id, age, "2026-06-12"]]);
     const r = await expectFail(c, MIGRATION);
-    check(`M1 "${age}" is refused rather than silently taking one bound`, r.failed && /fractional/.test(r.message), r.failed ? "" : "it was accepted");
+    // Since 2026-10-15 a non-ASCII age is refused before the fractional check, so the dash
+    // ranges are named by that stage instead. Refused either way; the message is what differs.
+    const want = isAscii(age) ? /fractional/ : /non-ASCII/;
+    check(`M1 "${age}" is refused rather than silently taking one bound`, r.failed && want.test(r.message), r.failed ? r.message.split("\n")[0].slice(0, 90) : "it was accepted");
   }
 }
 {
-  // Under UTF8 -- which is what Neon is and what this harness now creates -- a non-breaking space
-  // is not [[:space:]], so the age does not parse and the row is refused rather than guessed at.
+  // A non-breaking space in the age is refused rather than guessed at. Since 2026-10-15 by the
+  // non-ASCII stage, before any regex result is used, so the outcome no longer depends on ctype.
+  // The message is asserted, not just the row id: a refusal through "cannot be derived" would
+  // mean the stage had moved back below the regex stages.
   await fresh(c, [["m-7", "2 years", "2026-06-12"]]);
   const r = await expectFail(c, MIGRATION);
-  check("M2 a non-breaking space in the age is refused under UTF8", r.failed && /m-7/.test(r.message), r.failed ? "" : "it was accepted");
+  check("M2 a non-breaking space in the age is refused by the non-ASCII stage", r.failed && /m-7/.test(r.message) && /non-ASCII/.test(r.message), r.failed ? r.message.split("\n")[0].slice(0, 90) : "it was accepted");
 }
 {
   // The pre-check's job is to put what the owner must act on where they will see it. Sorting the
@@ -725,7 +736,8 @@ function appRule(ageStr, intakeStr) {
   ]) {
     await fresh(c, [[id, age, "2026-06-12"]]);
     const r = await expectFail(c, MIGRATION);
-    check(`N1 "${age}" is refused rather than silently taking one bound`, r.failed && /fractional/.test(r.message), r.failed ? "" : "it was accepted");
+    const want = isAscii(age) ? /fractional/ : /non-ASCII/;
+    check(`N1 "${age}" is refused rather than silently taking one bound`, r.failed && want.test(r.message), r.failed ? r.message.split("\n")[0].slice(0, 90) : "it was accepted");
   }
 }
 {
@@ -792,7 +804,12 @@ function appRule(ageStr, intakeStr) {
   // One fixture per way the file can refuse, plus two it accepts. An earlier version omitted the
   // implausible and fractional rows, so J1 asserted "names every row the file would refuse"
   // while testing only two of the four refusals -- the claim was in the name, not in the check.
+  // The non-ASCII and app-only-unit rows were added on 2026-10-15 for the same reason.
   const J = [
+    ["j-9", "2" + String.fromCharCode(0xa0) + "years", "2026-06-12", "non-ASCII age"],
+    // Both wrong at once: the non-ASCII stage runs first in the file and the pre-check alike.
+    ["j-11", "2" + String.fromCharCode(0xa0) + "years", "not-a-date", "non-ASCII age"],
+    ["j-10", "1 tahun 6 months", "2026-06-12", "unparseable age"],
     ["j-1", "2 years", "2026-06-12", "ok: years"],
     ["j-2", "unknown", "2026-06-12", "unparseable age"],
     ["j-3", "2 years", "2024-02-31", "bad intakeDate"],
@@ -818,11 +835,22 @@ function appRule(ageStr, intakeStr) {
   // The summary line must carry the result, not the word "true". A previous revision passed a
   // literal `true` here and printed `ok` whatever the loop found -- which is precisely the
   // defect the comment above J1 says an earlier revision of J1 had, reintroduced one line down.
+  // Each refusing verdict is matched to the file's own message for it and the row id, not to
+  // "any failure", so an unrelated error cannot pass for a deliberate refusal.
+  const MESSAGE = {
+    "unparseable age": /cannot be derived/,
+    "bad intakeDate": /cannot be derived/,
+    "implausible age": /not a plausible/,
+    "fractional age": /fractional/,
+    "non-ASCII age": /non-ASCII/,
+  };
   const j3bad = [];
   for (const [id, age, intake, want] of J) {
     await fresh(c, [[id, age, intake]]);
     const r = await expectFail(c, MIGRATION);
-    const agrees = want.startsWith("ok:") ? !r.failed : r.failed;
+    const agrees = want.startsWith("ok:")
+      ? !r.failed
+      : r.failed && MESSAGE[want].test(r.message) && r.message.includes(id);
     if (!agrees) j3bad.push(`${id} (${want}): ${r.failed ? `aborted -- ${r.message.split("\n")[0]}` : "was accepted"}`);
   }
   check(

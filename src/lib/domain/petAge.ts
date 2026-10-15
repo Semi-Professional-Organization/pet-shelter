@@ -230,17 +230,31 @@ const EARLIEST_DATE = new Date(-8.64e15).toISOString().split("T")[0];
  * years and months only; this function also reads Malay (`tahun`, `thn`, `bulan`, `bln`,
  * `minggu`, `mggu`) and weeks in either language. So "2 tahun" or "3 minggu" yields a birthday
  * here and is *refused and named* there, which fails closed: the backfill stops on the row rather
- * than storing a different date from the one the app would compute. The migration's own header
- * claims it reads "only in the spellings the app itself reads" — true when written, wider now on
- * this side. Recorded in `tasks/open/malay-age-units-outpace-the-backfill.md`; not a licence to
- * treat the arithmetic as independent.
+ * than storing a different date from the one the app would compute — and that holds for a string
+ * MIXING such a unit with an English one, too: "1 tahun 6 months" is refused, because the backfill
+ * treats any unit it does not read, anywhere in the string, as underivable. (Before 2026-10-14 it
+ * did not, and stored six months where this function reads one year.) The decision and what it
+ * does and does not verify: `tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`.
+ *
+ * They also disagree outside ASCII, because this function's patterns are JS regexes and the SQL's
+ * are Postgres ones: `\s`, `\b` and `[[:space:]]`, `\M` treat a no-break space, U+0085 and accented
+ * letters differently. So the backfill refuses any `age` containing a non-ASCII character, before
+ * any of its pattern results is used — widening this function to read Unicode (`\p{Zs}`, normalisation)
+ * changes nothing there. `tasks/decisions/2026-10-15-the-backfill-refuses-any-non-ascii-age.md`.
+ *
+ * It is not a licence to treat the arithmetic as independent. Adding a unit HERE widens the gap, so
+ * the backfill must refuse it — `20260922_pets_birth_date_contract/rehearse.mjs` imports this
+ * function and compares it against the backfill's SQL. But only when someone runs it with
+ * `npx tsx`: it is not part of `npm test` or CI, so changing this function does not, on its own,
+ * run that comparison. Run it.
  *
  * **The day of month rolls forward, deliberately.** `Date.UTC(2023, 1, 29)` is 1 March, so one
  * year before 2024-02-29 is 2023-03-01, not 2023-02-28; one month before 2026-03-31 is
  * 2026-03-03, not 2026-02-28. Clamping reads better and keeps the anniversary in the intended
  * month, and it was briefly implemented here — but Postgres `make_interval` clamps while
- * JavaScript rolls, so both SQL files build the date with `make_date(y, m, 1) + (day - 1)` to
- * match *this* function. Changing the behaviour here silently changes what a migrated row should
+ * JavaScript rolls, so the expand migration builds the date with `make_date(y, m, 1) + (day - 1)`
+ * to match *this* function. (The contract migration beside it does no date arithmetic at all, so
+ * there is one SQL copy of this rule, not two.) Changing the behaviour here silently changes what a migrated row should
  * have contained. The cost of the rollover is bounded and understood: it biases an animal a few
  * days younger, and only a row sitting within a day or two of exactly 12, 36 or 96 months lands
  * in a different `AGE_BAND_MIN_MONTHS` band as a result. Every value it produces carries
