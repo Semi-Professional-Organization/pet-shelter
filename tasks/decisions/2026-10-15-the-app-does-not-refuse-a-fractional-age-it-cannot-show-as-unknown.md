@@ -56,14 +56,18 @@ What remains new is only the date an overflow gets where master threw:
 **This is mostly defensive today.** At runtime only a pet with an `age` and no `birthDate`
 reaches `approximateBirthDate`. The Prisma `Pet` model has no `age` field, so no database read
 does, even though production's `pets` table keeps the column until the *contract* migration
-drops it; the expand half only adds `birthDate`. What remains is a browser's `localStorage`
+drops it. (The expand half adds `birthDate` and `birthDateIsEstimate` and makes `age` and
+`ageCategory` nullable; it drops nothing.) What remains is a browser's `localStorage`
 copy, derived in `usePetStore`'s initializer. (The contract rehearsal also calls the function
 directly.)
 
-Rendered with such a pet saved, the store differs for one render only. On master the throw was
-caught, so the first render showed the ten fixtures. On this branch the first render shows the
-saved pets, the overflow one as `273847 years`, senior. Whether that frame is painted was
-reasoned, not traced. From the second render on, both are identical. The mount effect
+Rendered with such a pet saved, the client store differs for one render only. On master the
+throw was caught, so the first client render showed the ten fixtures. On this branch the first
+client render shows the saved pets, the overflow one as `273847 years`, senior. The server render
+always shows the fixtures (the initializer skips storage without `window`). So on this branch that
+pet's first client render disagrees with the server HTML, a hydration mismatch, where master's
+agreed; master already mismatches the same way for any ordinary saved list. Whether that frame is
+painted was reasoned, not traced. From the second render on, both are identical. The mount effect
 (`petStore.ts`, `setPets(JSON.parse(saved))`) replaces the pets with the saved ones as stored,
 deriving nothing, and that discards the clamped value too. The clamp matters fully once that
 mount effect derives ages too, or once a new caller passes an age.
