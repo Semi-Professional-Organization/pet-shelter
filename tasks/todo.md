@@ -1854,6 +1854,38 @@ every navbar label for each is in the table. Round ten's findings were ledger te
 fix changes no code, so no round eleven was run on it. **That is a stated gap:** the corrected table
 has been checked only by the grep it came from.
 
+## Round eleven, and the first check against a served build (2026-10-15)
+
+The gap above did not stay open: round eleven reviewed `9c0bebe` the next morning, re-deriving the
+`href` sets from source on its own. Every factual claim held — seven shared, two matching, five
+drifting, every label and key value exact. Two wording nits, both fixed: `/pets` has five labels
+but only three distinct English wordings, and the mobile labels render behind an emoji, so an
+accessible name is not the source string alone.
+
+Until now every claim in this stream was checked by unit, component and integration tests, a build,
+and CI's Playwright golden paths, none of which target these three defects in a browser. The Vercel
+preview is behind Vercel's login, so the production build was served locally with `next start`
+(throwaway secrets — the startup guard also requires `STAFF_INVITE_SECRET`; no `.env.local`, so no
+database) and driven with Playwright from a script outside the repo:
+
+- **#77:** `/` mounts **0** elements with `role="dialog"` or `aria-modal`.
+- **#80:** every same-site link carrying a fragment, collected from `/`, `/pets`, `/bulletins`,
+  `/get-involved`, `/faq` and `/donate`, resolves: `/#how-it-works` and `/get-involved#volunteer`,
+  each linked from all six. Clicking the footer's Adoption Process link on `/pets` lands with the
+  section 96px from the top, below the sticky header.
+- **#78:** with Malay chosen the way the language switch stores it, `/` shows 32 Malay dictionary
+  values and `/bulletins` 16, and **no** English dictionary value of 12 characters or more whose
+  Malay differs. The dictionary was loaded from `translations.ts`, not typed into the script.
+- `<html lang>` read `ms` in the browser and `en` in the served HTML, even with the Malay cookie
+  sent. That is what `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`
+  says: the provider corrects it after hydration.
+
+The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
+closed there, so its links were not collected; none of them carries a fragment (read from
+`Navbar.tsx`), and its labels are inline ternaries the dictionary comparison cannot see — they are
+the navbar half of the drift table above. What this does not cover: a real screen reader, and
+production data — with no database, the bulletin and pet content is whatever the fallback serves.
+
 ## Verification
 
 Final, on the tree merged with `master` at `187593c`:

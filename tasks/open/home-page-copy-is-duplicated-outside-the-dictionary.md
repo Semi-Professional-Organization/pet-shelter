@@ -37,7 +37,8 @@ inline, so the two English strings remain identical by coincidence rather than b
 navbar mostly inlines its own pairs. Measured on 2026-10-14 by listing every `href` literal in
 `Navbar.tsx` and `Footer.tsx` with `grep` and intersecting the two lists: they share **seven**.
 Two match, because the navbar reads the same key — `/sponsors` (`nav.sponsorWall`) and
-`/bulletins` (`nav.bulletins`). **Five drift.** Every navbar label for each is listed:
+`/bulletins` (`nav.bulletins`). **Five drift.** Every navbar label for each is listed, as its source string — the mobile menu
+renders each behind an emoji ("🔍 Track Application"), so an accessible name is not the string alone:
 
 | Link | Navbar labels (en / ms) | Footer key (en / ms) |
 |---|---|---|
@@ -50,7 +51,7 @@ Two match, because the navbar reads the same key — `/sponsors` (`nav.sponsorWa
 Every Malay navbar label above differs from its key. In English, two navbar labels match the key —
 `/donate`'s top bar and `/applications/track`'s mobile entry — and the rest differ. A link counts
 as drifting here when any of its labels differs. The navbar also disagrees with itself: `/pets`
-alone carries five wordings.
+alone has five labels — five distinct wordings in Malay, three in English.
 
 `nav.sponsorWall` was the one link fixed in PR #104, because the footer's copy of it was a fallback
 for a key that did not exist; both halves are pinned in both languages, by
