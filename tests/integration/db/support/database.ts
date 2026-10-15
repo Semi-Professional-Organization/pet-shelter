@@ -116,6 +116,15 @@ export const PROBE_SCOPE_PREFIX = "HFS-DON-2999";
  */
 export const PROBE_PLEDGE_PREFIX = "HFS-PLG-2999";
 
+/**
+ * Every general-gift reference this tier may create, and therefore may delete.
+ *
+ * Its own prefix rather than a reuse of `PROBE_PLEDGE_PREFIX`: the two live in
+ * different tables with separate unique indexes, and a shared fence would let a
+ * cleanup written for one reach rows of the other.
+ */
+export const PROBE_GIFT_PREFIX = "HFS-GFT-2999";
+
 /** Actor/reason captured by every rejection probe. */
 export const PROBE_REJECTION_AUDIT_CONTEXT = {
   actorId: "probe-coordinator-id",
@@ -158,8 +167,14 @@ export async function cleanProbeLedger(): Promise<void> {
   });
   // A settled probe pledge carries a probe receipt number. There is no database
   // foreign key, but deleting in dependency order keeps the intent legible.
+  await prisma.auditLog.deleteMany({
+    where: { targetId: { startsWith: PROBE_GIFT_PREFIX } },
+  });
   await prisma.petSponsorship.deleteMany({
     where: { pledgeRef: { startsWith: PROBE_PLEDGE_PREFIX } },
+  });
+  await prisma.donationPledge.deleteMany({
+    where: { pledgeRef: { startsWith: PROBE_GIFT_PREFIX } },
   });
   await prisma.donation.deleteMany({
     where: { sequenceScope: { startsWith: PROBE_SCOPE_PREFIX } },

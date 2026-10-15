@@ -1,4 +1,5 @@
 import { Sen, senFromInteger, sumSen } from "@/lib/domain/money";
+import { generateContributionRef } from "@/lib/domain/contributionRef";
 
 /**
  * The lifecycle of a supporter's commitment to fund one animal's care.
@@ -115,11 +116,13 @@ export function shouldShowSocialProof(summary: PetSponsorshipSummary): boolean {
  * must be able to tell an unverified claim from an issued receipt at a glance.
  * It is random rather than sequential because, unlike a receipt number, nothing
  * statutory depends on it being gapless.
+ *
+ * The shape lives in `contributionRef.ts`, shared with the general-gift series
+ * `HFS-GFT`, so the two claim references cannot drift apart. Only the prefix
+ * differs, and that difference is the whole point.
  */
 export function generatePledgeRef(now: Date = new Date()): string {
-  const day = now.toISOString().slice(0, 10).replace(/-/g, "");
-  const serial = Math.floor(100000 + Math.random() * 900000);
-  return `HFS-PLG-${day}-${serial}`;
+  return generateContributionRef("PLG", now);
 }
 
 /** What the supporter is told happens next, given how they said they would pay. */

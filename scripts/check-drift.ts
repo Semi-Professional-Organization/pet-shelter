@@ -19,14 +19,16 @@
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 
-import { resolveDatabaseUrl, LOCAL_DATABASE_URL } from "../prisma/env";
+import { resolveDatabaseUrl, isLocalDatabaseUrl } from "../prisma/env";
 import { classifyDiff } from "./lib/sqlSafety";
 
 const target = resolveDatabaseUrl();
 console.log(
   "Target:",
   target.replace(/:\/\/([^:]+):[^@]+@/, "://$1:***@"),
-  target === LOCAL_DATABASE_URL ? "(local)" : "(remote)"
+  // By host, as in the two migration scripts — string equality with the one
+  // canonical URL called a local database on any other port "(remote)".
+  isLocalDatabaseUrl(target) ? "(local)" : "(remote)"
 );
 
 // Run Prisma's JS entrypoint through the current node binary rather than the

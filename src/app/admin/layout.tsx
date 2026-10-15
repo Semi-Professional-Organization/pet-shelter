@@ -93,6 +93,13 @@ export default function AdminLayout({
   // a Super Admin edits the configuration, a Volunteer Coordinator only sends a
   // test email — so gating it on the write permission alone would hide a page
   // the coordinator still has legitimate work on.
+  //
+  // Every tab must name a permission. The `permissions: null` opt-out that used
+  // to exist here had exactly one user — a "Community Bulletins" tab pointing at
+  // the PUBLIC /bulletins page — and it is how that tab was shown to every role
+  // including Volunteer, sending staff to a page whose "editing" wrote to their
+  // own browser. Requiring the field removes the shape of that mistake rather
+  // than just its instance.
   const navLinks = [
     { href: "/admin/pets", label: "Pet Management (CRUD)", icon: Dog, permissions: [PERMISSIONS.MANAGE_PETS] },
     { href: "/admin/applications", label: "Adoption Applications", icon: FileText, permissions: [PERMISSIONS.VIEW_APPLICATIONS] },
@@ -102,11 +109,9 @@ export default function AdminLayout({
     { href: "/admin/members", label: "Staff & Permissions", icon: Users, permissions: [PERMISSIONS.MANAGE_MEMBERS] },
     { href: "/admin/audit", label: "Audit & Security Logs", icon: ShieldCheck, permissions: [PERMISSIONS.VIEW_AUDIT_LOG] },
     { href: "/admin/settings", label: "Shelter Settings", icon: Settings, permissions: [PERMISSIONS.MANAGE_SETTINGS, PERMISSIONS.SEND_SHELTER_EMAIL] },
-    { href: "/bulletins", label: "Community Bulletins", icon: Bell, permissions: null },
-  ].filter(
-    (tab) =>
-      tab.permissions === null ||
-      tab.permissions.some((permission) => roleHasPermission(role, permission))
+    { href: "/admin/bulletins", label: "Community Bulletins", icon: Bell, permissions: [PERMISSIONS.MANAGE_CONTENT] },
+  ].filter((tab) =>
+    tab.permissions.some((permission) => roleHasPermission(role, permission))
   );
 
   return (
