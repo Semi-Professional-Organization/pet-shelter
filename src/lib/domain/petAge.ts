@@ -179,20 +179,28 @@ const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 
 /**
  * UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string — or `null` when the
- * result lies outside the range a `Date` can hold. An unbounded age count reaches that range:
- * `15000000 weeks` made `toISOString()` throw `RangeError`, and every caller is unguarded, so one
- * such row took down the whole list render. The guard sits here, on the date, rather than as a
- * per-unit cap on the count, so it covers every unit and cannot disagree between them.
- *
- * Deliberately no plausibility ceiling. `61 years` is almost certainly a typo, but the only
- * answer this function can give instead is the intake date, which shows the animal as a newborn —
- * worse than the old reading. See
- * `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`.
+ * result lies outside the range a `Date` can hold. `setUTCFullYear` rather than `Date.UTC`,
+ * because `Date.UTC` reads a year of 0–99 as 1900–1999: `2000 years` before 2026 landed in 1926,
+ * younger than `1900 years`. Identical for every year from 100 on.
  */
 function isoDate(year: number, month: number, day: number): string | null {
-  const d = new Date(Date.UTC(year, month, day));
+  const d = new Date(0);
+  d.setUTCFullYear(year, month, day);
   return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
 }
+
+/**
+ * The earliest date a `Date` can hold. An age so large that its birth date would be earlier still
+ * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError` at a caller
+ * that does not catch it, which took down the whole list render.
+ *
+ * ceiling: no plausibility check at all, deliberately. `61 years` or `15000000 weeks` is junk, but
+ * the only other answer this function can give is the intake date, which shows the animal as a
+ * newborn — so clamping keeps "a larger age is older", and the upgrade path is an "age unknown"
+ * result the read path can show. Why:
+ * `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`.
+ */
+const EARLIEST_DATE = new Date(-8.64e15).toISOString().split("T")[0];
 
 /**
  * Approximates a birth date from an age string (e.g. "2 years", "4 months", "2 tahun") relative
@@ -239,33 +247,33 @@ export function approximateBirthDate(
     return { birthDate: new Date().toISOString().split("T")[0], isEstimate: true };
   }
 
-  // An age whose date overflows is unreadable, the same as one with no unit at all: the intake
-  // date. Returned at once rather than falling on to the next unit, which would read the wrong one.
-  const derived = (birthDate: string | null) => ({
-    birthDate: birthDate ?? intakeDateStr.split("T")[0],
-    isEstimate: true,
-  });
+  const intakeOnly = intakeDateStr.split("T")[0];
+  // An intake itself outside the `Date` range leaves nothing to reckon from: returned as given,
+  // as it is for an age with no unit. Past this check an overflow can only be an age too large.
+  if (!isoDate(parts.year, parts.month, parts.day)) {
+    return { birthDate: intakeOnly, isEstimate: true };
+  }
 
   const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    return derived(isoDate(parts.year - years, parts.month, parts.day));
+    return { birthDate: isoDate(parts.year - years, parts.month, parts.day) ?? EARLIEST_DATE, isEstimate: true };
   }
 
   const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    return derived(isoDate(parts.year, parts.month - months, parts.day));
+    return { birthDate: isoDate(parts.year, parts.month - months, parts.day) ?? EARLIEST_DATE, isEstimate: true };
   }
 
   // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
   // "1 year 6 months" reads the year. Day arithmetic rather than a month or year offset, so the
-  // month-end rollover above cannot arise here — `Date.UTC` normalises a negative day exactly.
+  // month-end rollover above cannot arise here — `Date` normalises a negative day exactly.
   const weekMatch = norm.match(AGE_WEEKS_PATTERN);
   if (weekMatch) {
     const weeks = parseInt(weekMatch[1], 10);
-    return derived(isoDate(parts.year, parts.month, parts.day - weeks * 7));
+    return { birthDate: isoDate(parts.year, parts.month, parts.day - weeks * 7) ?? EARLIEST_DATE, isEstimate: true };
   }
 
-  return derived(null);
+  return { birthDate: intakeOnly, isEstimate: true };
 }

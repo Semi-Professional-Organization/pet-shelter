@@ -240,26 +240,41 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
   describe("approximateBirthDate when the derived date overflows", () => {
     const intake = "2026-06-12";
 
-    // Unreadable, like an age with no unit: the intake date. The compound case must not fall on to
-    // its smaller unit and come back as two months.
+    // Clamped to the earliest date a `Date` holds, so a larger age is still older — never the
+    // intake date, which would show a newborn. The compound case must not fall on to its smaller
+    // unit and come back as two months.
     it.each(["300000 years", "99999999 months", "15000000 weeks", "300000 years 2 months"])(
-      "treats %j as unreadable instead of throwing",
+      "clamps %j to the earliest date instead of throwing",
       (age) => {
-        expect(approximateBirthDate(age, intake).birthDate).toBe(intake);
+        expect(approximateBirthDate(age, intake).birthDate).toBe("-271821-04-20");
       },
     );
 
-    // The overflow can come from the intake side too. Returned as given, as an unparsed age is.
-    it("does not throw when the intake date itself puts the result out of range", () => {
+    // The clamped date has to survive the read path, not just this function.
+    it("reads a clamped age as a senior, end to end", () => {
+      const pet = withDerivedAge({ intakeDate: intake, age: "15000000 weeks" }, intake);
+      expect(pet.ageCategory).toBe("senior");
+    });
+
+    // An intake outside the range leaves nothing to reckon from: returned as given, exactly as it
+    // is for an age with no unit.
+    it("does not throw when the intake date itself is out of range", () => {
       expect(approximateBirthDate("2 years", "300000-01-01").birthDate).toBe("300000-01-01");
     });
 
-    // Only an overflow changes. A large count still inside the range keeps its old reading, odd as
-    // it is: the alternative is the intake date, which shows a newborn. No plausibility ceiling.
+    // Inside the range nothing changes, odd as the readings are. No plausibility ceiling.
     it.each([
       ["61 years", "1965-06-12"],
       ["12345678 wks", "-234583-03-21"],
     ])("still derives %j, which stays inside the date range", (age, expected) => {
+      expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+    });
+
+    // `Date.UTC` read a year of 0–99 as 1900–1999, so `2000 years` came out younger than `1900`.
+    it.each([
+      ["2000 years", "0026-06-12"],
+      ["1990 years", "0036-06-12"],
+    ])("keeps %j in the right century", (age, expected) => {
       expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
     });
   });
