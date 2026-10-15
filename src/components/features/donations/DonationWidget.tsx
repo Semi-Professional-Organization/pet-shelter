@@ -3,7 +3,6 @@
 import {
   LHDN_TAX_DEDUCTIBLE_REF,
   PUBLIC_ROS_REGISTRATION_NO,
-  isTaxClaimable,
 } from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
@@ -11,7 +10,6 @@ import {
   QrCode,
   CheckCircle2,
   Copy,
-  Printer,
   ShieldCheck,
   ArrowRight,
   RotateCcw,
@@ -24,16 +22,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SPONSORSHIP_TIERS, useSponsorshipStore } from "@/lib/client/sponsorshipStore";
+import { SPONSORSHIP_TIERS } from "@/lib/client/sponsorshipStore";
 import { tierAmountFor } from "@/lib/domain/sponsorshipTiers";
 import {
   DONATION_RECORDING_UNCONFIRMED_MESSAGE,
   safeContributionFailureMessage,
 } from "@/lib/domain/contributionFailure";
 import { submitDonationPledgeAction } from "@/actions/donations";
+import type { DonationPledgeDTO } from "@/lib/validations/donation";
 import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel";
+import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
 import { getPublicPets } from "@/actions/pets";
-import { DonationReceipt, SponsorshipTier } from "@/types/sponsorship";
+import { SponsorshipTier } from "@/types/sponsorship";
 import { Pet } from "@/types/pet";
 import initialPetsData from "@/data/pets.json";
 import { withDerivedAge } from "@/lib/domain/petAge";
@@ -47,7 +47,6 @@ interface DonationWidgetProps {
 export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const { t, isMs } = useLanguage();
   const searchParams = useSearchParams();
-  const { saveDonationReceipt } = useSponsorshipStore();
 
   const urlPetName = searchParams.get("pet");
   const urlSponsorPetId = searchParams.get("sponsorPetId");
@@ -115,9 +114,23 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const [wantsTaxReceipt, setWantsTaxReceipt] = useState(false);
   const [notes, setNotes] = useState("");
   const [copiedBank, setCopiedBank] = useState(false);
+  const qrConfig = useDonationQrConfig();
+  // What the donor says they are paying with. Until 2026-10-13 this form sent
+  // `duitnow_qr` for every gift while publishing the Maybank account beside the
+  // QR, so a bank-transfer donor was recorded on the wrong rail — on their receipt,
+  // and in the coordinator's queue, where it is the hint for which line of the
+  // bank statement to match. It is still a self-report; the statement is the
+  // authority. But it should at least be the donor's answer and not ours.
+  const [paymentMethod, setPaymentMethod] = useState<"duitnow_qr" | "online_banking">(
+    "duitnow_qr"
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [completedReceipt, setCompletedReceipt] = useState<DonationReceipt | null>(null);
+  // A pledge, never a receipt. `useSponsorshipStore.saveDonationReceipt` is
+  // deliberately not called here: that store's own module comment says a number
+  // which never went through Postgres "is not a receipt — it is a string that looks
+  // like one", and an HFS-GFT reference is not a receipt number at all.
+  const [completedPledge, setCompletedPledge] = useState<DonationPledgeDTO | null>(null);
 
   // Fetch public pets if not supplied initially
   useEffect(() => {
@@ -212,15 +225,14 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
       // than stored, because a tax number the donor withdrew is not ours to keep.
       taxIdOrIc: wantsTaxReceipt ? taxIdOrIc.trim() || undefined : undefined,
       notes: notes.trim() || undefined,
-      paymentMethod: "duitnow_qr" as const,
+      paymentMethod,
     };
 
     try {
       const result = await submitDonationPledgeAction(payload);
 
       if (result.success && result.data) {
-        saveDonationReceipt(result.data as DonationReceipt);
-        setCompletedReceipt(result.data as DonationReceipt);
+        setCompletedPledge(result.data);
       } else {
         // See the note in useSponsorshipController: a receipt number that never
         // passed through the ledger is not a receipt.
@@ -239,7 +251,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   };
 
   const handleReset = () => {
-    setCompletedReceipt(null);
+    setCompletedPledge(null);
+    setPaymentMethod("duitnow_qr");
     setSelectedPet(null);
     setTargetPetName("");
     setDonorName("");
@@ -254,13 +267,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     setErrorMessage(null);
   };
 
-  const handlePrintReceipt = () => {
-    if (typeof window !== "undefined") {
-      window.print();
-    }
-  };
-
-  if (completedReceipt) {
+  if (completedPledge) {
     return (
       <div className="border border-border bg-card p-6 sm:p-10 rounded-2xl shadow-sm space-y-6">
         <div className="bg-success-surface border border-success-accent/30 p-5 rounded-xl flex items-start gap-3.5">
@@ -268,132 +275,110 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           <div>
             <h3 className="font-heading text-lg font-bold text-foreground">
               {isMs
-                ? "Terima Kasih! Sumbangan Anda Telah Diterima."
-                : "Thank You! Your Donation Has Been Received."}
+                ? "Terima Kasih! Ikrar Sumbangan Anda Telah Direkodkan."
+                : "Thank You! Your Donation Pledge Has Been Recorded."}
             </h3>
+            {/*
+              Deliberately not "received". Nothing has looked at a bank statement at
+              this point — the donor was shown a DuitNow QR and told us they paid.
+              Until 2026-09-22 this screen said "Your Donation Has Been Received" and
+              printed an official Section 44(6) e-Receipt beneath it, which meant a
+              supporter who had sent nothing walked away holding a filable tax
+              document. There is no receipt on this screen because none exists yet.
+            */}
             <p className="text-sm text-muted-foreground mt-1">
-              {isTaxClaimable(completedReceipt)
-                ? isMs
-                  ? `e-Resit rasmi pengecualian cukai berjumlah RM ${completedReceipt.amountMYR}.00 sedia di bawah.`
-                  : `An official tax-exempt e-Receipt for RM ${completedReceipt.amountMYR}.00 is ready below.`
-                : isMs
-                  ? `e-Resit rasmi berjumlah RM ${completedReceipt.amountMYR}.00 sedia di bawah. Ia tidak mengandungi nombor pengenalan cukai, jadi ia tidak boleh dituntut.`
-                  : `An official e-Receipt for RM ${completedReceipt.amountMYR}.00 is ready below. It carries no tax identifier, so it cannot be claimed against a return.`}
+              {isMs
+                ? `Kami telah merekodkan ikrar RM ${completedPledge.amountMYR.toFixed(2)} anda. Resit cukai rasmi dikeluarkan selepas penyelaras kami memadankan pemindahan anda.`
+                : `We have recorded your pledge of RM ${completedPledge.amountMYR.toFixed(2)}. Your official tax receipt is issued once our coordinator matches your transfer.`}
             </p>
           </div>
         </div>
 
-        {/* Printable Official Receipt Dossier */}
-        <div
-          id="donation-receipt-print"
-          className="receipt p-6 sm:p-8 space-y-5 shadow-xs"
-        >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-receipt-ink pb-4">
+        <div className="border border-border rounded-xl p-6 sm:p-8 space-y-5 bg-background">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
             <div>
-              <h3 className="font-heading text-xl sm:text-2xl font-extrabold uppercase tracking-tight text-receipt-ink">
-                Hope for Strays Animal Sanctuary
+              <h3 className="font-heading text-lg font-bold text-foreground">
+                {isMs ? "Rujukan Ikrar Anda" : "Your Pledge Reference"}
               </h3>
-              <p className="text-xs text-receipt-ink-muted">
-                No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia
-              </p>
-              <p className="text-2xs text-receipt-ink-faint">
-                ROS Reg: {completedReceipt.shelterRegistrationNo}
-                {/* The shelter's exemption reference belongs on a document the donor
-                    can actually file. Printing it on one that carries no identifier
-                    states the relief is available on this gift, which it is not. */}
-                {isTaxClaimable(completedReceipt) && (
-                  <> • Tax Exemption: {completedReceipt.taxDeductibleRef}</>
-                )}
+              <p className="text-xs text-muted-foreground">
+                {isMs
+                  ? "Sila catatkan rujukan ini dalam keterangan pemindahan anda."
+                  : "Please quote this reference in your transfer description."}
               </p>
             </div>
-
             <div className="text-left sm:text-right">
-              <span className="inline-block px-2.5 py-1 bg-receipt-ink text-receipt-paper font-mono text-xs font-bold uppercase rounded-sm">
-                {t("donations.receiptTitle", "Official e-Receipt")}
+              {/*
+                A claim reference, not a receipt number. The `HFS-GFT` prefix exists
+                so a donor cannot mistake this for the `HFS-DON` series, and so a
+                coordinator reading a bank statement can tell which queue it belongs
+                to at a glance.
+              */}
+              <span className="tone-chip tone-warning">
+                {isMs ? "Menunggu Pembayaran" : "Pending payment"}
               </span>
-              <div className="font-mono text-xs font-bold text-receipt-ink-soft mt-1">
-                {completedReceipt.receiptNumber}
-              </div>
-              <div className="text-2xs text-receipt-ink-faint">
-                {completedReceipt.date}
+              <div className="font-mono text-base font-bold text-foreground mt-1">
+                {completedPledge.pledgeRef}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             <div>
-              <div className="text-3xs uppercase font-bold text-receipt-ink-faint">
-                {isMs ? "Dikeluarkan Kepada" : "Issued To"}
+              <div className="text-3xs uppercase font-bold text-muted-foreground">
+                {isMs ? "Direkodkan Untuk" : "Recorded For"}
               </div>
-              <div className="font-bold text-receipt-ink text-sm">
-                {completedReceipt.donorName}
+              <div className="font-bold text-foreground text-sm">
+                {completedPledge.donorName}
               </div>
-              <div className="text-receipt-ink-muted">{completedReceipt.donorEmail}</div>
-              {completedReceipt.donorPhone && (
-                <div className="text-receipt-ink-muted">
-                  {completedReceipt.donorPhone}
-                </div>
-              )}
-              {completedReceipt.taxIdOrIc && (
-                <div className="text-receipt-ink-muted font-mono">
-                  IC/SSM: {completedReceipt.taxIdOrIc}
-                </div>
-              )}
+              <div className="text-muted-foreground">{completedPledge.donorEmail}</div>
             </div>
 
             <div>
-              <div className="text-3xs uppercase font-bold text-receipt-ink-faint">
-                {isMs ? "Peruntukan Penajaan" : "Sponsorship Allocation"}
+              <div className="text-3xs uppercase font-bold text-muted-foreground">
+                {isMs ? "Peruntukan" : "Allocation"}
               </div>
-              <div className="font-bold text-receipt-ink text-sm">
-                {completedReceipt.tierName}
+              <div className="font-bold text-foreground text-sm">
+                {completedPledge.tierName}
               </div>
-              {completedReceipt.targetPetName && (
-                <div className="text-receipt-ink-soft font-medium">
+              {completedPledge.targetPetName && (
+                <div className="text-muted-foreground font-medium">
                   🐾 {isMs ? "Dedikasi Haiwan" : "Dedicated Pet"}:{" "}
-                  {completedReceipt.targetPetName}
+                  {completedPledge.targetPetName}
                 </div>
               )}
-              <div className="text-receipt-ink-faint">
-                Payment: DuitNow National Instant Rail
+              <div className="text-muted-foreground uppercase text-3xs">
+                {completedPledge.frequency.replace("_", " ")}
               </div>
-              {completedReceipt.frequency && (
-                <div className="text-receipt-ink-faint uppercase text-3xs">
-                  Type: {completedReceipt.frequency.replace("_", " ")}
-                </div>
-              )}
             </div>
           </div>
 
-          {completedReceipt.notes && (
-            <div className="p-3 receipt-panel border rounded-md text-xs italic">
-              &ldquo;{completedReceipt.notes}&rdquo;
-            </div>
-          )}
-
-          <div className="border-t border-b border-receipt-rule py-3 flex items-center justify-between font-heading">
-            <span className="text-sm font-bold text-receipt-ink">
-              {isMs
-                ? "Jumlah Sumbangan Diterima"
-                : "Total Contribution Received"}
+          <div className="border-t border-b border-border py-3 flex items-center justify-between font-heading">
+            <span className="text-sm font-bold text-foreground">
+              {isMs ? "Jumlah Diikrarkan" : "Amount Pledged"}
             </span>
-            <span className="text-2xl font-extrabold receipt-accent">
-              RM {completedReceipt.amountMYR}.00
+            <span className="text-2xl font-extrabold text-foreground">
+              RM {completedPledge.amountMYR.toFixed(2)}
             </span>
           </div>
 
-          <div className="text-3xs text-receipt-ink-faint leading-relaxed italic">
+          <div className="tone-soft tone-warning rounded-xl border p-4 text-xs leading-relaxed">
+            <strong>{isMs ? "Apa yang berlaku seterusnya" : "What happens next"}</strong>
+            <br />
+            {completedPledge.reconciliationNotice}
+          </div>
+
+          {/*
+            Stated plainly rather than merely omitted. A donor who has given to this
+            shelter before has had a printable Section 44(6) dossier on this screen,
+            and silence about the change reads as a missing feature rather than as a
+            deliberate boundary.
+          */}
+          <p className="text-3xs text-muted-foreground leading-relaxed italic">
             *{" "}
-            {isTaxClaimable(completedReceipt)
-              ? t(
-                  "donations.receiptSubtitle",
-                  "Approved Under Subsection 44(6) Income Tax Act 1967 • Ref: {taxRef}",
-                  { taxRef: LHDN_TAX_DEDUCTIBLE_REF }
-                )
-              : isMs
-                ? "Resit ini tidak mengandungi No. Kad Pengenalan / Pasport / SSM, jadi ia tidak boleh difailkan untuk potongan cukai."
-                : "This receipt carries no NRIC, passport or SSM number, so it cannot be filed for a tax deduction."}
-          </div>
+            {isMs
+              ? "Ini bukan resit dan ia tidak boleh difailkan untuk potongan cukai. Resit rasmi Seksyen 44(6) anda akan dihantar melalui e-mel selepas pembayaran anda disahkan."
+              : "This is not a receipt and cannot be filed for a tax deduction. Your official Section 44(6) receipt is emailed to you once your payment has been confirmed."}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -407,14 +392,10 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
             {isMs ? "Buat Sumbangan Lain" : "Make Another Donation"}
           </Button>
 
-          <Button
-            size="sm"
-            onClick={handlePrintReceipt}
-            className="gap-1.5 cursor-pointer rounded-xl"
-          >
-            <Printer className="size-3.5" />
-            {t("donations.printReceiptBtn", "Print Official e-Receipt")}
-          </Button>
+          {/*
+            No print button. The only thing worth printing was the receipt dossier,
+            and printing a claim reference invites a donor to file it as one.
+          */}
         </div>
       </div>
     );
@@ -647,6 +628,18 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           {/* DuitNow QR — shared with the pet sponsorship modal */}
           <DonationQrPanel
             className="md:col-span-5"
+            // The question below is the one source of truth for how the donor
+            // paid, exactly as the radio group is in the sponsorship modal, so the
+            // panel is given no other channels to offer. Its switcher would be a
+            // second selector the submitted payload cannot see, and the payload
+            // has no value for a wallet payment in any case: a Touch 'n Go gift
+            // would be receipted as DuitNow whatever the donor picked.
+            //
+            // ceiling: `/donate` therefore shows only the DuitNow code, even when
+            // the shelter has uploaded TNG and bank QR images. Offering them here
+            // needs a payment-method value for each, on the pledge, the receipt
+            // and the coordinator's queue — not a tab.
+            configOverride={{ ...qrConfig, tngQrUrl: "", bankQrUrl: "" }}
             instructions={t(
               "donations.duitNowInstructions",
               "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app."
@@ -710,6 +703,56 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
             </div>
           </div>
         </div>
+
+        {/*
+          Asked, not assumed. Both rails are on screen above, so the form cannot
+          know which one the donor used unless they say. Native radios, the same
+          control the sponsorship modal uses for the same question, so arrow keys
+          and a single tab stop come from the platform.
+        */}
+        <fieldset className="border-t border-border pt-4 space-y-2">
+          <legend className="text-xs font-bold text-foreground">
+            {isMs ? "Bagaimana anda membayar?" : "How are you paying?"}
+          </legend>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(
+              [
+                [
+                  "duitnow_qr",
+                  "DuitNow QR",
+                  isMs ? "Imbas dengan aplikasi perbankan Malaysia." : "Scan with a Malaysian banking app.",
+                ],
+                [
+                  "online_banking",
+                  isMs ? "Pindahan Bank Terus" : "Direct Bank Transfer",
+                  isMs ? "Pindahkan terus ke akaun Maybank di atas." : "Transfer to the Maybank account above.",
+                ],
+              ] as const
+            ).map(([value, label, hint]) => (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 text-xs transition-colors ${
+                  paymentMethod === value
+                    ? "border-primary bg-primary/5 text-foreground"
+                    : "border-border bg-card text-muted-foreground"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="donationPaymentMethod"
+                  value={value}
+                  checked={paymentMethod === value}
+                  onChange={() => setPaymentMethod(value)}
+                  className="mt-0.5 size-4 accent-primary"
+                />
+                <span>
+                  <strong className="block text-foreground">{label}</strong>
+                  {hint}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </div>
 
       {/* 5. Official Donor Dossier Form */}

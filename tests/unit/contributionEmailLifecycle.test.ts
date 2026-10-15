@@ -5,10 +5,10 @@ type DeferredWork = () => Promise<unknown>;
 const doubles = vi.hoisted(() => ({
   // Explicit test doubles for the two durable-write boundaries.
   recordSponsorshipPledge: vi.fn(),
-  issueDonationReceipt: vi.fn(),
+  recordDonationPledge: vi.fn(),
   // Explicit test doubles for the external email boundary.
   sendSponsorshipWelcomeEmail: vi.fn(),
-  sendDonationReceiptEmail: vi.fn(),
+  sendDonationPledgeEmail: vi.fn(),
   // This spy captures lifecycle-owned work without running it during the action.
   scheduleAfterResponse: vi.fn(),
   scheduledWork: [] as DeferredWork[],
@@ -52,7 +52,6 @@ vi.mock("@/lib/server/donationLedger", () => {
 
   return {
     ReceiptIssuanceError,
-    issueDonationReceipt: doubles.issueDonationReceipt,
     listDonationsOrThrow: vi.fn(),
     isLedgerPersistent: vi.fn(() => false),
     formatReceiptNumber: vi.fn(),
@@ -61,9 +60,43 @@ vi.mock("@/lib/server/donationLedger", () => {
   };
 });
 
+/**
+ * The donation form's durable-write boundary moved on 2026-09-22.
+ *
+ * It used to be `issueDonationReceipt` — the form allocated an official
+ * `HFS-DON-*` receipt on submission, from a supporter's word that they had paid.
+ * It is now `recordDonationPledge`, which writes a `PENDING_PAYMENT` row and no
+ * receipt number at all. The lifecycle contract this file guards is unchanged:
+ * nothing observable leaves the system until that write is confirmed.
+ */
+vi.mock("@/lib/server/donationPledgeLedger", () => {
+  class DonationPledgeWriteError extends Error {
+    readonly cause?: unknown;
+
+    constructor(message: string, cause?: unknown) {
+      super(message);
+      this.name = "DonationPledgeWriteError";
+      this.cause = cause;
+    }
+  }
+
+  return {
+    DonationPledgeWriteError,
+    recordDonationPledge: doubles.recordDonationPledge,
+    settleDonationPledge: vi.fn(),
+    rejectPendingDonationPledge: vi.fn(),
+    listPendingDonationPledges: vi.fn(),
+    findDonationPledgeByRef: vi.fn(),
+    memoryDonationPledgeCount: vi.fn(() => 0),
+    // Required: the global harness calls this in its own `beforeEach`.
+    resetDonationPledgeLedger: vi.fn(),
+  };
+});
+
 vi.mock("@/lib/email", () => ({
   sendSponsorshipWelcomeEmail: doubles.sendSponsorshipWelcomeEmail,
-  sendDonationReceiptEmail: doubles.sendDonationReceiptEmail,
+  sendDonationPledgeEmail: doubles.sendDonationPledgeEmail,
+  sendDonationReceiptEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/scheduleAfterResponse", () => ({
@@ -121,11 +154,8 @@ const donationInput = {
   paymentMethod: "duitnow_qr" as const,
 };
 
-const persistedDonation = {
-  id: "don-persisted-1",
-  receiptNumber: "HFS-DON-202609-0042",
-  sequenceScope: "HFS-DON-202609",
-  sequenceValue: 42,
+const persistedPledge = {
+  id: "gift-persisted-1",
   donorName: "Persisted Donor",
   donorEmail: "persisted.donor@example.com",
   tierId: "kibble" as const,
@@ -134,9 +164,10 @@ const persistedDonation = {
   currency: "MYR",
   frequency: "one_time" as const,
   paymentMethod: "duitnow_qr" as const,
-  taxDeductibleRef: "persisted-tax-reference",
-  shelterRegistrationNo: "persisted-registration",
-  issuedAt: "2026-09-14T12:00:00.000Z",
+  status: "PENDING_PAYMENT" as const,
+  pledgeRef: "HFS-GFT-20260914-004242",
+  receiptNumber: null,
+  createdAt: "2026-09-14T12:00:00.000Z",
 };
 
 beforeEach(() => {
@@ -146,9 +177,9 @@ beforeEach(() => {
     doubles.scheduledWork.push(work);
   });
   doubles.recordSponsorshipPledge.mockResolvedValue(persistedSponsorship);
-  doubles.issueDonationReceipt.mockResolvedValue(persistedDonation);
+  doubles.recordDonationPledge.mockResolvedValue(persistedPledge);
   doubles.sendSponsorshipWelcomeEmail.mockResolvedValue({ success: true });
-  doubles.sendDonationReceiptEmail.mockResolvedValue({ success: true });
+  doubles.sendDonationPledgeEmail.mockResolvedValue({ success: true });
 });
 
 describe("contribution email lifecycle", () => {
@@ -179,7 +210,7 @@ describe("contribution email lifecycle", () => {
     expect(doubles.sendSponsorshipWelcomeEmail).toHaveBeenCalledWith(result.data);
   });
 
-  it("registers the persisted donation DTO and dispatches it only through scheduled work", async () => {
+  it("registers the persisted pledge DTO and dispatches it only through scheduled work", async () => {
     const { submitDonationPledgeAction } = await import("@/actions/donations");
 
     const result = await submitDonationPledgeAction(donationInput);
@@ -187,20 +218,23 @@ describe("contribution email lifecycle", () => {
     expect(result).toMatchObject({
       success: true,
       data: {
-        receiptNumber: persistedDonation.receiptNumber,
-        donorName: persistedDonation.donorName,
-        donorEmail: persistedDonation.donorEmail,
-        tierName: persistedDonation.tierName,
+        pledgeRef: persistedPledge.pledgeRef,
+        donorName: persistedPledge.donorName,
+        donorEmail: persistedPledge.donorEmail,
+        tierName: persistedPledge.tierName,
         amountMYR: 43.21,
+        status: "PENDING_PAYMENT",
       },
     });
+    // The acknowledgement carries no receipt number, because none was drawn.
+    expect(result.data).not.toHaveProperty("receiptNumber");
     expect(doubles.scheduleAfterResponse).toHaveBeenCalledTimes(1);
-    expect(doubles.sendDonationReceiptEmail).not.toHaveBeenCalled();
+    expect(doubles.sendDonationPledgeEmail).not.toHaveBeenCalled();
 
     await doubles.scheduledWork[0]();
 
-    expect(doubles.sendDonationReceiptEmail).toHaveBeenCalledOnce();
-    expect(doubles.sendDonationReceiptEmail).toHaveBeenCalledWith(result.data);
+    expect(doubles.sendDonationPledgeEmail).toHaveBeenCalledOnce();
+    expect(doubles.sendDonationPledgeEmail).toHaveBeenCalledWith(result.data);
   });
 
   it("does not register sponsorship email work when persistence fails", async () => {
@@ -218,9 +252,11 @@ describe("contribution email lifecycle", () => {
   });
 
   it("does not register donation email work when persistence fails", async () => {
-    const { ReceiptIssuanceError } = await import("@/lib/server/donationLedger");
-    doubles.issueDonationReceipt.mockRejectedValueOnce(
-      new ReceiptIssuanceError("database did not confirm the receipt")
+    const { DonationPledgeWriteError } = await import(
+      "@/lib/server/donationPledgeLedger"
+    );
+    doubles.recordDonationPledge.mockRejectedValueOnce(
+      new DonationPledgeWriteError("database did not confirm the pledge")
     );
     const { submitDonationPledgeAction } = await import("@/actions/donations");
 
@@ -228,7 +264,7 @@ describe("contribution email lifecycle", () => {
 
     expect(result.success).toBe(false);
     expect(doubles.scheduleAfterResponse).not.toHaveBeenCalled();
-    expect(doubles.sendDonationReceiptEmail).not.toHaveBeenCalled();
+    expect(doubles.sendDonationPledgeEmail).not.toHaveBeenCalled();
   });
 
   it("keeps a successful sponsorship result settled when deferred email rejects", async () => {
@@ -246,7 +282,7 @@ describe("contribution email lifecycle", () => {
   });
 
   it("keeps a successful donation result settled when deferred email rejects", async () => {
-    doubles.sendDonationReceiptEmail.mockRejectedValueOnce(new Error("mailer unavailable"));
+    doubles.sendDonationPledgeEmail.mockRejectedValueOnce(new Error("mailer unavailable"));
     const { submitDonationPledgeAction } = await import("@/actions/donations");
 
     const result = await submitDonationPledgeAction(donationInput);
@@ -255,7 +291,7 @@ describe("contribution email lifecycle", () => {
     await expect(doubles.scheduledWork[0]()).rejects.toThrow("mailer unavailable");
     expect(result).toMatchObject({
       success: true,
-      data: { receiptNumber: persistedDonation.receiptNumber },
+      data: { pledgeRef: persistedPledge.pledgeRef },
     });
   });
 });

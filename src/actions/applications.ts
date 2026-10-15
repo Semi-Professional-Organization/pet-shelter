@@ -49,6 +49,7 @@ import {
   sendInterviewInvitationEmail,
 } from "@/lib/email";
 import { recordAuditLog } from "@/lib/domain/auditLog";
+import { uniqueViolationOn } from "@/lib/server/uniqueViolation";
 
 export async function getApplications(): Promise<AdoptionApplicationRecord[]> {
   const session = await getVerifiedSession();
@@ -59,15 +60,21 @@ export async function getApplications(): Promise<AdoptionApplicationRecord[]> {
 
 const MAX_REFERENCE_CODE_ATTEMPTS = 5;
 
-/** True for a Prisma unique-constraint violation naming the referenceCode index. */
+/**
+ * True for a unique violation that names the `referenceCode` index.
+ *
+ * Until 2026-10-13 this read `err.meta.target`, which Prisma 7 with
+ * `@prisma/adapter-pg` never sets — so it returned `false` for every collision and
+ * `insertWithUniqueReferenceCode` never took its retry: a colliding reference code
+ * surfaced as a failed submission. `uniqueViolationOn` reads the shape this client
+ * really raises; see `src/lib/server/uniqueViolation.ts` for the captured error.
+ *
+ * Strictly `true`. An *unnamed* violation is not retried here, unlike the two
+ * pledge ledgers: this insert writes a caller-supplied `id` as well, so the
+ * reference code is not provably the only unique it could have violated.
+ */
 function isReferenceCodeCollision(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
-  const candidate = err as { code?: string; meta?: { target?: unknown } };
-  if (candidate.code !== "P2002") return false;
-
-  const target = candidate.meta?.target;
-  const asText = Array.isArray(target) ? target.join(",") : String(target ?? "");
-  return asText.includes("referenceCode");
+  return uniqueViolationOn(err, "referenceCode") === true;
 }
 
 /**

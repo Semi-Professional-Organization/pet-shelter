@@ -103,8 +103,8 @@ export function DonatePageView({
     {
       q: isMs ? "Bagaimanakah saya menerima resit rasmi potongan cukai?" : "How do I receive my official tax receipt?",
       a: isMs
-        ? "Sebaik sahaja sumbangan selesai melalui portal kami, e-Resit rasmi berkomputer dengan nombor rujukan LHDN lengkap akan dijana serta-merta di skrin dan dihantar ke alamat e-mel anda."
-        : "Upon completing your donation through our secure portal, your computer-generated official e-Receipt with full LHDN reference numbers is rendered instantly on-screen and automatically dispatched to your provided email address.",
+        ? "Selepas anda menghantar borang, kami memberikan nombor rujukan ikrar untuk dicatat dalam pemindahan anda. e-Resit rasmi dengan nombor rujukan LHDN lengkap dihantar ke e-mel anda sebaik sahaja penyelaras kami memadankan pemindahan itu dengan penyata bank, biasanya dalam 2 hari bekerja."
+        : "When you submit the form we give you a pledge reference to quote on your transfer. Your official e-Receipt, with full LHDN reference numbers, is emailed to you once our coordinator has matched that transfer against the shelter's bank statement, usually within 2 working days.",
     },
     {
       q: isMs ? "Bolehkah syarikat korporat menderma dan menuntut pelepasan cukai?" : "Can corporate organizations donate and claim tax relief?",
