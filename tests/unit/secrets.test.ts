@@ -316,7 +316,32 @@ describe("assertSecretsConfigured", () => {
     });
 
     // What someone types into a hosting dashboard meaning "empty".
-    it.each(['""', "''"])("treats an invite code of only quote marks (%s) as unset", (code) => {
+    it("reads a quote-wrapped invite code without its quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", '"q7z4"');
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(getStaffInviteSecret()).toBe("q7z4");
+    });
+
+    it.each(["'HOPE2026'", '"admin123"'])("still refuses a quote-wrapped published code (%s)", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    // Its exact bytes are a key: quotes around it are part of the secret.
+    it("reads the session secret exactly, quotes included", () => {
+      vi.stubEnv("SESSION_SECRET", `"${STRONG_SESSION}"`);
+
+      expect(getSessionSecret()).toBe(`"${STRONG_SESSION}"`);
+    });
+
+    it.each(['""', "''", '" "', "``"])("treats an invite code of only quote marks (%s) as unset", (code) => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
@@ -522,7 +547,8 @@ describe("no operator-facing file publishes a secret that boots in production", 
 
   const QUOTED_8_PLUS = /[`"']([^`"']{8,})[`"']/g;
   /** `NAME=value` with no quotes, as in an env block in a runbook. */
-  const UNQUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=\s*([^\s"'`]+)/g;
+  // A single `=` only: `===` and `=>` in a code sample are not assignments.
+  const UNQUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=(?![=>])\s*([^\s"'`]+)/g;
 
   type Published = { file: string; line: number; name: GuardedName; value: string };
 

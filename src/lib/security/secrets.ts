@@ -54,12 +54,12 @@ export interface ResolveSecretOptions {
    */
   allowShort?: boolean;
   /**
-   * Values this repository has published, **already lower-cased**, refused in
-   * production whatever their length; the configured value is lower-cased to
-   * match. Checked before `allowShort`, so a short published value is refused,
-   * not waived.
+   * Values this repository has published, refused in production whatever their
+   * length, compared case-insensitively (both sides are lower-cased here, so a
+   * caller cannot get it wrong). Checked before `allowShort`, so a short
+   * published value is refused, not waived.
    */
-  published?: ReadonlySet<string>;
+  published?: readonly string[];
 }
 
 /**
@@ -86,19 +86,30 @@ export const DEV_SECRET_DEFAULTS = {
  * in a public repository is readable, test fixtures included, and no list can
  * hold them all; that is what the length recommendation is for.
  */
-const PUBLISHED_INVITE_CODES: ReadonlySet<string> = new Set(
-  ["HOPE2026", "1234", ...PUBLISHED_STAFF_PASSWORDS].map((code) => code.toLowerCase())
-);
+const PUBLISHED_INVITE_CODES: readonly string[] = ["HOPE2026", "1234", ...PUBLISHED_STAFF_PASSWORDS];
 
 /** Minimum length for the HMAC key that signs every session cookie. */
 const SESSION_SECRET_MIN_LENGTH = 32;
 
 const warnedSecrets = new Set<string>();
 
-const NONE_PUBLISHED: ReadonlySet<string> = new Set();
-
 function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
+}
+
+/**
+ * For a secret an operator chooses and types by hand (`allowShort`): drop one
+ * pair of matching surrounding quotes, as typed into a hosting dashboard, and
+ * trim again. So `"q7z4"` is the code `q7z4`, and `""` or `" "` is unset rather
+ * than a two- or three-character code that `allowShort` would accept.
+ *
+ * Not applied to the other secrets: their exact bytes are keys. Changing how
+ * `SESSION_SECRET` is read would sign sessions, and derive the field key, with a
+ * different value than before.
+ */
+function unquote(value: string): string {
+  const match = /^(["'`])([\s\S]*)\1$/.exec(value);
+  return match ? match[2].trim() : value;
 }
 
 /** Why a configured value is unacceptable. `short` is the only kind `allowShort` waives. */
@@ -112,7 +123,7 @@ function describeWeakness(
   value: string,
   devDefault: string,
   minLength: number,
-  published: ReadonlySet<string>
+  published: readonly string[] = []
 ): Weakness | null {
   if (value.length === 0) return { kind: "unset", description: "not set" };
   // Exact, as it always was. Matching case variants too would be a new way to
@@ -121,7 +132,8 @@ function describeWeakness(
   if (value === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  if (published.has(value.toLowerCase())) {
+  const lowered = value.toLowerCase();
+  if (published.some((p) => p.toLowerCase() === lowered)) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
   if (value.length < minLength) {
@@ -147,11 +159,8 @@ function warnOnce(key: string, message: string): void {
 export function resolveSecret(name: string, opts: ResolveSecretOptions): string {
   const minLength = opts.minLength ?? 16;
   const raw = (process.env[name] ?? "").trim();
-  // Quote marks alone (`""`, `''`) are what someone types into a hosting
-  // dashboard meaning "empty". Read them as unset rather than as a two-character
-  // value that `allowShort` would accept.
-  const value = /^["']*$/.test(raw) ? "" : raw;
-  const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published ?? NONE_PUBLISHED);
+  const value = opts.allowShort ? unquote(raw) : raw;
+  const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published);
 
   if (!weakness) return value;
 

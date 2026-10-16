@@ -26,7 +26,10 @@ includes the value.
 
 ## What it does not change
 
-- **An unset, whitespace-only or quote-marks-only (`""`) code is still refused at boot.** The secret policy fails fast
+- **An unset or whitespace-only code is still refused at boot.** For the invite code only, one
+  pair of surrounding quotes is removed first, as typed into a hosting dashboard: `"q7z4"` is
+  the code `q7z4`, and `""` or `" "` is unset. The other secrets are read exactly, because
+  their bytes are keys. The secret policy fails fast
   on a missing secret, rather than on the first registration. (`registerAction` would refuse an
   empty submitted code anyway; an earlier draft gave that as the reason, which was wrong.)
 - **The development default is still refused at boot, by exact match, as before.** It is
@@ -67,7 +70,8 @@ stays at 16 or more random characters.
   for the blast radius, and it would compose with this one, but it was not the owner's choice.
   It is the upgrade path named in the `ceiling:` comment on `getStaffInviteSecret`, together
   with moving the rate limiter to shared state. Until then, any *other* weak secret still takes
-  the whole site down at boot.
+  the whole site down at boot. Tracked in
+  `tasks/open/one-weak-secret-still-takes-the-whole-site-down.md`.
 - **Scanning quoted words shorter than 8 characters in operator files:** a quoted word may be
   prose ("strong", "none"). A 4-character floor was tried, and review showed it would fail the
   guard on prose. So a short invite code written in quotes inside a sentence is not scanned; one
@@ -107,14 +111,15 @@ stays at 16 or more random characters.
 
   | Mutant | Tests failed |
   |---|---|
-  | invite accessor without `allowShort` | 2 |
-  | every weakness waived, not only `short` | 20 |
+  | invite accessor without `allowShort` | 9 |
+  | every weakness waived, not only `short` | 24 |
   | `allowShort` applied to every secret | 2 |
-  | published codes not passed to the invite accessor | 8 |
-  | published check skipped, so the short waiver takes them | 8 |
-  | staff passwords left out of the invite deny list | 3 |
-  | published codes compared case-sensitively | 4 |
-  | a quotes-only value read as a two-character code | 2 |
+  | published codes not passed to the invite accessor | 10 |
+  | published check skipped, so the short waiver takes them | 10 |
+  | staff passwords left out of the invite deny list | 4 |
+  | published codes compared case-sensitively | 3 |
+  | wrapping quotes kept on the invite code | 7 |
+  | quotes stripped from every secret, the session key included | 1 |
   | dev default compared case-insensitively (a new boot refusal) | 1 |
   | development warning claims a fallback for a configured value | 1 |
   | warnings keyed on the name alone (the swallowed-warning bug) | 1 |
