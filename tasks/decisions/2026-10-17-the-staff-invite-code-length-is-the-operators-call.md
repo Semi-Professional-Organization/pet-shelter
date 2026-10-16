@@ -26,10 +26,11 @@ includes the value.
 
 ## What it does not change
 
-- **An unset or whitespace-only code is still refused at boot.** For the invite code only, one
-  pair of surrounding quotes is removed first, as typed into a hosting dashboard: `"q7z4"` is
-  the code `q7z4`, and `""` or `" "` is unset. The other secrets are read exactly, because
-  their bytes are keys. The secret policy fails fast
+- **An unset or whitespace-only code is still refused at boot.** The code is otherwise read
+  exactly as set, quotes included, like every other secret. Stripping surrounding quotes was
+  tried for one round and reverted. It changed which code staff must type for any existing code
+  that starts and ends with a quote, and it could newly refuse the boot for a quoted
+  development default. The secret policy fails fast
   on a missing secret, rather than on the first registration. (`registerAction` would refuse an
   empty submitted code anyway; an earlier draft gave that as the reason, which was wrong.)
 - **The development default is still refused at boot, by exact match, as before.** It is
@@ -40,7 +41,9 @@ includes the value.
   legacy invite codes `HOPE2026` and `1234`, plus the seeded staff passwords (`admin123` and
   the rest, from `src/lib/security/publishedPasswords.ts`). The 16-character minimum was the
   only thing refusing them in production; code review caught both groups. They are listed in
-  `PUBLISHED_INVITE_CODES` and checked before the short waiver.
+  `PUBLISHED_INVITE_CODES` and checked before the short waiver. The list also holds every
+  documented development default, so another secret's default pasted into the invite slot, or
+  the invite's own default in another letter case, is refused.
 - **`SESSION_SECRET` (32) and `ADMIN_SECRET_KEY` (16) keep their minimums.** Only the invite code
   passes `allowShort`.
 
@@ -93,17 +96,18 @@ stays at 16 or more random characters.
   - an earlier "not set" warning no longer swallows a later "short" one.
 - The `.env.example` check and the operator-file guard both call the app's real accessors, so
   neither can drift from the app's policy. The guard reads quoted values of 8+ characters and
-  unquoted `NAME=value` lines of any length, skipping placeholders such as `<your-code>`.
-- A probe planted five lines in a runbook:
+  assignments (`NAME=value`, `NAME="value"`, `export NAME='value'`) of any length, skipping
+  placeholders such as `<your-code>` and code such as `===` and `=>`.
+- A probe planted lines in a runbook:
 
   | Planted line | Result |
   |---|---|
-  | 8-character code, unquoted env line | caught |
-  | 3-character code, unquoted env line | caught |
+  | invite code in an assignment, unquoted, 3 or 8 characters | caught |
+  | invite code in an assignment, quoted, 4 or 6 characters | caught |
   | "strong" as a quoted prose word | no false alarm |
   | `<your-code>`, `...`, `<paste-generated-key-here>` placeholders | no false alarm |
-  | 4-character code, backticked in prose | not scanned (the stated ceiling) |
-  | 6-character code, quoted in prose | not scanned (the stated ceiling) |
+  | `=== undefined`, `=> rotate` | no false alarm |
+  | 4-character code, backticked in prose, not an assignment | not scanned (the stated ceiling) |
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
   `/admin/login` with 200, and its log carried the warning without the value. Started with
   `HOPE2026` or with the development default, it refused to boot.
@@ -111,15 +115,14 @@ stays at 16 or more random characters.
 
   | Mutant | Tests failed |
   |---|---|
-  | invite accessor without `allowShort` | 9 |
-  | every weakness waived, not only `short` | 24 |
+  | invite accessor without `allowShort` | 3 |
+  | every weakness waived, not only `short` | 22 |
   | `allowShort` applied to every secret | 2 |
-  | published codes not passed to the invite accessor | 10 |
-  | published check skipped, so the short waiver takes them | 10 |
-  | staff passwords left out of the invite deny list | 4 |
-  | published codes compared case-sensitively | 3 |
-  | wrapping quotes kept on the invite code | 7 |
-  | quotes stripped from every secret, the session key included | 1 |
-  | dev default compared case-insensitively (a new boot refusal) | 1 |
+  | published codes not passed to the invite accessor | 11 |
+  | published check skipped, so the short waiver takes them | 11 |
+  | staff passwords left out of the invite deny list | 3 |
+  | dev defaults left out of the invite deny list | 3 |
+  | published codes compared case-sensitively | 4 |
+  | dev default compared case-insensitively (a new boot refusal) | 2 |
   | development warning claims a fallback for a configured value | 1 |
   | warnings keyed on the name alone (the swallowed-warning bug) | 1 |

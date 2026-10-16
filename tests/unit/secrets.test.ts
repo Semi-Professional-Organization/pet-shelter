@@ -316,37 +316,28 @@ describe("assertSecretsConfigured", () => {
     });
 
     // What someone types into a hosting dashboard meaning "empty".
-    it("reads a quote-wrapped invite code without its quotes", () => {
+    // Exactly as set, quotes included, like every secret: stripping them was
+    // tried and reverted, since it changed which code staff must type.
+    it("reads the invite code exactly, quotes included", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", '"q7z4"');
       vi.spyOn(console, "warn").mockImplementation(() => {});
 
       expect(() => assertSecretsConfigured()).not.toThrow();
-      expect(getStaffInviteSecret()).toBe("q7z4");
+      expect(getStaffInviteSecret()).toBe('"q7z4"');
     });
 
-    it.each(["'HOPE2026'", '"admin123"'])("still refuses a quote-wrapped published code (%s)", (code) => {
+    it.each([
+      ["the admin key's default", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY],
+      ["the session secret's default", DEV_SECRET_DEFAULTS.SESSION_SECRET],
+      ["its own default, upper-cased", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET.toUpperCase()],
+    ])("refuses %s as the invite code", (_label, code) => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
-    });
-
-    // Its exact bytes are a key: quotes around it are part of the secret.
-    it("reads the session secret exactly, quotes included", () => {
-      vi.stubEnv("SESSION_SECRET", `"${STRONG_SESSION}"`);
-
-      expect(getSessionSecret()).toBe(`"${STRONG_SESSION}"`);
-    });
-
-    it.each(['""', "''", '" "', "``"])("treats an invite code of only quote marks (%s) as unset", (code) => {
-      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
-      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
-      vi.stubEnv("STAFF_INVITE_SECRET", code);
-
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
     });
 
     it("still refuses a whitespace-only invite code", () => {
@@ -549,6 +540,8 @@ describe("no operator-facing file publishes a secret that boots in production", 
   /** `NAME=value` with no quotes, as in an env block in a runbook. */
   // A single `=` only: `===` and `=>` in a code sample are not assignments.
   const UNQUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=(?![=>])\s*([^\s"'`]+)/g;
+  /** `NAME="value"` or `export NAME='value'`: an assignment, so read at any length. */
+  const QUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=(?![=>])\s*(["'`])([^"'`]+)\2/g;
 
   type Published = { file: string; line: number; name: GuardedName; value: string };
 
@@ -561,13 +554,15 @@ describe("no operator-facing file publishes a secret that boots in production", 
         const named = NAMES.filter((n) => line.includes(n));
         if (named.length !== 1) return; // a line listing several names states no value
         const name = named[0];
-        // An unquoted `NAME=value` is always a value, so it is read at any length.
-        // A quoted token may be prose ("strong", "none"), so it is read only at
-        // 8+ characters. ceiling: a 4-7 character invite code written in quotes
-        // inside a sentence is not scanned; one in an env block is.
+        // An assignment (`NAME=value`, quoted or not) is always a value, so it is
+        // read at any length. A quoted token elsewhere may be prose ("strong",
+        // "none"), so it is read only at 8+ characters. ceiling: a short invite
+        // code written in quotes inside a sentence, not as an assignment, is not
+        // scanned.
         const values = [
           ...[...line.matchAll(QUOTED_8_PLUS)].map((m) => m[1]),
           ...[...line.matchAll(UNQUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[2]),
+          ...[...line.matchAll(QUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[3]),
         ];
         for (const value of values) {
           if (value === name || (NAMES as string[]).includes(value)) continue;

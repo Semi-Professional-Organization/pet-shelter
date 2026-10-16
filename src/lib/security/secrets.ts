@@ -86,7 +86,15 @@ export const DEV_SECRET_DEFAULTS = {
  * in a public repository is readable, test fixtures included, and no list can
  * hold them all; that is what the length recommendation is for.
  */
-const PUBLISHED_INVITE_CODES: readonly string[] = ["HOPE2026", "1234", ...PUBLISHED_STAFF_PASSWORDS];
+const PUBLISHED_INVITE_CODES: readonly string[] = [
+  "HOPE2026",
+  "1234",
+  ...PUBLISHED_STAFF_PASSWORDS,
+  // Every documented development default, so another secret's default pasted
+  // into the invite slot, or this one in another letter case, is refused too.
+  // (The invite's own default is also refused by exact match, as for all.)
+  ...Object.values(DEV_SECRET_DEFAULTS),
+];
 
 /** Minimum length for the HMAC key that signs every session cookie. */
 const SESSION_SECRET_MIN_LENGTH = 32;
@@ -95,21 +103,6 @@ const warnedSecrets = new Set<string>();
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
-}
-
-/**
- * For a secret an operator chooses and types by hand (`allowShort`): drop one
- * pair of matching surrounding quotes, as typed into a hosting dashboard, and
- * trim again. So `"q7z4"` is the code `q7z4`, and `""` or `" "` is unset rather
- * than a two- or three-character code that `allowShort` would accept.
- *
- * Not applied to the other secrets: their exact bytes are keys. Changing how
- * `SESSION_SECRET` is read would sign sessions, and derive the field key, with a
- * different value than before.
- */
-function unquote(value: string): string {
-  const match = /^(["'`])([\s\S]*)\1$/.exec(value);
-  return match ? match[2].trim() : value;
 }
 
 /** Why a configured value is unacceptable. `short` is the only kind `allowShort` waives. */
@@ -158,8 +151,10 @@ function warnOnce(key: string, message: string): void {
  */
 export function resolveSecret(name: string, opts: ResolveSecretOptions): string {
   const minLength = opts.minLength ?? 16;
-  const raw = (process.env[name] ?? "").trim();
-  const value = opts.allowShort ? unquote(raw) : raw;
+  // Read exactly (trimmed), for every secret. Quote marks are part of the value:
+  // stripping them for the invite code was tried and reverted, because it
+  // changed which code staff must type and could newly refuse the boot.
+  const value = (process.env[name] ?? "").trim();
   const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published);
 
   if (!weakness) return value;
