@@ -131,17 +131,28 @@ so the defect has one public issue.
   ran but recorded nothing, because the tree did not change.
 - **Other sessions were unlogged during that window too, not only after it.** Several other
   sessions running at the same time, including `a17e9995`, the one this entry opened on, made
-  Bash calls throughout it, and none produced a guard or drift line. The guard log's lines match
-  `1c022c97`'s own calls.
-- **A linked worktree does not stop the hook on its own.** `1c022c97` worked almost entirely in
-  `.claude/worktrees/pets-birthdate-migration`, and it logged.
-- **Three properties are confounded.** According to their transcripts, `1c022c97` ran from the
-  Claude desktop app, was not a background job, and ran an older Claude Code version. The
-  unlogged sessions in that window were all CLI background jobs on a newer version. Any of the
-  three could be the cause. A CLI background-job session has logged before: the 2026-09-21 line
-  quoted at the top came from one, running in the main checkout. An experiment has to change one
-  property at a time, for example a non-background CLI session on the current version, counting
-  guard lines before and after one Bash call.
+  Bash calls throughout it, and none produced a guard or drift line. Every guard line pairs with
+  one of `1c022c97`'s own calls, though a few of its calls have no guard line.
+- **The strongest candidate is where each session was started.** Every unlogged session on record,
+  including `a17e9995`, was launched from `.claude/worktrees/e2e-local-database-only`. Both
+  sessions that logged (`60c30e3b`, the 2026-09-21 line quoted at the top, and `1c022c97`) were
+  launched from the main checkout. That directory is not in `git worktree list`. It holds only
+  `.claude/settings.local.json`, and no `.claude/settings.json`, which is the file that wires the
+  hook. It reappeared on 2026-09-21 at about 16:45Z, just after `60c30e3b` had removed the
+  worktree that stood there and a minute before the first unlogged session started. A session
+  whose project root is that directory would load no project hook at all. This is a correlation
+  across every case on record, not yet a test.
+- **What it is probably not.** The version: the unlogged sessions of 2026-09-21 ran the same
+  version as `60c30e3b`, which logged. A linked worktree as such: `1c022c97` logged while its
+  shell worked in `.claude/worktrees/pets-birthdate-migration`, although it was launched from
+  the main checkout, so this does not cover a session *launched* from a worktree. `1c022c97` ran
+  from the desktop app and has no background-job marker in its transcript (inferred from a
+  missing field), while the unlogged sessions were CLI background jobs, so those two properties
+  are not yet separated from the launch directory.
+- **The experiment.** Launch one CLI session from that directory and one from the main checkout,
+  otherwise alike, and count guard lines before and after one Bash call in each. If the launch
+  directory is the cause, removing the stray directory, or giving every launch point the project
+  settings, ends the defect.
 - **No settings layer disables hooks.** Neither `.claude/settings.local.json` nor the user-level
   settings has a `hooks` key or `disableAllHooks`, and no commit has touched
   `.claude/settings.json` or `agent-guard.mjs` since 2026-09-09.
