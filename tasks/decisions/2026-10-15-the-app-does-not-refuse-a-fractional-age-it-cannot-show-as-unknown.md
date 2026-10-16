@@ -63,13 +63,9 @@ directly.)
 
 Rendered with such a pet saved, the client store differs for one render only. On master the
 throw was caught, so the first client render showed the ten fixtures. On this branch the first
-client render shows the saved pets, the overflow one as `273847 years`, senior. The store's server
-render is always the fixtures, because the initializer skips storage without `window`. The one
-page that server-renders a store pet is a pet's detail page (`/pets/[id]`, through
-`usePetDetailViewController`). So the overflow pet's own detail page can now disagree with its
-server HTML on the first client render, a hydration mismatch. That was reasoned from the code,
-and not traced in a browser, and neither was whether that frame is painted. From the second
-render on, master and this branch are identical. The mount effect
+client render shows the saved pets, the overflow one as `273847 years`, senior. From the second
+render on, master and this branch are identical. What that one-render difference does on pages
+that server-render store pets (hydration against server HTML) was not traced. The mount effect
 (`petStore.ts`, `setPets(JSON.parse(saved))`) replaces the pets with the saved ones as stored,
 deriving nothing, and that discards the clamped value too. The clamp matters fully once that
 mount effect derives ages too, or once a new caller passes an age.

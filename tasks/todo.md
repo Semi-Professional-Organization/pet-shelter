@@ -54,8 +54,9 @@ Record active multi-step work streams below.
   | 7 | 9 — that repository path is unreachable (no `age` field), plus claims built on it and a stale #113 reason | entry deleted unpublished; claims corrected |
   | 8 | 7 — `usePetStore`'s mount effect discards derivation (a pre-existing code defect, outside the diff); six false claims, in the docstring, the decision, the table-has-no-`age` wording, the lesson, the test comment and the edit-form claim | claims corrected; mount effect listed as not done |
   | 9 | 4 — "nothing user-visible" (the first render differs), raised in both the decision and this stream; another caller exists; expand vs contract migration | corrected in `d282e11` |
-  | 10 | 6, none blocking — a false coverage sentence in this table; rows 1 and 8 inexact; the expand half misdescribed; the merge order with #114; server-render hydration | five corrected in `e223b3f`; merge order settled by merging #114 first, so the decision's citation of its open entry resolves |
-  | 11 | 5, none blocking — hydration overstated (only `/pets/[id]` server-renders a store pet); rows 9 and 10 inexact; the stream's render line out of step; stale PR description | corrected in the commit after `e223b3f` |
+  | 10 | 6, none blocking — a false coverage sentence in this table; rows 1 and 8 inexact; the expand half misdescribed; the merge order with #114; server-render hydration | five corrected in `e223b3f`; merge order: #114 then this PR, back to back, because each cites the other's ledger file and the links dangle until both land |
+  | 11 | 5, none blocking — hydration overstated (only `/pets/[id]` server-renders a store pet); rows 9 and 10 inexact; the stream's render line out of step; stale PR description | four corrected in `3b4c9ac`; the PR description edited directly |
+  | 12 | 6, none blocking — hydration still mis-scoped; a gates claim the PR contradicts; row 10's merge-order fix only moved the dangling link; row 11 credited a commit for a description edit; the description's withdrawn-change table missing a row | hydration cut to what was observed; rows and gates line corrected in the commit after `3b4c9ac`; description edited directly |
 
   The branch's code last changed in round five's fix (`da58f3b`). The commits after it change
   only comments under `src/` and `tests/`, plus the ledger. Each correction is reviewed by the
@@ -69,7 +70,9 @@ Record active multi-step work streams below.
   master by design.
 - The petAge suite passes at UTC-8, with `TZ` set in PowerShell and the offset confirmed as 480 in
   the same shell. (Node ignores `TZ` set from Git Bash on this machine.)
-- Gates and merge check: see the PR, which records them on the final merged tree.
+- Gates last ran on this branch merged with `1b6dbbc` (#113). None has run yet on the tree that
+  will land, `master` plus #114 plus this PR. That is done, and CI is green on it, before this PR
+  is merged.
 
 **Deliberately not done.**
 - Fractional and ranged ages still misread (`0,5 tahun` gives five years). Fixing them needs an
