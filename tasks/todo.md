@@ -41,27 +41,10 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, one row per round: the finding count from that round's report, and the
-  commit that responded to it, whose message describes the response.
-
-  | round | findings | responding commit |
-  |---|---|---|
-  | 1 | 9 | `f6ffd3d` |
-  | 2 | 7 | `1387603` |
-  | 3 | 8 | `1a67599` |
-  | 4 | 8 | `2c180d3` |
-  | 5 | 8 | `da58f3b` |
-  | 6 | 7 | `fae1337` |
-  | 7 | 9 | `0b87c1c` |
-  | 8 | 7 | `16de77d` |
-  | 9 | 4 | `d282e11` |
-  | 10 | 6 | `e223b3f` |
-  | 11 | 5 | `3b4c9ac` |
-  | 12 | 6 | `a4599f8` |
-  | 13 | 4 | the commit after `a4599f8` |
-
-  The branch's code last changed in `da58f3b`. The commits after it change only comments under
-  `src/` and `tests/`, plus the ledger. The loop ends on a round with no findings.
+- `/code-review high` runs in rounds, and the loop ends on a round with no findings. Each round's findings and the
+  commits answering them are in PR #119's commit list on GitHub; the branch's own commits do not
+  survive the squash merge. The code last changed in the fix that restored `Date.UTC`'s century
+  reading; every later change under `src/` and `tests/` is a comment.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).
