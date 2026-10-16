@@ -99,7 +99,14 @@ export function withDerivedAge<T extends {
   intakeDate: string;
   age?: string;
   ageCategory?: string;
-}>(pet: T, asOf: Date | string = new Date()): T & {
+}>(
+  pet: T,
+  asOf: Date | string = new Date()
+  // `Omit` first, then the four fields this function decides. A plain `T & { … }` intersected the
+  // caller's types with the computed ones, so a literal `birthDateIsEstimate: false` survived as
+  // the type `false` while the runtime returned `true`, and a flag typed `undefined` collapsed the
+  // whole result to `never`. These four are recomputed here, so the input's types must not leak.
+): Omit<T, "birthDate" | "birthDateIsEstimate" | "age" | "ageCategory"> & {
   birthDate: string;
   birthDateIsEstimate: boolean;
   age: string;
@@ -171,6 +178,41 @@ const AGE_MONTHS_PATTERN = /(\d+)\s*(?:months?|mths?|mnths?|mos?|bulan|bln|m)\b/
 const AGE_WEEKS_PATTERN = /(\d+)\s*(?:weeks?|wks?|minggu|mggu)\b/;
 
 /**
+ * UTC calendar arithmetic on parsed date parts, as a `YYYY-MM-DD` string — or `null` when the
+ * result lies outside the range a `Date` can hold.
+ *
+ * `Date.UTC` reads a year argument of 0–99 as 1900–1999, so `2000 years` before 2026 lands in
+ * 1926. That is left alone deliberately. Replacing it with `setUTCFullYear` was tried and
+ * withdrawn: it fixed only junk ages, and it turned a hand-typed two-digit intake (`26-06-12`)
+ * from 1926 into 26 AD, and put year-0026 dates into the pet form, whose `isoDateSchema` still
+ * has the `Date.UTC` reading and calls them "not a real calendar day". A third copy, `isIsoDate`
+ * in `transparency.ts`, already reads years 0–99 literally, so the copies disagree today; a fix
+ * for the century reading has to settle all three together.
+ */
+function isoDate(year: number, month: number, day: number): string | null {
+  const d = new Date(Date.UTC(year, month, day));
+  return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+}
+
+/**
+ * The earliest date a `Date` can hold. An age so large that its birth date would be earlier still
+ * — `15000000 weeks` — gets this, rather than `toISOString()` throwing `RangeError`. At runtime
+ * only a pet with an `age` and no `birthDate` reaches this function, and the Prisma `Pet` model has
+ * no `age` field, so no database read does. What remains is a legacy `localStorage` copy, in
+ * `usePetStore`'s initializer. The contract migration's rehearsal also calls it directly.
+ *
+ * ceiling: no plausibility check at all, deliberately. `61 years` or `15000000 weeks` is junk, but
+ * the only other answer this function can give is the intake date, which shows the animal as a
+ * newborn. Clamping keeps an overflowing age older than any age that fits, and the upgrade path is
+ * an "age unknown" result the read path can show. Why:
+ * `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`.
+ * Also known: an extended-year string such as this one does not split as `YYYY-MM-DD`, so
+ * `parseDateParts` reads it in local time and can land a day early west of UTC. That was already
+ * true of the in-range junk readings (`12345678 wks` gives `-234583-03-21`).
+ */
+const EARLIEST_DATE = new Date(-8.64e15).toISOString().split("T")[0];
+
+/**
  * Approximates a birth date from an age string (e.g. "2 years", "4 months", "2 tahun") relative
  * to the intake date. Timezone-invariant UTC arithmetic.
  *
@@ -229,30 +271,37 @@ export function approximateBirthDate(
     return { birthDate: new Date().toISOString().split("T")[0], isEstimate: true };
   }
 
+  const intakeOnly = intakeDateStr.split("T")[0];
+  // The arithmetic first, so any date that fits is returned exactly as before, even from an
+  // intake that is itself out of range. Only when the result overflows does it matter which side
+  // did: an age can only reach into the past, so with an intake inside the range the overflow is
+  // the age's and clamps. With the intake out of range too there is nothing to reckon from, and it
+  // is returned as given, as it is for an age with no unit.
+  const derived = (birthDate: string | null) => ({
+    birthDate: birthDate ?? (isoDate(parts.year, parts.month, parts.day) ? EARLIEST_DATE : intakeOnly),
+    isEstimate: true,
+  });
+
   const yearMatch = norm.match(AGE_YEARS_PATTERN);
   if (yearMatch) {
     const years = parseInt(yearMatch[1], 10);
-    const d = new Date(Date.UTC(parts.year - years, parts.month, parts.day));
-    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+    return derived(isoDate(parts.year - years, parts.month, parts.day));
   }
 
   const monthMatch = norm.match(AGE_MONTHS_PATTERN);
   if (monthMatch) {
     const months = parseInt(monthMatch[1], 10);
-    const d = new Date(Date.UTC(parts.year, parts.month - months, parts.day));
-    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+    return derived(isoDate(parts.year, parts.month - months, parts.day));
   }
 
   // Weeks last, so the largest unit still wins: "1 bulan 2 minggu" reads the month, the way
   // "1 year 6 months" reads the year. Day arithmetic rather than a month or year offset, so the
-  // month-end rollover above cannot arise here — `Date.UTC` normalises a negative day exactly.
+  // month-end rollover above cannot arise here — `Date` normalises a negative day exactly.
   const weekMatch = norm.match(AGE_WEEKS_PATTERN);
   if (weekMatch) {
     const weeks = parseInt(weekMatch[1], 10);
-    const d = new Date(Date.UTC(parts.year, parts.month, parts.day - weeks * 7));
-    return { birthDate: d.toISOString().split("T")[0], isEstimate: true };
+    return derived(isoDate(parts.year, parts.month, parts.day - weeks * 7));
   }
 
-  const dateOnly = intakeDateStr.split("T")[0];
-  return { birthDate: dateOnly, isEstimate: true };
+  return { birthDate: intakeOnly, isEstimate: true };
 }

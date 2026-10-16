@@ -15,6 +15,75 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Parser fixes from PR #42's review — overflow clamp, `withDerivedAge` type
+
+**Branch:** `fix/approximate-birth-date-shapes` · off master `187593c` · 2026-10-15
+**Decision:** `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`
+**Lesson:** `tasks/lessons/2026-10-15-a-refusal-ported-into-a-function-that-must-return-becomes-a-default.md`
+
+## Items
+
+- [x] `approximateBirthDate` no longer throws. A count whose date leaves the `Date` range
+      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. It now clamps
+      to the earliest date a `Date` holds (`-271821-04-20`), older than any age that fits. When
+      the intake is out of range too, the intake is returned as given, as for an age with no
+      unit. **Mostly defensive today:** the Prisma model has no `age`, and `usePetStore`'s
+      mount effect replaces the derived pets with the raw saved ones. What still differs, for
+      one render, is set out in the decision.
+- [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
+      `expectTypeOf` tests that fail `tsc` on the old signature.
+- [x] Tried and **withdrawn** after review, all for one reason: a refusal here is the intake
+      date, which shows a newborn. They were a fractional/range refusal (`3-4 years` went
+      from four years to newborn), a sixty-year ceiling (`61 years` went from senior to
+      newborn), and an overflow guard sending `15000000 weeks` to the intake date. Also dropped:
+      an ISO fall-through, and `setUTCFullYear` in place of `Date.UTC`, which turned a two-digit
+      intake (`26-06-12`) into 26 AD. See the decision and lesson.
+
+## Review
+
+- `/code-review high` runs in rounds, and the loop ends on a round with no findings. No
+  per-round record of findings is kept here. The commits that answered them are in PR #119's
+  commit list on GitHub, which survives the squash merge, and each message says what it changed.
+  The code last changed in the fix that restored `Date.UTC`'s century reading. Every later change
+  this branch itself made under `src/` and `tests/` is a comment; merges from `master` bring
+  other code in.
+- Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
+  0 other. Every input master read without throwing reads the same, including every string PR
+  #113's rehearsal pins (the three non-ASCII ones added at its request).
+- #113's contract rehearsal, which imports the real function, passes on the merged tree (85/0).
+- Discriminating tests (fail on master by name): the four overflow clamps, the end-to-end
+  `senior` check, and the out-of-range intake. The rest of that block are guards that pass on
+  master by design.
+- The petAge suite passes at UTC-8, with `TZ` set in PowerShell and the offset confirmed as 480 in
+  the same shell. (Node ignores `TZ` set from Git Bash on this machine.)
+- The tree that will land, `master` plus #114 plus this PR, does not exist until #114 merges.
+  Every gate is run on it, and CI is green on it, before this PR is merged.
+
+**Deliberately not done.**
+- Fractional and ranged ages still misread (`0,5 tahun` gives five years). Fixing them needs an
+  "unknown age" path first; see the decision.
+- A non-ISO intake (`2026/06/12`) still leaks into `birthDate` unconverted on the fall-through.
+  It is pre-existing, and the obvious fix threw on an out-of-range intake for every age.
+- `Date.UTC` still reads years 0–99 as 1900–1999 (`2000 years` gives 1926). Fixing it alone
+  moved two-digit intakes to 26 AD; it needs `isoDateSchema`, `transparency.ts`'s `isIsoDate`
+  (which already reads 0–99 literally) and the intake format settled together.
+- Compact compounds (`2y3m`) and unlisted spellings (`6 mons`): tied to how the backfill's
+  fractional check is narrowed (`expand-refuses-compound-ages-written-in-short-units.md`).
+- Three copies of the estimate rule: latent, no writer produces `''`.
+- Distributive return type for a union-typed pet: needs an `as` cast and no caller passes a
+  union.
+- The `approximateBirthDate` docstring still explains rollover with `Date.UTC(2023, 1, 29)`.
+  That is still true of JavaScript and of `isoDate`, which uses `Date.UTC`.
+- `usePetStore`'s mount effect (`setPets(JSON.parse(saved))`) undoes the initializer's
+  `withDerivedAge`, so saved pets keep their stale stored `age`/`ageCategory`. Already named in
+  #114's parser entry as a known defect; not fixed here, because fixing it changes what every
+  returning browser shows and wants its own test.
+- `petRepository.ts` maps rows inside the same `try` as the Prisma query, so a mapping exception
+  would be handled as a database outage. No known input makes `mapDbPetToPet` throw today, so
+  this is latent and not recorded as an open entry. A round-six entry claiming otherwise was
+  deleted before it was published.
+- The decision cites an open entry that arrives with PR #114.
+
 # PR #42 follow-up — what a review run after the merge found
 
 **Branch:** `fix/pr-42-review-findings` · opened 2026-10-14 · off `master` at `187593c`
