@@ -135,17 +135,20 @@ establish it.
 
       Cannot find module 'D:\Dev\Repos\pet-shelter\.claude\worktrees\e2e-local-database-only\.claude\hooks\agent-guard.mjs'
 
-  Only for a small share of their calls, though, and only during some periods. Most of their
-  calls, including calls by the same session and version at other times, show no error at all.
+  They appear in periods: within such a period every successful matched call carries the error,
+  and outside them there is no sign the hook ran at all, including calls by the same session and
+  version at other times.
 
-So for a session launched from that directory, the hook either does not run or fails, and when
-it fails that is recorded only some of the time. What decides which is not established. Deleting
+So for a session launched from that directory, the hook fails on every call during some periods
+and shows no sign of running otherwise. What switches it between the two is not established. Deleting
 the directory could break sessions still running from it, so the fix should wait until the
 mechanism is known.
 
 Unchanged facts from the 2026-10-14/15 reading: the current drift log holds 161 lines, all from
-`1c022c97`, 2026-10-13T15:09Z to 16:37Z, inside that session's lifetime; no settings layer sets
-`hooks` or `disableAllHooks`; and older log contents are gone, by a means not observed.
+`1c022c97`, 2026-10-13T15:09Z to 16:37Z, inside that session's lifetime; no
+`settings.local.json` (in the main checkout or the stray directory), and no user or managed
+settings layer, sets `hooks` or `disableAllHooks`; and older log contents are gone, by a means not
+observed.
 
 Related but distinct: `tasks/open/matcherless-hook-wiring-unverified.md` (only an alternation
 matcher has been observed firing — this one *is* an alternation matcher, and for this session it
