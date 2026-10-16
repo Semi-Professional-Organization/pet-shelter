@@ -14,10 +14,12 @@ and agree. The app results were re-run on 2026-10-16 against `master` at `d6dd03
 runs only for a record with no `birthDate`: chiefly a pet saved to browser `localStorage` before
 #94, on first render. That is narrow, and widens the moment the known `petStore.ts` mount-effect
 defect is fixed. Since PR #113 merged on 2026-10-15, the contract rehearsal also imports this
-function and compares the backfill against it. It does so only on fixed lists of spellings. None
-of the misread shapes in the table or the decimal list below is on them, so those defects do not
-reach that comparison today; a spelling added to the lists would. (The lists do include
-`1 tahun 6 months`, the mixed-language case below, which the backfill now refuses.)
+function, but compares the two only on its `AGREED` and `APP_ONLY` lists and the first three
+`NON_ASCII` strings (`rehearse.mjs` lines 352, 386 and 455–459 on `master` at `d6dd030`), none
+of which this function misreads. Its other lists do contain shapes below: `1.5 years`, the dash
+ranges `3–4 years` and `2—3 years`, and `1½ years`. Those are only checked to be refused by the
+backfill, never compared with this function, so these defects do not reach that comparison
+today. Extending the comparison to those lists would expose them.
 
 ## Regressions PR #42 introduced
 

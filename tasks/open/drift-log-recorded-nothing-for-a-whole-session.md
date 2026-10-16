@@ -116,34 +116,36 @@ by `git status` instead (empty, so every touched file is in a commit) is a stron
 session but does not generalise, because it cannot see a write that was made and then reverted —
 the "while I am here" edit the log is meant to surface.
 
-## Since about 2026-10-13T16:57Z, nothing from any session
+## Both logs hold one session's lifetime, and nothing else
 
 A third session, also a background job in a linked worktree, read the files on 2026-10-14 and
 2026-10-15. It filed a separate entry before this one was widened; that entry is folded in here
 so the defect has one public issue.
 
-- **The drift log holds 161 lines, all from `1c022c97…`, spanning 2026-10-13T15:09Z to 16:37Z,
-  and its modification time is that last line.** No session has added a line since, though
-  several wrote hundreds of files over the next two days.
-- **The hook ran for twenty minutes after that last drift line.** The guard log has eight more
-  lines, from 16:37:28Z to 16:57:24Z, and `1c022c97`'s state file was written at 16:57:25Z, so
-  the drift branch itself ran. It logged nothing in that window because the tree did not change.
-  So the hook went quiet after about 16:57Z, not at 16:37Z. "Not down globally" above is true up
-  to then. After it, nothing is logged for anyone. The guard log was still last written at
-  16:57Z on 2026-10-15.
+- **Every line in both logs falls inside one session's lifetime.** The drift log holds 161
+  lines, all from `1c022c97…`, from 2026-10-13T15:09Z to 16:37Z. The guard log starts at
+  14:46:35Z and ends at 16:57:24Z. That session's transcript starts at 14:46:09Z, its last
+  hook-triggering call is at 16:57:23Z, and it ends at 16:58:19Z. Its state file was written at
+  16:57:25Z. So 16:57Z is not when the hook changed. It is when the only session that has
+  logged since these files began stopped working, and nothing has been logged for any session
+  since. Between 16:37Z and 16:57Z its drift branch ran but recorded nothing, because the tree
+  did not change.
+- **That logging session ran in a linked worktree.** 412 of its 435 working-directory records
+  are `.claude/worktrees/pets-birthdate-migration`. So "a linked worktree stops the hook", one
+  of the two properties named under "Not established" above, does not hold on its own. Whether
+  `1c022c97` was a background job was not checked; that is the property still open.
 - **No settings layer disables hooks.** Neither `.claude/settings.local.json` nor the user-level
   settings has a `hooks` key or `disableAllHooks`, and no commit has touched
   `.claude/settings.json` or `agent-guard.mjs` since 2026-09-09.
 - **In that session's shell, `AGENT_GUARD_LOG`, `AGENT_DRIFT_LOG` and `AGENT_DRIFT_STATE` were
   unset.** The hook runs in its own process, whose environment was not observed.
-- **Why both logs *begin* on 2026-10-13 is not established either.** The guard log starts at
-  14:46:35Z and the drift log at 15:09:34Z. `TEMP` still holds files from every day between
-  2026-10-01 and 2026-10-12, so an age-based clean-up that kept those would have kept a log
-  appended on those days. Either nothing was logged from about 2026-09-21 to 2026-10-13, so the
-  silence is older than it looks, or something else deleted the logs. The 2026-09-08 lines that
-  "Not established" above mentions are no longer in the file.
+- **What happened to the older contents is not established.** Both files begin with
+  `1c022c97`'s session. The 2026-09-08 lines that "Not established" above mentions, and the
+  2026-09-21 line quoted at the top, are no longer in the file. Whether they were deleted, or the
+  files were recreated, was not observed.
 - **The guard script can exit before it logs.** If its input fails to parse, it calls `allow()`
-  (line 116 of `agent-guard.mjs`), whose `process.exit(0)` is at line 99, before `log()` runs. So a silent guard log does not by itself
+  (line 116 of `agent-guard.mjs`), whose `process.exit(0)` is at line 99, before `log()` runs
+  at line 152. So a silent guard log does not by itself
   prove the hook was not invoked. A wrapper recording the hook process's argv, environment and
   stdin would separate "not invoked" from "invoked with a payload it cannot read".
 
