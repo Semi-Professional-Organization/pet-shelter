@@ -41,10 +41,12 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high` runs in rounds, and the loop ends on a round with no findings. Each round's findings and the
-  commits answering them are in PR #119's commit list on GitHub; the branch's own commits do not
-  survive the squash merge. The code last changed in the fix that restored `Date.UTC`'s century
-  reading; every later change under `src/` and `tests/` is a comment.
+- `/code-review high` runs in rounds, and the loop ends on a round with no findings. No
+  per-round record of findings is kept here. The commits that answered them are in PR #119's
+  commit list on GitHub, which survives the squash merge, and each message says what it changed.
+  The code last changed in the fix that restored `Date.UTC`'s century reading. Every later change
+  this branch itself made under `src/` and `tests/` is a comment; merges from `master` bring
+  other code in.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).
