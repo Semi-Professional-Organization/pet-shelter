@@ -54,11 +54,12 @@ export interface ResolveSecretOptions {
    */
   allowShort?: boolean;
   /**
-   * Values this repository has published, refused in production whatever their
-   * length, compared case-insensitively. Checked before `allowShort`, so a short
-   * published value is refused, not waived.
+   * Values this repository has published, **already lower-cased**, refused in
+   * production whatever their length; the configured value is lower-cased to
+   * match. Checked before `allowShort`, so a short published value is refused,
+   * not waived.
    */
-  published?: readonly string[];
+  published?: ReadonlySet<string>;
 }
 
 /**
@@ -78,23 +79,23 @@ export const DEV_SECRET_DEFAULTS = {
  * `allowShort` it would not, so they are refused by name.
  *
  * The seeded staff passwords are refused too, from the one list that already
- * holds them (`./publishedPasswords`): they are 8-10 characters, so the old
+ * holds them (`./publishedPasswords`): they are 6-10 characters, so the old
  * minimum refused them as well.
  *
  * Deliberately only values the app once *accepted as credentials*. Every string
  * in a public repository is readable, test fixtures included, and no list can
  * hold them all; that is what the length recommendation is for.
  */
-const PUBLISHED_INVITE_CODES: readonly string[] = [
-  "HOPE2026",
-  "1234",
-  ...PUBLISHED_STAFF_PASSWORDS,
-];
+const PUBLISHED_INVITE_CODES: ReadonlySet<string> = new Set(
+  ["HOPE2026", "1234", ...PUBLISHED_STAFF_PASSWORDS].map((code) => code.toLowerCase())
+);
 
 /** Minimum length for the HMAC key that signs every session cookie. */
 const SESSION_SECRET_MIN_LENGTH = 32;
 
 const warnedSecrets = new Set<string>();
+
+const NONE_PUBLISHED: ReadonlySet<string> = new Set();
 
 function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
@@ -111,7 +112,7 @@ function describeWeakness(
   value: string,
   devDefault: string,
   minLength: number,
-  published: readonly string[]
+  published: ReadonlySet<string>
 ): Weakness | null {
   if (value.length === 0) return { kind: "unset", description: "not set" };
   // Exact, as it always was. Matching case variants too would be a new way to
@@ -120,8 +121,7 @@ function describeWeakness(
   if (value === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  const lowered = value.toLowerCase();
-  if (published.some((p) => p.toLowerCase() === lowered)) {
+  if (published.has(value.toLowerCase())) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
   if (value.length < minLength) {
@@ -146,8 +146,12 @@ function warnOnce(key: string, message: string): void {
  */
 export function resolveSecret(name: string, opts: ResolveSecretOptions): string {
   const minLength = opts.minLength ?? 16;
-  const value = (process.env[name] ?? "").trim();
-  const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published ?? []);
+  const raw = (process.env[name] ?? "").trim();
+  // Quote marks alone (`""`, `''`) are what someone types into a hosting
+  // dashboard meaning "empty". Read them as unset rather than as a two-character
+  // value that `allowShort` would accept.
+  const value = /^["']*$/.test(raw) ? "" : raw;
+  const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published ?? NONE_PUBLISHED);
 
   if (!weakness) return value;
 

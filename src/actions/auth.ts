@@ -212,8 +212,10 @@ export async function registerAction(data: {
 
   // 1. Rate Limiting on Registrations
   //
-  // Two *independent* budgets, and deliberately not one composite key. The
-  // address budget is what makes the invite guard below non-enumerable, and it
+  // Two *independent* budgets, and deliberately not one composite key. With a
+  // recommended-length (16+) code the address budget is what makes the invite
+  // guard below non-enumerable; a shorter code, which the operator may now
+  // choose, is guessable regardless (`getStaffInviteSecret`). The budget
   // only works because the email is absent from its key.
   //
   // `register:${email}` alone was the defect — recorded in

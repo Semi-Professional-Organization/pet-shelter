@@ -315,6 +315,15 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).not.toThrow();
     });
 
+    // What someone types into a hosting dashboard meaning "empty".
+    it.each(['""', "''"])("treats an invite code of only quote marks (%s) as unset", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+    });
+
     it("still refuses a whitespace-only invite code", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);

@@ -26,7 +26,7 @@ includes the value.
 
 ## What it does not change
 
-- **An unset or whitespace-only code is still refused at boot.** The secret policy fails fast
+- **An unset, whitespace-only or quote-marks-only (`""`) code is still refused at boot.** The secret policy fails fast
   on a missing secret, rather than on the first registration. (`registerAction` would refuse an
   empty submitted code anyway; an earlier draft gave that as the reason, which was wrong.)
 - **The development default is still refused at boot, by exact match, as before.** It is
@@ -108,12 +108,13 @@ stays at 16 or more random characters.
   | Mutant | Tests failed |
   |---|---|
   | invite accessor without `allowShort` | 2 |
-  | every weakness waived, not only `short` | 18 |
-  | `allowShort` applied to every secret | 4 |
+  | every weakness waived, not only `short` | 20 |
+  | `allowShort` applied to every secret | 2 |
   | published codes not passed to the invite accessor | 8 |
   | published check skipped, so the short waiver takes them | 8 |
   | staff passwords left out of the invite deny list | 3 |
-  | published codes compared case-sensitively | 3 |
+  | published codes compared case-sensitively | 4 |
+  | a quotes-only value read as a two-character code | 2 |
   | dev default compared case-insensitively (a new boot refusal) | 1 |
   | development warning claims a fallback for a configured value | 1 |
   | warnings keyed on the name alone (the swallowed-warning bug) | 1 |
