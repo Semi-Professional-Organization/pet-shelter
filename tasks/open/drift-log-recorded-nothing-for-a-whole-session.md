@@ -139,11 +139,12 @@ establish it.
   and outside them there is no sign the hook ran at all, including calls by the same session and
   version at other times.
 
-So for most sessions launched from that directory, the hook failed on every call during one
-window shared across them, on 2026-09-21 from about 17:05Z to 17:40Z, and showed no sign of
-running otherwise. At least one, `e8689beb`, active in that window on the same version, shows no
-sign of the hook at any time. What switches it is not established; that shared window is the
-strongest lead. Deleting
+At least two such periods are on record. Most sessions launched from that directory failed on
+every call in one shared window on 2026-09-21, from about 17:05Z to 17:41Z. One of them,
+`9b859c16`, failed again on 2026-10-15 from about 16:12Z to 16:34Z, on a later version and
+working in another worktree, still naming the stray directory's path. `e8689beb`, active in the
+2026-09-21 window on the same version as the others, shows no sign of the hook at any time. What
+switches the hook between failing and not running is not established. Deleting
 the directory could break sessions still running from it, so the fix should wait until the
 mechanism is known.
 
