@@ -1,7 +1,7 @@
 # The write-path hook writes nothing at all for some sessions, so their drift cannot be read
 
-**Status:** open · opened 2026-09-22 · observed at `8d36ace` from a linked worktree · **cause
-found 2026-10-17**, in the last section; the hypotheses between here and there are superseded by it
+**Status:** open · opened 2026-09-22 · observed at `8d36ace` from a linked worktree · cause still
+not established; the last section records what the session transcripts show
 
 `AGENTS.md` ("Read the drift log before the close write") and `CLAUDE.md` close-out step 2 both
 require a session to filter `claude-agent-drift.log` by its own id and account for every path. A
@@ -117,40 +117,36 @@ by `git status` instead (empty, so every touched file is in a commit) is a stron
 session but does not generalise, because it cannot see a write that was made and then reverted —
 the "while I am here" edit the log is meant to surface.
 
-## Cause, found 2026-10-17: the hook runs and cannot find its script
+## What the session transcripts show, 2026-10-17
 
-The hook does run in the silent sessions, and every call fails. `.claude/settings.json` wires
-`PostToolUse` to `node "${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-guard.mjs"`. The silent
-sessions were all launched from `.claude/worktrees/e2e-local-database-only`, a directory that is
-not a registered worktree and holds only `.claude/settings.local.json`. For them
-`CLAUDE_PROJECT_DIR` is that directory, there is no `.claude/hooks/agent-guard.mjs` under it, and
-`node` fails before the script can log anything:
+Observations from the transcripts under `~/.claude/projects`. They narrow the cause; they do not
+establish it.
 
-    Cannot find module 'D:\Dev\Repos\pet-shelter\.claude\worktrees\e2e-local-database-only\.claude\hooks\agent-guard.mjs'
+- **Where each session was launched splits logged from silent.** Every silent session on record
+  was launched from `.claude/worktrees/e2e-local-database-only`. That directory has existed since
+  2026-09-16, is not a registered worktree, and holds only `.claude/settings.local.json`; its
+  `.claude/` folder dates from 2026-09-21T16:46Z. (`60c30e3b`'s attempts to remove it failed.)
+  Every session that logged (`60c30e3b`, `44dc9b6b`, `1c022c97`) was launched from the main
+  checkout. CLI background jobs are on both sides, so neither "background job" nor the version
+  separates them. `44dc9b6b`'s state file, read above as misattribution, was its own.
+- **Sometimes the hook ran and could not find its script.** `.claude/settings.json` runs
+  `node "${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-guard.mjs"`. Some silent sessions record
+  non-blocking `PostToolUse` errors of the form
 
-Their transcripts record this as a non-blocking `PostToolUse` hook error, from tool calls made
-while their shell was in other worktrees too. The session that folded a second entry into this
-one counted 45 of these errors in its own transcript. The harness reports a non-blocking hook
-error in the transcript, not to the session, so nothing surfaced it. Later in some sessions
-these errors stop being recorded at all, so a transcript without them is not evidence the hook
-succeeded.
+      Cannot find module 'D:\Dev\Repos\pet-shelter\.claude\worktrees\e2e-local-database-only\.claude\hooks\agent-guard.mjs'
 
-Sessions launched from the main checkout logged, whether CLI background jobs (`60c30e3b`, the
-2026-09-21 line quoted at the top; `44dc9b6b`, whose state file is its own, written while it
-ran) or a desktop session (`1c022c97`, the only one in the current files). That separates the
-launch directory from the background-job and version hypotheses above. The misattribution
-reading of `44dc9b6b`'s state file is also superseded: it was that session's own.
+  These come only from calls made while the shell was in a registered worktree, and cluster in
+  two short windows: 2026-09-21 around 17:05Z to 17:41Z, and a few on 2026-10-15. The harness
+  reports them in the transcript, not to the session.
+- **For almost every other call there is no sign the hook ran at all.** That includes every call
+  made with the shell in the stray directory itself, and every call in the 2026-10-13 window.
+  The version that wrote the errors still writes them, so their absence is evidence the hook did
+  not run, not that recording stopped.
 
-The stray directory was recreated on 2026-09-21 at about 16:46Z, seconds before the first silent
-session's first record, after `60c30e3b` had removed the worktree that stood there at 14:55Z. That
-fits background jobs being relaunched at a working directory that no longer existed, which
-recreated it. That part is inferred from timestamps, not observed.
-
-**Fix, not done here.** Deleting the stray directory does not fix sessions already launched from
-it, whose `CLAUDE_PROJECT_DIR` stays pointed there, and could break them. Copying settings into it
-does not supply the missing script. What would end it is a hook command that does not depend on
-the launch directory resolving to a full checkout, or one that fails loudly when the script is
-missing.
+So the leading reading is that a session launched from that directory usually loads no project
+hook, and in some conditions loads one that points at a script that is not there. What decides
+which, and why, is not established. Deleting the directory could break sessions still running
+from it; the fix should be chosen once the mechanism is known.
 
 Unchanged facts from the 2026-10-14/15 reading: the current drift log holds 161 lines, all from
 `1c022c97`, 2026-10-13T15:09Z to 16:37Z, inside that session's lifetime; no settings layer sets
@@ -161,8 +157,7 @@ matcher has been observed firing — this one *is* an alternation matcher, and f
 did not fire),
 and `tasks/open/drift-log-credits-a-merge-to-the-session-that-ran-it.md`.
 
-**Settles when:** the hook command no longer depends on the launch directory holding the hook
-script (or fails loudly when it does not), and a session launched from somewhere other than the
-main checkout writes a file and finds that write in `claude-agent-drift.log` under its own
-`session_id`. Alternatively, the close-out step that depends on the log is changed to name what
-it can actually verify, and this entry records which.
+**Settles when:** a session launched from `.claude/worktrees/e2e-local-database-only`, or any
+directory that is not a full checkout, writes a file and finds that write in
+`claude-agent-drift.log` under its own `session_id`. Alternatively, the close-out step that
+depends on the log is changed to name what it can actually verify, and this entry records which.
