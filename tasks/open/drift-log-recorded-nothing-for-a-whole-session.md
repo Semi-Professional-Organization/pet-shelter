@@ -123,9 +123,10 @@ Observations from the transcripts under `~/.claude/projects`. They narrow the ca
 establish it.
 
 - **Where each session was launched splits logged from silent.** Every silent session on record
-  was launched from `.claude/worktrees/e2e-local-database-only`. That directory has existed since
-  2026-09-16, is not a registered worktree, and holds only `.claude/settings.local.json`; its
-  `.claude/` folder dates from 2026-09-21T16:46Z. (`60c30e3b`'s attempts to remove it failed.)
+  was launched from `.claude/worktrees/e2e-local-database-only`. It was a registered worktree
+  until `60c30e3b` removed it at about 14:55Z on 2026-09-21; only the emptied directory could not
+  be deleted. The silent sessions launched into it at about 16:46Z, when its `.claude/` folder,
+  holding only `settings.local.json`, was created.
   Every session that logged (`60c30e3b`, `44dc9b6b`, `1c022c97`) was launched from the main
   checkout. CLI background jobs are on both sides, so neither "background job" nor the version
   separates them. `44dc9b6b`'s state file, read above as misattribution, was its own.
@@ -140,12 +141,14 @@ establish it.
   reports them in the transcript, not to the session.
 - **For almost every other call there is no sign the hook ran at all.** That includes every call
   made with the shell in the stray directory itself, and every call in the 2026-10-13 window.
-  The version that wrote the errors still writes them, so their absence is evidence the hook did
-  not run, not that recording stopped.
+  Only some Claude Code versions have been seen recording these errors, and not the ones that
+  ran on 2026-10-13 or 2026-10-14. So for those windows a missing error does not show whether the
+  hook did not run, or ran, failed and went unrecorded.
 
-So the leading reading is that a session launched from that directory usually loads no project
-hook, and in some conditions loads one that points at a script that is not there. What decides
-which, and why, is not established. Deleting the directory could break sessions still running
+So a session launched from that directory either loads no project hook, or loads one that points
+at a script that is not there and fails, recorded only by some versions. Which, and why, is not
+established. The 2026-09-21 errors began in every affected session within a minute of 17:05Z,
+which suggests a trigger common to all of them rather than where each shell was. Deleting the directory could break sessions still running
 from it; the fix should be chosen once the mechanism is known.
 
 Unchanged facts from the 2026-10-14/15 reading: the current drift log holds 161 lines, all from
