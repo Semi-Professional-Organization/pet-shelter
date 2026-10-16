@@ -140,11 +140,13 @@ establish it.
   version at other times.
 
 At least two such periods are on record. Most sessions launched from that directory failed on
-every call in one shared window on 2026-09-21, from about 17:05Z to 17:41Z. One of them,
-`9b859c16`, failed again on 2026-10-15 from about 16:12Z to 16:34Z, on a later version and
-working in another worktree, still naming the stray directory's path. `e8689beb`, active in the
-2026-09-21 window on the same version as the others, shows no sign of the hook at any time. What
-switches the hook between failing and not running is not established. Deleting
+every successful matched call in one shared window on 2026-09-21, from about 17:05Z to 17:41Z.
+One of them, `9b859c16`, failed again on 2026-10-15 from about 16:12Z to 16:34Z, on a later
+version, in the same worktree as before, still naming the stray directory's path. Every recorded
+error came from a call made with the shell in a worktree other than the stray directory; no call
+made from the stray directory itself shows one. `e8689beb`, which never left the stray directory,
+shows no sign of the hook at any time. What switches the hook between failing and not running is
+not established. Deleting
 the directory could break sessions still running from it, so the fix should wait until the
 mechanism is known.
 
