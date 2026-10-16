@@ -1009,12 +1009,12 @@ model Bulletin {
   ///
   /// Unlike Faq, **nothing resolves these yet**: the `Bulletin` type carries no
   /// Malay fields and the public feed is English-only. Whoever settles
-  /// tasks/open/home-page-text-stays-english-on-the-malay-site.md adds the
+  /// tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md adds the
   /// fields and the `titleMs ?? title` fallback in bulletinRepository together.
   ///
   /// These columns are written by the editor but not yet rendered: the public
   /// feed is English-only until
-  /// tasks/open/home-page-text-stays-english-on-the-malay-site.md is settled,
+  /// tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md is settled,
   /// which owns the render side. They exist now because adding them later would
   /// mean a second DDL migration against a production branch that has no Prisma
   /// down path — TARGET_SCHEMA_TYPE_INTEGRITY P-C's warning about baking a

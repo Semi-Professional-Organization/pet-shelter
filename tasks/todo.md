@@ -84,6 +84,174 @@ Record active multi-step work streams below.
   deleted before it was published.
 - The decision cites an open entry that arrives with PR #114.
 
+# PR #42 follow-up — what a review run after the merge found
+
+**Branch:** `fix/pr-42-review-findings` · opened 2026-10-14 · off `master` at `187593c`
+**Review:** `/code-review max` of `18c533e..868e584`, run 2026-10-14, 15 findings
+
+## Items
+
+- [x] Re-established state before acting. #42 had been squash-merged as `187593c` with
+      `reviews: 0`, 36 seconds after the review started — tree identical to the branch head, so all
+      15 findings were on `master` and every fix had to be a follow-up PR.
+- [x] Split the findings with the session behind PR #113 rather than racing it. #113 already
+      carried the fix for the worst one (finding 1: the backfill stored a different date for
+      `1 tahun 6 months` than the app computed, despite this branch's claim that it "fails
+      closed"). That session took F10, F12 and F13 onto #113; this branch took the rest that do
+      not touch `petAge.ts` or the SQL.
+- [x] **F15 — corrected a false public ledger entry**, in two passes. The entry described a strict
+      `intakeDate` check that existed only in a reverted commit, asked for a production count
+      against a rule `master` never had, and reopened a settled decision. The first rewrite
+      overcorrected — it said a stranded record's *status* could not be changed (it can:
+      `updatePetStatus` bypasses `petFormSchema`) and that no existing row was at risk (the
+      `2024-01-01` column default can produce one). Second pass fixed both, and widened the
+      production check to every row with `birthDate > intakeDate`, so a hand-corrected birthday is
+      caught as well as the default. It also renamed the file, believing the name was the public
+      issue's title. It is not — the mirror takes the title from the first heading — and renaming
+      would have *closed* the issue as if settled. The rename was reverted; the new heading
+      retitles the issue in place.
+- [x] **F11 — pinned seven accepted spellings nothing tested.** `tahun`, `thn`, `bln`, bare `m`,
+      `yr`, `week`, `mnths`. One `it.each` case per spelling, so a dropped one is reported by name.
+      Proved each case kills its own mutant: dropped one spelling at a time from the real patterns,
+      ran the suite, restored the original bytes from memory. Seven mutants, each killed by exactly
+      its own case and no other, every time. Later rounds folded every accepted spelling into that
+      one table, so each unit alternative in the patterns now has a named row; the mutation result
+      was re-run after each change and held.
+- [x] **F14 — corrected the previous stream's record, here rather than in it.** The stream below
+      says the `minggu` regex was left alone; it was fixed in #42. An earlier pass on this branch
+      edited that stream in place. A review pointed out that `CLAUDE.md` step 5 and this file's own
+      header forbid reformatting what is below a new stream, so those edits were reverted and the
+      corrections moved into the section below — the stream underneath is now byte-identical to
+      `master`.
+- [x] Filed `drift-log-has-recorded-nothing-since-2026-10-13.md`. First version compared this session's
+      zero lines against 161 for another and blamed how the worktree was entered. Wrong: the whole
+      log is 161 lines from **one** session across 90 minutes on 2026-10-13, and nothing from anyone
+      since. Rewritten as what it is — the log went silent for every session. **Later folded
+      into** master's `drift-log-recorded-nothing-for-a-whole-session.md` (widened by #104 on
+      the same defect) and deleted, so the defect has one public issue, not two.
+
+- [x] **Reviewed this branch before opening it**, `/code-review high`, and it found ten more — six of
+      them prose stating a state that was not true, in a branch whose whole purpose was correcting
+      that. The tree hash was still in a public entry; two corrections cited squashed-branch commits
+      that are not ancestors of `master`; the stream said an open PR "deletes" a file; the drift
+      entry's comparison was meaningless; the rewritten date-rules entry named the wrong failure
+      and dropped a real risk. Each probed, all ten fixed or recorded.
+
+- [x] **A third and a fourth review, each probed before acting.** The third found the F5 premise
+      false and the rename mistaken; the fourth re-ran every parser claim and citation in the
+      rewritten entries and found them all correct — the probe-first method held where it was used.
+      Its findings were the places still reasoned rather than run: the drift entry called the
+      liveness log unconditional (the script exits before it on an unparseable payload, and both
+      logs share `tmpdir()`, so a moved temp directory would freeze both), the Malay decimals were
+      said to be refused "as fractional" (they are refused for having no unit), and the
+      born-at-the-shelter query needed the expand migration first and missed three of the four
+      rules a stored birthday can fail.
+- [x] **Found that the SQL emulator had been broken all along.** The Bash tool collapses a doubled
+      backslash in command text, so `\s` reached Node as a plain `s` and matched the letter. Its
+      verdicts for inputs with a space were computed on the wrong pattern; most happened to be
+      right. Rebuilt with the backslash from its character code and self-tested; only the English
+      decimals changed. A lesson and a memory note record it.
+
+- [x] **Fifth and sixth reviews.** The fifth found subtler interactions: a mixed Malay/English age
+      is stored wrong by the expand migration on `master` *now* (filed as live, not hypothetical);
+      the no-unit check runs before the fractional one; a sibling entry's planned fix would reopen
+      a divergence (the two now link each other); an env var redirects the hook's logs; the
+      liveness log cannot be attributed to a session. The sixth reported the code clean and every
+      cited fact correct, and found precision and process items — a headline still asserting a
+      conclusion the body had withdrawn, the wrong cause given for one refusal, a table claiming
+      "every spelling" with six missing, and a decision held in this stream instead of
+      `tasks/decisions/`. All fixed.
+
+## Corrections to the stream below
+
+`Pet form birth date — critique PR #42, then yield it to PR #94` is left exactly as written. These
+are the parts of it that are wrong, recorded here because a stream below this one is not edited:
+
+- **Its two "`minggu` left alone deliberately" bullets are false.** #42 made weeks a unit in both
+  languages after the owner ruled that "3 minggu" means three weeks. Both bullets were written
+  before that change and never revised.
+- **Where it cites a commit as where something landed, read `187593c`.** #42 was squash-merged to
+  `master` as `187593c`. Its branch commits — `925b7c6` (weeks), `4cad3ce` (a review's fix round) —
+  are real but are not ancestors of `master` (`git merge-base --is-ancestor 925b7c6 origin/master`
+  exits 1), and they stop resolving if `feat/pet-form-birth-date` is deleted.
+- **It omits the omission that mattered most:** the expand harness's `appRule` was left stale
+  while #42 widened the real function. In
+  `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
+- **It omits that #42 merged unreviewed** after the 2026-10-13 review — including `925b7c6`, a
+  behaviour change, and `4cad3ce`, that review's own fix round.
+
+## Review
+
+The review's verdict on my own work is the thing worth recording. Of 15 findings, the largest
+group was prose I wrote asserting a state that was not true — a docstring naming SQL files that do
+no arithmetic, a ledger entry citing a tree hash as a commit, a stream saying a fix had not been
+made, a public entry describing a rule `master` never had. I named this pattern three times on the
+night it happened and kept producing it, because naming it did not change what I checked before
+writing. What would have: grepping each claim against `origin/master` at the moment of writing,
+not against the branch I was standing on.
+
+Then the review of *this* branch found six more of the same, written after I had already put the
+lesson into words — including the tree hash surviving in a public entry this branch was created
+to fix. Writing the rule down did not stop me breaking it. What did, in the second round, was
+mechanical: for the new parser entry, every claim was run against the real function on `master`
+through a throwaway test before it was written, and the two that resisted a runtime probe went to
+`tsc` instead. It held: the fourth review re-ran every parser claim and citation in that entry and
+found them all correct. (When this paragraph was first drafted, no review had yet seen the entry,
+and I first wrote that the second one had cleared it — which it could not have.) What later reviews
+still found was in claims I had *reasoned* rather than run, and in the probe itself: the SQL
+emulator had been silently broken all along. Check first, then write — and check the checker.
+
+The one that cost most was `6d32df9`. `git merge-tree --write-tree` prints a *tree* OID. I told
+another session "merges clean against master at `6d32df9`", it repeated the hash in good faith, and
+it ended up in a public issue as the commit where `master` still used local setters. `git cat-file
+-t 6d32df9` prints `tree`.
+
+## Explicitly NOT done
+
+The open defects are tracked in the ledger, not here — a work stream may record what was not done,
+but `tasks/README.md` does not let it hold an open question. Each was reproduced against the real
+function on `master` before being filed, rather than copied from the review.
+
+- **F4–F9, all of the parser defects — deferred until open PR #113 lands or is withdrawn**, at that
+  session's request, because #113 also edits `petAge.ts`. All are fixable in the app alone: the
+  backfill refuses every affected shape, so changing what the app computes for them changes nothing
+  it stores. Most are **regressions #42 introduced** with its trailing `\b` — `2y3m` read correctly
+  as two years before #42 and reads as three months now; `6 mons` read as six months and now falls
+  through to intake. Decimals read the wrong digits (`0,75 tahun` → seventy-five years; the English
+  cases predate #42), an unbounded count throws `RangeError`, the return type can lie, and three
+  copies of the estimate rule disagree on `birthDate: ''`. In
+  `approximate-birth-date-misreads-several-age-shapes.md`, every case reproduced against both the
+  pre-#42 and current function.
+- **F5's coupling to the SQL was a false premise, and this stream carried it for a round.** An
+  earlier version said compact compounds could not be fixed app-side because the backfill's `\M`
+  "fails the same way" and the two "agree, both wrong". It was accepted from another session after
+  only the app half was checked. The backfill's fractional check *aborts* on `2y3m` (`migration.sql`
+  lines 403 and 445–448), so nothing is stored wrong — it runs second, after the no-unit check at
+  429, which `2y3m` passes because its trailing `3m` is a unit the backfill reads. That session confirmed it on
+  a real Postgres and withdrew the claim from its own decision entry.
+- **F2 remainder — the expand harness's stale `appRule`.** Needs `embedded-postgres` to run, and
+  deleting the copy changes O1/O2 wholesale. In the rehearsal entry.
+- **`CLAUDE.md` step 7 still says nothing about what `git merge-tree --write-tree` prints.** Filed as
+  `tasks/open/close-out-step-7-does-not-say-what-merge-tree-prints.md`, so it surfaces at session
+  start and mirrors to an issue rather than living only here. A
+  review argued the tree-hash trap belongs there, not only in a lesson — and `CLAUDE.md` step 6
+  itself records that a lesson living only in `tasks/lessons/` was ignored and let PR #38 ship a
+  defect. Not changed here: `CLAUDE.md` is the process every session follows, and changing it is
+  the owner's decision rather than a ride-along on a ledger branch. The clause, ready to add to
+  step 7: *"Its first output line is the **tree** the merge would produce, not a commit — never
+  quote it as a ref. Use the exit status for clean or conflicted, and cite `git rev-parse
+  origin/master` for the commit."*
+- **The structural half of F11.** The seven spellings are pinned, but a spelling *added* to a
+  pattern still goes untested until someone adds a row. Making that impossible means exporting the
+  vocabulary from `petAge.ts` and feeding both the patterns and the test from it.
+- **The years and weeks word boundaries are unpinned, deliberately.** Removing either still leaves
+  the suite green, and pinning them would mean asserting a wrong answer. Recorded as a decision —
+  `tasks/decisions/2026-10-14-the-years-and-weeks-unit-boundaries-are-left-unpinned.md` — because it
+  is a choice someone could reasonably reverse, and a stream is not where the next session looks.
+- **The `tasks/todo.md` conflict with #113.** Both branches prepend a stream at the same anchor, so
+  whichever merges second conflicts and loses its CI run until resolved. Inherent to this file's
+  one-append-point design (its own header says so); resolved by keeping both streams.
+
 # The backfill rehearsal checks the real age function
 
 **Branch:** `fix/rehearsal-checks-the-real-age-function` · opened 2026-10-14 · follows #94 and #42
@@ -2096,3 +2264,480 @@ GitHub rather than in a test.
 CI for `102763d` shows **cancelled**, not failed: Playwright, static analysis and strict
 persistence passed, and the unit job was still running when `a6d1007` superseded it, which is what
 `cancel-in-progress` in `ci.yml` is for. The same tree passed every job on this branch beforehand.
+
+# Home page defects — hero dead mounts, dead anchors, Malay copy (#77, #78, #80)
+
+**Branch:** `worktree-home-page-defects-77-78-80` · opened 2026-09-22 · ROUTINE lane
+**Base:** branched at `origin/master` `8d36ace`; merged `4782ff2` (#88) and `fa3021e` (#89) during
+the work, so the merge base at review time is `fa3021e`
+
+> Appended at the tail rather than prepended, on the instruction in the prompt that opened this
+> stream: concurrent branches all insert at the top of this file, and two insertions at one line
+> conflict — which costs a PR its whole CI run. The HTML comment at the top of this file still says
+> to prepend. Those two instructions disagree; this is the contradiction, recorded rather than
+> silently resolved. Whoever splits this file per `tasks/README.md` should retire one of them.
+
+## What landed
+
+Three commits, one per defect, each carrying its own tests and deleting its own `tasks/open/` entry.
+
+- `f58991a` **#77** — `Hero` dropped `PetMatchQuiz` and `SponsorshipModal`, which it mounted with
+  `open={false}` and could never open. **`4782ff2` (#88) shipped the identical code change from
+  another session while this branch was being written**, so the merge absorbed this commit to a net
+  zero on `Hero.tsx`. What the branch actually contributes for #77 is
+  `tests/components/heroDialogMounts.test.tsx`, which #88 shipped without, and a decision entry
+  correcting two of the three reasons #88's entry gives.
+- `f6e1b3b` **#80** — `HomeProcessSection` remounted on `/`; `HomeCommunitySection` and
+  `HomeGalleryHeader` deleted; `/#support` repointed to `/get-involved#volunteer`; the impossible
+  `pathname === "/#how-it-works"` comparison dropped. `tests/unit/homeAnchors.test.ts`.
+- `bce4c16` **#78** — the hero `<h1>` and image `alt`, the bulletin feed's public chrome, and the
+  three literals `page.tsx` rendered itself now switch on `isMs`.
+  `tests/components/homeMalay.test.tsx`.
+
+Reasoning is in three `tasks/decisions/` entries dated 2026-09-22, not repeated here.
+
+## Review — what was deliberately not done
+
+**The bulletin admin chrome stays English.** Seven strings behind `isAdminMode`. The entry that
+owns that editor — `bulletins-are-a-per-browser-demo-anyone-can-edit.md` — settles by deleting it,
+so translating it commissions Malay for copy that entry removes. `#78`'s settle condition allows a
+row to be accepted as intentionally English if the acceptance is written down; it is.
+
+**`common.loading` was not reused** for the gallery's "Loading rescue animals…", though the entry
+named it as the nearest existing key. It would have narrowed the English from a specific label to
+"Loading…" — a visible regression on the English site to fix a Malay bug. The key stays unused.
+
+**`<html lang>` is still hardcoded `"en"`** in `layout.tsx`, site-wide, so every page's served HTML
+is English until hydration. Translating the `<h1>` makes that mismatch sharper, not milder. Out of
+scope and stated in the PR; it needs a decision about whether `/` gives up ISR, which this work
+deliberately did not.
+
+**Superseded — see "Corrections" below.** **`/pets` and `/bulletins` still pass English `title` props to `BulletinFeed`.** The prop still
+works and a test pins that it does. Those pages are outside `#78`'s inventory and have other
+untranslated chrome of their own.
+
+**`#adopt`, `#our-work` and `#mission` still have no `scroll-mt`**, though the sticky header means
+an anchor lands under it. Nothing links to them, so nothing scrolls to them. Only `#how-it-works`
+got the offset, because after this change it is the only id on `/` that anything links to.
+
+**`hero.quizBtn` and `hero.sponsorBtn` were left in the dictionary**, now unused, along with the
+rest of the dead `hero.*` namespace. They are the human-authored labels a FE-02 restore would need;
+deleting them would throw away Malay that a restore would have to re-commission.
+
+**The parallel #77 work in the shared checkout was not touched.** At 00:50 an unidentified session
+edited `src/components/layout/Hero.tsx` and wrote
+`tasks/decisions/2026-09-22-hero-removes-dead-dialog-mounts.md` in `D:/Dev/Repos/pet-shelter` on
+`master`, uncommitted. It reaches the same conclusion as `f58991a` by partly wrong reasoning (see
+the `toContain` lesson). It is someone's in-flight work and the index there is shared, so it was
+left exactly as found. **Whoever owns it should drop it before this merges.**
+
+## Two things found that were not the task
+
+- `tests/components/home.test.tsx:153` does not pin the hero layout the way the brief and a
+  parallel decision file both claimed. `toContain` is not exhaustive and modal triggers are not
+  links. Written up as a lesson; the decision it was cited for was still correct.
+- The write-path drift log recorded **nothing** for this session and named a different session in
+  the only state file it touched, so close-out step 2 could not be performed as written. Filed as
+  `tasks/open/drift-log-recorded-nothing-for-a-whole-session.md` with the observations separated
+  from the inferred cause.
+
+## Review round, and what it changed
+
+`/code-review` at xhigh over the whole diff returned fourteen findings. None was a crash-class bug;
+most were coverage holes, duplication, and one silent copy change. Every one was probed before being
+accepted. The substantive outcomes:
+
+- **The new anchor guard had two holes, both closed.** It matched only `"/#id"`, so the
+  `/get-involved#volunteer` link this very branch created was outside its own coverage; and it
+  scanned raw text, so a commented-out mount still counted as rendered. Both now probe-verified.
+  A guard that does not cover the fix that produced it is half a guard.
+- **Remounting `HomeProcessSection` was republishing drifted copy.** Its steps duplicated
+  `home.step*`, and the two had diverged while the section sat unmounted. Wired to the dictionary.
+- **`BulletinFeed`'s `title` prop became `titleKey`.** Translating the chrome around the heading
+  while leaving the heading an English literal left `/bulletins` and `/pets` *worse* than before.
+- **Type-safety and duplicate-copy cleanups**: `labelKey` is a dictionary-keyed template type, and
+  no `t()` call in that file passes an English fallback — the provider already falls through to
+  `en`, so a literal argument could only be an unreachable second copy.
+- **Two copy corrections the remount exposed**: the navbar advertised a "4-langkah" guide for a
+  three-step section, and its tagline carried the hero `<h1>`'s English verbatim while its Malay was
+  already abbreviated. Shortened the English rather than lengthening a `text-3xs` slot.
+- **Eight `home.*` keys orphaned by deleting `HomeCommunitySection`** were removed; the sweep that
+  proved two keys unused should have caught these in the same pass.
+
+## Second review round, and why it mattered
+
+`/code-review` was run again over the fix commit, per close-out step 6 — the rule that exists
+because a fix round is unreviewed code written in a hurry. It returned fourteen more findings, two
+confirmed by live probe, and it was right to.
+
+**The headline one: the test named for the comment-stripping fix never called the walker.** It
+asserted on `stripComments` in isolation, so deleting the strip call from inside the walk reverted
+the whole fix with every test green. The manual probe run at the time had been real and end-to-end;
+the committed test was not, and only the committed test runs again. Replaced with a temp-dir fixture
+page driven through `idsRenderedBy`; deleting the strip call now fails it. Written up as a lesson.
+
+**Second probe-confirmed finding: every reported line number was wrong** — shifted by the comment
+lines above the link, one of them by 33 lines into a different component. Comment bodies are blanked
+in place now rather than deleted. The guard's only diagnostic output is where the broken link is.
+
+Also closed: the walk now seeds from `layout.tsx` as well as `page.tsx` (`Navbar`/`Footer` ids were
+invisible, which would have failed a *working* link and pressured someone to weaken the guard);
+default imports are resolved; query strings before a fragment are matched; two docblocks cited
+ledger files this branch had deleted; and `HomeProcessSection` gained real render coverage in both
+locales, having had none.
+
+**One change was reverted outright.** The navbar tagline had been shortened in English to remove a
+duplicate of the hero `<h1>`. That dropped "& Education" — one of the three pillars the org names —
+which is a content decision, not a deduplication, and it created a third near-identical variant
+rather than removing one. Restored, and the duplication is now a ledger entry instead.
+
+Two findings were accepted as real and **not** fixed, because they are pre-existing and wider than
+this work: `HomeStandardsSection` carries the same diverged-duplicate copy against `home.protocol*`,
+and ~25 dictionary keys still have no reader. Both are in
+`tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`, which argues for a guard test
+rather than another hand-picked sweep. The `<html lang>` gap that had been recorded only in a
+component docblock is now `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`.
+
+## Resumed 2026-10-13 — rounds three and four, and the copy pass
+
+The branch sat for three weeks. On return `master` had gained #93, #100, #102, #94 and #42; each was
+merged in, with `npm run db:generate` after #94 changed the schema. The ledger entry for the test
+flake conflicted twice, because #102 and this branch had independently extended it with the same
+discovery a day apart; resolved to `master`'s version plus only what this branch measured.
+
+**Round three** (asked for as "code review and open PR") found fifteen issues. Four were holes in
+the anchor guard, two of which could have produced a false green: a `//` mid-line cut a live `href`
+out of the scan, and `\bid=` matched the tail of `data-pet-id=`. All fixed in `243412d`, and PR #104
+was opened — **without reviewing `243412d` itself.** That is exactly the case close-out step 6
+names. It was caught only because later work forced another review; written up as a lesson.
+
+**The copy pass** (`f7dd5b2`, asked for directly) gave the bulletin feature one English name after
+finding it answered to seven. No copy convention is written down in `docs/`; the rule used — one
+noun, scope in the qualifier, Title Case — was read off what the markup already did.
+
+**Round four** reviewed everything since round three, and found fourteen more. The ones that changed
+what the PR claimed:
+
+- The copy pass had missed the two most-seen names — the `/bulletins` browser-tab title and the
+  admin sidebar link. Fixed.
+- Adopting the dictionary's step-3 text made the adoption section say **"no hidden fees"** above a
+  section headed "100% Free Adoption Policy". The inline text it replaced was the correct one, and
+  the test had pinned the wrong wording by asserting the right one was absent. Both corrected.
+- With `#how-it-works` restored, the **TNRM** pillar's "Learn More" landed on adoption steps. It
+  now goes to `/faq`, the page that explains TNRM.
+- The guard's comment stripping was rebuilt on TypeScript's parser after a third regex version
+  still had a hole — a `/*` inside `accept="image/*"` swallowed real code. A string-skipping scanner
+  would have been worse: JSX text is full of apostrophes. The parser also showed that inside JSX
+  children `// <X />` is not a comment and renders, which an earlier fixture had asserted the
+  opposite of. Each repair was probed red against the code it replaced.
+- Typing `t()` itself was probed and **not** shipped: 38 errors across nine files, eighteen of which
+  are keys that exist in no dictionary and so render English on the Malay site today — sixteen in
+  the adoption wizard. Filed as `tasks/open/translation-keys-the-dictionary-does-not-have.md`. A
+  `useTypedTranslation()` hook now enforces real keys for the components this branch owns.
+- Sixteen dead `t()` fallbacks in `Footer` were removed; two were kept because their keys exist
+  nowhere and the fallback is the only text there is. A new `Footer` suite pins both, and its first
+  version had a case that could never fail — `container.textContent` glues sibling text together,
+  so a `\b` never matched. Caught by probing it with a dropped live fallback.
+
+## Corrections to this stream's own earlier claims
+
+- "`/pets` and `/bulletins` still pass English `title` props" (under *deliberately not done*) was
+  superseded in `b90304d`: the prop is now a required `titleKey` and both pages pass one.
+- The flake entry was told that "three of the twelve" component failures were hook timeouts. All
+  twelve were timeouts and none an assertion; the three was a count of Vitest's deduplicated error
+  blocks. Corrected in the entry, written up as a lesson.
+- `tasks/open/drift-log-recorded-nothing-for-a-whole-session.md` stated "the hook is firing", from
+  guard-log timing in a log that carries no session id. A controlled count on 2026-10-14 — 140 lines
+  before one call, 140 after — showed the hook wrote nothing at all for this session. Corrected and
+  retitled; also a lesson.
+
+## Round five — reviewing round four's own fix
+
+Run because round four's fix commit was new code, which is the rule this stream records breaking
+once already. Twelve findings; the code ones were each probed red against what they replaced.
+
+- **The parser-based comment stripper had a hole of its own.** Walking into JSDoc tag nodes asked
+  the context-free scanner about positions inside a doc block, where `@param x // note` read as a
+  line comment running past `*/`. A one-line doc followed by code lost the code. JSDoc nodes are now
+  skipped, with a backstop that drops any range starting inside another.
+- **Default imports narrowed silently.** Only `export default function Name` resolved; `export
+  default Panel` and `export default memo(Card)` were dropped with no record. They resolve now, and
+  an unnamable default is reported as a parser gap.
+- **Step 3's wording was wrong a second time.** "Zero adoption fees" over-promised: fees are
+  admin-configurable, and a pet page shows any non-"Free" value. It now says "no commercial adoption
+  fees", the qualified claim this section's own subtitle already makes. Whether the organisation's
+  policy is "free" or "no commercial fee" is left for the owner and recorded in the decision.
+- **The no-provider `t` was a diverged second copy** that put a fallback ahead of the dictionary and
+  never interpolated. Both paths now share one `translate()`.
+- `useTypedTranslation()` returns `{ t, isMs }` and passes params, so `Footer` moved onto it: its
+  seventeen other keys are compile-checked, and its two missing keys are the only untyped calls left
+  in any file this branch touched. Pillar links travel with their pillars instead of being chosen by
+  index, and a new test pins the TNRM link to `/faq` by heading rather than position.
+- Each file is now parsed once by the guard, not twice.
+
+## Round six — reviewing round five's fix
+
+Eleven findings. Two were confirmed by the reviewer's own probe, and both were in code written to
+close the round before:
+
+- **The backstop dropped real comments.** It checked each range against a snapshot that still held
+  ranges it had already discarded, so a fake range found inside a JSDoc — dropped, correctly — then
+  took down a real `{/* <Dead /> */}` that started inside it: a commented-out mount counted as
+  rendered. It is now a sweep against surviving ranges only, which also replaces an unmarked O(n²)
+  scan with a linear one.
+- **The JSDoc test could not fail with the JSDoc skip removed.** After the fix, the skip and the
+  backstop are each sufficient alone, so no outcome test can pin either separately. The outcome is
+  pinned by the reviewer's exact cascade case, and the sweep by a direct test; probing each layer
+  broken alone, then both, gave one failure and then two.
+- `useLanguage`'s no-provider path had no test at all, though the previous round claimed to have
+  fixed it. `Footer` rendered with plain `render` now pins the registration line; probed red
+  against the old fallback.
+- `nav.sponsorWall` stopped being a missing key: the navbar already shipped Malay for the same
+  link inline. Seventeen remain.
+- The "left for the owner" list of free-adoption claims named two of eleven. The full inventory is
+  now its own open entry, because it is a live policy question rather than part of a decision.
+
+Not fixed, and marked: the typed `t` cannot require params for keys with placeholders, because the
+dictionary's values are typed as `string`. Recorded with a `ceiling:` comment and its upgrade path.
+
+## Every finding from rounds six and seven, and what happened to it
+
+The round-six section above said "eleven findings" and accounted for six. A finding that is neither
+fixed nor dismissed with a reason is the part nobody can reconstruct, so both rounds are listed
+whole here.
+
+**Round six** (11):
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Backstop dropped real comments via already-dropped ranges | Fixed: survivors-only sweep |
+| 2 | JSDoc test could not fail with the skip removed | **Not closed in round six — only reworded.** Closed in round seven by removing the skip |
+| 3 | No-provider `t` fix had no test | Fixed: `Footer` rendered with plain `render` |
+| 4 | Owner's free-adoption list incomplete | Moved to its own open entry — whose first version was itself wrong; see round seven |
+| 5 | `nav.sponsorWall` drifted from the navbar's copy | Fixed: one key, read by both |
+| 6 | Typed `t` cannot require params for placeholder keys | Not fixed: marked with a `ceiling:` and its upgrade paths |
+| 7 | Unmarked O(n²) scan in the backstop | Fixed: the sweep is linear |
+| 8 | Stale line numbers in the missing-keys entry | Fixed |
+| 9 | Escaped backticks and a duplicated paragraph in this stream | Fixed |
+| 10 | Blocks recomputed per visit; two per-file caches | Fixed: one cache entry per file |
+| 11 | `Footer` reads the context twice | **Deliberately kept.** It needs one untyped call for `nav.sponsorPortal`, a key that does not exist; the second read is named `untypedT`, commented as that defect, and goes when the key is added |
+
+**Round seven** (14). Its verdict on the code was that it "looks right"; most findings were about what
+the round claimed and recorded.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | JSDoc skip still untested | Fixed by deleting it; disabling the sweep now fails both JSDoc cases |
+| 2 | Free-adoption inventory missing four promises | Fixed: rebuilt from each source line read in context |
+| 3 | Decision still described the pre-fix backstop | Fixed |
+| 4 | `adoptionFeeDog`/`Cat` are read by nothing public | Fixed: the entry now points at the per-pet field, the only one that reaches a page |
+| 5 | Wrong counts — emails, a conditional wizard line, a medical-records line | Fixed: twelve places, two emails, one to applicants |
+| 6 | "Nothing contradicts on screen" was unobserved | Fixed: scoped to seed data and marked ASSERTED |
+| 7 | Round six's dispositions were missing | This table |
+| 8 | Provider docs still said eighteen missing keys | Fixed: seventeen |
+| 9 | `nestedRanges`' doc sat on `stripComments`' doc | Fixed: each doc above its own function |
+| 10 | JSX-text filter was the same unmarked pairwise scan | Marked with a `ceiling:` and its upgrade path |
+| 11 | Navbar half of the shared key unpinned | Fixed: a test opens the menu by hover; probed against a drifted label |
+| 12 | A cheaper way to catch missing params: detect a leftover `{name}` | **Not implemented.** Recorded in the ceiling as the cheaper upgrade path. It changes runtime behaviour for every key and would fail any existing test that renders a placeholder without params — a site-wide change, made at the end of a review loop, would itself need another round |
+| 13 | `visit` looked up the same cache entry three times | Fixed; the now-unused `readStripped` went with it |
+| 14 | `decisions/` entries rewritten in place, against `tasks/README.md` | **Answered, not changed.** These entries exist only on this unmerged branch; nothing has been decided until it merges, and revising a draft is not reversing a record. The README states no exception for drafts. Whether it should is the owner's call |
+
+## Round eight — reviewing round seven's fix
+
+Reviewed `4744020` alone. No correctness bug in the code. It confirmed that deleting the JSDoc skip
+was safe (eight edge cases, identical output). Ten findings were about tests and claims, all
+confirmed by reading the cited lines:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The navbar test works around a real defect: hover opens the desktop menu, click toggles it shut | **Recorded, not fixed:** `tasks/open/desktop-nav-menus-close-on-the-click-that-hover-opened.md`. A site-wide menu behaviour change, and keyboard users depend on the toggle |
+| 2 | The navbar test checked a literal, so English drift passed | Fixed: both languages compared against `translations[lang].nav.sponsorWall`. Probed: an inline `"Sponsor Wall"` now fails the `en` case |
+| 3 | A test comment still described two layers after the skip was deleted | Fixed |
+| 4 | The navbar and footer label three other links differently | **Recorded, not fixed:** added to `tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`. Choosing wording is a copy decision |
+| 5 | The provider doc still kept a missing-key count by hand | Fixed: the count is gone, the doc points at the ledger entry |
+| 6 | The leftover-`{name}` upgrade path was oversold | Fixed: the ceiling now states its limits (rendered keys only, test-only, misfires on braces in a value) |
+| 7 | `importMap` re-read the cache entry `visit` already held | Fixed: `visit` passes the entry |
+| 8 | The JSX-text ceiling's sizes were off by about ten times | Fixed: the measured figures (about 400 nodes, at most 42 ranges) |
+| 9 | A `length > 0` assertion that could never fail | Deleted; `getAllByRole` is the presence check |
+| 10 | A navbar test living in the footer file | Moved to `tests/components/navbar.test.tsx` |
+
+Round eight found no correctness defect and nothing that changes what the PR claims. Its own fixes
+are still new code, so round nine reviews them.
+
+## Round nine — reviewing round eight's fix
+
+Reviewed `131bf8c` and the ledger in `ea724d3`. No product-code defect. It confirmed the ledger's
+menu claim by probe (swapping hover for click fails both language cases), and the ceiling's sizes as
+an upper bound. Three findings, each confirmed against the source:
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The navbar/footer table listed three drifting links; five drift, and `/donate`'s English matches | Fixed: all five, with the mobile labels. **`ea724d3`'s commit message still says three**, and history is not rewritten for it — this row is the correction |
+| 2 | The footer half of `nav.sponsorWall` was pinned only in Malay, against a literal: the gap round eight closed in the navbar | Fixed: both languages against the dictionary. Probed: an inline English `"Sponsor Wall"` in the footer now fails the `en` case |
+| 3 | `importMap`'s new default parameter was never used | Fixed: the entry is a required parameter |
+
+Each of these was the same shape: a fix applied to the case in front of it and not to its twin. That
+was the lesson the review loop kept teaching, so it is written down —
+`tasks/lessons/2026-10-14-a-fix-for-one-half-of-a-pair-must-be-checked-against-the-other.md`.
+
+## Round ten — reviewing round nine's fix
+
+Reviewed `6a92009` and `72a0fd3`. The code is correct: the footer test fails on an inline English
+label, as claimed, and the `importMap` change is safe. The ledger rewrite was wrong again, in the
+commit that wrote the lesson against exactly this. The rewrite claimed to have enumerated every
+`href`, but the enumeration was done from memory. It missed `/bulletins`, a seventh shared link,
+which matches. It left "the other three" one paragraph below a table of five. It listed three of the
+five labels the navbar gives `/pets`, and its English summary named one partial match out of two.
+Round nine's row 1 above repeats that summary and is superseded here.
+
+Fixed by doing what the lesson says: `grep` every `href` literal in both files, intersect the lists,
+and read each label at its line. Seven shared, two match (`/sponsors`, `/bulletins`), five drift;
+every navbar label for each is in the table. Round ten's findings were ledger text only, and this
+fix changes no code, so no round eleven was run on it. **That is a stated gap:** the corrected table
+has been checked only by the grep it came from.
+
+## Round eleven, and the first check against a served build (2026-10-15)
+
+The gap above did not stay open: round eleven reviewed `9c0bebe` the next morning, re-deriving the
+`href` sets from source on its own. Every factual claim held — seven shared, two matching, five
+drifting, every label and key value exact. Two wording nits, both fixed: `/pets` has five labels
+but only three distinct English wordings, and the mobile labels render behind an emoji, so an
+accessible name is not the source string alone.
+
+Until now every claim in this stream was checked by unit, component and integration tests, a build,
+and CI's Playwright golden paths, none of which target these three defects in a browser. The Vercel
+preview is behind Vercel's login, so the production build was served locally with `next start`
+(throwaway secrets — the startup guard also requires `STAFF_INVITE_SECRET`; no `.env.local`, so no
+database) and driven with Playwright from a script outside the repo:
+
+- **#77:** `/` mounts **0** elements with `role="dialog"` or `aria-modal`.
+- **#80:** every same-site link carrying a fragment, collected from `/`, `/pets`, `/bulletins`,
+  `/get-involved`, `/faq` and `/donate`, resolves: `/#how-it-works` and `/get-involved#volunteer`,
+  each linked from all six. Clicking the footer's Adoption Process link on `/pets` lands with the
+  section 96px from the top, below the sticky header.
+- **#78:** with Malay chosen the way the language switch stores it, `/` shows 32 Malay dictionary
+  values and `/bulletins` 16, and **no** English dictionary value of 12 characters or more whose
+  Malay differs. The dictionary was loaded from `translations.ts`, not typed into the script.
+- `<html lang>` read `ms` in the browser and `en` in the served HTML, even with the Malay cookie
+  sent. That is what `tasks/open/served-html-is-english-whatever-language-the-reader-chose.md`
+  says: the provider corrects it after hydration.
+
+The same script at a 390px phone viewport with touch gave identical results. The mobile menu stayed
+closed there, so its links were not collected; none of them carries a fragment (read from
+`Navbar.tsx`), and all but its bulletins link (`nav.bulletins`) use inline ternaries the dictionary
+comparison cannot see. *(From "and all but" to the end of the `#volunteer` sentence, this was
+rewritten after round eleven by the fixes for rounds twelve, thirteen and fourteen.)*
+Four of those are in the drift table above (`/pets` twice, `/donate`,
+`/applications/track`). `/faq` and the `/get-involved` page are not: the footer has no `/faq` link,
+and links that page only at `#volunteer`, which is a table row of its own. What
+this does not cover: a real screen reader, and
+production data — with no database, the bulletin and pet content is whatever the fallback serves.
+
+## Round twelve, and why the loop stops
+
+Round twelve reviewed `457b791` and confirmed every source claim — the `/pets` labels, no fragment in
+the mobile menu, `lang` set client-side, `STAFF_INVITE_SECRET` required by the startup guard, the
+storage key. Two overstatements in my wording, both fixed: the mobile menu's "Browse All Animals"
+button has no emoji (its six text links do), and its bulletins link reads `nav.bulletins` rather
+than an inline ternary. Both re-checked by listing every emoji-bearing line of `Navbar.tsx` with a
+Unicode-property match — `grep -F` on an emoji returned 0 under Git Bash, a false negative.
+
+**Corrected 2026-10-15.** The paragraph that stood here stopped the loop on a false premise, and
+`deea461`'s commit message repeats it; history is not rewritten. The owner then asked for round
+thirteen, and review continued. Rounds ten to seventeen:
+
+| Round | Reviewed | Findings | Disposition |
+|---|---|---|---|
+| 10 | `6a92009` (tests), `72a0fd3` (ledger) | Tests correct. Drift table missed the shared `/bulletins` link and two of `/pets`' five labels, said the other three under a table of five, and named one English partial match out of two | Table rebuilt from a grep (`9c0bebe`) |
+| 11 | `9c0bebe` (ledger) | Five `/pets` wordings claimed, three in English; mobile emoji prefix not mentioned | Fixed (`457b791`) |
+| 12 | `457b791` (ledger) | Said each mobile label renders behind an emoji, but one button has none; said its labels are inline ternaries, but bulletins reads its key | Fixed (`deea461`) |
+| 13 | `deea461` (ledger) | Loop-stop premise false, also in its commit message; a sentence implied every inline mobile label is in the drift table | Two fixed (`3d455db`); commit message recorded only |
+| 14 | `3d455db` (ledger) | Round twelve misdescribed; an unmarked in-place edit; a finding count that called a recorded item fixed; an ambiguous sentence about footer links | Fixed (`0fff8b5`) |
+| 15 | `0fff8b5` (ledger) | The table sorted rounds eleven and twelve by different standards; an in-place edit marker omitted round twelve and the `#volunteer` sentence; round fourteen had no dispositions; the code-defect sentence did not say only round ten had code in scope | Fixed (`5b149c3`) |
+| 16 | `5b149c3` (ledger) | A causal sentence omitted the owner's request; a motive claim; a claim the record no longer labels rounds; row 15 misdescribed; the lesson labelled findings and paraphrased inside quotation marks; long lines | Fixed (`78aa18c`) |
+| 17 | `78aa18c` (ledger) | Each round since was said of rounds ten to sixteen; row 15 misdescribed again; the lesson quoted a phrase not in the record; a rewrap dropped two words; row 16 had no hash; that commit's message counts four rewrites where the record shows three | Fixed by the commit after `78aa18c`; the commit message recorded only |
+
+Only round ten had code in scope, and that code was correct.
+
+## Round thirteen, and an accessibility-tree check
+
+Reviewed `deea461`. No code defect; every Navbar claim held when re-derived (six emoji lines, the
+button without one, bulletins on its key, no mobile fragment). Three findings: two fixed — the false
+loop-stop premise above, and a sentence implying every inline mobile label is in the drift table —
+and one recorded but not fixed, the same premise in `deea461`'s commit message.
+
+A real screen reader was not available, so the production build was served locally again and
+Playwright's accessibility snapshot — what assistive technology is handed — was read on `/` and
+`/bulletins` with Malay chosen. `lang` is `ms` after hydration on both. Every heading is Malay, in
+order (`/`: one h1, then h2/h3 sections; `/bulletins`: h1 "Buletin Pusat Perlindungan", h2 "Semua
+Buletin"), except the bulletin's own title — content, which has no Malay column, already out of
+scope. No English dictionary value is in either tree, and no link lacks an accessible name. This is
+the tree a screen reader reads from, not a screen reader's behaviour: announcement order, and how a
+pre-hydration `lang="en"` is spoken, remain unverified.
+
+**What still needs the owner:** the Vercel preview is behind Vercel's login, and no browser tool
+here carries that login, so the branch has not been seen against real data.
+
+## Merged with #109, #103 and #113 (2026-10-15)
+
+#109 merged cleanly (`940f6d7`); none of this branch's ledger line citations moved. Then, as the
+owner asked for the PR to be merged, #103 and #113 landed and the PR went conflicting, so it was not
+merged; `master` was merged in first (`2a618b6`).
+
+#103 rebuilt the bulletin feed this branch had translated: a read-only Server Component fed by a
+server store, no admin controls, category labels lifted into a shared presentation table. The
+resolution keeps all of that and translates through it — a `Translated` client leaf per fixed
+string, `labelKey` added to #103's table rather than a second map, master's server-read
+`bulletins` plus this branch's `titleKey` on each page, master's admin sidebar unchanged, #103's
+outage-safe empty-state wording in both languages, and the removed toggle's two keys deleted. The
+Malay test of that toggle now pins its absence. Two probes: an English chip label fails five cases,
+an added button fails two.
+
+Records corrected for it: the bulletin admin-chrome decision (its named exception no longer
+exists), two open entries describing the old feed, and the same drift-log entry filed by both
+branches, now one entry with the second session's observation kept. Bulletins now store Malay text
+(#103) that the public feed does not yet render, by #103's decision; the out-of-scope note says so.
+
+On the merged tree: `npm run check` 0 errors and 13 warnings, the new one in #103's
+`BulletinFormDialog.tsx`; unit 104 files, 1820 tests; components 18 files, 228; integration 92;
+build compiled with `/` and `/bulletins` static. The served-build browser checks passed unchanged,
+plus a new one: `/pets`' feed heading in both languages, with no button in the feed.
+
+## Review of the merge resolution
+
+Reviewed `2a618b6` and `95679b7`: nothing from #103 or #113 lost or altered — every conflicted file
+was compared with `master`'s. Three findings, each confirmed and fixed:
+
+| Finding | Disposition |
+|---|---|
+| #103 handed the render side of the Malay bulletin columns to the entry this branch settles and deletes. The delete merged silently, leaving four pointers to a missing file and no owner | New entry `tasks/open/bulletin-malay-text-is-stored-but-not-rendered.md`; the four pointers in `schema.prisma`, `bulletinRepository.ts` and #103's decision now name it. The two mentions in other sessions' streams are left as written |
+| The no-staff-control test checked buttons only; an "Edit notices" link passed it | Also asserts no link. Probed: that link now fails both languages |
+| The admin's English category `label` and the dictionary's English could drift apart | `tests/unit/bulletinPresentation.test.ts` pins them equal and the Malay distinct. Probed: relabelling one fails it |
+
+Its fixes were reviewed in turn. One finding: the no-link case rendered only a text notice, so a link
+added inside the video or image branch passed it. It now renders one notice of each media type;
+probed with a link in each branch, and both fail. That review also confirmed every claim in the new
+open entry and that the schema change is comments only (`prisma validate` passes).
+
+## Verification
+
+As of round seven, on the tree merged with `master` at `187593c` (current figures are in the
+section above):
+
+- `npm run check` — 0 errors, 12 pre-existing warnings, one fewer than at the base.
+- `npx vitest run --project unit` — 100 files, **1614 tests**; 0 assertion errors, 0 timeouts.
+- `npx vitest run --project components` — 15 files, **213 tests**; 0 assertion errors, 0 timeouts.
+- `npm run test:integration` — 9 files, **92 tests**.
+- `npm run build` — compiled; `/` and `/bulletins` both still `○ (Static)`.
+
+Both full tiers were green on this run and timeout-red on others; that is
+`tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, and one green run is a data
+point, not a fix. Each new suite was run against the unfixed code first and observed failing, and
+every repair to the guard was re-probed by breaking it again afterwards.
+
+Two gaps in the record, stated so nobody infers more than happened. `f7dd5b2`'s commit trailer
+named only a subset of the component suite and no unit run, for a change to the dictionary; the
+parity test was run afterwards and passes, so the gap is in the record rather than the code. And
+one `homeMalay` run on 2026-10-14 reported a single failure whose error was not captured, because
+its output had been filtered to the summary line; three runs immediately after were green, and it
+is recorded as unexplained rather than attributed to the flake.
