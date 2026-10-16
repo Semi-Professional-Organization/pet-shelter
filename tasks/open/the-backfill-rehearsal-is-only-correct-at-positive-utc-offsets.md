@@ -86,7 +86,7 @@ the app reads one year, with no refusal. The backfill now refuses any age contai
 string, a unit the app reads and it does not, and any age containing a non-ASCII character. (A
 word neither side reads is not refused by that check: `1 year 6 mons` is stored as one year. A
 bare `6 mons` is still refused, as having no unit the backfill reads.) The same check
-reproduces expand's J1 and J3 over eight mixed strings and ten non-ASCII ones to show the
+reproduces expand's J1 and J3 over its mixed and non-ASCII fixtures to show the
 pre-check agrees with the file, verdict by verdict. Settled in
 `tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md` and
 `tasks/decisions/2026-10-15-the-backfill-refuses-any-non-ascii-age.md`. The count is printed by

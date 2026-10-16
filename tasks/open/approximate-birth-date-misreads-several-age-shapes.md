@@ -13,13 +13,11 @@ and agree. The app results were re-run on 2026-10-16 against `master` at `d6dd03
 **Where it reaches today.** Since #94 the pet form collects a birthday directly, so this function
 runs only for a record with no `birthDate`: chiefly a pet saved to browser `localStorage` before
 #94, on first render. That is narrow, and widens the moment the known `petStore.ts` mount-effect
-defect is fixed. Since PR #113 merged on 2026-10-15, the contract rehearsal also imports this
-function, but compares the two only on its `AGREED` and `APP_ONLY` lists and the first three
-`NON_ASCII` strings (`rehearse.mjs` lines 352, 386 and 455–459 on `master` at `d6dd030`), none
-of which this function misreads. Its other lists do contain shapes below: `1.5 years`, the dash
-ranges `3–4 years` and `2—3 years`, and `1½ years`. Those are only checked to be refused by the
-backfill, never compared with this function, so these defects do not reach that comparison
-today. Extending the comparison to those lists would expose them.
+defect is fixed. Since PR #113 merged on 2026-10-15, the contract rehearsal
+(`prisma/migrations/manual/20260922_pets_birth_date_contract/rehearse.mjs`) also imports this
+function and pins some of its outputs. **Fixing a misread here can therefore fail that
+rehearsal.** For example, it expects `1` + U+0085 + `year 6 months` to read as six months
+(2025-12-12), which is itself a misread. Re-check its expectations when changing this function.
 
 ## Regressions PR #42 introduced
 
@@ -117,14 +115,15 @@ Not a future risk. `1 tahun 6 months`: the app tries years first, reads `tahun`,
 year (2025-06-12). The backfill reads English units only, skips `tahun`, finds `6 months`, and
 **stores** six months (2025-12-12) — no refusal, because the string has a unit it reads and is not
 fractional. `2 tahun 3 months` does the same. Confirmed against a real Postgres (pglite) in an
-earlier review and again with the pattern emulator. The expand migration on `master` is queued for
-an owner to apply, so this was a silent wrong write waiting to happen. **Closed by PR #113,
+earlier review and again with the pattern emulator. The expand migration on `master` was then
+queued for an owner to apply, so this was a silent wrong write waiting to happen. **Closed by PR #113,
 merged 2026-10-15:** the backfill now refuses any age containing, anywhere in the string, a unit
 the app reads and the backfill does not (`tahun`, `thn`, `bulan`, `bln`, `minggu`, `mggu`,
 `week(s)`, `wk(s)`, `mnth(s)`, `yo`), and any age containing a non-ASCII character
 (`tasks/decisions/2026-10-14-the-backfill-refuses-any-age-with-a-unit-it-does-not-read.md`). A
-word neither side reads as a unit, such as `mons` in `1 year 6 mons`, is not refused. Reasoned
-from the pattern, not run: the backfill then reads `1 year`, as the app does.
+word neither side reads as a unit, such as `mons` in `1 year 6 mons`, is not refused. Run on
+pglite against `master` at `d6dd030`: the backfill stores `1 year 6 mons` as one year
+(2025-06-12), as the app reads it, and still refuses a bare `6 mons`.
 
 **Settles when:** the remaining defects are fixed and pinned by tests: the compact compounds and
 unlisted spellings; decimals, ranges and in-range junk counts (an "age unknown" result, or a
