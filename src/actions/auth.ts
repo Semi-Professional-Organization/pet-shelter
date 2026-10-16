@@ -216,8 +216,9 @@ export async function registerAction(data: {
   // address budget is what makes the invite guard below non-enumerable, and it
   // only works because the email is absent from its key.
   //
-  // `register:${email}` alone was the defect — `src/lib/security/secrets.ts`
-  // names it at getStaffInviteSecret(): the email is attacker-supplied, so a
+  // `register:${email}` alone was the defect — recorded in
+  // `tasks/decisions/2026-09-08-rate-limit-keys-carry-no-attacker-supplied-value.md`:
+  // the email is attacker-supplied, so a
   // caller walking the invite code just varies the address and draws a fresh
   // 5-per-minute budget on every single request. Folding the IP *into* that key
   // as `register:${ip}:${email}` does not fix it and is strictly worse: a

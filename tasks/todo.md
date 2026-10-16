@@ -15,6 +15,38 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# A short staff invite code no longer takes the site down
+
+**Branch:** `fix/invite-code-any-length` · opened 2026-10-17 · base `d6dd030`
+
+On 2026-10-17 a new `STAFF_INVITE_SECRET` under 16 characters failed the startup secret check,
+and every public page returned 500. The owner chose to make the code's length their call. A
+short code now boots with a warning, and the risk accepted is in
+`tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
+
+- [x] `allowShort` and `published` on `resolveSecret`. Only the "short" kind of weakness is
+      waived. Unset, the dev default, and published credentials (`HOPE2026`, `1234`, the
+      seeded staff passwords) are still refused.
+- [x] The `.env.example` test and the operator-file guard call the real accessors.
+- [x] Four `/code-review high` rounds. Findings fixed included the legacy published codes
+      booting, an overstated risk claim in the decision, and a guard floor that would have
+      failed on prose.
+
+## Review
+
+**Verified:** `npm run check`, 0 errors. `npm run test:all` all passing. `npm run build`
+exit 0. `next start` checks: a 4-character code serves pages with 200 and logs the warning
+without the value; `HOPE2026`, `admin123` and the dev default refuse to boot. Mutants are
+listed in the decision entry.
+
+**Deliberately not done:**
+
+- No minimum length below 16: the owner's choice.
+- Not limiting a weak secret's damage to the feature it gates (option 2): the better design,
+  but not chosen. It is the upgrade path in the `ceiling:` comment, and until it lands any
+  *other* weak secret still takes the site down at boot.
+- The rate limiter stays per-process, so it does not bound guessing on serverless hosts.
+
 # The backfill rehearsal checks the real age function
 
 **Branch:** `fix/rehearsal-checks-the-real-age-function` · opened 2026-10-14 · follows #94 and #42

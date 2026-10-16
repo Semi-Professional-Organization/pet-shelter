@@ -73,6 +73,10 @@ again by varying the email. That is the honest state — an untrustworthy addres
 anything — but it means the variable has to be set. Recorded on `getStaffInviteSecret()`, which is
 why its 16-character minimum stays.
 
+> **Superseded 2026-10-17:** the invite code's minimum no longer stays. The owner made its length
+> their call, and a short code now boots with a warning. See
+> `tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
+
 ## The pattern under all three
 
 Every one was a **security control that reads correctly and does nothing**, which is the same shape

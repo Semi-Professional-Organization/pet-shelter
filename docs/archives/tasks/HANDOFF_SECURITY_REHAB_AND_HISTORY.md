@@ -61,6 +61,10 @@ reports **every** failure at once, so one deploy cycle fixes them all.
 
 ### The invite code minimum is 16 characters, and 4 was rejected
 
+> **Superseded 2026-10-17.** The owner made the invite code's length their own call: a short
+> code now boots with a warning, and the test described below was replaced. See
+> `tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
+
 A 4-character minimum was proposed and declined. `registerAction`'s rate limit is keyed
 `register:${email}` — **a value the caller supplies** — so varying the email defeats it entirely,
 and the in-memory limiter does not survive a restart or scale horizontally. That leaves a short

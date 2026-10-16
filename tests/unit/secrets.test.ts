@@ -245,7 +245,9 @@ describe("assertSecretsConfigured", () => {
       // Distinctive values that cannot collide with the message's own wording.
       vi.stubEnv("SESSION_SECRET", "zqxvw1");
       vi.stubEnv("ADMIN_SECRET_KEY", "jkmpq2");
-      vi.stubEnv("STAFF_INVITE_SECRET", "bhtrv3");
+      // A published code in an unusual case: short codes now boot, so this is
+      // what makes the invite path fail and put its own line in the message.
+      vi.stubEnv("STAFF_INVITE_SECRET", "HoPe2026");
 
       let message = "";
       try {
@@ -254,19 +256,79 @@ describe("assertSecretsConfigured", () => {
         message = (error as Error).message;
       }
 
+      expect(message).toMatch(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
       expect(message).not.toMatch(/zqxvw1/);
       expect(message).not.toMatch(/jkmpq2/);
-      expect(message).not.toMatch(/bhtrv3/);
+      expect(message).not.toMatch(/hope2026/i);
     });
 
-    // A 4-character invite code was proposed; it is rejected because the
-    // registration rate limit is keyed on the attacker-supplied email.
-    it("rejects a 4-character staff invite code", () => {
+    // The invite code's length is the operator's call
+    // (tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md).
+    // A short one used to fail the boot check and take every public page down.
+    it("boots with a 4-character staff invite code, and warns without the value", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
-      vi.stubEnv("STAFF_INVITE_SECRET", "1234");
+      vi.stubEnv("STAFF_INVITE_SECRET", "q7z4");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(getStaffInviteSecret()).toBe("q7z4");
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/STAFF_INVITE_SECRET.*recommended 16/));
+      expect(warn.mock.calls.flat().join(" ")).not.toMatch(/q7z4/);
+    });
+
+    it("still refuses the published development default as the invite code", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET);
 
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+    });
+
+    // Short, so allowShort alone would accept them; refused because this
+    // repository publishes them, whatever the letter case.
+    it.each(["HOPE2026", "1234", "hope2026"])("still refuses the published invite code %s", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+    });
+
+    // The seeded staff passwords are published too, and short enough that the
+    // old minimum refused them. Reused from the one list that holds them.
+    it.each(["admin123", "STAFF123", "vol123"])("refuses the published staff password %s as the invite code", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+    });
+
+    // Matching case variants of a dev default would be a new boot refusal for
+    // every secret, the outage this policy change removes; it stays exact.
+    it("still boots a session secret that is only a case variant of its dev default", () => {
+      vi.stubEnv("SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET.toUpperCase());
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+    });
+
+    it("still refuses a whitespace-only invite code", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", "   ");
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+    });
+
+    it("keeps the length minimum for every other secret", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", "short-admin");
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY/);
     });
   });
 
@@ -282,6 +344,28 @@ describe("assertSecretsConfigured", () => {
       vi.spyOn(console, "warn").mockImplementation(() => {});
 
       expect(() => assertSecretsConfigured()).not.toThrow();
+    });
+
+    it("says a published value is used as configured, not that a fallback is in use", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", "HOPE2026");
+
+      expect(getStaffInviteSecret()).toBe("HOPE2026");
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/publishes; using it as configured/));
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/fallback/));
+    });
+
+    it("still warns that the invite code is short after warning that it was unset", () => {
+      // warnOnce used to be keyed on the name alone, so the first warning
+      // swallowed every later one for the same secret.
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", "q7z4");
+      getStaffInviteSecret();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/not set/));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/shorter than the recommended 16/));
     });
 
     it("surfaces the warning for each weak secret once, at startup", () => {
@@ -323,10 +407,13 @@ describe(".env.example authentication secrets", () => {
     }
   }
 
+  // Each with the app's own accessor, so the "refuses to boot" check below runs
+  // the policy the app runs (including `allowShort` on the invite code) rather
+  // than a second copy of it.
   const SECRETS = [
-    ["SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET, 32],
-    ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY, 16],
-    ["STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET, 16],
+    ["SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET, getSessionSecret],
+    ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY, getAdminSecretKey],
+    ["STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET, getStaffInviteSecret],
   ] as const;
 
   beforeEach(() => {
@@ -342,12 +429,13 @@ describe(".env.example authentication secrets", () => {
     expect(documented[name]).toBe(devDefault);
   });
 
-  it.each(SECRETS)("refuses to boot production with the documented %s", (name, devDefault, minLength) => {
+  it.each(SECRETS)("refuses to boot production with the documented %s", (name, _devDefault, accessor) => {
     expect(documented[name], `${name} is not documented in .env.example`).toBeDefined();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv(name, documented[name]);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    expect(() => resolveSecret(name, { devDefault, minLength })).toThrow(SecretConfigurationError);
+    expect(() => accessor()).toThrow(SecretConfigurationError);
   });
 
   it("names EMAIL_FROM rather than the unread SENDER_EMAIL", () => {
@@ -379,10 +467,13 @@ describe(".env.example authentication secrets", () => {
  * itself must refuse each published value under `NODE_ENV=production`.
  */
 describe("no operator-facing file publishes a secret that boots in production", () => {
+  // The app's own accessors, not a copy of their options, so this guard tests
+  // exactly what production accepts. A short invite code now boots, so a
+  // published one fails here; what the scan reads is set out in `collect`.
   const GUARDED = {
-    SESSION_SECRET: { devDefault: DEV_SECRET_DEFAULTS.SESSION_SECRET, minLength: 32 },
-    ADMIN_SECRET_KEY: { devDefault: DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY, minLength: 16 },
-    STAFF_INVITE_SECRET: { devDefault: DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET, minLength: 16 },
+    SESSION_SECRET: getSessionSecret,
+    ADMIN_SECRET_KEY: getAdminSecretKey,
+    STAFF_INVITE_SECRET: getStaffInviteSecret,
   } as const;
   type GuardedName = keyof typeof GUARDED;
   const NAMES = Object.keys(GUARDED) as GuardedName[];
@@ -414,9 +505,15 @@ describe("no operator-facing file publishes a secret that boots in production", 
       /^[A-Z][A-Z0-9_]*$/.test(value) ||
       value.includes("/") ||
       /\.(ts|tsx|mjs|js|json|md|env)$/.test(value) ||
-      /^[A-Z][A-Za-z]+Error$/.test(value)
+      /^[A-Z][A-Za-z]+Error$/.test(value) ||
+      // Placeholders an operator replaces, not values: <your-code>, ..., $VAR, #.
+      /^(<.*>|\.{3,}|\$.*|#.*)$/.test(value)
     );
   }
+
+  const QUOTED_8_PLUS = /[`"']([^`"']{8,})[`"']/g;
+  /** `NAME=value` with no quotes, as in an env block in a runbook. */
+  const UNQUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=\s*([^\s"'`]+)/g;
 
   type Published = { file: string; line: number; name: GuardedName; value: string };
 
@@ -429,8 +526,15 @@ describe("no operator-facing file publishes a secret that boots in production", 
         const named = NAMES.filter((n) => line.includes(n));
         if (named.length !== 1) return; // a line listing several names states no value
         const name = named[0];
-        for (const match of line.matchAll(/[`"']([^`"']{8,})[`"']/g)) {
-          const value = match[1];
+        // An unquoted `NAME=value` is always a value, so it is read at any length.
+        // A quoted token may be prose ("strong", "none"), so it is read only at
+        // 8+ characters. ceiling: a 4-7 character invite code written in quotes
+        // inside a sentence is not scanned; one in an env block is.
+        const values = [
+          ...[...line.matchAll(QUOTED_8_PLUS)].map((m) => m[1]),
+          ...[...line.matchAll(UNQUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[2]),
+        ];
+        for (const value of values) {
           if (value === name || (NAMES as string[]).includes(value)) continue;
           if (looksLikeCode(value)) continue;
           out.push({ file, line: index + 1, name, value });
@@ -463,17 +567,13 @@ describe("no operator-facing file publishes a secret that boots in production", 
   });
 
   it.each(published.map((p) => [`${p.file}:${p.line} ${p.name}`, p] as const))(
-    "%s is refused by resolveSecret under NODE_ENV=production",
+    "%s is refused by its accessor under NODE_ENV=production",
     (_label, entry) => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv(entry.name, entry.value);
 
-      expect(() =>
-        resolveSecret(entry.name, {
-          devDefault: GUARDED[entry.name].devDefault,
-          minLength: GUARDED[entry.name].minLength,
-        })
-      ).toThrow(SecretConfigurationError);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(() => GUARDED[entry.name]()).toThrow(SecretConfigurationError);
     }
   );
 });

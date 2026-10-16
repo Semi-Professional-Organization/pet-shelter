@@ -42,7 +42,10 @@ All eight from §1. Generate each secret with:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Minimums enforced by `src/lib/security/secrets.ts`: `SESSION_SECRET` 32 characters, the other two 16.
+Minimums enforced by `src/lib/security/secrets.ts`: `SESSION_SECRET` 32 characters,
+`ADMIN_SECRET_KEY` 16. `STAFF_INVITE_SECRET` has a *recommended* 16: a shorter value boots with a
+warning in the logs, so check the logs, not the boot, for it. The legacy invite codes this
+repository publishes are refused at any length.
 A value equal to that secret's `DEV_SECRET_DEFAULTS` entry is rejected, which is why `.env.example`
 publishes those exact defaults — copying it verbatim into production refuses to boot by design.
 

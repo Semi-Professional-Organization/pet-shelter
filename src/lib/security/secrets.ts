@@ -12,14 +12,22 @@
  * | `production`             | throw — fail the boot loudly rather than serve forgeries    |
  * | `development` / `test`   | return a clearly-labelled dev default and warn once         |
  *
- * "Weak" covers three cases: unset (or whitespace), shorter than `minLength`,
- * and *equal to the documented development default* — the last one is what
- * catches an `.env.example` value copied verbatim into a real deploy.
+ * "Weak" covers four cases: unset (or whitespace), *equal to the documented
+ * development default* (which catches an `.env.example` value copied verbatim
+ * into a real deploy), equal to a value listed in `published`, and shorter than
+ * `minLength`.
  *
- * This module deliberately imports nothing from the project (layer L-B5): it
- * sits below the rest of `src/lib/security/` and must stay importable from any
- * layer, server or client-adjacent, without dragging dependencies in.
+ * One exception: an accessor may pass `allowShort`, which turns "shorter than
+ * `minLength`" alone into a warning. Only `STAFF_INVITE_SECRET` does. The other
+ * three cases are refused regardless.
+ *
+ * This module imports nothing from the project except `./publishedPasswords`,
+ * which itself imports nothing (layer L-B5): it sits below the rest of
+ * `src/lib/security/` and must stay importable from any layer, server or
+ * client-adjacent, without dragging dependencies in.
  */
+
+import { PUBLISHED_STAFF_PASSWORDS } from "./publishedPasswords";
 
 /** Raised when a secret cannot be resolved safely in production. */
 export class SecretConfigurationError extends Error {
@@ -38,6 +46,19 @@ export interface ResolveSecretOptions {
   devDefault: string;
   /** Minimum acceptable length for a configured value. Defaults to 16. */
   minLength?: number;
+  /**
+   * When true, a configured value shorter than `minLength` is *accepted* in
+   * production, with a warning recommending `minLength`. A missing value, the
+   * development default and a `published` value are still refused: none of them
+   * is a length the operator chose.
+   */
+  allowShort?: boolean;
+  /**
+   * Values this repository has published, refused in production whatever their
+   * length, compared case-insensitively. Checked before `allowShort`, so a short
+   * published value is refused, not waived.
+   */
+  published?: readonly string[];
 }
 
 /**
@@ -50,6 +71,26 @@ export const DEV_SECRET_DEFAULTS = {
   STAFF_INVITE_SECRET: "dev-only-insecure-staff-invite-code-change-me",
 } as const;
 
+/**
+ * Invite codes this repository has published, as hardcoded literals that once
+ * bypassed the configured secret (`tests/unit/auth.test.ts` pins that they no
+ * longer do). The 16-character minimum used to refuse them in production; with
+ * `allowShort` it would not, so they are refused by name.
+ *
+ * The seeded staff passwords are refused too, from the one list that already
+ * holds them (`./publishedPasswords`): they are 8-10 characters, so the old
+ * minimum refused them as well.
+ *
+ * Deliberately only values the app once *accepted as credentials*. Every string
+ * in a public repository is readable, test fixtures included, and no list can
+ * hold them all; that is what the length recommendation is for.
+ */
+const PUBLISHED_INVITE_CODES: readonly string[] = [
+  "HOPE2026",
+  "1234",
+  ...PUBLISHED_STAFF_PASSWORDS,
+];
+
 /** Minimum length for the HMAC key that signs every session cookie. */
 const SESSION_SECRET_MIN_LENGTH = 32;
 
@@ -59,20 +100,40 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
+/** Why a configured value is unacceptable. `short` is the only kind `allowShort` waives. */
+type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; description: string };
+
 /**
  * Describes why a configured value is unacceptable, or `null` when it is fine.
  * The description never includes the value itself — these strings reach logs.
  */
-function describeWeakness(value: string, devDefault: string, minLength: number): string | null {
-  if (value.length === 0) return "not set";
-  if (value === devDefault) return "still set to the documented development default";
-  if (value.length < minLength) return `shorter than the required ${minLength} characters`;
+function describeWeakness(
+  value: string,
+  devDefault: string,
+  minLength: number,
+  published: readonly string[]
+): Weakness | null {
+  if (value.length === 0) return { kind: "unset", description: "not set" };
+  // Exact, as it always was. Matching case variants too would be a new way to
+  // refuse the boot for every secret, which is the outage this policy change
+  // is meant to remove; `published` is case-insensitive because it is new.
+  if (value === devDefault) {
+    return { kind: "dev-default", description: "still set to the documented development default" };
+  }
+  const lowered = value.toLowerCase();
+  if (published.some((p) => p.toLowerCase() === lowered)) {
+    return { kind: "published", description: "set to a value this repository publishes" };
+  }
+  if (value.length < minLength) {
+    return { kind: "short", description: `shorter than the required ${minLength} characters` };
+  }
   return null;
 }
 
-function warnOnce(name: string, message: string): void {
-  if (warnedSecrets.has(name)) return;
-  warnedSecrets.add(name);
+/** Once per secret *and* reason, so an earlier warning cannot swallow a later, different one. */
+function warnOnce(key: string, message: string): void {
+  if (warnedSecrets.has(key)) return;
+  warnedSecrets.add(key);
   console.warn(message);
 }
 
@@ -80,26 +141,44 @@ function warnOnce(name: string, message: string): void {
  * Resolves a secret from the environment under the policy described above.
  *
  * @throws {SecretConfigurationError} in production when the value is missing,
- * too short, or equal to the documented development default.
+ * equal to the documented development default, equal to a `published` value,
+ * or shorter than `minLength` — the last only when `allowShort` is not set.
  */
 export function resolveSecret(name: string, opts: ResolveSecretOptions): string {
   const minLength = opts.minLength ?? 16;
   const value = (process.env[name] ?? "").trim();
-  const weakness = describeWeakness(value, opts.devDefault, minLength);
+  const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published ?? []);
 
   if (!weakness) return value;
 
+  if (opts.allowShort && weakness.kind === "short") {
+    // Only the length is wrong, and for this secret the operator may choose that.
+    warnOnce(
+      `${name}:${weakness.kind}`,
+      `[security/secrets] ${name} is shorter than the recommended ${minLength} ` +
+        `characters. It is accepted, but a short value is easier to guess.`
+    );
+    return value;
+  }
+
   if (isProduction()) {
+    const length = opts.allowShort
+      ? `${minLength}+ characters recommended`
+      : `at least ${minLength} characters`;
     throw new SecretConfigurationError(
-      `${name} is ${weakness}. Set a unique, high-entropy ${name} of at least ` +
-        `${minLength} characters in the production environment. See .env.example.`
+      `${name} is ${weakness.description}. Set a unique, high-entropy ${name} (${length}) ` +
+        `in the production environment. See .env.example.`
     );
   }
 
+  // Only an unset value is replaced with the fallback; anything else is used as
+  // configured, so say which, rather than claim a fallback that is not in use.
+  const used =
+    weakness.kind === "unset" ? "using an insecure development fallback" : "using it as configured";
   warnOnce(
-    name,
-    `[security/secrets] ${name} is ${weakness}; using an insecure development ` +
-      `fallback. This configuration refuses to boot with NODE_ENV=production.`
+    `${name}:${weakness.kind}`,
+    `[security/secrets] ${name} is ${weakness.description}; ${used}. ` +
+      `This configuration refuses to boot with NODE_ENV=production.`
   );
 
   return value.length === 0 ? opts.devDefault : value;
@@ -127,23 +206,37 @@ export function getAdminSecretKey(): string {
  * takes effect without a redeploy. `assertSecretsConfigured()` covers the
  * fail-fast half; this accessor covers the rotation half.
  *
- * Keeps the default 16-character minimum deliberately. A shorter bound (4 was
- * proposed) is not defensible here: this single shared code is the only gate on
- * an account that can read applicant PII under PDPA 2010.
+ * **Recommended: 16 or more random characters.** Shorter is accepted, with a
+ * warning, because the owner decided the length is theirs to choose
+ * (`tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`).
+ * A short code that failed the boot check used to take the *whole public site*
+ * down, not just registration.
  *
- * That bound used to be the *only* thing standing between this code and
- * enumeration, because the registration rate limit was keyed on
- * `register:${email}` — an attacker-supplied value, so varying the email defeated
- * it. `registerAction` now also spends an independent `register:ip:` budget that
- * holds nothing the caller controls
- * (`tasks/decisions/2026-09-08-rate-limit-keys-carry-no-attacker-supplied-value.md`).
- * The length minimum still carries the weight wherever that budget cannot run —
- * see the ceiling on `getClientAddress()`, which declines to trust a forwarding
- * header no proxy vouches for — so it stays 16.
+ * Why 16 is still the recommendation: this single shared code is the only gate
+ * on an account that can read applicant PII under PDPA 2010. `registerAction`
+ * spends a `register:ip:` budget that holds nothing the caller controls
+ * (`tasks/decisions/2026-09-08-rate-limit-keys-carry-no-attacker-supplied-value.md`),
+ * but wherever that budget cannot run — see the ceiling on `getClientAddress()`,
+ * which declines to trust a forwarding header no proxy vouches for — the code's
+ * length is all that bounds guessing it.
+ *
+ * Still refused at boot: unset, because this policy fails fast on a missing
+ * secret rather than on the first registration (`registerAction` would refuse
+ * an empty submitted code anyway); and the development default and
+ * `PUBLISHED_INVITE_CODES`, because this repository publishes them.
+ *
+ * ceiling: no lower bound on a configured code, so even one character boots.
+ * The rate limit does not make up for it: `checkRateLimit` is a per-process Map,
+ * so each warm serverless instance counts separately, and a botnet is bounded by
+ * neither the per-address nor the per-email budget (see the ceiling in
+ * `registerAction`). Upgrade path: let a weak code disable registration only,
+ * not the boot (option 2 in the decision), or move the limiter to shared state.
  */
 export function getStaffInviteSecret(): string {
   return resolveSecret("STAFF_INVITE_SECRET", {
     devDefault: DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET,
+    allowShort: true,
+    published: PUBLISHED_INVITE_CODES,
   });
 }
 
