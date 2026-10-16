@@ -41,26 +41,27 @@ Record active multi-step work streams below.
 
 ## Review
 
-- `/code-review high`, rounds tallied from each round's report (each finding probed):
+- `/code-review high`, one row per round: the finding count from that round's report, and the
+  commit that responded to it, whose message describes the response.
 
-  | round | findings | outcome |
+  | round | findings | responding commit |
   |---|---|---|
-  | 1 | 9 — the fractional refusal returns a newborn; word ranges missed; list false positives (`Born 2022, 3 yrs`); a parity test the backfill contradicts; non-ISO leak; duplication; wrong level; no `ceiling:` marker; weeks claim | refusal withdrawn; the pre-existing sixty-year ceiling kept with its docblock corrected; ISO fall-through added |
-  | 2 | 7 — eager `isoDate` throw on intake; cap makes a newborn; wrong depth; `Date.UTC` 0–99; `Omit` union; weeks cap 5 days short; eager allocation | cap and ISO fall-through replaced by an overflow guard; union declined |
-  | 3 | 8 — overflow becomes the intake date; century; union; untracked decision; non-monotonic; raw intake; no marker; closure | clamp, `setUTCFullYear`, marker; union declined |
-  | 4 | 8 — range check before the arithmetic (code); `isoDateSchema`; 0–99 scope; form; docstring; decision cite; wording; stream | arithmetic moved first; others corrected or declined |
-  | 5 | 8 — stale merge claim; wrong `isoDateSchema` reason; two-digit intake to 26 AD (code); copy divergence; extended-year zone; lesson; discrimination overstated; `TZ` unverified | `setUTCFullYear` reverted; `TZ` checked in PowerShell |
-  | 6 | 7 — wrong "list render" claim; `petRepository` maps inside its `try` (altitude); unconditioned intake claim; unprobed form claim; third validator; closure; literal | claims corrected; an open entry written on the repository claim; style declined |
-  | 7 | 9 — that repository path is unreachable (no `age` field), plus claims built on it and a stale #113 reason | entry deleted unpublished; claims corrected |
-  | 8 | 7 — `usePetStore`'s mount effect discards derivation (a pre-existing code defect, outside the diff); six false claims, in the docstring, the decision, the table-has-no-`age` wording, the lesson, the test comment and the edit-form claim | claims corrected; mount effect listed as not done |
-  | 9 | 4 — "nothing user-visible" (the first render differs), raised in both the decision and this stream; another caller exists; expand vs contract migration | corrected in `d282e11` |
-  | 10 | 6, none blocking — a false coverage sentence in this table; rows 1 and 8 inexact; the expand half misdescribed; the merge order with #114; server-render hydration | five corrected in `e223b3f`; merge order: #114 then this PR, back to back, because each cites the other's ledger file and the links dangle until both land |
-  | 11 | 5, none blocking — hydration overstated (only `/pets/[id]` server-renders a store pet); rows 9 and 10 inexact; the stream's render line out of step; stale PR description | four corrected in `3b4c9ac`; the PR description edited directly |
-  | 12 | 6, none blocking — hydration still mis-scoped; a gates claim the PR contradicts; row 10's merge-order fix only moved the dangling link; row 11 credited a commit for a description edit; the description's withdrawn-change table missing a row | hydration cut to what was observed; rows and gates line corrected in the commit after `3b4c9ac`; description edited directly |
+  | 1 | 9 | `f6ffd3d` |
+  | 2 | 7 | `1387603` |
+  | 3 | 8 | `1a67599` |
+  | 4 | 8 | `2c180d3` |
+  | 5 | 8 | `da58f3b` |
+  | 6 | 7 | `fae1337` |
+  | 7 | 9 | `0b87c1c` |
+  | 8 | 7 | `16de77d` |
+  | 9 | 4 | `d282e11` |
+  | 10 | 6 | `e223b3f` |
+  | 11 | 5 | `3b4c9ac` |
+  | 12 | 6 | `a4599f8` |
+  | 13 | 4 | the commit after `a4599f8` |
 
-  The branch's code last changed in round five's fix (`da58f3b`). The commits after it change
-  only comments under `src/` and `tests/`, plus the ledger. Each correction is reviewed by the
-  next round, and the loop ends on a round with no findings, recorded as its own row.
+  The branch's code last changed in `da58f3b`. The commits after it change only comments under
+  `src/` and `tests/`, plus the ledger. The loop ends on a round with no findings.
 - Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
   0 other. Every input master read without throwing reads the same, including every string PR
   #113's rehearsal pins (the three non-ASCII ones added at its request).
@@ -70,9 +71,8 @@ Record active multi-step work streams below.
   master by design.
 - The petAge suite passes at UTC-8, with `TZ` set in PowerShell and the offset confirmed as 480 in
   the same shell. (Node ignores `TZ` set from Git Bash on this machine.)
-- Gates last ran on this branch merged with `1b6dbbc` (#113). None has run yet on the tree that
-  will land, `master` plus #114 plus this PR. That is done, and CI is green on it, before this PR
-  is merged.
+- The tree that will land, `master` plus #114 plus this PR, does not exist until #114 merges.
+  Every gate is run on it, and CI is green on it, before this PR is merged.
 
 **Deliberately not done.**
 - Fractional and ranged ages still misread (`0,5 tahun` gives five years). Fixing them needs an

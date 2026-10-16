@@ -70,8 +70,8 @@ that server-render store pets (hydration against server HTML) was not traced. Th
 deriving nothing, and that discards the clamped value too. The clamp matters fully once that
 mount effect derives ages too, or once a new caller passes an age.
 
-Two earlier versions of this paragraph described consequences that were never traced. One was a
-database swap to demo pets, the other a browser losing its saved pets. Both were wrong. See
+Earlier versions of this paragraph described consequences that were never traced, and were
+wrong. See
 `tasks/lessons/2026-10-15-probe-that-the-input-can-reach-the-path-not-just-that-the-path-exists.md`.
 
 **What would let this be reversed.** A way for the function, or its callers, to say *unknown*
