@@ -129,18 +129,19 @@ so the defect has one public issue.
   16:57:25Z. So 16:57Z is not when the hook changed. It is when the only session that has
   logged since these files began stopped working. Between 16:37Z and 16:57Z its drift branch
   ran but recorded nothing, because the tree did not change.
-- **Other sessions were unlogged during that window too, not only after it.** Six other sessions
-  running at the same time (including `a17e9995`, the one this entry opened on) made about 1,400
-  Bash calls between 14:46Z and 16:58Z, counted from their transcripts, and none produced a
-  guard or drift line. The guard log's lines match `1c022c97`'s own calls nearly one for one.
-- **What sets the logging session apart is where it ran, not the worktree.** `1c022c97` ran in a
-  linked worktree too (412 of its 435 working-directory records are
-  `.claude/worktrees/pets-birthdate-migration`), so "a linked worktree stops the hook", one of the
-  two properties under "Not established" above, does not hold on its own. Its transcript records
-  the Claude **desktop app** as its entrypoint; the six unlogged sessions were all **CLI**
-  sessions. That is a correlation from one window, not a test. The next experiment is one Bash
-  call from a CLI session and one from a desktop session, counting guard lines before and after
-  each.
+- **Other sessions were unlogged during that window too, not only after it.** Several other
+  sessions running at the same time, including `a17e9995`, the one this entry opened on, made
+  Bash calls throughout it, and none produced a guard or drift line. The guard log's lines match
+  `1c022c97`'s own calls.
+- **A linked worktree does not stop the hook on its own.** `1c022c97` worked almost entirely in
+  `.claude/worktrees/pets-birthdate-migration`, and it logged.
+- **Three properties are confounded.** According to their transcripts, `1c022c97` ran from the
+  Claude desktop app, was not a background job, and ran an older Claude Code version. The
+  unlogged sessions in that window were all CLI background jobs on a newer version. Any of the
+  three could be the cause. A CLI background-job session has logged before: the 2026-09-21 line
+  quoted at the top came from one, running in the main checkout. An experiment has to change one
+  property at a time, for example a non-background CLI session on the current version, counting
+  guard lines before and after one Bash call.
 - **No settings layer disables hooks.** Neither `.claude/settings.local.json` nor the user-level
   settings has a `hooks` key or `disableAllHooks`, and no commit has touched
   `.claude/settings.json` or `agent-guard.mjs` since 2026-09-09.
