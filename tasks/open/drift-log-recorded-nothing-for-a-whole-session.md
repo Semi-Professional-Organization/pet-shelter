@@ -123,33 +123,25 @@ Observations from the transcripts under `~/.claude/projects`. They narrow the ca
 establish it.
 
 - **Where each session was launched splits logged from silent.** Every silent session on record
-  was launched from `.claude/worktrees/e2e-local-database-only`. It was a registered worktree
-  until `60c30e3b` removed it at about 14:55Z on 2026-09-21; only the emptied directory could not
-  be deleted. The silent sessions launched into it at about 16:46Z, when its `.claude/` folder,
-  holding only `settings.local.json`, was created.
-  Every session that logged (`60c30e3b`, `44dc9b6b`, `1c022c97`) was launched from the main
-  checkout. CLI background jobs are on both sides, so neither "background job" nor the version
-  separates them. `44dc9b6b`'s state file, read above as misattribution, was its own.
+  was launched from `.claude/worktrees/e2e-local-database-only`, a former worktree that
+  `60c30e3b` removed on 2026-09-21, leaving an empty directory that later gained a `.claude/`
+  folder holding only `settings.local.json`. Every session that logged (`60c30e3b`, `44dc9b6b`,
+  `1c022c97`) was launched from the main checkout. CLI background jobs are on both sides, so
+  "background job" does not separate them. `44dc9b6b`'s state file, read above as
+  misattribution, was its own.
 - **Sometimes the hook ran and could not find its script.** `.claude/settings.json` runs
-  `node "${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-guard.mjs"`. Some silent sessions record
-  non-blocking `PostToolUse` errors of the form
+  `node "${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-guard.mjs"`. Some silent sessions record, in
+  their transcripts but not to the session, non-blocking `PostToolUse` errors of the form
 
       Cannot find module 'D:\Dev\Repos\pet-shelter\.claude\worktrees\e2e-local-database-only\.claude\hooks\agent-guard.mjs'
 
-  These come only from calls made while the shell was in a registered worktree, and cluster in
-  two short windows: 2026-09-21 around 17:05Z to 17:41Z, and a few on 2026-10-15. The harness
-  reports them in the transcript, not to the session.
-- **For almost every other call there is no sign the hook ran at all.** That includes every call
-  made with the shell in the stray directory itself, and every call in the 2026-10-13 window.
-  Only some Claude Code versions have been seen recording these errors, and not the ones that
-  ran on 2026-10-13 or 2026-10-14. So for those windows a missing error does not show whether the
-  hook did not run, or ran, failed and went unrecorded.
+  Only for a small share of their calls, though, and only during some periods. Most of their
+  calls, including calls by the same session and version at other times, show no error at all.
 
-So a session launched from that directory either loads no project hook, or loads one that points
-at a script that is not there and fails, recorded only by some versions. Which, and why, is not
-established. The 2026-09-21 errors began in every affected session within a minute of 17:05Z,
-which suggests a trigger common to all of them rather than where each shell was. Deleting the directory could break sessions still running
-from it; the fix should be chosen once the mechanism is known.
+So for a session launched from that directory, the hook either does not run or fails, and when
+it fails that is recorded only some of the time. What decides which is not established. Deleting
+the directory could break sessions still running from it, so the fix should wait until the
+mechanism is known.
 
 Unchanged facts from the 2026-10-14/15 reading: the current drift log holds 161 lines, all from
 `1c022c97`, 2026-10-13T15:09Z to 16:37Z, inside that session's lifetime; no settings layer sets
