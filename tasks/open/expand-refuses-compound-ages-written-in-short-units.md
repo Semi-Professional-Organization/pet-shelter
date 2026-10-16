@@ -53,3 +53,11 @@ The guard accepts compound ages in short units and still refuses genuine fractio
 the twelve-shape corpus in that file's `rehearse.mjs` extended to cover `2 yrs 6 mos`, `1 yr 6 mo`
 and `2 y 6 m` — and the header's pre-check query updated to match, since it is what the owner reads
 before applying.
+
+**Read with `approximate-birth-date-misreads-several-age-shapes.md` before fixing this.** Narrowing
+the guard has a consequence there. Compact compounds with no space — `2y3m`, `5yrs8mths`, `1y6m` —
+are currently refused only because this guard calls them fractional: the backfill's unit patterns
+read the trailing `3m` and would otherwise store three months. Narrow the guard to punctuated
+fractions and those pass, and are stored by the *smaller* unit. Once the app is also fixed to read
+them by the larger one, the two disagree. So the narrowed guard must either read a compact compound
+by its largest unit or go on refusing it — whatever it does for `2 yrs 6 mos`.
