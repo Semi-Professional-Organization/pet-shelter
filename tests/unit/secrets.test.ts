@@ -438,6 +438,27 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
     });
 
+    it("warns, without the value, that an accepted admin key keeps curly quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", `${String.fromCharCode(0x201c)}${STRONG_ADMIN}${String.fromCharCode(0x201d)}`);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/ADMIN_SECRET_KEY starts or ends with a quote mark/));
+      expect(warn.mock.calls.flat().join(" ")).not.toContain(STRONG_ADMIN);
+    });
+
+    // An interior run of edge characters must not make stripping quadratic.
+    it("reads a value with a long interior run of spaces in linear time", () => {
+      vi.stubEnv("STAFF_INVITE_SECRET", "a" + " ".repeat(200_000) + "b");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const started = performance.now();
+
+      getStaffInviteSecret();
+      expect(performance.now() - started).toBeLessThan(1000);
+    });
+
     it("warns, without the value, that an accepted invite code keeps its quotes", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
@@ -445,7 +466,7 @@ describe("assertSecretsConfigured", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       expect(() => assertSecretsConfigured()).not.toThrow();
-      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/starts or ends with a quote mark/));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/STAFF_INVITE_SECRET starts or ends with a quote mark/));
       expect(warn.mock.calls.flat().join(" ")).not.toMatch(/MyLongInviteCode/);
     });
 

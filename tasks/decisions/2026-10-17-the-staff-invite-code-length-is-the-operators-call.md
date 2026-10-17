@@ -72,6 +72,10 @@ includes the value.
 
 ## What this reverses, and the risk accepted
 
+**This reverses** the "16-character minimum stays" conclusion of
+`tasks/decisions/2026-09-08-review-corrected-three-of-the-same-days-security-decisions.md`,
+which stays as written because it was true when written.
+
 The 2026-09-08 decisions kept the 16-character minimum deliberately: "this single shared code is
 the only gate on an account that can read applicant PII under PDPA 2010".
 

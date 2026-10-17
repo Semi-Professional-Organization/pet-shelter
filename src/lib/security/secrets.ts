@@ -13,7 +13,8 @@
  * | `development` / `test`   | warn once; an unset secret falls back to a labelled dev     |
  * |                          | default, any other weak value is used as configured         |
  *
- * "Weak" covers four cases: unset (or whitespace, or only quote marks), *equal
+ * "Weak" covers four cases: unset (or nothing but whitespace, quote marks, the
+ * backtick and invisible format characters), *equal
  * to the documented development default*, with or without surrounding quotes
  * (which catches an `.env.example` value copied verbatim into a real deploy),
  * equal to a value listed in `published`, and shorter than `minLength`.
@@ -129,8 +130,22 @@ type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; descrip
  * fullwidth quotes. Each was caught by review.
  */
 const EDGE_CLASS = String.raw`[\p{Quotation_Mark}\p{Cf}` + "`" + String.raw`\s]`;
-const ONLY_EDGE = new RegExp(`^${EDGE_CLASS}*$`, "u");
-const OUTER_EDGE = new RegExp(`^${EDGE_CLASS}+|${EDGE_CLASS}+$`, "gu");
+const IS_EDGE = new RegExp(`^${EDGE_CLASS}$`, "u");
+
+/**
+ * The value with its edge characters removed, by scanning inward from each end
+ * one code point at a time. Linear by construction. A regex `X+$` is not: it is
+ * retried at every position of a long interior run, which took 80 seconds on a
+ * 200,000-character value in testing.
+ */
+function stripEdges(value: string): string {
+  const chars = [...value];
+  let start = 0;
+  let end = chars.length;
+  while (start < end && IS_EDGE.test(chars[start])) start++;
+  while (end > start && IS_EDGE.test(chars[end - 1])) end--;
+  return chars.slice(start, end).join("");
+}
 
 /**
  * The one reading of a configured value, used for every secret so its quote
@@ -147,8 +162,8 @@ const OUTER_EDGE = new RegExp(`^${EDGE_CLASS}+|${EDGE_CLASS}+$`, "gu");
  */
 function readConfigured(raw: string): { value: string; unwrapped: string } {
   const trimmed = raw.trim();
-  if (ONLY_EDGE.test(trimmed)) return { value: "", unwrapped: "" };
-  const unwrapped = trimmed.replace(OUTER_EDGE, "");
+  const unwrapped = stripEdges(trimmed);
+  if (unwrapped === "") return { value: "", unwrapped: "" };
   return { value: trimmed, unwrapped };
 }
 
@@ -217,16 +232,17 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
     opts.allowShort === true
   );
 
-  // A code typed by hand that is accepted *with* outer quotes: the quotes are part
-  // of the code, so staff typing it without them are refused with nothing to say
-  // why. Say so here, without the value.
-  if (opts.allowShort && (!weakness || weakness.kind === "short") && unwrapped !== value) {
+  // A value accepted *with* outer quotes or invisible characters: they are part
+  // of it, so anyone entering it without them (staff typing the invite code, a
+  // caller sending the admin key) is refused with nothing to say why. Say so
+  // here, without the value, for every secret.
+  if ((!weakness || (opts.allowShort && weakness.kind === "short")) && unwrapped !== value) {
     warnOnce(
       // Keyed on the length too, so a rotation to another quoted code warns again.
       `${name}:quoted:${value.length}`,
       `[security/secrets] ${name} starts or ends with a quote mark or an invisible ` +
-        `character, which is part of the code: staff must type it too. Remove it if ` +
-        `it was not meant to be part of the code.`
+        `character, which is part of the value: anyone entering it must include it ` +
+        `too. Remove it if it was not meant to be part of the value.`
     );
   }
 

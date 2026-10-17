@@ -47,7 +47,8 @@ Minimums enforced by `src/lib/security/secrets.ts`: `SESSION_SECRET` 32 characte
 warning in the logs, so check the logs, not the boot, for it. These invite codes are refused at
 any length, and refusing them fails the boot: `HOPE2026`, `1234`, the seeded staff passwords
 (`admin123` and the rest), and any secret's development default, in any letter case and with or
-without surrounding quotes. A value of only quote marks (`""`) counts as unset and is refused
+without surrounding quotes. A value made only of quote marks, backticks, whitespace or invisible characters (`""`, a
+zero-width space) counts as unset and is refused
 too. Any other value is used as typed, quotes included, with surrounding whitespace trimmed.
 For all three secrets, a value equal to any secret's `DEV_SECRET_DEFAULTS` entry is rejected,
 including with the `.env.example` quotes left on (for the session and admin keys this match is
