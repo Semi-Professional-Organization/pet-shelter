@@ -449,14 +449,17 @@ describe("assertSecretsConfigured", () => {
       expect(warn.mock.calls.flat().join(" ")).not.toContain(STRONG_ADMIN);
     });
 
-    // An interior run of edge characters must not make stripping quadratic.
+    // An interior run of edge characters must not make stripping quadratic. The
+    // linear scan takes about 7 ms here; the quadratic regex it replaced took 80 s.
+    // The bound is far above the first and far below the second, so a slow CI
+    // runner cannot make it flaky.
     it("reads a value with a long interior run of spaces in linear time", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", "a" + " ".repeat(200_000) + "b");
       vi.spyOn(console, "warn").mockImplementation(() => {});
       const started = performance.now();
 
       getStaffInviteSecret();
-      expect(performance.now() - started).toBeLessThan(1000);
+      expect(performance.now() - started).toBeLessThan(4000);
     });
 
     it("warns, without the value, that an accepted invite code keeps its quotes", () => {
@@ -498,6 +501,28 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", "   ");
 
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+    });
+
+    // Edge characters carry no entropy, so they do not count toward a minimum.
+    it.each([
+      ["SESSION_SECRET", String.fromCharCode(0x200b).repeat(31) + "x"],
+      ["ADMIN_SECRET_KEY", '"'.repeat(15) + "a"],
+    ])("refuses %s padded to its minimum with edge characters", (name, padded) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, padded);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is shorter than the required`));
+    });
+
+    it("still boots a properly quoted key with enough real characters", () => {
+      vi.stubEnv("SESSION_SECRET", `"${STRONG_SESSION}"`);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
     });
 
     it("keeps the length minimum for every other secret", () => {

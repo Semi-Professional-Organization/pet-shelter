@@ -197,7 +197,10 @@ function describeWeakness(
   if (published.some((p) => fold(p) === target)) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
-  if (value.length < minLength) {
+  // Measured without edge quote marks and invisible characters: they carry no
+  // entropy, and counting them let 31 zero-width spaces plus one letter pass a
+  // 32-character minimum.
+  if (unwrapped.length < minLength) {
     return { kind: "short", description: `shorter than the required ${minLength} characters` };
   }
   return null;
@@ -236,7 +239,10 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
   // of it, so anyone entering it without them (staff typing the invite code, a
   // caller sending the admin key) is refused with nothing to say why. Say so
   // here, without the value, for every secret.
-  if ((!weakness || (opts.allowShort && weakness.kind === "short")) && unwrapped !== value) {
+  // Whether this value is used rather than refused, computed once so the warning
+  // below and the two accepting branches cannot drift apart.
+  const accepted = !weakness || (opts.allowShort === true && weakness.kind === "short");
+  if (accepted && unwrapped !== value) {
     warnOnce(
       // Keyed on the length too, so a rotation to another quoted code warns again.
       `${name}:quoted:${value.length}`,
@@ -248,7 +254,7 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
 
   if (!weakness) return value;
 
-  if (opts.allowShort && weakness.kind === "short") {
+  if (accepted) {
     // Only the length is wrong, and for this secret the operator may choose that.
     // Keyed on the length too: rotating to a short code of a different length
     // without a redeploy (the accessor reads per call) warns again. A new code of

@@ -26,7 +26,8 @@ short code now boots with a warning, and the risk accepted is in
 
 > **Before deploying this branch:** check the production values of `SESSION_SECRET` and
 > `ADMIN_SECRET_KEY`. Either one now refuses the boot if it is any secret's development default,
-> with or without quotes. That is correct, because such a key is public in this repository. But
+> with or without quotes, or if it reaches its minimum length (32 and 16) only by counting
+> quote marks or invisible characters at its ends. That is correct, because such a key is public in this repository. But
 > a production configured that way today would return 500 on every page after the deploy.
 
 - [x] `allowShort` waives only the "short" weakness, and only for the invite code.
