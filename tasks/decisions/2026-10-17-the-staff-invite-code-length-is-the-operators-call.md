@@ -38,8 +38,12 @@ includes the value.
   only when *matching* the deny list, every outer pair of them, so a published code pasted as
   `"HOPE2026"` or `""HOPE2026""` is still refused. That never alters an accepted code. Its cost is that a quoted development default,
   which booted before this change, is now refused.
-- **The development default is still refused at boot, by exact match, as before.** It is
-  published in this repository. A case-insensitive match was tried and reverted: it would have
+- **The development default is still refused at boot, by exact match, as before**, and now
+  also with its outer quotes removed, for all three secrets. `.env.example` publishes each
+  default inside quotes, so pasting that value verbatim used to boot production on a session
+  or admin key anyone can read in this repository. The gap predates this change. It was found
+  in review because this change claimed one quote rule for every secret. A case-insensitive
+  match was tried and reverted: it would have
   been a new way for the session and admin secrets to refuse the boot, the outage this change
   exists to remove.
 - **Published credentials are refused as the invite code, in any letter case.** These are the
@@ -104,7 +108,8 @@ stays at 16 or more random characters.
   assignments (`NAME=value`, `NAME="value"`, `export NAME='value'`) of any length, skipping
   placeholders such as `<your-code>` and `$(command)`, and code such as `===` and `=>`. On
   invite-code lines it reads assignments only, because a quoted prose word there
-  ("offboarding") would otherwise count as a code that boots.
+  ("offboarding") would otherwise count as a code that boots. Quoted tokens there are read at
+  16+ characters, so a long code written in prose is still caught.
 - A probe planted lines in a runbook:
 
   | Planted line | Result |
@@ -113,6 +118,8 @@ stays at 16 or more random characters.
   | invite code in an assignment, quoted, 4 or 6 characters | caught |
   | "strong" as a quoted prose word | no false alarm |
   | `<your-code>`, `...`, `<paste-generated-key-here>` placeholders | no false alarm |
+  | 24-character invite code backticked in prose | caught |
+  | "offboarding" quoted on an invite-code line | no false alarm |
   | `=== undefined`, `=> rotate` | no false alarm |
   | 4-character code, backticked in prose, not an assignment | not scanned (the stated ceiling) |
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
@@ -134,6 +141,7 @@ stays at 16 or more random characters.
   | quote-wrapped published code no longer matched | 5 |
   | only one pair of outer quotes unwrapped | 2 |
   | dev default compared case-insensitively (a new boot refusal) | 2 |
+  | dev default not matched with its quotes removed | 2 |
   | short warning keyed without the length (rotation goes silent) | 1 |
   | development warning claims a fallback for a configured value | 1 |
   | warnings keyed on the name alone (the swallowed-warning bug) | 2 |
