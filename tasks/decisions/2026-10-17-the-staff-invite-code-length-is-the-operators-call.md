@@ -37,11 +37,13 @@ includes the value.
   staff must type for any existing code that starts and ends with a quote. Quotes are removed
   only when *matching* the deny list: any leading and trailing quote marks, paired or not, so
   a published code pasted as `"HOPE2026"`, `""HOPE2026""` or `"HOPE2026` is still refused.
-  "Quote marks" means Unicode categories, not a list: initial, final, opening and closing
-  punctuation (every quotation style, including German low quotes, guillemets and CJK corner
-  brackets) and invisible format characters (zero-width spaces, word joiner, BOM), plus
-  straight quotes and whitespace. A list was tried first, and each review found a style it
-  missed. A code's interior punctuation is untouched. An invite code accepted with outer quotes
+  "Quote marks" means Unicode's own `Quotation_Mark` property: every quotation style,
+  including curly, German low, guillemets, CJK corners and fullwidth. It also covers invisible
+  format characters (zero-width spaces, word joiner, BOM), the backtick and whitespace.
+  Brackets are not quote marks, and a code's interior punctuation is untouched. Two attempts
+  came first and were corrected by review: a hand-written list, which each review found
+  another style missing from, and the punctuation categories, which missed fullwidth quotes
+  and took in every bracket. An invite code accepted with outer quotes
   logs a warning, without the value, because staff typing it without them are refused. That never alters an accepted code. Its cost is that a quoted development default,
   which booted before this change, is now refused.
 - **The development default is still refused at boot, by exact match, as before**, and now
@@ -156,8 +158,8 @@ stays at 16 or more random characters.
   | dev default not matched with its quotes removed | 1 |
   | published value not matched with its quotes removed | 8 |
   | edges not stripped for matching | 13 |
-  | initial and final quotes not recognised | 6 |
-  | opening and closing punctuation not recognised | 2 |
+  | quotation marks not recognised | 12 |
+  | brackets treated as quote marks | 2 |
   | invisible format characters not recognised | 2 |
   | quoted warning keyed without the length (rotation goes silent) | 1 |
   | quotes-only value no longer read as unset | 9 |
