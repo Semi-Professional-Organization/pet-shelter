@@ -392,6 +392,7 @@ describe("assertSecretsConfigured", () => {
       ["guillemets", String.fromCharCode(0xab), String.fromCharCode(0xbb)],
       ["single guillemets", String.fromCharCode(0x2039), String.fromCharCode(0x203a)],
       ["CJK corner brackets", String.fromCharCode(0x300c), String.fromCharCode(0x300d)],
+      ["fullwidth quotes", String.fromCharCode(0xff02), String.fromCharCode(0xff02)],
       ["a word joiner", "", String.fromCharCode(0x2060)],
     ])("refuses a published code wrapped in %s", (_label, open, close) => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
@@ -399,6 +400,16 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", `${open}HOPE2026${close}`);
 
       expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    // Brackets are not quote marks: a bracketed code is a code, not unset, and
+    // draws no "quote mark" warning.
+    it.each(["[shelter-2026]", "(abc)"])("accepts a bracketed code as is, without a quote warning (%s)", (code) => {
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(getStaffInviteSecret()).toBe(code);
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/quote mark/));
     });
 
     it.each(["q7z4", "abc-def_123", "a(b)c", "x'y"])("keeps an accepted code's interior punctuation (%s)", (code) => {

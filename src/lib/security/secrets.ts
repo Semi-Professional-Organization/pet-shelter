@@ -118,15 +118,17 @@ function isProduction(): boolean {
 type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; description: string };
 
 /**
- * Characters a pasted value can carry at its edges without meaning them. These are
- * Unicode categories, not a list, so no quotation style is missed. Pi/Pf/Ps/Pe
- * cover every opening, closing, initial and final punctuation mark (curly quotes,
- * German low quotes, guillemets, CJK corner brackets, brackets). Cf covers the
- * invisible format characters (zero-width spaces, word joiner, BOM). Straight
- * quotes and whitespace are added by hand. Listing characters one at a time was
- * tried first, and each review found another style.
+ * Characters a pasted value can carry at its edges without meaning them, as
+ * Unicode properties rather than a list. `Quotation_Mark` is Unicode's own set of
+ * every quotation mark: straight, curly, German low quotes, guillemets, CJK
+ * corners, fullwidth. `Cf` is the invisible format characters (zero-width
+ * spaces, word joiner, BOM). The backtick and whitespace are added by hand.
+ *
+ * Two lists were tried first. One named characters; the other used the
+ * punctuation categories, which also took in every bracket and still missed the
+ * fullwidth quotes. Each was caught by review.
  */
-const EDGE_CLASS = String.raw`[\p{Pi}\p{Pf}\p{Ps}\p{Pe}\p{Cf}"'` + "`" + String.raw`\s]`;
+const EDGE_CLASS = String.raw`[\p{Quotation_Mark}\p{Cf}` + "`" + String.raw`\s]`;
 const ONLY_EDGE = new RegExp(`^${EDGE_CLASS}*$`, "u");
 const OUTER_EDGE = new RegExp(`^${EDGE_CLASS}+|${EDGE_CLASS}+$`, "gu");
 
