@@ -322,7 +322,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
     });
 
     it.each(['"HOPE2026"', "'admin123'", '"Hope2026"', '""HOPE2026""', `"'HOPE2026'"`, '"HOPE2026', "admin123'"])("refuses a published code wrapped in quotes (%s)", (code) => {
@@ -367,7 +367,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", '""');
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
 
-      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY is not set/);
+      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY is set to only quote marks/);
     });
 
     // Characters pasted from Word, Notion or a rendered page.
@@ -432,7 +432,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
     });
 
     it("warns, without the value, that an accepted admin key keeps curly quotes", () => {
@@ -504,6 +504,30 @@ describe("assertSecretsConfigured", () => {
           published: ["pass'word'"],
         })
       ).toThrow(/publishes/);
+    });
+
+    it("still says a truly unset invite code is not set", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+    });
+
+    // Placeholders earlier versions of .env.example published; still in git history.
+    it.each([
+      ["SESSION_SECRET", "replace-me-with-a-random-32-plus-character-secret"],
+      ["SESSION_SECRET", "generate-a-secure-random-32-character-secret-key-here"],
+      ["ADMIN_SECRET_KEY", "replace-me-with-a-random-admin-secret-key"],
+      ["ADMIN_SECRET_KEY", "generate-a-secure-admin-secret-key-here"],
+      ["STAFF_INVITE_SECRET", "replace-me-with-a-random-staff-invite-code"],
+    ])("refuses %s set to the old placeholder %s", (name, placeholder) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, placeholder);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
     });
 
     it("still refuses a whitespace-only invite code", () => {

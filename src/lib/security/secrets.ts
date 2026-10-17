@@ -76,11 +76,28 @@ export const DEV_SECRET_DEFAULTS = {
 } as const;
 
 /**
- * Every documented development default. Passed as `published` to the session and
- * admin accessors too, so one secret's default pasted into another's slot (the
- * wrong `.env.example` line) is refused, not just a secret's own default.
+ * Placeholder values earlier versions of `.env.example` published for these
+ * secrets. Still in git history, so still public: a deploy copied from an old
+ * example file must not boot on one.
  */
-const ALL_DEV_DEFAULTS: readonly string[] = Object.values(DEV_SECRET_DEFAULTS);
+const PUBLISHED_PLACEHOLDERS: readonly string[] = [
+  "replace-me-with-a-random-32-plus-character-secret",
+  "generate-a-secure-random-32-character-secret-key-here",
+  "replace-me-with-a-random-admin-secret-key",
+  "generate-a-secure-admin-secret-key-here",
+  "replace-me-with-a-random-staff-invite-code",
+];
+
+/**
+ * Every documented development default and every published placeholder. Passed as
+ * `published` to all three accessors, so one secret's default pasted into
+ * another's slot (the wrong `.env.example` line), or an old placeholder, is
+ * refused, not just a secret's own current default.
+ */
+const PUBLISHED_DEFAULTS: readonly string[] = [
+  ...Object.values(DEV_SECRET_DEFAULTS),
+  ...PUBLISHED_PLACEHOLDERS,
+];
 
 /**
  * Invite codes this repository has published, as hardcoded literals that once
@@ -103,7 +120,7 @@ const PUBLISHED_INVITE_CODES: readonly string[] = [
   // Every documented development default, so another secret's default pasted
   // into the invite slot, or this one in another letter case, is refused too.
   // (The invite's own default is also refused by exact match, as for all.)
-  ...ALL_DEV_DEFAULTS,
+  ...PUBLISHED_DEFAULTS,
 ];
 
 /** Minimum length for the HMAC key that signs every session cookie. */
@@ -228,8 +245,9 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
   // Exact apart from trimming and the quotes-only rule. Stripping quotes from an
   // accepted value was tried for the invite code and reverted, because it
   // changed which code staff must type.
-  const { value, unwrapped } = readConfigured(process.env[name] ?? "");
-  const weakness = describeWeakness(
+  const raw = process.env[name] ?? "";
+  const { value, unwrapped } = readConfigured(raw);
+  const described = describeWeakness(
     value,
     unwrapped,
     opts.devDefault,
@@ -237,6 +255,13 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
     opts.published,
     opts.allowShort === true
   );
+  // A value that is present but only quote marks, spaces or invisible characters
+  // reads as unset, but saying "not set" would send an operator looking for a
+  // missing variable that their dashboard plainly shows. Say what is there.
+  const weakness =
+    described?.kind === "unset" && raw.trim() !== ""
+      ? { ...described, description: "set to only quote marks, spaces or invisible characters" }
+      : described;
 
   // Whether this value is used rather than refused, computed once so the warning
   // below and the two accepting branches cannot drift apart.
@@ -301,7 +326,7 @@ export function getSessionSecret(): string {
   return resolveSecret("SESSION_SECRET", {
     devDefault: DEV_SECRET_DEFAULTS.SESSION_SECRET,
     minLength: SESSION_SECRET_MIN_LENGTH,
-    published: ALL_DEV_DEFAULTS,
+    published: PUBLISHED_DEFAULTS,
   });
 }
 
@@ -309,7 +334,7 @@ export function getSessionSecret(): string {
 export function getAdminSecretKey(): string {
   return resolveSecret("ADMIN_SECRET_KEY", {
     devDefault: DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY,
-    published: ALL_DEV_DEFAULTS,
+    published: PUBLISHED_DEFAULTS,
   });
 }
 
