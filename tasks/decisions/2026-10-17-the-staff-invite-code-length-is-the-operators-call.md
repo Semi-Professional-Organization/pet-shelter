@@ -28,14 +28,15 @@ includes the value.
 
 - **An unset or whitespace-only code is still refused at boot.** So is a value of nothing but
   quote marks and spaces (`""`, `"`, `" "`), which is what someone types into a dashboard
-  meaning "empty". The secret policy fails fast on a missing secret, rather than on the first
+  meaning "empty". One reader (`readConfigured`) applies this to every secret, so a
+  quotes-only admin key is also "not set", and in development the fallback really is used. The secret policy fails fast on a missing secret, rather than on the first
   registration. (`registerAction` would refuse an empty submitted code anyway; an earlier draft
   gave that as the reason, which was wrong.)
 - **An accepted code is read exactly as set, quotes included**, like every other secret.
   Stripping surrounding quotes was tried for one round and reverted: it changed which code
   staff must type for any existing code that starts and ends with a quote. Quotes are removed
-  only when *matching* the deny list, so a published code pasted as `"HOPE2026"` is still
-  refused. That never alters an accepted code. Its cost is that a quoted development default,
+  only when *matching* the deny list, every outer pair of them, so a published code pasted as
+  `"HOPE2026"` or `""HOPE2026""` is still refused. That never alters an accepted code. Its cost is that a quoted development default,
   which booted before this change, is now refused.
 - **The development default is still refused at boot, by exact match, as before.** It is
   published in this repository. A case-insensitive match was tried and reverted: it would have
@@ -101,7 +102,9 @@ stays at 16 or more random characters.
 - The `.env.example` check and the operator-file guard both call the app's real accessors, so
   neither can drift from the app's policy. The guard reads quoted values of 8+ characters and
   assignments (`NAME=value`, `NAME="value"`, `export NAME='value'`) of any length, skipping
-  placeholders such as `<your-code>` and code such as `===` and `=>`.
+  placeholders such as `<your-code>` and `$(command)`, and code such as `===` and `=>`. On
+  invite-code lines it reads assignments only, because a quoted prose word there
+  ("offboarding") would otherwise count as a code that boots.
 - A probe planted lines in a runbook:
 
   | Planted line | Result |
@@ -119,16 +122,17 @@ stays at 16 or more random characters.
 
   | Mutant | Tests failed |
   |---|---|
-  | invite accessor without `allowShort` | 9 |
-  | every weakness waived, not only `short` | 30 |
+  | invite accessor without `allowShort` | 4 |
+  | every weakness waived, not only `short` | 31 |
   | `allowShort` applied to every secret | 2 |
-  | published codes not passed to the invite accessor | 14 |
-  | published check skipped, so the short waiver takes them | 14 |
+  | published codes not passed to the invite accessor | 16 |
+  | published check skipped, so the short waiver takes them | 16 |
   | staff passwords left out of the invite deny list | 4 |
   | dev defaults left out of the invite deny list | 3 |
-  | published codes compared case-sensitively | 6 |
-  | quote-wrapped published code no longer matched | 3 |
-  | quotes-only value no longer read as unset | 5 |
+  | published codes compared case-sensitively | 8 |
+  | quotes-only value no longer read as unset | 7 |
+  | quote-wrapped published code no longer matched | 5 |
+  | only one pair of outer quotes unwrapped | 2 |
   | dev default compared case-insensitively (a new boot refusal) | 2 |
   | short warning keyed without the length (rotation goes silent) | 1 |
   | development warning claims a fallback for a configured value | 1 |
