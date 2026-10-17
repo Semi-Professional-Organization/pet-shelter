@@ -35,8 +35,8 @@ includes the value.
 - **An accepted code is read exactly as set, quotes included**, like every other secret.
   Stripping surrounding quotes was tried for one round and reverted: it changed which code
   staff must type for any existing code that starts and ends with a quote. Quotes are removed
-  only when *matching* the deny list, every outer pair of them, so a published code pasted as
-  `"HOPE2026"` or `""HOPE2026""` is still refused. That never alters an accepted code. Its cost is that a quoted development default,
+  only when *matching* the deny list: any leading and trailing quote marks, paired or not, so
+  a published code pasted as `"HOPE2026"`, `""HOPE2026""` or `"HOPE2026` is still refused. That never alters an accepted code. Its cost is that a quoted development default,
   which booted before this change, is now refused.
 - **The development default is still refused at boot, by exact match, as before**, and now
   also with its outer quotes removed, for all three secrets. `.env.example` publishes each
@@ -54,7 +54,13 @@ includes the value.
   documented development default, so another secret's default pasted into the invite slot, or
   the invite's own default in another letter case, is refused.
 - **`SESSION_SECRET` (32) and `ADMIN_SECRET_KEY` (16) keep their minimums.** Only the invite code
-  passes `allowShort`.
+  passes `allowShort`. Review found two older gaps in them, both fixed here: each accepted
+  *another* secret's dev default (the wrong `.env.example` line), and its own default with the
+  quotes left on. Both are now refused. That is a new boot refusal, correct because such a
+  deployment runs on a key anyone can read, and the open entry asks for the production values
+  to be checked before deploying. For keys the match is exact in letter case; only the invite
+  code, typed by hand, is matched case-insensitively, so no case variant of a key becomes a new
+  way to fail the boot.
 
 ## What this reverses, and the risk accepted
 
@@ -125,23 +131,29 @@ stays at 16 or more random characters.
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
   `/admin/login` with 200, and its log carried the warning without the value. Started with
   `HOPE2026` or with the development default, it refused to boot.
-- Mutants, all killed:
+- Mutants:
 
   | Mutant | Tests failed |
   |---|---|
-  | invite accessor without `allowShort` | 4 |
-  | every weakness waived, not only `short` | 31 |
+  | invite accessor without `allowShort` | 9 |
+  | every weakness waived, not only `short` | 36 |
   | `allowShort` applied to every secret | 2 |
-  | published codes not passed to the invite accessor | 16 |
-  | published check skipped, so the short waiver takes them | 16 |
-  | staff passwords left out of the invite deny list | 4 |
+  | published codes not passed to the invite accessor | 18 |
+  | published check skipped | 20 |
+  | staff passwords left out of the invite deny list | 5 |
   | dev defaults left out of the invite deny list | 3 |
-  | published codes compared case-sensitively | 8 |
-  | quotes-only value no longer read as unset | 7 |
-  | quote-wrapped published code no longer matched | 5 |
-  | only one pair of outer quotes unwrapped | 2 |
+  | other secrets' defaults not passed to session and admin | 2 |
+  | invite code compared case-sensitively | 5 |
+  | keys compared case-insensitively (a new boot refusal) | 1 |
   | dev default compared case-insensitively (a new boot refusal) | 2 |
-  | dev default not matched with its quotes removed | 2 |
+  | published value not matched with its quotes removed | 7 |
+  | only one quote mark stripped from each end | 2 |
+  | quotes-only value no longer read as unset | 7 |
   | short warning keyed without the length (rotation goes silent) | 1 |
   | development warning claims a fallback for a configured value | 1 |
   | warnings keyed on the name alone (the swallowed-warning bug) | 2 |
+  | dev default not matched with its quotes removed | survived, equivalent |
+
+  The survivor is equivalent, not a gap. Every secret's deny list now holds every dev default
+  and compares the quote-stripped value, so a quoted own default is refused through that path
+  even when this check is removed. The outcome is the same refusal; only the message differs.
