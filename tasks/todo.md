@@ -24,28 +24,39 @@ and every public page returned 500. The owner chose to make the code's length th
 short code now boots with a warning, and the risk accepted is in
 `tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
 
-- [x] `allowShort` and `published` on `resolveSecret`. Only the "short" kind of weakness is
-      waived. Unset, the dev default, and published credentials (`HOPE2026`, `1234`, the
-      seeded staff passwords) are still refused.
+> **Before deploying this branch:** check the production values of `SESSION_SECRET` and
+> `ADMIN_SECRET_KEY`. Either one now refuses the boot if it is any secret's development default,
+> with or without quotes. That is correct, because such a key is public in this repository. But
+> a production configured that way today would return 500 on every page after the deploy.
+
+- [x] `allowShort` waives only the "short" weakness, and only for the invite code.
+- [x] Still refused: unset, quotes-only (straight, curly or zero-width), the dev defaults, and
+      published credentials (`HOPE2026`, `1234`, the seeded staff passwords), all recognised
+      through surrounding quotes. An accepted code is used as set, and a warning says so if
+      it keeps quote marks.
+- [x] The session and admin keys now also refuse any secret's dev default, quoted or not
+      (exact letter case). These refusals are new; see the note above.
 - [x] The `.env.example` test and the operator-file guard call the real accessors.
-- [x] Four `/code-review high` rounds. Findings fixed included the legacy published codes
-      booting, an overstated risk claim in the decision, and a guard floor that would have
-      failed on prose.
+- [x] Fourteen `/code-review high` rounds, each verified, fixed or declined with a reason in the
+      decision entry. Two of my own fixes were reverted along the way (case-insensitive key
+      matching, stripping quotes from an accepted code).
 
 ## Review
 
-**Verified:** `npm run check`, 0 errors. `npm run test:all` all passing. `npm run build`
-exit 0. `next start` checks: a 4-character code serves pages with 200 and logs the warning
-without the value; `HOPE2026`, `admin123` and the dev default refuse to boot. Mutants are
-listed in the decision entry.
+**Verified at the branch tip:** `npm run check`, 0 errors. `npm run test:all` all passing.
+`npm run build` exit 0. `next start` checks: a 4-character code serves pages with 200 and logs
+the warning without the value. `HOPE2026`, `"HOPE2026`, `admin123`, `""`, and a session secret
+set to the admin default all refuse to boot, while an upper-cased session default still boots.
+Mutants are tabulated in the decision entry.
 
 **Deliberately not done:**
 
-- No minimum length below 16: the owner's choice.
+- No minimum length: the owner's choice.
 - Not limiting a weak secret's damage to the feature it gates (option 2): the better design,
-  but not chosen. It is the upgrade path in the `ceiling:` comment, and until it lands any
-  *other* weak secret still takes the site down at boot.
+  but not chosen. It is tracked in `tasks/open/one-weak-secret-still-takes-the-whole-site-down.md`.
 - The rate limiter stays per-process, so it does not bound guessing on serverless hosts.
+- Quoted invite codes of 8-15 characters inside prose are not scanned by the guard; that is the
+  stated ceiling.
 
 # The backfill rehearsal checks the real age function
 

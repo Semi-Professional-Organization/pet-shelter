@@ -118,6 +118,16 @@ function isProduction(): boolean {
 type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; description: string };
 
 /**
+ * Characters a pasted value can carry at its edges without meaning them: straight
+ * quotes, the curly quotes that Word, Notion and rendered pages substitute, and
+ * zero-width characters. Built from code points, so the source shows which.
+ */
+const EDGE_CHARS =
+  "\"'`" + String.fromCharCode(0x201c, 0x201d, 0x2018, 0x2019, 0x200b, 0x200c, 0x200d, 0xfeff);
+const ONLY_EDGE = new RegExp(`^[${EDGE_CHARS}\\s]*$`);
+const OUTER_EDGE = new RegExp(`^[${EDGE_CHARS}\\s]+|[${EDGE_CHARS}\\s]+$`, "g");
+
+/**
  * The one reading of a configured value, used for every secret so its quote
  * rules cannot drift apart.
  *
@@ -132,8 +142,8 @@ type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; descrip
  */
 function readConfigured(raw: string): { value: string; unwrapped: string } {
   const trimmed = raw.trim();
-  if (/^["'`\s]*$/.test(trimmed)) return { value: "", unwrapped: "" };
-  const unwrapped = trimmed.replace(/^["'`\s]+|["'`\s]+$/g, "");
+  if (ONLY_EDGE.test(trimmed)) return { value: "", unwrapped: "" };
+  const unwrapped = trimmed.replace(OUTER_EDGE, "");
   return { value: trimmed, unwrapped };
 }
 
@@ -201,6 +211,18 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
     opts.published,
     opts.allowShort === true
   );
+
+  // A code typed by hand that is accepted *with* outer quotes: the quotes are part
+  // of the code, so staff typing it without them are refused with nothing to say
+  // why. Say so here, without the value.
+  if (opts.allowShort && (!weakness || weakness.kind === "short") && unwrapped !== value) {
+    warnOnce(
+      `${name}:quoted`,
+      `[security/secrets] ${name} starts or ends with a quote mark or an invisible ` +
+        `character, which is part of the code: staff must type it too. Remove it if ` +
+        `it was not meant to be part of the code.`
+    );
+  }
 
   if (!weakness) return value;
 

@@ -373,6 +373,49 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY is not set/);
     });
 
+    // Characters pasted from Word, Notion or a rendered page.
+    const LDQ = String.fromCharCode(0x201c);
+    const RDQ = String.fromCharCode(0x201d);
+    const ZWSP = String.fromCharCode(0x200b);
+
+    it("refuses a published code in curly quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", `${LDQ}HOPE2026${RDQ}`);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    it("refuses a session dev default in curly quotes", () => {
+      vi.stubEnv("SESSION_SECRET", `${LDQ}${DEV_SECRET_DEFAULTS.SESSION_SECRET}${RDQ}`);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/SESSION_SECRET is still set to the documented/);
+    });
+
+    it.each([
+      ["curly quotes", `${LDQ}${RDQ}`],
+      ["a zero-width space", ZWSP],
+    ])("treats an invite code of only %s as unset", (_label, code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+    });
+
+    it("warns, without the value, that an accepted invite code keeps its quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", '"MyLongInviteCode2026xx"');
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/starts or ends with a quote mark/));
+      expect(warn.mock.calls.flat().join(" ")).not.toMatch(/MyLongInviteCode/);
+    });
+
     it("reads the invite code exactly, quotes included", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
