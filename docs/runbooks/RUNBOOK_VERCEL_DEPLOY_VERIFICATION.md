@@ -48,8 +48,10 @@ warning in the logs, so check the logs, not the boot, for it. These invite codes
 any length, and refusing them fails the boot: `HOPE2026`, `1234`, the seeded staff passwords
 (`admin123` and the rest), and any secret's development default, in any letter case and with or
 without surrounding quotes. A value of only quote marks (`""`) counts as unset and is refused
-too. Any other value is used exactly as typed, quotes included.
-A value equal to that secret's `DEV_SECRET_DEFAULTS` entry is rejected, which is why `.env.example`
+too. Any other value is used as typed, quotes included, with surrounding whitespace trimmed.
+For all three secrets, a value equal to any secret's `DEV_SECRET_DEFAULTS` entry is rejected,
+including with the `.env.example` quotes left on (for the session and admin keys this match is
+exact in letter case), which is why `.env.example`
 publishes those exact defaults — copying it verbatim into production refuses to boot by design.
 
 ### Preview

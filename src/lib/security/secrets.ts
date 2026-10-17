@@ -56,9 +56,10 @@ export interface ResolveSecretOptions {
   allowShort?: boolean;
   /**
    * Values this repository has published, refused in production whatever their
-   * length, compared case-insensitively (both sides are lower-cased here, so a
-   * caller cannot get it wrong). Checked before `allowShort`, so a short
-   * published value is refused, not waived.
+   * length, with or without outer quotes. Compared case-insensitively when
+   * `allowShort` is set (a code typed by hand), exactly otherwise (a key).
+   * Checked before `allowShort`, so a short published value is refused, not
+   * waived.
    */
   published?: readonly string[];
 }
@@ -97,6 +98,13 @@ const PUBLISHED_INVITE_CODES: readonly string[] = [
   ...Object.values(DEV_SECRET_DEFAULTS),
 ];
 
+/**
+ * Every documented development default. Passed as `published` to the session and
+ * admin accessors too, so one secret's default pasted into another's slot (the
+ * wrong `.env.example` line) is refused, not just a secret's own default.
+ */
+const ALL_DEV_DEFAULTS: readonly string[] = Object.values(DEV_SECRET_DEFAULTS);
+
 /** Minimum length for the HMAC key that signs every session cookie. */
 const SESSION_SECRET_MIN_LENGTH = 32;
 
@@ -117,21 +125,17 @@ type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; descrip
  *   quotes included. A value of nothing but quote marks and spaces (`""`, `"`,
  *   `" "`) is what someone types into a dashboard meaning "empty", so it reads as
  *   `""` (unset). No real secret is only quote marks.
- * - `unwrapped` has every pair of matching outer quotes removed. It is used only
- *   to *recognise* a published value pasted with quotes (`"HOPE2026"`,
- *   `""HOPE2026""`), never as the value, so an accepted secret is never altered.
+ * - `unwrapped` has any leading and trailing quote marks removed, paired or not.
+ *   It is used only to *recognise* a published value pasted with quotes
+ *   (`"HOPE2026"`, `""HOPE2026""`, `"HOPE2026`), never as the value, so an
+ *   accepted secret is never altered.
  */
 function readConfigured(raw: string): { value: string; unwrapped: string } {
   const trimmed = raw.trim();
   if (/^["'`\s]*$/.test(trimmed)) return { value: "", unwrapped: "" };
-  let unwrapped = trimmed;
-  for (let m = OUTER_QUOTES.exec(unwrapped); m; m = OUTER_QUOTES.exec(unwrapped)) {
-    unwrapped = m[2].trim();
-  }
+  const unwrapped = trimmed.replace(/^["'`\s]+|["'`\s]+$/g, "");
   return { value: trimmed, unwrapped };
 }
-
-const OUTER_QUOTES = /^(["'`])([\s\S]*)\1$/;
 
 /**
  * Describes why a configured value is unacceptable, or `null` when it is fine.
@@ -142,7 +146,8 @@ function describeWeakness(
   unwrapped: string,
   devDefault: string,
   minLength: number,
-  published: readonly string[] = []
+  published: readonly string[] = [],
+  caseInsensitive = false
 ): Weakness | null {
   if (value.length === 0) return { kind: "unset", description: "not set" };
   // Exact in case, as it always was: matching case variants too would be a new
@@ -150,12 +155,16 @@ function describeWeakness(
   // removed, because `.env.example` publishes the default *inside* quotes, and
   // pasting that line's value verbatim left a session or admin key that anyone
   // can read in this repository. Refusing that boot is the point of the check.
-  if (value === devDefault || unwrapped === devDefault) {
+  if (unwrapped === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  // As set and with its outer quotes removed (see `readConfigured`).
-  const candidates = [value, unwrapped].map((v) => v.toLowerCase());
-  if (published.some((p) => candidates.includes(p.toLowerCase()))) {
+  // `unwrapped` equals `value` unless the value carries outer quotes, and no
+  // published value does, so comparing it alone covers both forms. Letter case
+  // is ignored only for a code someone types by hand (`allowShort`); for a key,
+  // a case variant must not become a new way to refuse the boot.
+  const fold = (v: string) => (caseInsensitive ? v.toLowerCase() : v);
+  const target = fold(unwrapped);
+  if (published.some((p) => fold(p) === target)) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
   if (value.length < minLength) {
@@ -184,14 +193,22 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
   // accepted value was tried for the invite code and reverted, because it
   // changed which code staff must type.
   const { value, unwrapped } = readConfigured(process.env[name] ?? "");
-  const weakness = describeWeakness(value, unwrapped, opts.devDefault, minLength, opts.published);
+  const weakness = describeWeakness(
+    value,
+    unwrapped,
+    opts.devDefault,
+    minLength,
+    opts.published,
+    opts.allowShort === true
+  );
 
   if (!weakness) return value;
 
   if (opts.allowShort && weakness.kind === "short") {
     // Only the length is wrong, and for this secret the operator may choose that.
-    // Keyed on the length too: rotating to a different short code without a
-    // redeploy (the accessor reads per call) warns again.
+    // Keyed on the length too: rotating to a short code of a different length
+    // without a redeploy (the accessor reads per call) warns again. A new code of
+    // the same length does not; the value itself is never part of the key.
     warnOnce(
       `${name}:short:${value.length}`,
       `[security/secrets] ${name} is shorter than the recommended ${minLength} ` +
@@ -228,6 +245,7 @@ export function getSessionSecret(): string {
   return resolveSecret("SESSION_SECRET", {
     devDefault: DEV_SECRET_DEFAULTS.SESSION_SECRET,
     minLength: SESSION_SECRET_MIN_LENGTH,
+    published: ALL_DEV_DEFAULTS,
   });
 }
 
@@ -235,6 +253,7 @@ export function getSessionSecret(): string {
 export function getAdminSecretKey(): string {
   return resolveSecret("ADMIN_SECRET_KEY", {
     devDefault: DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY,
+    published: ALL_DEV_DEFAULTS,
   });
 }
 

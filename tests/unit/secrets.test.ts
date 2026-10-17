@@ -328,7 +328,7 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
     });
 
-    it.each(['"HOPE2026"', "'admin123'", '"Hope2026"', '""HOPE2026""', `"'HOPE2026'"`])("refuses a published code wrapped in quotes (%s)", (code) => {
+    it.each(['"HOPE2026"', "'admin123'", '"Hope2026"', '""HOPE2026""', `"'HOPE2026'"`, '"HOPE2026', "admin123'"])("refuses a published code wrapped in quotes (%s)", (code) => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
@@ -350,6 +350,19 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv(name, `"${devDefault}"`);
 
       expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is (still set to the documented|set to a value)`));
+    });
+
+    // The wrong `.env.example` line pasted into the wrong slot.
+    it.each([
+      ["SESSION_SECRET", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY],
+      ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.SESSION_SECRET],
+    ])("refuses %s set to another secret's dev default", (name, otherDefault) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, otherDefault);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
     });
 
     it("reports a quotes-only admin key as not set, as for the invite code", () => {

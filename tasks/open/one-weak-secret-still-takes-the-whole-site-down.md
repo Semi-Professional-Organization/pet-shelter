@@ -17,6 +17,13 @@ from:
 - an invite code set to a value this repository publishes;
 - any secret left unset.
 
+That fix also adds two **new** refusals for the session and admin keys: any secret's
+development default (not only its own), and a default with its `.env.example` quotes left on.
+Both are right, because a deployment configured that way is running on a key anyone can read
+in this repository. But a deployment that happens to be configured that way today would stop
+booting on its next deploy. **Check the production values of `SESSION_SECRET` and
+`ADMIN_SECRET_KEY` before deploying it.**
+
 ## The upgrade path
 
 Limit each secret's failure to the feature it gates. A weak invite code would disable staff
