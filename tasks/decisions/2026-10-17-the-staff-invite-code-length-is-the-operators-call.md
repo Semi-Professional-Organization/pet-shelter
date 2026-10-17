@@ -153,17 +153,17 @@ stays at 16 or more random characters.
 
   | Mutant | Tests failed |
   |---|---|
-  | padding counted toward the minimum length | 2 |
+  | length measured without edge characters (refuses a random key) | 1 |
   | no warning for an accepted quoted value | 3 |
   | quoted warning for the invite code only | 1 |
   | every weakness waived, not only short | 45 |
-  | allowShort applied to every secret | 4 |
+  | allowShort applied to every secret | 2 |
   | quotes-only no longer read as unset | 9 |
-  | edges not stripped for matching | 32 |
-  | edge stripping quadratic again | 19 |
+  | edges not stripped for matching | 30 |
+  | edge stripping quadratic again | 17 |
   | quotation marks not recognised | 13 |
   | brackets treated as quote marks | 2 |
-  | invisible format characters not recognised | 3 |
+  | invisible format characters not recognised | 2 |
   | quoted warning keyed without the length | 1 |
   | dev defaults left out of the invite deny list | 3 |
   | invite accessor without allowShort | 15 |
@@ -172,7 +172,7 @@ stays at 16 or more random characters.
   | staff passwords left out of the invite deny list | 5 |
   | other secrets' defaults not passed to session and admin | 2 |
   | invite code compared case-sensitively | 15 |
-  | keys compared case-insensitively (new boot refusal) | 5 |
+  | keys compared case-insensitively (new boot refusal) | 3 |
   | dev default compared case-insensitively (new boot refusal) | 2 |
   | dev default not matched with its quotes removed | 1 |
   | published value not matched with its quotes removed | 14 |
