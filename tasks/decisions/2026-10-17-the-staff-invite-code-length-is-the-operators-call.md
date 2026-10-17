@@ -36,7 +36,10 @@ includes the value.
   Stripping surrounding quotes was tried for one round and reverted: it changed which code
   staff must type for any existing code that starts and ends with a quote. Quotes are removed
   only when *matching* the deny list: any leading and trailing quote marks, paired or not, so
-  a published code pasted as `"HOPE2026"`, `""HOPE2026""` or `"HOPE2026` is still refused. That never alters an accepted code. Its cost is that a quoted development default,
+  a published code pasted as `"HOPE2026"`, `""HOPE2026""` or `"HOPE2026` is still refused.
+  "Quote marks" means straight and curly quotes and zero-width characters, the ones a value
+  pasted from Word, Notion or a rendered page carries. An invite code accepted with outer quotes
+  logs a warning, without the value, because staff typing it without them are refused. That never alters an accepted code. Its cost is that a quoted development default,
   which booted before this change, is now refused.
 - **The development default is still refused at boot, by exact match, as before**, and now
   also with its outer quotes removed, for all three secrets. `.env.example` publishes each
@@ -132,29 +135,28 @@ stays at 16 or more random characters.
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
   `/admin/login` with 200, and its log carried the warning without the value. Started with
   `HOPE2026` or with the development default, it refused to boot.
-- Mutants:
+- Mutants, all killed:
 
   | Mutant | Tests failed |
   |---|---|
-  | invite accessor without `allowShort` | 9 |
-  | every weakness waived, not only `short` | 36 |
+  | invite accessor without `allowShort` | 10 |
+  | every weakness waived, not only `short` | 39 |
   | `allowShort` applied to every secret | 2 |
-  | published codes not passed to the invite accessor | 18 |
-  | published check skipped | 20 |
+  | published codes not passed to the invite accessor | 19 |
+  | published check skipped | 21 |
   | staff passwords left out of the invite deny list | 5 |
   | dev defaults left out of the invite deny list | 3 |
   | other secrets' defaults not passed to session and admin | 2 |
   | invite code compared case-sensitively | 5 |
   | keys compared case-insensitively (a new boot refusal) | 1 |
   | dev default compared case-insensitively (a new boot refusal) | 2 |
-  | published value not matched with its quotes removed | 7 |
-  | only one quote mark stripped from each end | 2 |
-  | quotes-only value no longer read as unset | 7 |
+  | dev default not matched with its quotes removed | 1 |
+  | published value not matched with its quotes removed | 8 |
+  | edges not stripped for matching | 13 |
+  | curly quotes not recognised | 3 |
+  | zero-width characters not recognised | 1 |
+  | quotes-only value no longer read as unset | 9 |
+  | no warning for an accepted quoted code | 1 |
   | short warning keyed without the length (rotation goes silent) | 1 |
   | development warning claims a fallback for a configured value | 1 |
   | warnings keyed on the name alone (the swallowed-warning bug) | 2 |
-  | dev default not matched with its quotes removed | survived, equivalent |
-
-  The survivor is equivalent, not a gap. Every secret's deny list now holds every dev default
-  and compares the quote-stripped value, so a quoted own default is refused through that path
-  even when this check is removed. The outcome is the same refusal; only the message differs.
