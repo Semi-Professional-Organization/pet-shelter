@@ -386,6 +386,28 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(/publishes/);
     });
 
+    // Unicode categories, not a list: every quotation style is recognised.
+    it.each([
+      ["German low quotes", String.fromCharCode(0x201e), String.fromCharCode(0x201c)],
+      ["guillemets", String.fromCharCode(0xab), String.fromCharCode(0xbb)],
+      ["single guillemets", String.fromCharCode(0x2039), String.fromCharCode(0x203a)],
+      ["CJK corner brackets", String.fromCharCode(0x300c), String.fromCharCode(0x300d)],
+      ["a word joiner", "", String.fromCharCode(0x2060)],
+    ])("refuses a published code wrapped in %s", (_label, open, close) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", `${open}HOPE2026${close}`);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    it.each(["q7z4", "abc-def_123", "a(b)c", "x'y"])("keeps an accepted code's interior punctuation (%s)", (code) => {
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(getStaffInviteSecret()).toBe(code);
+    });
+
     it("refuses a session dev default in curly quotes", () => {
       vi.stubEnv("SESSION_SECRET", `${LDQ}${DEV_SECRET_DEFAULTS.SESSION_SECRET}${RDQ}`);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);

@@ -118,14 +118,17 @@ function isProduction(): boolean {
 type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; description: string };
 
 /**
- * Characters a pasted value can carry at its edges without meaning them: straight
- * quotes, the curly quotes that Word, Notion and rendered pages substitute, and
- * zero-width characters. Built from code points, so the source shows which.
+ * Characters a pasted value can carry at its edges without meaning them. These are
+ * Unicode categories, not a list, so no quotation style is missed. Pi/Pf/Ps/Pe
+ * cover every opening, closing, initial and final punctuation mark (curly quotes,
+ * German low quotes, guillemets, CJK corner brackets, brackets). Cf covers the
+ * invisible format characters (zero-width spaces, word joiner, BOM). Straight
+ * quotes and whitespace are added by hand. Listing characters one at a time was
+ * tried first, and each review found another style.
  */
-const EDGE_CHARS =
-  "\"'`" + String.fromCharCode(0x201c, 0x201d, 0x2018, 0x2019, 0x200b, 0x200c, 0x200d, 0xfeff);
-const ONLY_EDGE = new RegExp(`^[${EDGE_CHARS}\\s]*$`);
-const OUTER_EDGE = new RegExp(`^[${EDGE_CHARS}\\s]+|[${EDGE_CHARS}\\s]+$`, "g");
+const EDGE_CLASS = String.raw`[\p{Pi}\p{Pf}\p{Ps}\p{Pe}\p{Cf}"'` + "`" + String.raw`\s]`;
+const ONLY_EDGE = new RegExp(`^${EDGE_CLASS}*$`, "u");
+const OUTER_EDGE = new RegExp(`^${EDGE_CLASS}+|${EDGE_CLASS}+$`, "gu");
 
 /**
  * The one reading of a configured value, used for every secret so its quote
@@ -217,7 +220,8 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
   // why. Say so here, without the value.
   if (opts.allowShort && (!weakness || weakness.kind === "short") && unwrapped !== value) {
     warnOnce(
-      `${name}:quoted`,
+      // Keyed on the length too, so a rotation to another quoted code warns again.
+      `${name}:quoted:${value.length}`,
       `[security/secrets] ${name} starts or ends with a quote mark or an invisible ` +
         `character, which is part of the code: staff must type it too. Remove it if ` +
         `it was not meant to be part of the code.`
