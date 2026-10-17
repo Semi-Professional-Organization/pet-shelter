@@ -492,6 +492,20 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
     });
 
+    // A published value that itself ends in an edge character must still match:
+    // stripping the configured value alone would never find it.
+    it("refuses a published value that ends in a quote mark", () => {
+      vi.stubEnv("PROBE_SECRET", "pass'word'");
+
+      expect(() =>
+        resolveSecret("PROBE_SECRET", {
+          devDefault: DEV_DEFAULT,
+          minLength: 4,
+          published: ["pass'word'"],
+        })
+      ).toThrow(/publishes/);
+    });
+
     it("still refuses a whitespace-only invite code", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
@@ -570,6 +584,17 @@ describe("assertSecretsConfigured", () => {
 
       const shortWarnings = warn.mock.calls.filter((c) => /shorter than the recommended/.test(String(c[0])));
       expect(shortWarnings).toHaveLength(2);
+    });
+
+    it("warns again when rotated from one published code to another", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", "HOPE2026");
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", "content123");
+      getStaffInviteSecret();
+
+      const published = warn.mock.calls.filter((c) => /publishes/.test(String(c[0])));
+      expect(published).toHaveLength(2);
     });
 
     it("still warns that the invite code is short after warning that it was unset", () => {

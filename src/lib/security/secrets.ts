@@ -189,13 +189,13 @@ function describeWeakness(
   if (unwrapped === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  // `unwrapped` equals `value` unless the value carries edge characters, and no
-  // published value does, so comparing it alone covers both forms. Letter case
+  // Both forms, as set and with its edge characters removed: a published value
+  // that itself ended in a quote mark would otherwise never match. Letter case
   // is ignored only for a code someone types by hand (`allowShort`); for a key,
   // a case variant must not become a new way to refuse the boot.
   const fold = (v: string) => (caseInsensitive ? v.toLowerCase() : v);
-  const target = fold(unwrapped);
-  if (published.some((p) => fold(p) === target)) {
+  const targets = [fold(value), fold(unwrapped)];
+  if (published.some((p) => targets.includes(fold(p)))) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
   // Measured on the value as set, as before this policy changed. Measuring it
@@ -287,7 +287,8 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
   const used =
     weakness.kind === "unset" ? "using an insecure development fallback" : "using it as configured";
   warnOnce(
-    `${name}:${weakness.kind}`,
+    // Keyed on the length, like the other warnings, so a rotation warns again.
+    `${name}:${weakness.kind}:${value.length}`,
     `[security/secrets] ${name} is ${weakness.description}; ${used}. ` +
       `This configuration refuses to boot with NODE_ENV=production.`
   );
