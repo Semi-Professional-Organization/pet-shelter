@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import {
   computeAgeInMonths,
   computeAgeCategory,
@@ -181,39 +181,51 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
     });
 
     /**
-     * Weeks, and the abbreviations that make the word boundary safe.
+     * Every accepted unit spelling, one case each, in one table.
      *
-     * `3 minggu` is Malay for three weeks and used to read as three *months*, because a bare `m`
-     * with no boundary matches the m of minggu — ten weeks early, for exactly the operators the
-     * Malay vocabulary serves. Adding the boundary alone is a worse bug: it rejects every short
-     * month form that continues with letters. Both halves are pinned here, because fixing one
-     * and breaking the other passes a narrow test table.
+     * The unit patterns are a closed list behind a word boundary, so dropping a spelling does not
+     * fail loudly — that age silently falls through to the intake date, the very failure the list
+     * exists to prevent. The boundary is what stops `3 minggu` reading as months; listing every
+     * abbreviation beside it is what keeps the boundary from rejecting `2 mth`, `3 mnth` or `5 yo`.
+     *
+     * One table rather than several blocks, so each spelling is reported by name: a single `it`
+     * with many `expect`s stops at its first failure and hides every later one. Still hand-kept — a
+     * spelling *added* to a pattern goes untested until a row is added here. Making that structural
+     * means exporting the vocabulary from `petAge.ts` and feeding both the patterns and this table.
      */
-    it("reads weeks in both languages", () => {
-      expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).toBe("2026-05-22");
-      expect(approximateBirthDate("2 mggu", "2026-06-12").birthDate).toBe("2026-05-29");
-      expect(approximateBirthDate("3 weeks", "2026-06-12").birthDate).toBe("2026-05-22");
-      expect(approximateBirthDate("3 wks", "2026-06-12").birthDate).toBe("2026-05-22");
-      expect(approximateBirthDate("3 wk", "2026-06-12").birthDate).toBe("2026-05-22");
-    });
-
-    it("does not read a Malay week as a month", () => {
-      // The defect itself, named by the value it used to produce.
-      expect(approximateBirthDate("3 minggu", "2026-06-12").birthDate).not.toBe("2026-03-12");
-    });
-
-    it("still reads every short month and year form", () => {
-      // These four are what a bare `\b` after `m`/`y` silently destroys. If this test fails, the
-      // unit list lost an abbreviation and those ages now fall through to the intake date.
-      expect(approximateBirthDate("2 mth", "2026-06-12").birthDate).toBe("2026-04-12");
-      expect(approximateBirthDate("2 mths", "2026-06-12").birthDate).toBe("2026-04-12");
-      expect(approximateBirthDate("3 mnth", "2026-06-12").birthDate).toBe("2026-03-12");
-      expect(approximateBirthDate("5 yo", "2026-06-12").birthDate).toBe("2021-06-12");
-      // And the forms that already worked, so the curated list cannot quietly shrink.
-      expect(approximateBirthDate("6 mo", "2026-06-12").birthDate).toBe("2025-12-12");
-      expect(approximateBirthDate("4 mos", "2026-06-12").birthDate).toBe("2026-02-12");
-      expect(approximateBirthDate("3 yrs", "2026-06-12").birthDate).toBe("2023-06-12");
-      expect(approximateBirthDate("1 y/o", "2026-06-12").birthDate).toBe("2025-06-12");
+    it.each([
+      // Weeks, in both languages. `3 minggu` used to read as three *months* (2026-03-12): a bare
+      // `m` with no boundary matched the m of minggu, ten weeks early.
+      ["3 minggu", "2026-05-22"],
+      ["2 mggu", "2026-05-29"],
+      ["3 weeks", "2026-05-22"],
+      ["3 wks", "2026-05-22"],
+      ["3 wk", "2026-05-22"],
+      ["1 week", "2026-06-05"],
+      // Months. The bare `m` and the abbreviations the boundary would otherwise reject.
+      ["4 months", "2026-02-12"],
+      ["1 month", "2026-05-12"],
+      ["3 m", "2026-03-12"],
+      ["6 mo", "2025-12-12"],
+      ["4 mos", "2026-02-12"],
+      ["2 mth", "2026-04-12"],
+      ["2 mths", "2026-04-12"],
+      ["3 mnth", "2026-03-12"],
+      ["3 mnths", "2026-03-12"],
+      ["6 bln", "2025-12-12"],
+      ["4 bulan", "2026-02-12"],
+      // Years.
+      ["2 years", "2024-06-12"],
+      ["1 year", "2025-06-12"],
+      ["2 y", "2024-06-12"],
+      ["1 yr", "2025-06-12"],
+      ["3 yrs", "2023-06-12"],
+      ["5 yo", "2021-06-12"],
+      ["1 y/o", "2025-06-12"],
+      ["2 tahun", "2024-06-12"],
+      ["3 thn", "2023-06-12"],
+    ])("reads the accepted spelling %j", (input, expected) => {
+      expect(approximateBirthDate(input, "2026-06-12").birthDate).toBe(expected);
     });
 
     it("lets the largest unit win in a compound age", () => {
@@ -230,6 +242,86 @@ describe("Pet Age & Lifecycle Domain Math (petAge.ts)", () => {
       const born = approximateBirthDate("1 year", "2024-02-29").birthDate;
       expect(computeAgeInMonths(born, "2024-02-29")).toBe(11);
       expect(computeAgeCategory(born, "2024-02-29")).toBe("puppy_kitten");
+    });
+  });
+
+  /**
+   * A count so large the derived date leaves the range a `Date` can hold. These threw `RangeError`
+   * from `toISOString()`. Kept in its own block, away from the spellings.
+   */
+  describe("approximateBirthDate when the derived date overflows", () => {
+    const intake = "2026-06-12";
+
+    // Clamped to the earliest date a `Date` holds, so a larger age is still older — never the
+    // intake date, which would show a newborn. The compound case must not fall on to its smaller
+    // unit and come back as two months.
+    it.each(["300000 years", "99999999 months", "15000000 weeks", "300000 years 2 months"])(
+      "clamps %j to the earliest date instead of throwing",
+      (age) => {
+        expect(approximateBirthDate(age, intake).birthDate).toBe("-271821-04-20");
+      },
+    );
+
+    // The clamped date has to survive the read path, not just this function.
+    it("reads a clamped age as a senior, end to end", () => {
+      const pet = withDerivedAge({ intakeDate: intake, age: "15000000 weeks" }, intake);
+      expect(pet.ageCategory).toBe("senior");
+    });
+
+    // When the intake is out of range and the derived date overflows too, there is nothing to
+    // reckon from: the intake is returned as given, as for an age with no unit. (A derived date that
+    // fits is returned as computed, even from such an intake; see the next test.)
+    it("does not throw when the intake date itself is out of range", () => {
+      expect(approximateBirthDate("2 years", "300000-01-01").birthDate).toBe("300000-01-01");
+    });
+
+    // The arithmetic runs before any range check, so an intake just past the maximum still yields
+    // a birth date that fits, exactly as master computed it — not the intake date.
+    it("derives a date that fits even when the intake alone is past the maximum", () => {
+      expect(approximateBirthDate("1 week", "275760-09-14").birthDate).toBe("+275760-09-07");
+    });
+
+    // Inside the range nothing changes, odd as the readings are. No plausibility ceiling.
+    it.each([
+      ["61 years", "1965-06-12"],
+      ["12345678 wks", "-234583-03-21"],
+    ])("still derives %j, which stays inside the date range", (age, expected) => {
+      expect(approximateBirthDate(age, intake).birthDate).toBe(expected);
+    });
+
+    // `Date.UTC` reads a year of 0–99 as 1900–1999, and that stays: "fixing" it turned a
+    // hand-typed two-digit intake into 26 AD and handed the form dates its validator rejects.
+    it.each([
+      ["3 months", "26-06-12", "1926-03-12"],
+      ["2000 years", intake, "1926-06-12"],
+    ])("keeps %j from %j where master read it", (age, from, expected) => {
+      expect(approximateBirthDate(age, from).birthDate).toBe(expected);
+    });
+  });
+
+  /**
+   * `withDerivedAge` recomputes four fields, so their types must come from it, not from the input.
+   * `expectTypeOf` is checked by `tsc` (`npm run typecheck`), not at runtime; the `expect` beside
+   * each covers the runtime half.
+   */
+  describe("withDerivedAge's return type", () => {
+    it("types the flag it computes as boolean, not as the literal it was given", () => {
+      const r = withDerivedAge(
+        { intakeDate: "2026-06-12", age: "2 years", birthDateIsEstimate: false },
+        "2026-06-12",
+      );
+      // No birthDate, so the flag is forced to true at runtime — its type must not stay `false`.
+      expectTypeOf(r.birthDateIsEstimate).toEqualTypeOf<boolean>();
+      expect(r.birthDateIsEstimate).toBe(true);
+    });
+
+    it("does not collapse to never when the flag is passed as undefined", () => {
+      const r = withDerivedAge(
+        { intakeDate: "2026-06-12", age: "2 years", birthDateIsEstimate: undefined },
+        "2026-06-12",
+      );
+      expectTypeOf(r.age).toEqualTypeOf<string>();
+      expect(r.age).toBe("2 years");
     });
   });
 });

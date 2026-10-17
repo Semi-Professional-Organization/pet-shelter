@@ -60,6 +60,245 @@ Mutants are tabulated in the decision entry.
 - Quoted invite codes of 8-15 characters inside prose are not scanned by the guard; that is the
   stated ceiling.
 
+
+
+# Parser fixes from PR #42's review — overflow clamp, `withDerivedAge` type
+
+**Branch:** `fix/approximate-birth-date-shapes` · off master `187593c` · 2026-10-15
+**Decision:** `tasks/decisions/2026-10-15-the-app-does-not-refuse-a-fractional-age-it-cannot-show-as-unknown.md`
+**Lesson:** `tasks/lessons/2026-10-15-a-refusal-ported-into-a-function-that-must-return-becomes-a-default.md`
+
+## Items
+
+- [x] `approximateBirthDate` no longer throws. A count whose date leaves the `Date` range
+      (`15000000 weeks`, `300000 years`) made `toISOString()` throw `RangeError`. It now clamps
+      to the earliest date a `Date` holds (`-271821-04-20`), older than any age that fits. When
+      the intake is out of range too, the intake is returned as given, as for an age with no
+      unit. **Mostly defensive today:** the Prisma model has no `age`, and `usePetStore`'s
+      mount effect replaces the derived pets with the raw saved ones. What still differs, for
+      one render, is set out in the decision.
+- [x] `withDerivedAge` return type omits the four fields it recomputes. Pinned by two
+      `expectTypeOf` tests that fail `tsc` on the old signature.
+- [x] Tried and **withdrawn** after review, all for one reason: a refusal here is the intake
+      date, which shows a newborn. They were a fractional/range refusal (`3-4 years` went
+      from four years to newborn), a sixty-year ceiling (`61 years` went from senior to
+      newborn), and an overflow guard sending `15000000 weeks` to the intake date. Also dropped:
+      an ISO fall-through, and `setUTCFullYear` in place of `Date.UTC`, which turned a two-digit
+      intake (`26-06-12`) into 26 AD. See the decision and lesson.
+
+## Review
+
+- `/code-review high` runs in rounds, and the loop ends on a round with no findings. No
+  per-round record of findings is kept here. The commits that answered them are in PR #119's
+  commit list on GitHub, which survives the squash merge, and each message says what it changed.
+  The code last changed in the fix that restored `Date.UTC`'s century reading. Every later change
+  this branch itself made under `src/` and `tests/` is a comment; merges from `master` bring
+  other code in.
+- Grid: 476 age × intake pairs, master against the branch: 389 identical, 87 where master threw,
+  0 other. Every input master read without throwing reads the same, including every string PR
+  #113's rehearsal pins (the three non-ASCII ones added at its request).
+- #113's contract rehearsal, which imports the real function, passes on the merged tree (85/0).
+- Discriminating tests (fail on master by name): the four overflow clamps, the end-to-end
+  `senior` check, and the out-of-range intake. The rest of that block are guards that pass on
+  master by design.
+- The petAge suite passes at UTC-8, with `TZ` set in PowerShell and the offset confirmed as 480 in
+  the same shell. (Node ignores `TZ` set from Git Bash on this machine.)
+- The tree that will land, `master` plus #114 plus this PR, does not exist until #114 merges.
+  Every gate is run on it, and CI is green on it, before this PR is merged.
+
+**Deliberately not done.**
+- Fractional and ranged ages still misread (`0,5 tahun` gives five years). Fixing them needs an
+  "unknown age" path first; see the decision.
+- A non-ISO intake (`2026/06/12`) still leaks into `birthDate` unconverted on the fall-through.
+  It is pre-existing, and the obvious fix threw on an out-of-range intake for every age.
+- `Date.UTC` still reads years 0–99 as 1900–1999 (`2000 years` gives 1926). Fixing it alone
+  moved two-digit intakes to 26 AD; it needs `isoDateSchema`, `transparency.ts`'s `isIsoDate`
+  (which already reads 0–99 literally) and the intake format settled together.
+- Compact compounds (`2y3m`) and unlisted spellings (`6 mons`): tied to how the backfill's
+  fractional check is narrowed (`expand-refuses-compound-ages-written-in-short-units.md`).
+- Three copies of the estimate rule: latent, no writer produces `''`.
+- Distributive return type for a union-typed pet: needs an `as` cast and no caller passes a
+  union.
+- The `approximateBirthDate` docstring still explains rollover with `Date.UTC(2023, 1, 29)`.
+  That is still true of JavaScript and of `isoDate`, which uses `Date.UTC`.
+- `usePetStore`'s mount effect (`setPets(JSON.parse(saved))`) undoes the initializer's
+  `withDerivedAge`, so saved pets keep their stale stored `age`/`ageCategory`. Already named in
+  #114's parser entry as a known defect; not fixed here, because fixing it changes what every
+  returning browser shows and wants its own test.
+- `petRepository.ts` maps rows inside the same `try` as the Prisma query, so a mapping exception
+  would be handled as a database outage. No known input makes `mapDbPetToPet` throw today, so
+  this is latent and not recorded as an open entry. A round-six entry claiming otherwise was
+  deleted before it was published.
+- The decision cites an open entry that arrives with PR #114.
+
+# PR #42 follow-up — what a review run after the merge found
+
+**Branch:** `fix/pr-42-review-findings` · opened 2026-10-14 · off `master` at `187593c`
+**Review:** `/code-review max` of `18c533e..868e584`, run 2026-10-14, 15 findings
+
+## Items
+
+- [x] Re-established state before acting. #42 had been squash-merged as `187593c` with
+      `reviews: 0`, 36 seconds after the review started — tree identical to the branch head, so all
+      15 findings were on `master` and every fix had to be a follow-up PR.
+- [x] Split the findings with the session behind PR #113 rather than racing it. #113 already
+      carried the fix for the worst one (finding 1: the backfill stored a different date for
+      `1 tahun 6 months` than the app computed, despite this branch's claim that it "fails
+      closed"). That session took F10, F12 and F13 onto #113; this branch took the rest that do
+      not touch `petAge.ts` or the SQL.
+- [x] **F15 — corrected a false public ledger entry**, in two passes. The entry described a strict
+      `intakeDate` check that existed only in a reverted commit, asked for a production count
+      against a rule `master` never had, and reopened a settled decision. The first rewrite
+      overcorrected — it said a stranded record's *status* could not be changed (it can:
+      `updatePetStatus` bypasses `petFormSchema`) and that no existing row was at risk (the
+      `2024-01-01` column default can produce one). Second pass fixed both, and widened the
+      production check to every row with `birthDate > intakeDate`, so a hand-corrected birthday is
+      caught as well as the default. It also renamed the file, believing the name was the public
+      issue's title. It is not — the mirror takes the title from the first heading — and renaming
+      would have *closed* the issue as if settled. The rename was reverted; the new heading
+      retitles the issue in place.
+- [x] **F11 — pinned seven accepted spellings nothing tested.** `tahun`, `thn`, `bln`, bare `m`,
+      `yr`, `week`, `mnths`. One `it.each` case per spelling, so a dropped one is reported by name.
+      Proved each case kills its own mutant: dropped one spelling at a time from the real patterns,
+      ran the suite, restored the original bytes from memory. Seven mutants, each killed by exactly
+      its own case and no other, every time. Later rounds folded every accepted spelling into that
+      one table, so each unit alternative in the patterns now has a named row; the mutation result
+      was re-run after each change and held.
+- [x] **F14 — corrected the previous stream's record, here rather than in it.** The stream below
+      says the `minggu` regex was left alone; it was fixed in #42. An earlier pass on this branch
+      edited that stream in place. A review pointed out that `CLAUDE.md` step 5 and this file's own
+      header forbid reformatting what is below a new stream, so those edits were reverted and the
+      corrections moved into the section below — the stream underneath is now byte-identical to
+      `master`.
+- [x] Filed `drift-log-has-recorded-nothing-since-2026-10-13.md`. First version compared this session's
+      zero lines against 161 for another and blamed how the worktree was entered. Wrong: the whole
+      log is 161 lines from **one** session across 90 minutes on 2026-10-13, and nothing from anyone
+      since. Rewritten as what it is — the log went silent for every session. **Later folded
+      into** master's `drift-log-recorded-nothing-for-a-whole-session.md` (widened by #104 on
+      the same defect) and deleted, so the defect has one public issue, not two.
+
+- [x] **Reviewed this branch before opening it**, `/code-review high`, and it found ten more — six of
+      them prose stating a state that was not true, in a branch whose whole purpose was correcting
+      that. The tree hash was still in a public entry; two corrections cited squashed-branch commits
+      that are not ancestors of `master`; the stream said an open PR "deletes" a file; the drift
+      entry's comparison was meaningless; the rewritten date-rules entry named the wrong failure
+      and dropped a real risk. Each probed, all ten fixed or recorded.
+
+- [x] **A third and a fourth review, each probed before acting.** The third found the F5 premise
+      false and the rename mistaken; the fourth re-ran every parser claim and citation in the
+      rewritten entries and found them all correct — the probe-first method held where it was used.
+      Its findings were the places still reasoned rather than run: the drift entry called the
+      liveness log unconditional (the script exits before it on an unparseable payload, and both
+      logs share `tmpdir()`, so a moved temp directory would freeze both), the Malay decimals were
+      said to be refused "as fractional" (they are refused for having no unit), and the
+      born-at-the-shelter query needed the expand migration first and missed three of the four
+      rules a stored birthday can fail.
+- [x] **Found that the SQL emulator had been broken all along.** The Bash tool collapses a doubled
+      backslash in command text, so `\s` reached Node as a plain `s` and matched the letter. Its
+      verdicts for inputs with a space were computed on the wrong pattern; most happened to be
+      right. Rebuilt with the backslash from its character code and self-tested; only the English
+      decimals changed. A lesson and a memory note record it.
+
+- [x] **Fifth and sixth reviews.** The fifth found subtler interactions: a mixed Malay/English age
+      is stored wrong by the expand migration on `master` *now* (filed as live, not hypothetical);
+      the no-unit check runs before the fractional one; a sibling entry's planned fix would reopen
+      a divergence (the two now link each other); an env var redirects the hook's logs; the
+      liveness log cannot be attributed to a session. The sixth reported the code clean and every
+      cited fact correct, and found precision and process items — a headline still asserting a
+      conclusion the body had withdrawn, the wrong cause given for one refusal, a table claiming
+      "every spelling" with six missing, and a decision held in this stream instead of
+      `tasks/decisions/`. All fixed.
+
+## Corrections to the stream below
+
+`Pet form birth date — critique PR #42, then yield it to PR #94` is left exactly as written. These
+are the parts of it that are wrong, recorded here because a stream below this one is not edited:
+
+- **Its two "`minggu` left alone deliberately" bullets are false.** #42 made weeks a unit in both
+  languages after the owner ruled that "3 minggu" means three weeks. Both bullets were written
+  before that change and never revised.
+- **Where it cites a commit as where something landed, read `187593c`.** #42 was squash-merged to
+  `master` as `187593c`. Its branch commits — `925b7c6` (weeks), `4cad3ce` (a review's fix round) —
+  are real but are not ancestors of `master` (`git merge-base --is-ancestor 925b7c6 origin/master`
+  exits 1), and they stop resolving if `feat/pet-form-birth-date` is deleted.
+- **It omits the omission that mattered most:** the expand harness's `appRule` was left stale
+  while #42 widened the real function. In
+  `tasks/open/the-backfill-rehearsal-is-only-correct-at-positive-utc-offsets.md`.
+- **It omits that #42 merged unreviewed** after the 2026-10-13 review — including `925b7c6`, a
+  behaviour change, and `4cad3ce`, that review's own fix round.
+
+## Review
+
+The review's verdict on my own work is the thing worth recording. Of 15 findings, the largest
+group was prose I wrote asserting a state that was not true — a docstring naming SQL files that do
+no arithmetic, a ledger entry citing a tree hash as a commit, a stream saying a fix had not been
+made, a public entry describing a rule `master` never had. I named this pattern three times on the
+night it happened and kept producing it, because naming it did not change what I checked before
+writing. What would have: grepping each claim against `origin/master` at the moment of writing,
+not against the branch I was standing on.
+
+Then the review of *this* branch found six more of the same, written after I had already put the
+lesson into words — including the tree hash surviving in a public entry this branch was created
+to fix. Writing the rule down did not stop me breaking it. What did, in the second round, was
+mechanical: for the new parser entry, every claim was run against the real function on `master`
+through a throwaway test before it was written, and the two that resisted a runtime probe went to
+`tsc` instead. It held: the fourth review re-ran every parser claim and citation in that entry and
+found them all correct. (When this paragraph was first drafted, no review had yet seen the entry,
+and I first wrote that the second one had cleared it — which it could not have.) What later reviews
+still found was in claims I had *reasoned* rather than run, and in the probe itself: the SQL
+emulator had been silently broken all along. Check first, then write — and check the checker.
+
+The one that cost most was `6d32df9`. `git merge-tree --write-tree` prints a *tree* OID. I told
+another session "merges clean against master at `6d32df9`", it repeated the hash in good faith, and
+it ended up in a public issue as the commit where `master` still used local setters. `git cat-file
+-t 6d32df9` prints `tree`.
+
+## Explicitly NOT done
+
+The open defects are tracked in the ledger, not here — a work stream may record what was not done,
+but `tasks/README.md` does not let it hold an open question. Each was reproduced against the real
+function on `master` before being filed, rather than copied from the review.
+
+- **F4–F9, all of the parser defects — deferred until open PR #113 lands or is withdrawn**, at that
+  session's request, because #113 also edits `petAge.ts`. All are fixable in the app alone: the
+  backfill refuses every affected shape, so changing what the app computes for them changes nothing
+  it stores. Most are **regressions #42 introduced** with its trailing `\b` — `2y3m` read correctly
+  as two years before #42 and reads as three months now; `6 mons` read as six months and now falls
+  through to intake. Decimals read the wrong digits (`0,75 tahun` → seventy-five years; the English
+  cases predate #42), an unbounded count throws `RangeError`, the return type can lie, and three
+  copies of the estimate rule disagree on `birthDate: ''`. In
+  `approximate-birth-date-misreads-several-age-shapes.md`, every case reproduced against both the
+  pre-#42 and current function.
+- **F5's coupling to the SQL was a false premise, and this stream carried it for a round.** An
+  earlier version said compact compounds could not be fixed app-side because the backfill's `\M`
+  "fails the same way" and the two "agree, both wrong". It was accepted from another session after
+  only the app half was checked. The backfill's fractional check *aborts* on `2y3m` (`migration.sql`
+  lines 403 and 445–448), so nothing is stored wrong — it runs second, after the no-unit check at
+  429, which `2y3m` passes because its trailing `3m` is a unit the backfill reads. That session confirmed it on
+  a real Postgres and withdrew the claim from its own decision entry.
+- **F2 remainder — the expand harness's stale `appRule`.** Needs `embedded-postgres` to run, and
+  deleting the copy changes O1/O2 wholesale. In the rehearsal entry.
+- **`CLAUDE.md` step 7 still says nothing about what `git merge-tree --write-tree` prints.** Filed as
+  `tasks/open/close-out-step-7-does-not-say-what-merge-tree-prints.md`, so it surfaces at session
+  start and mirrors to an issue rather than living only here. A
+  review argued the tree-hash trap belongs there, not only in a lesson — and `CLAUDE.md` step 6
+  itself records that a lesson living only in `tasks/lessons/` was ignored and let PR #38 ship a
+  defect. Not changed here: `CLAUDE.md` is the process every session follows, and changing it is
+  the owner's decision rather than a ride-along on a ledger branch. The clause, ready to add to
+  step 7: *"Its first output line is the **tree** the merge would produce, not a commit — never
+  quote it as a ref. Use the exit status for clean or conflicted, and cite `git rev-parse
+  origin/master` for the commit."*
+- **The structural half of F11.** The seven spellings are pinned, but a spelling *added* to a
+  pattern still goes untested until someone adds a row. Making that impossible means exporting the
+  vocabulary from `petAge.ts` and feeding both the patterns and the test from it.
+- **The years and weeks word boundaries are unpinned, deliberately.** Removing either still leaves
+  the suite green, and pinning them would mean asserting a wrong answer. Recorded as a decision —
+  `tasks/decisions/2026-10-14-the-years-and-weeks-unit-boundaries-are-left-unpinned.md` — because it
+  is a choice someone could reasonably reverse, and a stream is not where the next session looks.
+- **The `tasks/todo.md` conflict with #113.** Both branches prepend a stream at the same anchor, so
+  whichever merges second conflicts and loses its CI run until resolved. Inherent to this file's
+  one-append-point design (its own header says so); resolved by keeping both streams.
+
 # The backfill rehearsal checks the real age function
 
 **Branch:** `fix/rehearsal-checks-the-real-age-function` · opened 2026-10-14 · follows #94 and #42

@@ -1,6 +1,7 @@
 # The write-path hook writes nothing at all for some sessions, so their drift cannot be read
 
-**Status:** open · opened 2026-09-22 · observed at `8d36ace` from a linked worktree
+**Status:** open · opened 2026-09-22 · observed at `8d36ace` from a linked worktree · cause still
+not established; the last section records what the session transcripts show
 
 `AGENTS.md` ("Read the drift log before the close write") and `CLAUDE.md` close-out step 2 both
 require a session to filter `claude-agent-drift.log` by its own id and account for every path. A
@@ -116,11 +117,51 @@ by `git status` instead (empty, so every touched file is in a commit) is a stron
 session but does not generalise, because it cannot see a write that was made and then reverted —
 the "while I am here" edit the log is meant to surface.
 
+## What the session transcripts show, 2026-10-17
+
+Observations from the transcripts under `~/.claude/projects`. They narrow the cause; they do not
+establish it.
+
+- **Where each session was launched splits logged from silent.** Every silent session on record
+  was launched from `.claude/worktrees/e2e-local-database-only`, a former worktree that
+  `60c30e3b` removed on 2026-09-21, leaving an empty directory that later gained a `.claude/`
+  folder holding only `settings.local.json`. Every session that logged (`60c30e3b`, `44dc9b6b`,
+  `1c022c97`) was launched from the main checkout. CLI background jobs are on both sides, so
+  "background job" does not separate them. `44dc9b6b`'s state file, read above as
+  misattribution, was its own.
+- **Sometimes the hook ran and could not find its script.** `.claude/settings.json` runs
+  `node "${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-guard.mjs"`. Some silent sessions record, in
+  their transcripts but not to the session, non-blocking `PostToolUse` errors of the form
+
+      Cannot find module 'D:\Dev\Repos\pet-shelter\.claude\worktrees\e2e-local-database-only\.claude\hooks\agent-guard.mjs'
+
+  They appear in periods: within such a period every successful matched call carries the error,
+  and outside them there is no sign the hook ran at all, including calls by the same session and
+  version at other times.
+
+At least two such periods are on record. Most sessions launched from that directory failed on
+every successful matched call in one shared window on 2026-09-21, from about 17:05Z to 17:41Z.
+One of them, `9b859c16`, failed again on 2026-10-15 from about 16:12Z to 16:34Z, on a later
+version, in the same worktree as before, still naming the stray directory's path. Every recorded
+error came from a call made with the shell in a worktree other than the stray directory; no call
+made from the stray directory itself shows one. `e8689beb`, which never left the stray directory,
+shows no sign of the hook at any time. What switches the hook between failing and not running is
+not established. Deleting
+the directory could break sessions still running from it, so the fix should wait until the
+mechanism is known.
+
+Unchanged facts from the 2026-10-14/15 reading: the current drift log holds 161 lines, all from
+`1c022c97`, 2026-10-13T15:09Z to 16:37Z, inside that session's lifetime; no
+`settings.local.json` (in the main checkout or the stray directory), and no user or managed
+settings layer, sets `hooks` or `disableAllHooks`; and older log contents are gone, by a means not
+observed.
+
 Related but distinct: `tasks/open/matcherless-hook-wiring-unverified.md` (only an alternation
 matcher has been observed firing — this one *is* an alternation matcher, and for this session it
 did not fire),
 and `tasks/open/drift-log-credits-a-merge-to-the-session-that-ran-it.md`.
 
-**Settles when:** a background-job session running in a linked worktree writes a file and finds
-that write in `claude-agent-drift.log` under its own `session_id` — or the close-out step that depends on the log
-is changed to name what it can actually verify, and this entry records which.
+**Settles when:** a session launched from `.claude/worktrees/e2e-local-database-only`, or any
+directory that is not a full checkout, writes a file and finds that write in
+`claude-agent-drift.log` under its own `session_id`. Alternatively, the close-out step that
+depends on the log is changed to name what it can actually verify, and this entry records which.
