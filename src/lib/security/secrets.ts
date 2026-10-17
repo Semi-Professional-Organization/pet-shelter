@@ -155,7 +155,8 @@ function stripEdges(value: string): string {
  *   quotes included. A value of nothing but quote marks and spaces (`""`, `"`,
  *   `" "`) is what someone types into a dashboard meaning "empty", so it reads as
  *   `""` (unset). No real secret is only quote marks.
- * - `unwrapped` has any leading and trailing quote marks removed, paired or not.
+ * - `unwrapped` has its edge characters removed (see `EDGE_CLASS`: quote marks,
+ *   the backtick, invisible format characters and whitespace), paired or not.
  *   It is used only to *recognise* a published value pasted with quotes
  *   (`"HOPE2026"`, `""HOPE2026""`, `"HOPE2026`), never as the value, so an
  *   accepted secret is never altered.
@@ -188,7 +189,7 @@ function describeWeakness(
   if (unwrapped === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  // `unwrapped` equals `value` unless the value carries outer quotes, and no
+  // `unwrapped` equals `value` unless the value carries edge characters, and no
   // published value does, so comparing it alone covers both forms. Letter case
   // is ignored only for a code someone types by hand (`allowShort`); for a key,
   // a case variant must not become a new way to refuse the boot.
@@ -197,10 +198,12 @@ function describeWeakness(
   if (published.some((p) => fold(p) === target)) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
-  // Measured without edge quote marks and invisible characters: they carry no
-  // entropy, and counting them let 31 zero-width spaces plus one letter pass a
-  // 32-character minimum.
-  if (unwrapped.length < minLength) {
+  // Measured on the value as set, as before this policy changed. Measuring it
+  // without its edge characters was tried and reverted: a genuinely random key
+  // that happens to start or end with a quote mark then fell below its minimum
+  // and refused the boot, and padding in the middle still counted anyway. A
+  // length check cannot measure entropy; padding a key is an operator mistake.
+  if (value.length < minLength) {
     return { kind: "short", description: `shorter than the required ${minLength} characters` };
   }
   return null;
@@ -235,13 +238,14 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
     opts.allowShort === true
   );
 
-  // A value accepted *with* outer quotes or invisible characters: they are part
-  // of it, so anyone entering it without them (staff typing the invite code, a
-  // caller sending the admin key) is refused with nothing to say why. Say so
-  // here, without the value, for every secret.
   // Whether this value is used rather than refused, computed once so the warning
   // below and the two accepting branches cannot drift apart.
   const accepted = !weakness || (opts.allowShort === true && weakness.kind === "short");
+
+  // A value accepted *with* edge characters (see `stripEdges`): they are part of
+  // it, so anyone entering it without them (staff typing the invite code, a
+  // caller sending the admin key) is refused with nothing to say why. Say so
+  // here, without the value, for every secret.
   if (accepted && unwrapped !== value) {
     warnOnce(
       // Keyed on the length too, so a rotation to another quoted code warns again.

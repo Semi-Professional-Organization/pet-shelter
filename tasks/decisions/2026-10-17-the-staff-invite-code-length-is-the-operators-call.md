@@ -61,6 +61,11 @@ includes the value.
   `PUBLISHED_INVITE_CODES` and checked before the short waiver. The list also holds every
   documented development default, so another secret's default pasted into the invite slot, or
   the invite's own default in another letter case, is refused.
+- **Length is measured on the value as set, as before.** Measuring it without the edge
+  characters was tried for one round and reverted. It refused a genuinely random key that
+  happens to start or end with a quote mark, which is the outage this change removes, and
+  padding in the middle of a value still counted. A length check cannot measure entropy, and
+  padding a key with invisible characters is an operator mistake, not an attack.
 - **`SESSION_SECRET` (32) and `ADMIN_SECRET_KEY` (16) keep their minimums.** Only the invite code
   passes `allowShort`. Review found two older gaps in them, both fixed here: each accepted
   *another* secret's dev default (the wrong `.env.example` line), and its own default with the
