@@ -21,8 +21,8 @@ That fix also adds two **new** refusals for the session and admin keys: any secr
 development default (not only its own), and a default with its `.env.example` quotes left on.
 Both are right, because a deployment configured that way is running on a key anyone can read
 in this repository. But a deployment that happens to be configured that way today would stop
-booting on its next deploy. **Check the production values of `SESSION_SECRET` and
-`ADMIN_SECRET_KEY` before deploying it.**
+booting on its next deploy. **Check the production values of all three secrets before
+deploying it.** The invite code gains the same refusals, and also in any letter case.
 
 ## The upgrade path
 

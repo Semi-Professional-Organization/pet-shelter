@@ -315,9 +315,6 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).not.toThrow();
     });
 
-    // An accepted code is read exactly as set, quotes included, like every
-    // secret: stripping them was tried and reverted, since it changed which
-    // code staff must type.
     // What someone enters in a hosting dashboard meaning "empty". No real code
     // is only quote marks, so reading these as unset changes no code.
     it.each(['""', "''", '"', '" "', "``"])("treats an invite code of only quote marks (%s) as unset", (code) => {

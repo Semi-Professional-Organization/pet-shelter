@@ -10,7 +10,7 @@
  * | Environment              | Missing / weak / known-default secret                      |
  * |--------------------------|------------------------------------------------------------|
  * | `production`             | throw — fail the boot loudly rather than serve forgeries    |
- * | `development` / `test`   | warn once; an unset secret falls back to a labelled dev     |
+ * | `development` / `test`   | warn once per reason; an unset secret falls back to a dev   |
  * |                          | default, any other weak value is used as configured         |
  *
  * "Weak" covers four cases: unset (or nothing but whitespace, quote marks, the
@@ -252,7 +252,8 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
       `${name}:quoted:${value.length}`,
       `[security/secrets] ${name} starts or ends with a quote mark or an invisible ` +
         `character, which is part of the value: anyone entering it must include it ` +
-        `too. Remove it if it was not meant to be part of the value.`
+        `too. Check whether it was meant to be; a random key may legitimately end ` +
+        `in one, and changing it would refuse every caller sending the old value.`
     );
   }
 

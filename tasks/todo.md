@@ -24,9 +24,9 @@ and every public page returned 500. The owner chose to make the code's length th
 short code now boots with a warning, and the risk accepted is in
 `tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
 
-> **Before deploying this branch:** check the production values of `SESSION_SECRET` and
-> `ADMIN_SECRET_KEY`. Either one now refuses the boot if it is any secret's development default,
-> with or without quotes. That is correct, because such a key is public in this repository. But
+> **Before deploying this branch:** check the production values of all three secrets. Each now
+> refuses the boot if it is any secret's development default, with or without quotes, and the
+> invite code also in any letter case. That is correct, because such a key is public in this repository. But
 > a production configured that way today would return 500 on every page after the deploy.
 
 - [x] `allowShort` waives only the "short" weakness, and only for the invite code.
