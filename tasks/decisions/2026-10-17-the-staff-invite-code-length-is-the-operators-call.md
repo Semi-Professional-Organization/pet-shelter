@@ -144,30 +144,32 @@ stays at 16 or more random characters.
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
   `/admin/login` with 200, and its log carried the warning without the value. Started with
   `HOPE2026` or with the development default, it refused to boot.
-- Mutants, all killed:
+- Mutants, all 25 killed, against the committed code:
 
   | Mutant | Tests failed |
   |---|---|
-  | invite accessor without `allowShort` | 10 |
-  | every weakness waived, not only `short` | 39 |
-  | `allowShort` applied to every secret | 2 |
-  | published codes not passed to the invite accessor | 19 |
-  | published check skipped | 21 |
-  | staff passwords left out of the invite deny list | 5 |
-  | dev defaults left out of the invite deny list | 3 |
-  | other secrets' defaults not passed to session and admin | 2 |
-  | invite code compared case-sensitively | 5 |
-  | keys compared case-insensitively (a new boot refusal) | 1 |
-  | dev default compared case-insensitively (a new boot refusal) | 2 |
-  | dev default not matched with its quotes removed | 1 |
-  | published value not matched with its quotes removed | 8 |
-  | edges not stripped for matching | 13 |
-  | quotation marks not recognised | 12 |
+  | quotes-only no longer read as unset | 9 |
+  | edges not stripped for matching | 30 |
+  | edge stripping quadratic again | 17 |
+  | no warning for an accepted quoted value | 3 |
+  | quoted warning for the invite code only | 1 |
+  | quotation marks not recognised | 13 |
   | brackets treated as quote marks | 2 |
   | invisible format characters not recognised | 2 |
-  | quoted warning keyed without the length (rotation goes silent) | 1 |
-  | quotes-only value no longer read as unset | 9 |
-  | no warning for an accepted quoted code | 1 |
-  | short warning keyed without the length (rotation goes silent) | 1 |
+  | quoted warning keyed without the length | 1 |
+  | dev defaults left out of the invite deny list | 3 |
+  | invite accessor without allowShort | 15 |
+  | every weakness waived, not only short | 45 |
+  | allowShort applied to every secret | 2 |
+  | published codes not passed to the invite accessor | 25 |
+  | published check skipped | 27 |
+  | staff passwords left out of the invite deny list | 5 |
+  | other secrets' defaults not passed to session and admin | 2 |
+  | invite code compared case-sensitively | 5 |
+  | keys compared case-insensitively (new boot refusal) | 1 |
+  | dev default compared case-insensitively (new boot refusal) | 2 |
+  | dev default not matched with its quotes removed | 1 |
+  | published value not matched with its quotes removed | 14 |
+  | short warning keyed without the length | 1 |
   | development warning claims a fallback for a configured value | 1 |
-  | warnings keyed on the name alone (the swallowed-warning bug) | 2 |
+  | all warnings keyed on the name alone (the swallowed-warning bug) | 3 |
