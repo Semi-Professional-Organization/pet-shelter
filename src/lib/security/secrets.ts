@@ -76,9 +76,10 @@ export const DEV_SECRET_DEFAULTS = {
 } as const;
 
 /**
- * Placeholder values earlier versions of `.env.example` published for these
- * secrets. Still in git history, so still public: a deploy copied from an old
- * example file must not boot on one.
+ * Values this repository published for these secrets in the past: placeholders
+ * from earlier versions of `.env.example`, and the hardcoded fallbacks the source
+ * used before `3b43293` (still printed in `docs/tasks/TARGET_SECRET_HARDENING.md`).
+ * Still in git history, so still public: a deploy must not boot on one.
  */
 const PUBLISHED_PLACEHOLDERS: readonly string[] = [
   "replace-me-with-a-random-32-plus-character-secret",
@@ -86,6 +87,8 @@ const PUBLISHED_PLACEHOLDERS: readonly string[] = [
   "replace-me-with-a-random-admin-secret-key",
   "generate-a-secure-admin-secret-key-here",
   "replace-me-with-a-random-staff-invite-code",
+  "hope-for-strays-secret-key-32-chars-long-secure-salt!",
+  "hope_shelter_admin_secret_key_2026",
 ];
 
 /**
@@ -210,7 +213,9 @@ function describeWeakness(
   // that itself ended in a quote mark would otherwise never match. Letter case
   // is ignored only for a code someone types by hand (`allowShort`); for a key,
   // a case variant must not become a new way to refuse the boot.
-  const fold = (v: string) => (caseInsensitive ? v.toLowerCase() : v);
+  // NFKC first, so fullwidth or other compatibility forms typed through an
+  // input method (a fullwidth HOPE2026) fold to the published value too.
+  const fold = (v: string) => (caseInsensitive ? v.normalize("NFKC").toLowerCase() : v);
   const targets = [fold(value), fold(unwrapped)];
   if (published.some((p) => targets.includes(fold(p)))) {
     return { kind: "published", description: "set to a value this repository publishes" };
@@ -313,7 +318,9 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
     weakness.kind === "unset" ? "using an insecure development fallback" : "using it as configured";
   warnOnce(
     // Keyed on the length, like the other warnings, so a rotation warns again.
-    `${name}:${weakness.kind}:${value.length}`,
+    // On the description, not the kind: "not set" and "only quote marks" share
+    // the kind and the length, but are different things to tell an operator.
+    `${name}:${weakness.description}:${value.length}`,
     `[security/secrets] ${name} is ${weakness.description}; ${used}. ` +
       `This configuration refuses to boot with NODE_ENV=production.`
   );

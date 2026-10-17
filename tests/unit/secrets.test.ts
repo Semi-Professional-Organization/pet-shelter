@@ -530,6 +530,29 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
     });
 
+    // Hardcoded fallbacks the source used before 3b43293; still in git history.
+    it.each([
+      ["SESSION_SECRET", "hope-for-strays-secret-key-32-chars-long-secure-salt!"],
+      ["ADMIN_SECRET_KEY", "hope_shelter_admin_secret_key_2026"],
+    ])("refuses %s set to its former hardcoded fallback", (name, fallback) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, fallback);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+    });
+
+    it("refuses a published invite code typed in fullwidth characters", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      // HOPE2026 in fullwidth forms, built from code points.
+      const fullwidth = [..."HOPE2026"].map((c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0)).join("");
+      vi.stubEnv("STAFF_INVITE_SECRET", fullwidth);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
     it("still refuses a whitespace-only invite code", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
@@ -619,6 +642,17 @@ describe("assertSecretsConfigured", () => {
 
       const published = warn.mock.calls.filter((c) => /publishes/.test(String(c[0])));
       expect(published).toHaveLength(2);
+    });
+
+    it("warns separately for an unset value and a quotes-only one", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", '""');
+      getStaffInviteSecret();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/STAFF_INVITE_SECRET is not set/));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/set to only quote marks/));
     });
 
     it("still warns that the invite code is short after warning that it was unset", () => {
@@ -811,7 +845,8 @@ describe("no operator-facing file publishes a secret that boots in production", 
           ...[...line.matchAll(UNQUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[2]),
           ...[...line.matchAll(QUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[3]),
         ];
-        for (const value of values) {
+        // A quoted assignment is matched by both quoted patterns; check it once.
+        for (const value of new Set(values)) {
           if (value === name || (NAMES as string[]).includes(value)) continue;
           if (looksLikeCode(value)) continue;
           out.push({ file, line: index + 1, name, value });
