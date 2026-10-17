@@ -149,17 +149,22 @@ stays at 16 or more random characters.
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
   `/admin/login` with 200, and its log carried the warning without the value. Started with
   `HOPE2026` or with the development default, it refused to boot.
-- Mutants, all 26 killed, against the committed code:
+- Mutants, all 28 killed, against the committed code:
 
   | Mutant | Tests failed |
   |---|---|
+  | published check skipped | 29 |
+  | published value not matched with its edges removed | 14 |
+  | published value matched only with its edges removed | 1 |
+  | dev warning keyed without the length | 1 |
+  | all warnings keyed on the name alone (the swallowed-warning bug) | 4 |
   | length measured without edge characters (refuses a random key) | 1 |
   | no warning for an accepted quoted value | 3 |
   | quoted warning for the invite code only | 1 |
-  | every weakness waived, not only short | 45 |
+  | every weakness waived, not only short | 46 |
   | allowShort applied to every secret | 2 |
   | quotes-only no longer read as unset | 9 |
-  | edges not stripped for matching | 30 |
+  | edges not stripped for matching | 31 |
   | edge stripping quadratic again | 17 |
   | quotation marks not recognised | 13 |
   | brackets treated as quote marks | 2 |
@@ -167,15 +172,12 @@ stays at 16 or more random characters.
   | quoted warning keyed without the length | 1 |
   | dev defaults left out of the invite deny list | 3 |
   | invite accessor without allowShort | 15 |
-  | published codes not passed to the invite accessor | 25 |
-  | published check skipped | 27 |
-  | staff passwords left out of the invite deny list | 5 |
+  | published codes not passed to the invite accessor | 26 |
+  | staff passwords left out of the invite deny list | 6 |
   | other secrets' defaults not passed to session and admin | 2 |
   | invite code compared case-sensitively | 15 |
   | keys compared case-insensitively (new boot refusal) | 3 |
   | dev default compared case-insensitively (new boot refusal) | 2 |
   | dev default not matched with its quotes removed | 1 |
-  | published value not matched with its quotes removed | 14 |
   | short warning keyed without the length | 1 |
   | development warning claims a fallback for a configured value | 1 |
-  | all warnings keyed on the name alone (the swallowed-warning bug) | 3 |
