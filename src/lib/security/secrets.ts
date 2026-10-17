@@ -125,8 +125,13 @@ function describeWeakness(
   if (value === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  const lowered = value.toLowerCase();
-  if (published.some((p) => p.toLowerCase() === lowered)) {
+  // Matched with and without one pair of surrounding quotes, so a published
+  // code pasted as `"HOPE2026"` is still recognised. This affects only what is
+  // refused; an accepted value is never altered.
+  const candidates = [value, value.replace(/^(["'`])([\s\S]*)\1$/, "$2")].map((v) =>
+    v.trim().toLowerCase()
+  );
+  if (published.some((p) => candidates.includes(p.toLowerCase()))) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
   if (value.length < minLength) {
@@ -155,14 +160,21 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
   // stripping them for the invite code was tried and reverted, because it
   // changed which code staff must type and could newly refuse the boot.
   const value = (process.env[name] ?? "").trim();
-  const weakness = describeWeakness(value, opts.devDefault, minLength, opts.published);
+  // For a secret an operator types by hand (`allowShort`), a value of nothing but
+  // quote marks and spaces (`""`, `"`, `" "`) is what someone enters meaning
+  // "empty"; it is read as unset. No real code is only quote marks, so this
+  // changes no code anyone types.
+  const blank = opts.allowShort && /^["'`\s]*$/.test(value);
+  const weakness = describeWeakness(blank ? "" : value, opts.devDefault, minLength, opts.published);
 
   if (!weakness) return value;
 
   if (opts.allowShort && weakness.kind === "short") {
     // Only the length is wrong, and for this secret the operator may choose that.
+    // Keyed on the length too: rotating to a different short code without a
+    // redeploy (the accessor reads per call) warns again.
     warnOnce(
-      `${name}:${weakness.kind}`,
+      `${name}:short:${value.length}`,
       `[security/secrets] ${name} is shorter than the recommended ${minLength} ` +
         `characters. It is accepted, but a short value is easier to guess.`
     );

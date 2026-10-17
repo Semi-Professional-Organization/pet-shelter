@@ -315,9 +315,27 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).not.toThrow();
     });
 
-    // What someone types into a hosting dashboard meaning "empty".
-    // Exactly as set, quotes included, like every secret: stripping them was
-    // tried and reverted, since it changed which code staff must type.
+    // An accepted code is read exactly as set, quotes included, like every
+    // secret: stripping them was tried and reverted, since it changed which
+    // code staff must type.
+    // What someone enters in a hosting dashboard meaning "empty". No real code
+    // is only quote marks, so reading these as unset changes no code.
+    it.each(['""', "''", '"', '" "', "``"])("treats an invite code of only quote marks (%s) as unset", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+    });
+
+    it.each(['"HOPE2026"', "'admin123'", '"Hope2026"'])("refuses a published code wrapped in quotes (%s)", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
     it("reads the invite code exactly, quotes included", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
@@ -378,6 +396,17 @@ describe("assertSecretsConfigured", () => {
       expect(getStaffInviteSecret()).toBe("HOPE2026");
       expect(warn).toHaveBeenCalledWith(expect.stringMatching(/publishes; using it as configured/));
       expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/fallback/));
+    });
+
+    it("warns again when the invite code is rotated to a different short length", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", "twelve-chars");
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", "q7z");
+      getStaffInviteSecret();
+
+      const shortWarnings = warn.mock.calls.filter((c) => /shorter than the recommended/.test(String(c[0])));
+      expect(shortWarnings).toHaveLength(2);
     });
 
     it("still warns that the invite code is short after warning that it was unset", () => {
@@ -531,8 +560,10 @@ describe("no operator-facing file publishes a secret that boots in production", 
       value.includes("/") ||
       /\.(ts|tsx|mjs|js|json|md|env)$/.test(value) ||
       /^[A-Z][A-Za-z]+Error$/.test(value) ||
-      // Placeholders an operator replaces, not values: <your-code>, ..., $VAR, #.
-      /^(<.*>|\.{3,}|\$.*|#.*)$/.test(value)
+      // Placeholders an operator replaces, not values: <your-code>, ..., $VAR or
+      // ${VAR}, and a shell comment ("# ..."). Narrow on purpose: a real value
+      // may start with # or $ (#hope42), and that must still be checked.
+      /^(<.*>|\.{3,}|\$[A-Z_][A-Z0-9_]*|\$\{[^}]+\}|#)$/.test(value)
     );
   }
 
