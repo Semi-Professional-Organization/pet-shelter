@@ -111,6 +111,10 @@ stays at 16 or more random characters.
   prose ("strong", "none"). A 4-character floor was tried, and review showed it would fail the
   guard on prose. So a short invite code written in quotes inside a sentence is not scanned; one
   on an unquoted `NAME=value` line is, at any length. The ceiling is stated where it is set.
+- **Refusing CI's `SESSION_SECRET`** (`ci-only-...` in `.github/workflows/ci.yml`). It is
+  public, but the Playwright job seals its own admin session cookie with it, so refusing it
+  would break CI whenever that job runs a production server. The value's name says what it
+  is for.
 - **A deny-list of variants of the published codes** (`HOPE2026!`, `HOPE2027`, `12345`): no
   list catches every derivation, and the length recommendation is the defence.
 - **Refusing every short string the repository contains**, such as test fixtures: no list can

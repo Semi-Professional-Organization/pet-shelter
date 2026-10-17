@@ -37,9 +37,11 @@ short code now boots with a warning, and the risk accepted is in
 - [x] The session and admin keys now also refuse any secret's dev default, quoted or not
       (exact letter case). These refusals are new; see the note above.
 - [x] The `.env.example` test and the operator-file guard call the real accessors.
-- [x] Fourteen `/code-review high` rounds, each verified, fixed or declined with a reason in the
-      decision entry. Two of my own fixes were reverted along the way (case-insensitive key
-      matching, stripping quotes from an accepted code).
+- [x] Twenty-four `/code-review high` rounds. The loop ended at round 24, the first in which
+      every finding was declined with a written reason (the exit rule in the decision entry).
+      Fixes along the way were verified by probe and mutant. Four of my own changes were
+      reverted after review: case-insensitive key matching, stripping quotes from an accepted
+      code, quote-free length measurement, and editing an old decision entry.
 
 ## Review
 
