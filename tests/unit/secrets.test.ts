@@ -337,6 +337,21 @@ describe("assertSecretsConfigured", () => {
     });
 
     // The same reading for every secret, so one mistake gets one diagnosis.
+    // `.env.example` publishes each default inside quotes; pasting that value
+    // verbatim used to boot production on a key anyone can read here.
+    it.each([
+      ["SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET],
+      ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY],
+      ["STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET],
+    ])("refuses %s set to its dev default with the quotes left on", (name, devDefault) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, `"${devDefault}"`);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is (still set to the documented|set to a value)`));
+    });
+
     it("reports a quotes-only admin key as not set, as for the invite code", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", '""');
@@ -584,6 +599,7 @@ describe("no operator-facing file publishes a secret that boots in production", 
   }
 
   const QUOTED_8_PLUS = /[`"']([^`"']{8,})[`"']/g;
+  const QUOTED_16_PLUS = /[`"']([^`"']{16,})[`"']/g;
   /** `NAME=value` with no quotes, as in an env block in a runbook. */
   // A single `=` only: `===` and `=>` in a code sample are not assignments.
   const UNQUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=(?![=>])\s*([^\s"'`]+)/g;
@@ -603,13 +619,14 @@ describe("no operator-facing file publishes a secret that boots in production", 
         const name = named[0];
         // An assignment (`NAME=value`, quoted or not) is always a value, so it is
         // read at any length. A quoted token elsewhere may be prose ("strong",
-        // "none"), so it is read only at 8+ characters. ceiling: a short invite
-        // code written in quotes inside a sentence, not as an assignment, is not
-        // scanned.
+        // "none"), so it is read only at 8+ characters, or 16+ on invite-code
+        // lines, where any shorter quoted word would count as a code that boots.
+        // ceiling: an invite code under 16 characters written in quotes inside a
+        // sentence, not as an assignment, is not scanned.
         const values = [
-          // Not on invite-code lines: any quoted word there ("offboarding") would
-          // now count as a code that boots. There, only assignments are read.
-          ...(name === "STAFF_INVITE_SECRET" ? [] : [...line.matchAll(QUOTED_8_PLUS)].map((m) => m[1])),
+          ...[...line.matchAll(name === "STAFF_INVITE_SECRET" ? QUOTED_16_PLUS : QUOTED_8_PLUS)].map(
+            (m) => m[1]
+          ),
           ...[...line.matchAll(UNQUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[2]),
           ...[...line.matchAll(QUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[3]),
         ];

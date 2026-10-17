@@ -10,12 +10,13 @@
  * | Environment              | Missing / weak / known-default secret                      |
  * |--------------------------|------------------------------------------------------------|
  * | `production`             | throw — fail the boot loudly rather than serve forgeries    |
- * | `development` / `test`   | return a clearly-labelled dev default and warn once         |
+ * | `development` / `test`   | warn once; an unset secret falls back to a labelled dev     |
+ * |                          | default, any other weak value is used as configured         |
  *
- * "Weak" covers four cases: unset (or whitespace), *equal to the documented
- * development default* (which catches an `.env.example` value copied verbatim
- * into a real deploy), equal to a value listed in `published`, and shorter than
- * `minLength`.
+ * "Weak" covers four cases: unset (or whitespace, or only quote marks), *equal
+ * to the documented development default*, with or without surrounding quotes
+ * (which catches an `.env.example` value copied verbatim into a real deploy),
+ * equal to a value listed in `published`, and shorter than `minLength`.
  *
  * One exception: an accessor may pass `allowShort`, which turns "shorter than
  * `minLength`" alone into a warning. Only `STAFF_INVITE_SECRET` does. The other
@@ -144,10 +145,12 @@ function describeWeakness(
   published: readonly string[] = []
 ): Weakness | null {
   if (value.length === 0) return { kind: "unset", description: "not set" };
-  // Exact, as it always was. Matching case variants too would be a new way to
-  // refuse the boot for every secret, which is the outage this policy change
-  // is meant to remove; `published` is case-insensitive because it is new.
-  if (value === devDefault) {
+  // Exact in case, as it always was: matching case variants too would be a new
+  // way to refuse the boot for every secret. But also with its outer quotes
+  // removed, because `.env.example` publishes the default *inside* quotes, and
+  // pasting that line's value verbatim left a session or admin key that anyone
+  // can read in this repository. Refusing that boot is the point of the check.
+  if (value === devDefault || unwrapped === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
   // As set and with its outer quotes removed (see `readConfigured`).
