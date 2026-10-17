@@ -75,6 +75,13 @@ export const DEV_SECRET_DEFAULTS = {
 } as const;
 
 /**
+ * Every documented development default. Passed as `published` to the session and
+ * admin accessors too, so one secret's default pasted into another's slot (the
+ * wrong `.env.example` line) is refused, not just a secret's own default.
+ */
+const ALL_DEV_DEFAULTS: readonly string[] = Object.values(DEV_SECRET_DEFAULTS);
+
+/**
  * Invite codes this repository has published, as hardcoded literals that once
  * bypassed the configured secret (`tests/unit/auth.test.ts` pins that they no
  * longer do). The 16-character minimum used to refuse them in production; with
@@ -95,15 +102,8 @@ const PUBLISHED_INVITE_CODES: readonly string[] = [
   // Every documented development default, so another secret's default pasted
   // into the invite slot, or this one in another letter case, is refused too.
   // (The invite's own default is also refused by exact match, as for all.)
-  ...Object.values(DEV_SECRET_DEFAULTS),
+  ...ALL_DEV_DEFAULTS,
 ];
-
-/**
- * Every documented development default. Passed as `published` to the session and
- * admin accessors too, so one secret's default pasted into another's slot (the
- * wrong `.env.example` line) is refused, not just a secret's own default.
- */
-const ALL_DEV_DEFAULTS: readonly string[] = Object.values(DEV_SECRET_DEFAULTS);
 
 /** Minimum length for the HMAC key that signs every session cookie. */
 const SESSION_SECRET_MIN_LENGTH = 32;

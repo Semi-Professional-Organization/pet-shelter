@@ -113,9 +113,10 @@ stays at 16 or more random characters.
   neither can drift from the app's policy. The guard reads quoted values of 8+ characters and
   assignments (`NAME=value`, `NAME="value"`, `export NAME='value'`) of any length, skipping
   placeholders such as `<your-code>` and `$(command)`, and code such as `===` and `=>`. On
-  invite-code lines it reads assignments only, because a quoted prose word there
-  ("offboarding") would otherwise count as a code that boots. Quoted tokens there are read at
-  16+ characters, so a long code written in prose is still caught.
+  invite-code lines, quoted tokens outside an assignment are read only at 16+ characters,
+  because a shorter quoted prose word there ("offboarding") would otherwise count as a code
+  that boots. A long code written in prose is still caught; one of 8-15 characters is not, and
+  that is the stated ceiling.
 - A probe planted lines in a runbook:
 
   | Planted line | Result |
