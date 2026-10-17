@@ -328,12 +328,21 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
     });
 
-    it.each(['"HOPE2026"', "'admin123'", '"Hope2026"'])("refuses a published code wrapped in quotes (%s)", (code) => {
+    it.each(['"HOPE2026"', "'admin123'", '"Hope2026"', '""HOPE2026""', `"'HOPE2026'"`])("refuses a published code wrapped in quotes (%s)", (code) => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
       expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    // The same reading for every secret, so one mistake gets one diagnosis.
+    it("reports a quotes-only admin key as not set, as for the invite code", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", '""');
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY is not set/);
     });
 
     it("reads the invite code exactly, quotes included", () => {
@@ -387,6 +396,13 @@ describe("assertSecretsConfigured", () => {
       vi.spyOn(console, "warn").mockImplementation(() => {});
 
       expect(() => assertSecretsConfigured()).not.toThrow();
+    });
+
+    it("falls back to the dev default for a quotes-only value, as the warning says", () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", '""');
+
+      expect(getStaffInviteSecret()).toBe(DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET);
     });
 
     it("says a published value is used as configured, not that a fallback is in use", () => {
@@ -560,10 +576,10 @@ describe("no operator-facing file publishes a secret that boots in production", 
       value.includes("/") ||
       /\.(ts|tsx|mjs|js|json|md|env)$/.test(value) ||
       /^[A-Z][A-Za-z]+Error$/.test(value) ||
-      // Placeholders an operator replaces, not values: <your-code>, ..., $VAR or
-      // ${VAR}, and a shell comment ("# ..."). Narrow on purpose: a real value
-      // may start with # or $ (#hope42), and that must still be checked.
-      /^(<.*>|\.{3,}|\$[A-Z_][A-Z0-9_]*|\$\{[^}]+\}|#)$/.test(value)
+      // Placeholders an operator replaces, not values: <your-code>, ..., $VAR,
+      // ${VAR}, $(command), and a shell comment ("# ..."). Narrow on purpose: a
+      // real value may start with # or $ (#hope42), and that must still be checked.
+      /^(<.*>|\.{3,}|\$[A-Z_][A-Z0-9_]*|\$\{[^}]+\}|\$\(.*|#)$/.test(value)
     );
   }
 
@@ -591,7 +607,9 @@ describe("no operator-facing file publishes a secret that boots in production", 
         // code written in quotes inside a sentence, not as an assignment, is not
         // scanned.
         const values = [
-          ...[...line.matchAll(QUOTED_8_PLUS)].map((m) => m[1]),
+          // Not on invite-code lines: any quoted word there ("offboarding") would
+          // now count as a code that boots. There, only assignments are read.
+          ...(name === "STAFF_INVITE_SECRET" ? [] : [...line.matchAll(QUOTED_8_PLUS)].map((m) => m[1])),
           ...[...line.matchAll(UNQUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[2]),
           ...[...line.matchAll(QUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[3]),
         ];

@@ -109,11 +109,36 @@ function isProduction(): boolean {
 type Weakness = { kind: "unset" | "dev-default" | "published" | "short"; description: string };
 
 /**
+ * The one reading of a configured value, used for every secret so its quote
+ * rules cannot drift apart.
+ *
+ * - `value` is what the app uses: the setting trimmed, and otherwise exact,
+ *   quotes included. A value of nothing but quote marks and spaces (`""`, `"`,
+ *   `" "`) is what someone types into a dashboard meaning "empty", so it reads as
+ *   `""` (unset). No real secret is only quote marks.
+ * - `unwrapped` has every pair of matching outer quotes removed. It is used only
+ *   to *recognise* a published value pasted with quotes (`"HOPE2026"`,
+ *   `""HOPE2026""`), never as the value, so an accepted secret is never altered.
+ */
+function readConfigured(raw: string): { value: string; unwrapped: string } {
+  const trimmed = raw.trim();
+  if (/^["'`\s]*$/.test(trimmed)) return { value: "", unwrapped: "" };
+  let unwrapped = trimmed;
+  for (let m = OUTER_QUOTES.exec(unwrapped); m; m = OUTER_QUOTES.exec(unwrapped)) {
+    unwrapped = m[2].trim();
+  }
+  return { value: trimmed, unwrapped };
+}
+
+const OUTER_QUOTES = /^(["'`])([\s\S]*)\1$/;
+
+/**
  * Describes why a configured value is unacceptable, or `null` when it is fine.
  * The description never includes the value itself — these strings reach logs.
  */
 function describeWeakness(
   value: string,
+  unwrapped: string,
   devDefault: string,
   minLength: number,
   published: readonly string[] = []
@@ -125,12 +150,8 @@ function describeWeakness(
   if (value === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
-  // Matched with and without one pair of surrounding quotes, so a published
-  // code pasted as `"HOPE2026"` is still recognised. This affects only what is
-  // refused; an accepted value is never altered.
-  const candidates = [value, value.replace(/^(["'`])([\s\S]*)\1$/, "$2")].map((v) =>
-    v.trim().toLowerCase()
-  );
+  // As set and with its outer quotes removed (see `readConfigured`).
+  const candidates = [value, unwrapped].map((v) => v.toLowerCase());
   if (published.some((p) => candidates.includes(p.toLowerCase()))) {
     return { kind: "published", description: "set to a value this repository publishes" };
   }
@@ -156,16 +177,11 @@ function warnOnce(key: string, message: string): void {
  */
 export function resolveSecret(name: string, opts: ResolveSecretOptions): string {
   const minLength = opts.minLength ?? 16;
-  // Read exactly (trimmed), for every secret. Quote marks are part of the value:
-  // stripping them for the invite code was tried and reverted, because it
-  // changed which code staff must type and could newly refuse the boot.
-  const value = (process.env[name] ?? "").trim();
-  // For a secret an operator types by hand (`allowShort`), a value of nothing but
-  // quote marks and spaces (`""`, `"`, `" "`) is what someone enters meaning
-  // "empty"; it is read as unset. No real code is only quote marks, so this
-  // changes no code anyone types.
-  const blank = opts.allowShort && /^["'`\s]*$/.test(value);
-  const weakness = describeWeakness(blank ? "" : value, opts.devDefault, minLength, opts.published);
+  // Exact apart from trimming and the quotes-only rule. Stripping quotes from an
+  // accepted value was tried for the invite code and reverted, because it
+  // changed which code staff must type.
+  const { value, unwrapped } = readConfigured(process.env[name] ?? "");
+  const weakness = describeWeakness(value, unwrapped, opts.devDefault, minLength, opts.published);
 
   if (!weakness) return value;
 
