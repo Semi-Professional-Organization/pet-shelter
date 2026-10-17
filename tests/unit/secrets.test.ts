@@ -507,6 +507,17 @@ describe("assertSecretsConfigured", () => {
       expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/fallback/));
     });
 
+    it("warns again when the invite code is rotated to another quoted code", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", '"a-long-quoted-invite-code"');
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", '"another-quoted-invite-code-here"');
+      getStaffInviteSecret();
+
+      const quotedWarnings = warn.mock.calls.filter((c) => /starts or ends with a quote mark/.test(String(c[0])));
+      expect(quotedWarnings).toHaveLength(2);
+    });
+
     it("warns again when the invite code is rotated to a different short length", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       vi.stubEnv("STAFF_INVITE_SECRET", "twelve-chars");
