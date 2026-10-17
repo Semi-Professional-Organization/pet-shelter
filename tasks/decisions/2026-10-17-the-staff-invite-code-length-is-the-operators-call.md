@@ -144,29 +144,30 @@ stays at 16 or more random characters.
 - A production build started with a 4-character code served `/`, `/faq`, `/pets` and
   `/admin/login` with 200, and its log carried the warning without the value. Started with
   `HOPE2026` or with the development default, it refused to boot.
-- Mutants, all 25 killed, against the committed code:
+- Mutants, all 26 killed, against the committed code:
 
   | Mutant | Tests failed |
   |---|---|
-  | quotes-only no longer read as unset | 9 |
-  | edges not stripped for matching | 30 |
-  | edge stripping quadratic again | 17 |
+  | padding counted toward the minimum length | 2 |
   | no warning for an accepted quoted value | 3 |
   | quoted warning for the invite code only | 1 |
+  | every weakness waived, not only short | 45 |
+  | allowShort applied to every secret | 4 |
+  | quotes-only no longer read as unset | 9 |
+  | edges not stripped for matching | 32 |
+  | edge stripping quadratic again | 19 |
   | quotation marks not recognised | 13 |
   | brackets treated as quote marks | 2 |
-  | invisible format characters not recognised | 2 |
+  | invisible format characters not recognised | 3 |
   | quoted warning keyed without the length | 1 |
   | dev defaults left out of the invite deny list | 3 |
   | invite accessor without allowShort | 15 |
-  | every weakness waived, not only short | 45 |
-  | allowShort applied to every secret | 2 |
   | published codes not passed to the invite accessor | 25 |
   | published check skipped | 27 |
   | staff passwords left out of the invite deny list | 5 |
   | other secrets' defaults not passed to session and admin | 2 |
-  | invite code compared case-sensitively | 5 |
-  | keys compared case-insensitively (new boot refusal) | 1 |
+  | invite code compared case-sensitively | 15 |
+  | keys compared case-insensitively (new boot refusal) | 5 |
   | dev default compared case-insensitively (new boot refusal) | 2 |
   | dev default not matched with its quotes removed | 1 |
   | published value not matched with its quotes removed | 14 |
