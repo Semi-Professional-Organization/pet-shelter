@@ -37,8 +37,11 @@ includes the value.
   staff must type for any existing code that starts and ends with a quote. Quotes are removed
   only when *matching* the deny list: any leading and trailing quote marks, paired or not, so
   a published code pasted as `"HOPE2026"`, `""HOPE2026""` or `"HOPE2026` is still refused.
-  "Quote marks" means straight and curly quotes and zero-width characters, the ones a value
-  pasted from Word, Notion or a rendered page carries. An invite code accepted with outer quotes
+  "Quote marks" means Unicode categories, not a list: initial, final, opening and closing
+  punctuation (every quotation style, including German low quotes, guillemets and CJK corner
+  brackets) and invisible format characters (zero-width spaces, word joiner, BOM), plus
+  straight quotes and whitespace. A list was tried first, and each review found a style it
+  missed. A code's interior punctuation is untouched. An invite code accepted with outer quotes
   logs a warning, without the value, because staff typing it without them are refused. That never alters an accepted code. Its cost is that a quoted development default,
   which booted before this change, is now refused.
 - **The development default is still refused at boot, by exact match, as before**, and now
@@ -153,8 +156,10 @@ stays at 16 or more random characters.
   | dev default not matched with its quotes removed | 1 |
   | published value not matched with its quotes removed | 8 |
   | edges not stripped for matching | 13 |
-  | curly quotes not recognised | 3 |
-  | zero-width characters not recognised | 1 |
+  | initial and final quotes not recognised | 6 |
+  | opening and closing punctuation not recognised | 2 |
+  | invisible format characters not recognised | 2 |
+  | quoted warning keyed without the length (rotation goes silent) | 1 |
   | quotes-only value no longer read as unset | 9 |
   | no warning for an accepted quoted code | 1 |
   | short warning keyed without the length (rotation goes silent) | 1 |
