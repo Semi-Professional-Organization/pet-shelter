@@ -30,6 +30,18 @@ Both now ask for `MANAGE_CONTENT`: `requireFaqEditor()` in `src/actions/faqs.ts`
 - `2026-09-18-content-actions-honour-suspension.md` kept the role list only because changing who
   may edit was out of its scope, not as a choice of who should.
 
+## Before deploying
+
+Anyone who edits FAQs today as a Volunteer Coordinator loses that on deploy. The owner reported
+on 2026-10-19 that production's only active account is their Super Admin, the seeded ones
+suspended, which would mean nobody does; that is their report, not observed from here. This
+read-only query in the Neon SQL editor shows whether anyone would lose it:
+
+    SELECT email, role, status FROM users
+    WHERE role IN ('VOLUNTEER_COORDINATOR', 'COORDINATOR') AND status = 'ACTIVE';
+
+Give any row it returns the Content Editor role (or keep it a coordinator and accept the loss).
+
 ## Reversing it
 
 If coordinators must edit FAQs, grant `MANAGE_CONTENT` to `VOLUNTEER_COORDINATOR` in

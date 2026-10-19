@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
-    // Enables forbidden() / unauthorized() from next/navigation, used by
-    // /admin/members to return a real HTTP 403 instead of a soft redirect.
+    // Enables forbidden() / unauthorized() from next/navigation, which every admin
+    // section's gate (`requireAdminSection`) and /admin itself throw to render the
+    // 403 and 401 pages. Without it those calls throw and every section breaks.
     authInterrupts: true,
   },
   allowedDevOrigins: [

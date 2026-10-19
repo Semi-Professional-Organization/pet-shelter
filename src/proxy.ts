@@ -55,11 +55,11 @@ const GUARDED_ROUTES: { prefix: string; permission: Permission }[] = [
  *
  * The residual gap — a client-side navigation receiving HTML — is reachable
  * where the nav and the cookie disagree. The admin nav draws its tabs from the
- * member's live role when the console loads, and this function reads the role
- * sealed into the cookie at sign-in, so a member promoted since signing in is
- * offered the tab and refused here; and a cookie that expires while the console
- * is open is refused here on the next click. The texts below say what ends each:
- * signing in again.
+ * member's live role when the console loads (from the browser's cached copy if
+ * that check fails), and this function reads the role sealed into the cookie at
+ * sign-in, so a member promoted since signing in is offered the tab and refused
+ * here; and a cookie that expires while the console is open is refused here on
+ * the next click. The texts below say what ends each: signing in again.
  */
 const NEXT_STEP: Record<401 | 403, { hint: string; href: string; label: string }> = {
   // A signed-out visitor needs the sign-in page, not advice about their role.

@@ -8,6 +8,11 @@ export default async function AdminSettingsPage() {
   // test email); the form decides which of the two this member gets.
   const session = await requireAdminSection("/admin/settings");
 
+  // Two answers on purpose. Today they agree, because `roleCanEditGlobalQr` asks for
+  // MANAGE_SETTINGS, but QR editing has its own rule in qrAccess.ts, the place
+  // docs/qr-codes.md names for "who may write which scope". Widening that rule would
+  // also need the section and the form to offer the QR tab to the new holders: today
+  // only MANAGE_SETTINGS holders reach it.
   return (
     <ShelterSettingsForm
       canManageSettings={hasPermission(session, PERMISSIONS.MANAGE_SETTINGS)}
