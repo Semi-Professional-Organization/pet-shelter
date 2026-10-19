@@ -106,6 +106,36 @@ export function ratesFor({ model, served = model, prompt, speed, geo }) {
 // ================================ classification ================================
 
 const SHELLS = new Set(["Bash", "PowerShell"]);
+/** Tools whose result is a person's answer. */
+const PERSON_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
+/** Tools that read files by path; their "command" is the path and pattern they were given. */
+const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
+
+/**
+ * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`), leaving any of
+ * those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
+ */
+export function splitChain(cmd) {
+  const parts = [];
+  let current = "";
+  let quote = null;
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (quote) {
+      if (ch === quote) quote = null;
+      current += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+    } else if (ch === ";" || ch === "|" || (ch === "&" && cmd[i + 1] === "&")) {
+      parts.push(current);
+      current = "";
+      if ((ch === "|" || ch === "&") && cmd[i + 1] === ch) i++;
+    } else current += ch;
+  }
+  parts.push(current);
+  return parts;
+}
 
 /**
  * The workflow families: the runs of calls each proposed agent command would replace (gates,
@@ -125,8 +155,10 @@ export const FAMILIES = {
     /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|(ls|dir|Get-ChildItem) tasks[\\/](open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
   ledger: (tool, cmd) =>
     (SHELLS.has(tool) &&
-      /(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s[^|;&]*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd)) ||
-    (tool === "Read" && /tasks[\\/]((open|lessons|decisions)[\\/][^\\/]+|todo\.md)$/.test(cmd)),
+      // `.*`, not `[^|;&]*`: familiesOf hands over one command of a chain at a time, and a pipe
+      // left in it is inside quotes.
+      /(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd)) ||
+    (FILE_TOOLS.has(tool) && /tasks[\\/](todo\.md|(open|lessons|decisions)\b)/.test(cmd)),
   merge: (tool, cmd) => SHELLS.has(tool) && /git merge-tree|HEAD\.\.origin\/master|merge-base HEAD origin\/master/.test(cmd),
   drift: (tool, cmd) => SHELLS.has(tool) && /agent-drift\.log/.test(cmd),
   pr: (tool, cmd) =>
@@ -155,7 +187,11 @@ const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/i
  * exact parse would use vitest's own CLI definition, which is not available without the package.
  */
 export function isTargetedRun(cmd) {
-  const match = /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$|(?:^|\s)npm\s+(?:run\s+)?test(?::[\w-]+)?(?:\s+(.*))?$/.exec(String(cmd).trim());
+  // The npm scripts that run vitest: not test:e2e (Playwright) or test:coverage.
+  const match =
+    /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$|(?:^|\s)npm\s+(?:run\s+)?(?:-\S+\s+)*test(?::(?:components|integration|db|all|watch))?(?:\s+(.*))?$/.exec(
+      String(cmd).trim(),
+    );
   if (!match) return false;
   const words = (match[1] ?? match[2] ?? "")
     .trim()
@@ -166,10 +202,10 @@ export function isTargetedRun(cmd) {
     const word = words[i];
     // `-t <pattern>` needs no case: its pattern reads as a filter below.
     if (word.startsWith("--testNamePattern")) return true;
-    // A redirection (`2>&1`, `> out.txt`) is the shell's, not a filter; a bare operator takes
-    // the next word as its target.
-    if (/^\d*(>>?|<)/.test(word)) {
-      if (/^\d*(>>?|<)$/.test(word)) i++;
+    // A redirection (`2>&1`, `> out.txt`, PowerShell's `*>&1`) is the shell's, not a filter; a
+    // bare operator takes the next word as its target.
+    if (/^[\d*]?(>>?|<)/.test(word)) {
+      if (/^[\d*]?(>>?|<)$/.test(word)) i++;
       continue;
     }
     if (word.startsWith("-")) {
@@ -188,7 +224,7 @@ const withoutExeSuffix = (cmd) => cmd.replace(/\b(npm|npx|node|git|gh)\.(cmd|exe
 export function familiesOf(tool, cmd) {
   // Each command of a chain is classed on its own, so `vitest run <file> && npm run lint` is both
   // a targeted run and a gate.
-  const parts = SHELLS.has(tool) ? withoutExeSuffix(String(cmd)).split(/&&|\|\||[;|]/) : [cmd];
+  const parts = SHELLS.has(tool) ? splitChain(withoutExeSuffix(String(cmd))) : [cmd];
   return Object.keys(FAMILIES).filter((name) => parts.some((part) => FAMILIES[name](tool, part)));
 }
 
@@ -221,7 +257,7 @@ export function commandClass(tool, cmd) {
     rest = rest.slice(match[0].length);
   }
   // Only the first command of a chain, and no npm flag between `run` and the script.
-  const words = rest.split(/&&|\|\||[;|]/)[0].split(/\s+/).filter(Boolean);
+  const words = splitChain(rest)[0].split(/\s+/).filter(Boolean);
   if (words[0] === "npm" && words[1] === "run") while (/^-/.test(words[2] ?? "")) words.splice(2, 1);
   const take = words[0] === "npm" && words[1] === "run" ? 3 : SUBCOMMAND.has(words[0]) || words[0] === "npm" ? 2 : 1;
   const label = words.slice(0, take).filter(Boolean);
@@ -380,7 +416,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           if (block?.type !== "tool_use" || calls.has(block.id)) continue;
           request.tools++;
           const input = block.input || {};
-          const cmd = String(input.command ?? input.file_path ?? input.pattern ?? "");
+          const cmd = String(input.command ?? [input.file_path, input.path, input.pattern].filter(Boolean).join(" "));
           calls.set(block.id, {
             request: request.index,
             tool: String(block.name),
@@ -395,6 +431,9 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           if (block?.type !== "tool_result") continue;
           toolResult = true;
           results.push({ id: block.tool_use_id, chars: textLength(block.content) });
+          // A tool that waits for an answer returns when the person gives it.
+          // ceiling: a permission prompt also waits on a person, but leaves no mark in the record.
+          if (PERSON_TOOLS.has(calls.get(block.tool_use_id)?.tool)) noteTrigger("person");
         }
         // A text block beside a tool result is not a person: in this repo's transcripts the only
         // ones (4 of 19,315 results, 2026-10-20) are a fork's injected boilerplate. A message
@@ -571,7 +610,7 @@ export function coldResumes(file, breaks = segmentBreaks(file)) {
     if (!(idle > ttl)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
     const warm = (r.cache_creation_input_tokens * r.rates.cacheRead) / 1e6;
-    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger: r.trigger ?? "person" });
+    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger: r.trigger ?? "unknown" });
   }
   return out;
 }
@@ -658,7 +697,8 @@ const median = (xs) => {
  */
 export function summarize(files, { since, priceAs } = {}) {
   const sinceMs = since ? Date.parse(since) : -Infinity;
-  const inWindow = (ts) => !(Date.parse(ts) < sinceMs);
+  // Without a window everything is in; with one, a request with no readable time is out.
+  const inWindow = (ts) => !since || Date.parse(ts) >= sinceMs;
   priceFiles(files, { priceAs, inWindow });
 
   const totals = { cost: 0, read: 0, write: 0, output: 0, input: 0, search: 0, requests: 0 };
@@ -719,7 +759,7 @@ export function summarize(files, { since, priceAs } = {}) {
     who,
     contextBuckets: buckets,
     coldResumes: coldSummary(cold.filter((x) => x.trigger === "person")),
-    coldOnToolOrEvent: coldSummary(cold.filter((x) => x.trigger !== "person")),
+    coldOnAnythingElse: coldSummary(cold.filter((x) => x.trigger !== "person")),
     carried: { cost: carried.cost, byClass: commonClasses(carried.byClass, classSessions) },
     families: familyUsage(windowed),
     sessions,
@@ -761,7 +801,7 @@ export function formatReport(report, { logPath } = {}) {
   lines.push(
     `cold resumes: ${c.count} whole-context re-writes on a person's message after the cache expired, ${usd(c.cost)} = ${pct(c.cost, t.cost)}` +
       (c.count ? `; median context ${kTok(c.medianContext)}, median idle ${c.medianIdleHours.toFixed(1)}h` : "") +
-      `; ${report.coldOnToolOrEvent.count} more on a long tool or a background notice, ${pct(report.coldOnToolOrEvent.cost, t.cost)}`,
+      `; ${report.coldOnAnythingElse.count} more woken by anything else (a long tool, a notice), ${pct(report.coldOnAnythingElse.cost, t.cost)}`,
   );
   lines.push(
     `carried tool output (estimate, chars/4): ${usd(report.carried.cost)} = ${pct(report.carried.cost, t.cost)}; top: ` +

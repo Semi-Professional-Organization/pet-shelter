@@ -21,6 +21,7 @@ import {
   familyUsage,
   formatReport,
   isTargetedRun,
+  splitChain,
   jsonlLines,
   main,
   priceFiles,
@@ -53,7 +54,11 @@ type Usage = {
 function assistant(
   requestId: string,
   usage: Usage,
-  { model = "claude-opus-5-5", ts = "2026-10-01T10:00:00.000Z", tools = [] as { id: string; name: string; command?: string }[] } = {},
+  {
+    model = "claude-opus-5-5",
+    ts = "2026-10-01T10:00:00.000Z",
+    tools = [] as { id: string; name: string; command?: string; input?: Record<string, string> }[],
+  } = {},
 ) {
   return {
     type: "assistant",
@@ -64,7 +69,7 @@ function assistant(
       model,
       content: [
         { type: "text", text: SECRET },
-        ...tools.map((t) => ({ type: "tool_use", id: t.id, name: t.name, input: { command: t.command ?? "", description: SECRET } })),
+        ...tools.map((t) => ({ type: "tool_use", id: t.id, name: t.name, input: t.input ?? { command: t.command ?? "", description: SECRET } })),
       ],
       usage: {
         input_tokens: usage.input ?? 0,
@@ -78,6 +83,9 @@ function assistant(
     },
   };
 }
+
+/** A message someone typed. */
+const PERSON = { type: "user", origin: { kind: "human" }, message: { content: "back again" } };
 
 const toolResult = (id: string, chars: number) => ({
   type: "user",
@@ -244,6 +252,27 @@ describe("agent usage: workflow families", () => {
     expect(familiesOf("Bash", "npx vitest run > out.txt")).toEqual(["gates"]);
   });
 
+  it("keeps a quoted pipe inside one command, and does not take a test:e2e run for vitest", () => {
+    expect(splitChain('grep -E "a|b" tasks/open/x.md | wc -l')).toEqual(['grep -E "a|b" tasks/open/x.md ', " wc -l"]);
+    expect(familiesOf("Bash", 'grep -E "a|b" tasks/open/x.md')).toEqual(["ledger"]);
+    expect(isTargetedRun("npm run test:e2e -- tests/e2e/login.spec.ts")).toBe(false);
+    expect(familiesOf("Bash", "npm run -s test -- tests/unit/x.test.ts")).toEqual(["targeted tests"]);
+    expect(familiesOf("PowerShell", "npm test *>&1")).toEqual(["gates"]);
+  });
+
+  it("counts Glob and Grep over the ledger as ledger reads, by the path they were given", () => {
+    const file = extract([
+      assistant("r1", { out: 1 }, {
+        tools: [
+          { id: "g1", name: "Grep", input: { pattern: "kill condition", path: "tasks/lessons" } },
+          { id: "g2", name: "Glob", input: { pattern: "tasks/open/*.md" } },
+          { id: "g3", name: "Grep", input: { pattern: "tasks", path: "src" } },
+        ],
+      }),
+    ]);
+    expect(file.calls.map((c: { families: string[] }) => c.families)).toEqual([["ledger"], ["ledger"], []]);
+  });
+
   it("counts a shell read of any ledger file, not only todo.md", () => {
     for (const cmd of ["cat tasks/open/a.md", "sed -n 1,80p tasks/open/a.md", "head -20 tasks/decisions/x.md"]) {
       expect(familiesOf("Bash", cmd), cmd).toEqual(["ledger"]);
@@ -328,7 +357,7 @@ describe("agent usage: the analyses", () => {
     expect(coldResumes(file).map((c: { trigger: string }) => c.trigger)).toEqual(["tool", "person"]);
     const report = summarize([file]);
     expect(report.coldResumes.count).toBe(1);
-    expect(report.coldOnToolOrEvent.count).toBe(1);
+    expect(report.coldOnAnythingElse.count).toBe(1);
   });
 
   it("does not take a background notice, or a meta record riding along, for a person's message", () => {
@@ -373,6 +402,36 @@ describe("agent usage: the analyses", () => {
     );
     expect(file.requests[1].trigger).toBe("person");
     expect(familyUsage([file]).pr).toMatchObject({ bursts: 2, saving: 0 });
+  });
+
+  it("takes the answer to AskUserQuestion for the person who gave it", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z", tools: [{ id: "q", name: "AskUserQuestion" }] }),
+        toolResult("q", 10),
+        assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T16:00:00.000Z" }),
+      ]),
+    );
+    expect(file.requests[1].trigger).toBe("person");
+  });
+
+  it("counts a re-write woken by nothing it can name as neither a person's nor a notice's", () => {
+    const report = summarize([
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        { type: "user", isMeta: true, message: { content: "reminder" } },
+        assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T12:00:00.000Z" }),
+      ]),
+    ]);
+    expect(report.coldResumes.count).toBe(0);
+    expect(report.coldOnAnythingElse.count).toBe(1);
+  });
+
+  it("leaves a request with no readable time out of any --since window", () => {
+    const record = assistant("r1", { out: 1_000_000 });
+    delete (record as { timestamp?: string }).timestamp;
+    const files = [extract([record, assistant("r2", { out: 1 }, { ts: "2026-10-05T10:00:00.000Z" })])];
+    expect(summarize(files, { since: "2026-10-02" }).totals.requests).toBe(1);
   });
 
   it("ends a burst when a person's message arrives mid-turn", () => {
@@ -619,7 +678,9 @@ describe("agent usage: the analyses", () => {
     const files = [
       extract([
         assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        PERSON,
         assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-03T10:00:00.000Z" }),
+        PERSON,
         assistant("r3", { w1h: 400_000, out: 1 }, { ts: "2026-10-05T10:00:00.000Z" }),
       ]),
     ];
@@ -644,6 +705,7 @@ describe("agent usage: the analyses", () => {
     const files = [
       extract([
         assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        PERSON,
         assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-02T10:00:00.000Z" }),
       ]),
     ];
