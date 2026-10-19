@@ -10,7 +10,7 @@ rules" and are written `PowerShell(...)`; a `Bash(...)` rule is not described as
 PowerShell tool. This machine runs Windows, PowerShell is the primary shell, and agents here use
 both tools.
 
-The three rules added on 2026-10-20 (`db:migrate:bulletins`, `secrets:decrypt:local`,
+The rules added on 2026-10-20 (`db:migrate:bulletins`, `secrets:decrypt:local`, `secrets:run`,
 `ledger:issues -- --apply`) are written for both tools. The older ones were left alone to keep that
 change to the gaps it was asked to close.
 

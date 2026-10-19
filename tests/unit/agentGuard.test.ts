@@ -30,7 +30,7 @@ import { fileURLToPath } from "url";
  * does that job now and the harness enforces it. What remains here is the two
  * agent rules, the drift log, and — in the wiring block — assertions about the
  * permission rules themselves plus a ledger of the thirteen shapes prefix matching
- * cannot reach. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
+ * cannot reach, and four PowerShell path spellings. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
  *
  * What this file does NOT establish: that Claude Code runs the hook. Frontmatter
  * hooks load from the definition as it stood at SESSION START, so a hook wired
@@ -396,19 +396,23 @@ describe("agent guard", () => {
         .filter(r => r.startsWith(`${tool}(`))
         .some(r => matchesRule(r, command));
 
-    // These three are the agent-scripts catalog's permission gaps, closed for both shells: this
-    // repo's agents run PowerShell as often as Bash, and a Bash rule does not bind PowerShell.
-    // The older rules above are still Bash-only — tasks/open/permission-rules-bind-bash-only.md.
-    it.each(["Bash", "PowerShell"])("denies the two scripts that touch production through .env.local, in %s", (tool) => {
+    // The agent-scripts catalog's permission gaps, closed for both shells: this repo's agents run
+    // PowerShell as often as Bash, and the permissions reference documents PowerShell rules as
+    // their own `PowerShell(...)` shape. Whether a Bash rule also binds PowerShell is unobserved;
+    // the older rules above are Bash-only — tasks/open/permission-rules-bind-bash-only.md.
+    it.each(["Bash", "PowerShell"])("denies the scripts that reach production secrets, in %s", (tool) => {
       // In the main checkout `.env.local` is production: db:migrate:bulletins reads it, and
-      // secrets:decrypt:local overwrites it. db:migrate:bulletins:local is the rehearsal and must
-      // stay open, which is why the bulletins rule is word-bounded, not a bare `*`.
+      // secrets:decrypt:local overwrites it. secrets:run decrypts the production file into any
+      // command's environment. db:migrate:bulletins:local is the rehearsal and must stay open,
+      // which is why the bulletins rule is word-bounded, not a bare `*`.
       for (const command of [
         "npm run db:migrate:bulletins",
         "npm run db:migrate:bulletins -- --dry-run",
         "npx tsx scripts/migrate-bulletins.ts",
         "npm run secrets:decrypt:local",
         "node scripts/secrets.mjs decrypt-to-local .env.production.enc .env.local",
+        "npm run secrets:run -- npm run db:seed",
+        "node scripts/secrets.mjs run .env.production.enc -- npm start",
       ]) {
         expect(covered(command, tool), `expected covered: ${command}`).toBe(true);
       }
@@ -460,6 +464,20 @@ describe("agent guard", () => {
       ];
       for (const command of UNCOVERED) {
         expect(covered(command), `newly covered, move it: ${command}`).toBe(false);
+      }
+    });
+
+    it("does not catch a PowerShell path spelled any other way than the rule spells it", () => {
+      // The rules name `scripts/x` with forward slashes and no `./`. PowerShell accepts every
+      // spelling below, and each one reaches the same script unprompted.
+      const UNCOVERED_POWERSHELL = [
+        "npx tsx .\\scripts\\migrate-bulletins.ts",
+        "npx tsx ./scripts/migrate-bulletins.ts",
+        "node .\\scripts\\secrets.mjs decrypt-to-local",
+        "node scripts\\secrets.mjs run -- npm start",
+      ];
+      for (const command of UNCOVERED_POWERSHELL) {
+        expect(covered(command, "PowerShell"), `newly covered, move it: ${command}`).toBe(false);
       }
     });
 
