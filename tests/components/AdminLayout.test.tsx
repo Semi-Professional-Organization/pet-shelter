@@ -4,11 +4,10 @@ import { setMockLocation } from "../setup/nextMocks";
 import { normalizeRole, ROLES } from "@/lib/security/permissions";
 
 const auth = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
+const settings = vi.hoisted(() => ({ getVolunteerFormLinks: vi.fn() }));
 
 vi.mock("@/lib/client/adminAuth", () => ({ useAdminAuth: () => auth.current }));
-vi.mock("@/actions/settings", () => ({
-  getVolunteerFormLinks: vi.fn().mockResolvedValue({ volunteerFormResponsesUrl: "" }),
-}));
+vi.mock("@/actions/settings", () => settings);
 
 import AdminLayout from "@/app/admin/layout";
 
@@ -54,6 +53,7 @@ const COORDINATOR_TABS = ["/admin/applications", "/admin/donations", "/admin/aud
 describe("admin nav", () => {
   beforeEach(() => {
     setMockLocation("/admin/applications");
+    settings.getVolunteerFormLinks.mockReset().mockResolvedValue({ volunteerFormResponsesUrl: "" });
   });
 
   it.each<[string, string[]]>([
@@ -75,5 +75,39 @@ describe("admin nav", () => {
     );
 
     expect(tabs()).toEqual(expected);
+  });
+});
+
+describe("volunteer form shortcut", () => {
+  beforeEach(() => {
+    setMockLocation("/admin/applications");
+    settings.getVolunteerFormLinks.mockReset().mockResolvedValue({ volunteerFormResponsesUrl: "" });
+  });
+
+  it("asks for the form links only once the server has confirmed the role", () => {
+    // Until the session sync returns, the role is the browser's cached copy, which may
+    // hold one the member has since lost; the action would only be refused.
+    signedInAs(ROLES.VOLUNTEER_COORDINATOR);
+    auth.current = { ...auth.current, isLoading: true };
+
+    render(
+      <AdminLayout>
+        <p>section</p>
+      </AdminLayout>
+    );
+
+    expect(settings.getVolunteerFormLinks).not.toHaveBeenCalled();
+  });
+
+  it("asks for them for a confirmed coordinator", () => {
+    signedInAs(ROLES.VOLUNTEER_COORDINATOR);
+
+    render(
+      <AdminLayout>
+        <p>section</p>
+      </AdminLayout>
+    );
+
+    expect(settings.getVolunteerFormLinks).toHaveBeenCalledTimes(1);
   });
 });

@@ -62,7 +62,9 @@ export default function AdminLayout({
   const canOpenVolunteerResponses = roleHasPermission(user?.role, PERMISSIONS.REVIEW_APPLICATIONS);
 
   useEffect(() => {
-    if (!isAuthenticated || !canOpenVolunteerResponses) return;
+    // Not before the server has answered: until then the role is the browser's cached
+    // copy, which may still hold one the member has since lost.
+    if (isLoading || !isAuthenticated || !canOpenVolunteerResponses) return;
     let active = true;
     getVolunteerFormLinks()
       .then((links) => {
@@ -74,7 +76,7 @@ export default function AdminLayout({
     return () => {
       active = false;
     };
-  }, [isAuthenticated, canOpenVolunteerResponses]);
+  }, [isLoading, isAuthenticated, canOpenVolunteerResponses]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isPublicAdminRoute) {

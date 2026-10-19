@@ -56,21 +56,24 @@ export type AdminSection = AdminSectionDefinition & { href: AdminSectionHref };
 export const ADMIN_SECTIONS: readonly AdminSection[] = SECTIONS;
 
 /**
- * True when `role` holds a permission that opens `href`.
- *
  * Takes the role exactly as stored or sealed. `roleHasPermission` resolves the
  * deprecated aliases itself and fails closed, which normalising first would undo:
  * `normalizeRole` folds VOLUNTEER onto STAFF, and STAFF opens a section a VOLUNTEER
  * cannot.
  */
+function opens(role: string | null | undefined, section: AdminSection): boolean {
+  return section.permissions.some((permission) => roleHasPermission(role, permission));
+}
+
+/** True when `role` holds a permission that opens `href`. */
 export function canOpenAdminSection(role: string | null | undefined, href: AdminSectionHref): boolean {
   const section = ADMIN_SECTIONS.find((candidate) => candidate.href === href);
-  return section !== undefined && section.permissions.some((permission) => roleHasPermission(role, permission));
+  return section !== undefined && opens(role, section);
 }
 
 /** The sections `role` can open, in navigation order. */
 export function adminSectionsFor(role: string | null | undefined): AdminSection[] {
-  return ADMIN_SECTIONS.filter((section) => canOpenAdminSection(role, section.href));
+  return ADMIN_SECTIONS.filter((section) => opens(role, section));
 }
 
 /** The section `role` lands on when it enters the console, or null when it can open none. */

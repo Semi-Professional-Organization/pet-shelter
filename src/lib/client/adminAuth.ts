@@ -67,6 +67,11 @@ export function useAdminAuth() {
           }
         }
       } catch (e) {
+        // A thrown call (network, a Server Action id gone stale after a deploy) is not
+        // an answer, so the cached user stays rather than signing a member out on a
+        // blip. Its role can be stale, and the tabs drawn from it with it; each section
+        // still gates on the server, so a stale tab costs a 403 page whose "Back to
+        // Admin" lands correctly, not access.
         console.error("Error syncing session:", e);
       } finally {
         if (mounted) setIsLoading(false);
