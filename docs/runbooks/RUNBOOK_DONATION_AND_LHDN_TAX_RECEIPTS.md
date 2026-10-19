@@ -30,7 +30,7 @@ All public contributions to Hope for Strays are tax-deductible under Malaysian t
 | **Statutory Law** | Subsection 44(6), Income Tax Act 1967 (Malaysia) |
 | **Sanctuary Address** | No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor |
 | **Operating Hours** | Tuesday – Sunday: 10:00 AM – 5:00 PM (Closed Mondays) |
-| **Finance Helpline** | 03-7876 5432 / `donations@hopeforstrays.org` |
+| **Finance Helpline** | +60 10-550 3056 (calls and WhatsApp) / `donations@hopeforstrays.org` |
 
 ---
 
