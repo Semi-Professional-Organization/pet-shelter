@@ -39,36 +39,8 @@ jobs:
       - name: Layer boundaries
         run: node docs/architecture/layer-graph.mjs
 
-  commits:
-    name: Commit messages
-    runs-on: ubuntu-latest
-    # Only the commits this PR adds. The 203 commits that predate
-    # docs/reference/COMMIT_MESSAGES.md are grandfathered — re-linting them would
-    # fail every run for messages nobody is writing any more.
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          # The default shallow clone has no base branch to diff against.
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      # No `npm ci`: the linter is dependency-free Node on purpose, so this job
-      # reports in seconds and cannot be broken by an install failure.
-      - name: Lint the commits this pull request adds
-        run: node scripts/commit-msg.mjs --audit --strict --verbose origin/${{ github.base_ref }}..HEAD
-      # This repository squash-merges, so the commits linted above are discarded
-      # and the pull request title becomes the only message that reaches master.
-      # It was the one message the standard did not govern: e622249 landed on
-      # master failing both subject-length and capitalize.
-      #
-      # The title is untrusted input, so it goes through the environment rather
-      # than `run:` interpolation, which would let a crafted title inject shell.
-      - name: Lint the pull request title (the squash-merge subject)
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | node scripts/commit-msg.mjs --stdin
+  # The commit-message check is .github/workflows/commit-messages.yml, so that a title edit can
+  # rerun it without rerunning everything here.
 
   unit-and-components:
     name: Unit, integration & component tests
