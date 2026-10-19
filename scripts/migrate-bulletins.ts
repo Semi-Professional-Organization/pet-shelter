@@ -16,10 +16,12 @@
  * which is what makes the launch notices deployable without a full reseed.
  *
  * It is ALSO the only safe way to put this table on the production branch.
- * `npm run db:push` reconciles the whole schema, and
- * `tasks/open/production-schema-has-drifted-ahead-of-master.md` records three
- * destructive statements currently standing between master's schema and that
- * database — two of which lose data and have nothing to do with bulletins.
+ * `npm run db:push` reconciles the whole schema, so it applies every difference
+ * between master's schema and that database at once, not just this table's. When
+ * this script was written that included three destructive statements, two of which
+ * lost data and had nothing to do with bulletins. The drift was reconciled by hand
+ * and measured at zero on 2026-10-19, but the rule stands: see
+ * `tasks/lessons/2026-09-03-schema-changes-ship-as-additive-sql-here-never-as-db-push.md`.
  *
  * `DATABASE_URL` is resolved through `prisma/env.ts`, the single resolver every
  * database-touching script shares, so this cannot end up talking to a different

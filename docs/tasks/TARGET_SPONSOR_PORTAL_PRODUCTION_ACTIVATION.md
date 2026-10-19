@@ -226,7 +226,9 @@ memory without a database.
 
 Resolve the open entries with raw output copied into a `tasks/decisions/` entry. A squash merge
 drops the branch commits a deleted claim file lived in. Add a dated re-measure to
-`production-schema-has-drifted-ahead-of-master.md`, then delete the claim.
+`production-schema-has-drifted-ahead-of-master.md`, then delete the claim. (That drift entry was
+closed and deleted on 2026-10-19, when `db:check-drift` read zero; record any new re-measure in a
+`tasks/decisions/` entry instead.)
 
 ---
 
