@@ -41,6 +41,7 @@
       "Bash(node scripts/secrets.mjs run*)",
       "Bash(npm run secrets:edit*)",
       "Bash(node scripts/secrets.mjs edit*)",
+      "PowerShell(npm run db:migrate:faqs*)",
       "PowerShell(npx tsx scripts/migrate-faqs.ts*)",
       "PowerShell(tsx scripts/migrate-faqs.ts*)",
       "PowerShell(npm run db:migrate:bulletins)",
@@ -67,10 +68,10 @@
       "Bash(git rebase *)",
       "Bash(git branch -D*)",
       "Bash(rm -rf *)",
-      "Bash(npm run ledger:issues -- --apply*)",
-      "Bash(node scripts/ledger-issues.mjs --apply*)",
-      "PowerShell(npm run ledger:issues -- --apply*)",
-      "PowerShell(node scripts/ledger-issues.mjs --apply*)"
+      "Bash(npm run ledger:issues *--apply*)",
+      "Bash(node scripts/ledger-issues.mjs *--apply*)",
+      "PowerShell(npm run ledger:issues *--apply*)",
+      "PowerShell(node scripts/ledger-issues.mjs *--apply*)"
     ]
   },
   "hooks": {

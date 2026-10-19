@@ -18,8 +18,6 @@
  * predates the standard and failing on it would make the command useless.
  */
 
-import { invokedAs } from "./lib/invokedAs.mjs";
-
 /** Conventional Commit types. Measured from this repo's own history plus the
  *  standard set; see `docs/reference/COMMIT_MESSAGES.md` §2. */
 export const TYPES = [
@@ -525,7 +523,9 @@ async function main(argv) {
 }
 
 // Only run the CLI when executed directly, so the module stays importable by tests.
-if (invokedAs("scripts/commit-msg.mjs")) {
+const invokedDirectly =
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/commit-msg.mjs");
+if (invokedDirectly) {
   main(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`commit-msg: ${error.message}\n`);
     process.exit(1);

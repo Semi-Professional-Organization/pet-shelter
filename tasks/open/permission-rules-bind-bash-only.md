@@ -1,18 +1,17 @@
-# The older permission rules bind the Bash tool only, not PowerShell
+# Most permission rules bind the Bash tool only, not PowerShell
 
 **Status:** ASSERTED · opened 2026-10-20
 
-Every `deny` and `ask` rule in `.claude/settings.json` that predates 2026-10-20 is written as
-`Bash(...)`: the production `db:push`, `db:seed` and `db:migrate:faqs` denials, the Prisma
-denials, `git push --force`, and the `ask` rules for `git reset --hard`, `git stash`, `rm -rf` and
-the rest. Claude Code's permissions reference says PowerShell rules "use the same shape as Bash
+Most `deny` and `ask` rules in `.claude/settings.json` are written as `Bash(...)` only: the
+production `db:push` and `db:seed` denials, the Prisma denials, `git push --force`, and the `ask`
+rules for `git reset --hard`, `git stash`, `rm -rf` and the rest. Claude Code's permissions reference says PowerShell rules "use the same shape as Bash
 rules" and are written `PowerShell(...)`; a `Bash(...)` rule is not described as binding the
 PowerShell tool. This machine runs Windows, PowerShell is the primary shell, and agents here use
 both tools.
 
 The rules added on 2026-10-20 (`db:migrate:bulletins`, `secrets:decrypt:local`, `secrets:run`,
-`secrets:edit`, `ledger:issues -- --apply`, and the direct `tsx` form of both migrations) are
-written for both tools. The older ones were left
+`secrets:edit`, `ledger:issues ... --apply`, and both forms of the FAQ migration, whose direct
+`tsx` form had to match the bulletins one) are written for both tools. The older ones were left
 alone to keep that change to the gaps it was asked to close.
 
 A second unobserved question rides on the same test. Agents here usually start a PowerShell
