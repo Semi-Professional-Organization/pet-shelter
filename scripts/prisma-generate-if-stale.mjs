@@ -46,5 +46,6 @@ if (isClientCurrent(readFileSync(SCHEMA_PATH, "utf8"), generated)) {
     stdio: "inherit",
     shell: process.platform === "win32",
   });
+  if (result.error) console.error(`Could not run \`npx prisma generate\`: ${result.error.message}`);
   process.exit(result.status ?? 1);
 }

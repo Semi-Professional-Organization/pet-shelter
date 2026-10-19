@@ -83,9 +83,12 @@ const prismaSpies = vi.hoisted(() => {
     // member no store knows passed them all. Answered with the row a signed-in
     // test identity has, so the session is refreshed from it as in production.
     userFindUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
-    transaction: vi.fn(async (arg: unknown) => {
-      if (Array.isArray(arg)) return Promise.all(arg);
-      return undefined;
+    // Both forms, as `wireTransaction` in tests/integration/support/prismaDouble.ts runs them:
+    // an array of queued operations, or an interactive callback run against the client it was
+    // called on. Answering the callback form with `undefined` would "commit" work never done.
+    transaction: vi.fn(async function (this: unknown, arg: unknown) {
+      if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(this);
+      return Promise.all(arg as Promise<unknown>[]);
     }),
   };
 });
@@ -901,5 +904,15 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       expect(timelineMs[0].badge).toBe("Kemasukan Bersih");
       expect(timelineMs[0].description).toContain("Seksyen 19");
     });
+  });
+});
+
+describe("this file's Prisma double", () => {
+  it("runs an interactive transaction's callback against the client, as the shared double does", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+
+    const seen = await prisma.$transaction(async (tx) => tx);
+
+    expect(seen).toBe(prisma);
   });
 });

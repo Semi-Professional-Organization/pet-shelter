@@ -165,9 +165,12 @@ function createPrismaClient(): PrismaClient {
 
   // A managed Postgres like Neon can take several seconds to wake from idle,
   // so the connect timeout is generous; `DB_CONNECT_TIMEOUT_MS` overrides it.
-  // `||`, not `??`: an empty value would otherwise be 0, which `pg` reads as no
-  // timeout at all.
-  const connectionTimeoutMillis = Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000;
+  // An empty or non-numeric value falls back to 10 s; `Number("")` would be 0,
+  // which `pg` reads as no timeout at all. An explicit 0 is kept: that is how an
+  // operator turns the timeout off.
+  const configuredTimeout = process.env.DB_CONNECT_TIMEOUT_MS?.trim();
+  const connectionTimeoutMillis =
+    configuredTimeout && Number.isFinite(Number(configuredTimeout)) ? Number(configuredTimeout) : 10000;
 
   // Reuse connection pool across Turbopack hot reloads in dev mode
   const pool =

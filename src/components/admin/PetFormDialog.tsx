@@ -44,8 +44,11 @@ interface PetFormDialogProps {
   /**
    * Takes the form once per opening. The dialog waits for it (an async handler's promise) and
    * then asks to close, keeping Save locked until it opens again, so a parent that keeps it open
-   * after a save must close and reopen it. A handler that throws or rejects unlocks Save for
-   * another try instead, and the dialog stays open.
+   * after a save must close and reopen it, with the closed dialog rendered in between. A handler
+   * that throws or rejects is taken to have saved nothing: Save unlocks for another try and the
+   * dialog stays open. So a handler that may already have saved must resolve, and report its
+   * failure itself, or a retry saves twice.
+   * (`tasks/decisions/2026-10-20-the-pet-form-locks-save-until-it-opens-again.md`)
    */
   onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void | Promise<void>;
 }

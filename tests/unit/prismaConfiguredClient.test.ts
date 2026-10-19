@@ -41,10 +41,14 @@ describe("a configured Prisma client", () => {
     expect(poolOptions[0]).toMatchObject({ connectionTimeoutMillis: 10000 });
   });
 
-  it("takes DB_CONNECT_TIMEOUT_MS when it is a number", async () => {
-    vi.stubEnv("DB_CONNECT_TIMEOUT_MS", "2500");
+  it.each([
+    ["2500", 2500],
+    ["0", 0], // pg's "no timeout", set on purpose
+    ["not a number", 10000],
+  ])("reads DB_CONNECT_TIMEOUT_MS=%j as %d", async (value, expected) => {
+    vi.stubEnv("DB_CONNECT_TIMEOUT_MS", value);
 
     await expect(import("@/lib/server/prisma")).rejects.toThrow();
-    expect(poolOptions[0]).toMatchObject({ connectionTimeoutMillis: 2500 });
+    expect(poolOptions[0]).toMatchObject({ connectionTimeoutMillis: expected });
   });
 });
