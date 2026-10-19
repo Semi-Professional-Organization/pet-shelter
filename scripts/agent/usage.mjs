@@ -102,7 +102,11 @@ export function ratesFor({ model, served = model, prompt, speed, geo }) {
   const table = Object.hasOwn(PRICES, base) ? PRICES[base] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
   let speedMultiplier = 1;
-  if (speed === "fast" && Object.hasOwn(FAST_MULTIPLIER, base)) speedMultiplier = FAST_MULTIPLIER[base];
+  // The model that served a fast request decides whether it had a fast price; under --price-as
+  // the same premium is applied to the rates it is priced at, as the model is the one thing a
+  // before/after comparison holds constant.
+  const servedKey = priceKey(served);
+  if (speed === "fast" && Object.hasOwn(FAST_MULTIPLIER, servedKey)) speedMultiplier = FAST_MULTIPLIER[servedKey];
   else if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
   const geoMultiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
   if (geoMultiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
@@ -136,8 +140,8 @@ const PERSON_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
 const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
 
 /**
- * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`, a newline), leaving
- * any of those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
+ * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`, `&`, a newline),
+ * leaving any of those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
  */
 export function splitChain(cmd) {
   const parts = [];
@@ -156,7 +160,9 @@ export function splitChain(cmd) {
     } else if (ch === '"' || ch === "'") {
       quote = ch;
       current += ch;
-    } else if (ch === ";" || ch === "|" || ch === "\n" || (ch === "&" && cmd[i + 1] === "&")) {
+    } else if (ch === ";" || ch === "|" || ch === "\n" || (ch === "&" && cmd[i - 1] !== ">" && cmd[i + 1] !== ">")) {
+      // A lone `&` (a background job, PowerShell's call operator) ends a command too, but not the
+      // `&` of a redirection such as `2>&1` or `&>`.
       parts.push(current);
       current = "";
       if ((ch === "|" || ch === "&") && cmd[i + 1] === ch) i++;
@@ -182,7 +188,7 @@ export const FAMILIES = {
   gates: (tool, cmd, vitest) =>
     SHELLS.has(tool) &&
     !isTargetedRun(cmd, vitest) &&
-    (/npx tsc\b[^;&|]*--noEmit|next build/.test(cmd) ||
+    (RUNS.gates.test(cmd) ||
       VITEST_RUN.test(cmd) ||
       GATE_SCRIPTS.has(npmScript(cmd)) ||
       vitest.has(npmScript(cmd))),
@@ -191,21 +197,19 @@ export const FAMILIES = {
   // time), so `mkdir tasks/lessons` is not a listing; and a redirect into a ledger path is a write.
   orient: (tool, cmd) =>
     SHELLS.has(tool) &&
-    (/git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|ls -la \.git\/[^ ]*lock/.test(cmd) ||
-      /^\s*(ls|dir|Get-ChildItem)\s+tasks[\\/](open|lessons|decisions)/.test(cmd)),
+    (RUNS.orient.test(cmd) || /^\s*(ls|dir|Get-ChildItem)\s+tasks[\\/](open|lessons|decisions)/.test(cmd)),
   ledger: (tool, cmd) =>
     (SHELLS.has(tool) &&
       /^\s*(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd) &&
       !/>\s*\S*tasks[\\/]/.test(cmd)) ||
     (FILE_TOOLS.has(tool) && /tasks[\\/](todo\.md|(open|lessons|decisions)\b)/.test(cmd)),
-  merge: (tool, cmd) => SHELLS.has(tool) && /git merge-tree|HEAD\.\.origin\/master|merge-base HEAD origin\/master/.test(cmd),
+  merge: (tool, cmd) => SHELLS.has(tool) && RUNS.merge.test(cmd),
+  // Reading the drift log is the workflow, whatever command reads it.
   drift: (tool, cmd) => SHELLS.has(tool) && /agent-drift\.log/.test(cmd),
-  pr: (tool, cmd) =>
-    SHELLS.has(tool) && /gh pr (checks|view)|gh run (view|watch|list)|commits\/[^ ]+\/status|gh api [^ ]*deployments/.test(cmd),
-  ports: (tool, cmd) =>
-    // Port checks and process kills, not every command that carries a `:5432` database URL.
-    SHELLS.has(tool) &&
-    /Get-NetTCPConnection|Test-NetConnection|netstat|lsof -i|net\.connect|Stop-Process|taskkill|Get-CimInstance Win32_Process/.test(cmd),
+  pr: (tool, cmd) => SHELLS.has(tool) && RUNS.pr.test(cmd),
+  // Port checks and process kills, not every command that carries a `:5432` database URL. A
+  // `net.connect` probe sits inside `node -e`, so it is matched where it appears.
+  ports: (tool, cmd) => SHELLS.has(tool) && (RUNS.ports.test(cmd) || /net\.connect\(/.test(cmd)),
 };
 
 /** Vitest options that take a value as the next word, which is therefore not a file filter. */
@@ -223,6 +227,18 @@ const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/i
  */
 const COMMAND_START = String.raw`^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:cross-env\s+(?:[A-Za-z_]\w*=\S*\s+)*)?`;
 
+/** The family commands, each matched only where a command starts. */
+const RUNS = Object.fromEntries(
+  Object.entries({
+    gates: String.raw`(?:npx\s+tsc\b.*--noEmit|(?:npx\s+)?next\s+build\b)`,
+    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (?:master|HEAD)\.\.origin\/master|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock)`,
+    merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/master|log\b.*HEAD\.\.origin\/master)`,
+    pr: String.raw`gh\s+(?:pr\s+(?:checks|view)|run\s+(?:view|watch|list)|api\s+\S*(?:commits\/\S+\/status|deployments))`,
+    ports: String.raw`(?:Get-NetTCPConnection|Test-NetConnection|netstat|lsof\s+-i|Stop-Process|taskkill|Get-CimInstance\s+Win32_Process)`,
+  }).map(([name, pattern]) => [name, new RegExp(COMMAND_START + pattern)]),
+);
+const NPM_CALL = new RegExp(String.raw`${COMMAND_START}npm\s+(.*)$`);
+
 /** Gate scripts that are not test runs. */
 const GATE_SCRIPTS = new Set(["typecheck", "lint", "docs:check", "build", "check"]);
 
@@ -231,7 +247,7 @@ const GATE_SCRIPTS = new Set(["typecheck", "lint", "docs:check", "build", "check
  * `npm -s run test:components -- x`.
  */
 function npmCall(cmd) {
-  const m = new RegExp(`${COMMAND_START}npm\\s+(.*)$`).exec(cmd);
+  const m = NPM_CALL.exec(cmd);
   if (!m) return undefined;
   const words = m[1].trim().split(/\s+/);
   let i = 0;
@@ -257,7 +273,10 @@ const NPM_VALUE_FLAGS = new Set(["--prefix", "-w", "--workspace", "--userconfig"
  * `vitest run …`, `npx vitest --run …`, or bare `vitest …`, which runs once in a shell with no
  * terminal, as an agent's is: the words after it. `vitest.config.ts` is not `vitest`.
  */
-const VITEST_RUN = new RegExp(`${COMMAND_START}(?:npx\\s+)?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$))(.*)$`);
+const VITEST_RUN = new RegExp(
+  // Bare `vitest`, but not its subcommands that run no tests (`list`, `bench`, `init`).
+  `${COMMAND_START}(?:npx\\s+)?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$)(?!\\s+(?:list|bench|init)\\b))(.*)$`,
+);
 
 /**
  * The test filters in the words after `vitest run`: each positional word, normalised, and "-t"
@@ -1164,16 +1183,16 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
   }
 
   const projectsDir = join(env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
-  const root = mainCheckoutRoot(cwd);
   let dirs = opts.dirs;
   if (!dirs.length) {
+    const root = mainCheckoutRoot(cwd);
     if (!root) return fail(`git could not name this repo's main checkout from ${cwd}\nnext: pass --dir <transcript folder>`);
     dirs = defaultDirs(projectsDir, root);
   }
   dirs = dirs.map((d) => resolve(cwd, d));
   const missing = dirs.filter((d) => !existsSync(d));
   if (missing.length) return fail(`no such transcript folder: ${missing.join(", ")}`);
-  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
+  const files = byCreation(dirs.flatMap((d) => walk(d)));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
   // The test scripts as this checkout defines them, from its top level whatever the cwd; without a

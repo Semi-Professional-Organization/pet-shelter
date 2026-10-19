@@ -5,6 +5,7 @@ import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 import { COMMANDS } from "../../scripts/agent.mjs";
+import { invokedAs } from "../../scripts/lib/invokedAs.mjs";
 
 /**
  * AGENTS.md carries one line pointing at `node scripts/agent.mjs --help`, and docs may name a
@@ -37,15 +38,25 @@ describe("agent scripts entry point", () => {
     expect(missing).toEqual([]);
   });
 
-  it("keeps the two inline copies of the invocation check identical to the shared one", () => {
-    // scripts/lib/invokedAs.mjs says why these two keep their own copy; this keeps them equal.
+  it("keeps the two inline copies of the invocation check the same as each other", () => {
+    // scripts/lib/invokedAs.mjs says why these two keep their own, original copy.
     for (const script of ["scripts/commit-msg.mjs", "scripts/ledger-issues.mjs"]) {
       const source = readFileSync(join(ROOT, script), "utf8");
       expect(source, script).toContain(`process.argv[1] && process.argv[1].replace(/\\\\/g, "/").endsWith("${script}")`);
     }
-    expect(readFileSync(join(ROOT, "scripts/lib/invokedAs.mjs"), "utf8")).toContain(
-      `Boolean(process.argv[1]) && process.argv[1].replace(/\\\\/g, "/").endsWith(script)`,
-    );
+  });
+
+  it("knows a script by its path from the repo root, in either separator, and on Windows in any case", () => {
+    const saved = process.argv[1];
+    try {
+      process.argv[1] = "D:\\Dev\\Repos\\pet-shelter\\scripts\\agent.mjs";
+      expect(invokedAs("scripts/agent.mjs")).toBe(true);
+      expect(invokedAs("scripts/commit-msg.mjs")).toBe(false);
+      process.argv[1] = "D:/Dev/Repos/pet-shelter/Scripts/Agent.mjs";
+      expect(invokedAs("scripts/agent.mjs")).toBe(process.platform === "win32");
+    } finally {
+      process.argv[1] = saved;
+    }
   });
 
   it("reads a command name the way a doc writes it, and not the --help pointer", () => {

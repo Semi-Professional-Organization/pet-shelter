@@ -152,6 +152,8 @@ describe("agent usage: prices", () => {
     expect(ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast" })).toMatchObject({ input: 8, output: 40, cacheRead: 0.4, write1h: 16 });
     expect(ratesFor({ model: "claude-opus-5", prompt: 1, speed: "fast" })).toMatchObject({ input: 10, output: 50 });
     expect(ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast", geo: "us" }).output).toBeCloseTo(44);
+    // Under --price-as, the fast premium the request paid is applied to the rates it is priced at.
+    expect(ratesFor({ model: "claude-sonnet-5", served: "claude-opus-5-5", prompt: 1, speed: "fast" }).output).toBe(20);
   });
 
   it("prices the older models the page still lists, by their dated ids", () => {
@@ -305,6 +307,16 @@ describe("agent usage: workflow families", () => {
     // vitest ORs paths, so the file adds nothing to tests/unit.
     expect(families("Bash", "npx vitest run tests/unit/a.test.ts tests/unit")).toEqual(["gates"]);
     expect(families("Bash", "npm run test:components -- tests/components/F.test.tsx tests/components")).toEqual(["gates"]);
+  });
+
+  it("matches every family's command where it runs, not where a search mentions it", () => {
+    expect(families("Bash", 'grep -n "next build" CLAUDE.md')).toEqual([]);
+    expect(families("Bash", 'git log --grep "npx tsc --noEmit"')).toEqual([]);
+    expect(families("Bash", 'grep -rn "gh pr checks" tasks/lessons')).toEqual(["ledger"]);
+    expect(families("Bash", "gh pr checks 5")).toEqual(["pr"]);
+    expect(families("Bash", "npx vitest list tests/unit")).toEqual([]);
+    expect(families("Bash", 'echo "a" & npm run lint')).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run 2>&1 | tail")).toEqual(["gates"]);
   });
 
   it("matches a program where it runs, not where it is mentioned", () => {
