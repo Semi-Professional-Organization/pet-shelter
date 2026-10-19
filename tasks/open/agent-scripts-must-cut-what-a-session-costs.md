@@ -20,7 +20,7 @@ edit to them is an automatic DIED.
 ## Baseline
 
 Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 17,338 model
+transcript Claude Code still held for this repo: 17 sessions and their subagents, 17,433 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
@@ -28,19 +28,19 @@ later change of model cannot pose as a saving. Dollars are API list-price equiva
 |---|---:|
 | Mean cost per main-session request | $0.144 |
 | Mean cost per subagent request | $0.056 |
-| Cost split: cache reads / cache writes / output | 58.4% / 29.2% / 12.5% |
-| Share of cost from requests made above 400K context | 55.8% |
-| Cold resumes: whole context re-written on a person's message after the cache expired | 43, 9.5% of cost |
+| Cost split: cache reads / cache writes / output | 58.4% / 29.1% / 12.5% |
+| Share of cost from requests made above 400K context | 55.9% |
+| Cold resumes: whole context re-written on a person's message after the cache expired | 43, 9.4% of cost |
 | The same re-write woken by anything else (a long tool, a notice) | 11, 1.6% of cost |
-| Carrying old tool output (estimated) | 13.4% of cost |
-| Workflow families, saving at one command call per burst | 5.7% of cost combined |
+| Carrying old tool output (estimated) | 13.5% of cost |
+| Workflow families, saving at one command call per burst | 5.6% of cost combined |
 
 A cold resume's cost is the re-write beyond the cache read a warm request would have paid for the
 same tokens, which is what a hand-off could save.
 
 A workflow family is the set of calls one command would replace. The eight measured, with the
 saving each would make at one call per burst: gates 1.3%, targeted test runs 0.9%, orient 0.3%,
-ledger reads 1.7%, merge checks 0.2%, drift-log reads 0.1%, pull-request checks 1.1%, port checks
+ledger reads 1.6%, merge checks 0.2%, drift-log reads 0.1%, pull-request checks 1.1%, port checks
 0.1%. A call can belong to two families, so the sum is an upper bound. A burst is a run of
 requests that each call the family, and it ends at the end of a turn; calls issued in parallel
 from one request save nothing, since one command would remove no request. The plan estimated

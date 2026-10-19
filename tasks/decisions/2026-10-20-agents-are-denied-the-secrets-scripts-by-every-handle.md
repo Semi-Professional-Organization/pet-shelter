@@ -33,3 +33,9 @@ sessions here saw the auto-mode classifier refuse production reads, but no rule 
 spelling, the `sops` binary the scripts call, `node --import tsx`. Those are enumerated in
 `tests/unit/agentGuard.test.ts`; whether the PowerShell tool honours rules per subcommand is open
 in `tasks/open/permission-rules-bind-bash-only.md`.
+
+**The upgrade path, not taken here.** Every new spelling needs a rule per shell, and the ledger of
+misses only grows. A refusal inside the scripts themselves (for example, `scripts/secrets.mjs`
+and the migrations exit when `CLAUDECODE` is set unless the human passes an explicit flag)
+would hold whatever the spelling. It was not built in this change because the owner chose
+permission rules for these gaps, and a guard in production scripts is its own decision.

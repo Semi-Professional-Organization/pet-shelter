@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -21,7 +21,9 @@ import {
   familyUsage,
   formatReport,
   isTargetedRun,
+  orderTranscripts,
   splitChain,
+  vitestScripts,
   jsonlLines,
   main,
   priceFiles,
@@ -37,6 +39,10 @@ import {
  */
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
+
+/** This repo's own test scripts, as the command reads them. */
+const VITEST = vitestScripts(JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts);
+const families = (tool: string, cmd: string) => familiesOf(tool, cmd, VITEST);
 
 /** Text that must never reach the report: it stands in for message and tool-output content. */
 const SECRET = "SECRET-CONTENT-7f3a";
@@ -96,7 +102,7 @@ const toolResult = (id: string, chars: number) => ({
 const priceFile = (file: ReturnType<typeof extract>) => priceFiles([file])[0];
 
 function extract(records: unknown[], meta = { session: "s1", sub: false }, seen = new Set<string>()) {
-  const e = createExtractor(meta, seen);
+  const e = createExtractor(meta, seen, VITEST);
   for (const r of records) e.add(r);
   return e.finish();
 }
@@ -235,29 +241,29 @@ describe("agent usage: command classes", () => {
 
 describe("agent usage: workflow families", () => {
   it("files a targeted test run under targeted tests only, whichever way it is invoked", () => {
-    expect(familiesOf("Bash", "npm run test -- tests/unit/x.test.ts")).toEqual(["targeted tests"]);
-    expect(familiesOf("Bash", "npx vitest run tests/unit/x.test.ts")).toEqual(["targeted tests"]);
-    expect(familiesOf("PowerShell", "npx vitest run tests\\unit\\x.test.ts")).toEqual(["targeted tests"]);
+    expect(families("Bash", "npm run test:components -- tests/components/x.test.tsx")).toEqual(["targeted tests"]);
+    expect(families("Bash", "npx vitest run tests/unit/x.test.ts")).toEqual(["targeted tests"]);
+    expect(families("PowerShell", "npx vitest run tests\\unit\\x.test.ts")).toEqual(["targeted tests"]);
   });
 
   it("counts ledger and orient reads in PowerShell spellings and through the Read tool", () => {
-    expect(familiesOf("PowerShell", "Get-ChildItem tasks\\lessons")).toEqual(["orient", "ledger"]);
-    expect(familiesOf("PowerShell", "Get-Content tasks\\todo.md")).toEqual(["ledger"]);
-    expect(familiesOf("Read", "D:\\x\\tasks\\open\\a.md")).toEqual(["ledger"]);
-    expect(familiesOf("Read", "D:/x/src/tasks.ts")).toEqual([]);
+    expect(families("PowerShell", "Get-ChildItem tasks\\lessons")).toEqual(["orient", "ledger"]);
+    expect(families("PowerShell", "Get-Content tasks\\todo.md")).toEqual(["ledger"]);
+    expect(families("Read", "D:\\x\\tasks\\open\\a.md")).toEqual(["ledger"]);
+    expect(families("Read", "D:/x/src/tasks.ts")).toEqual([]);
   });
 
   it("does not take a shell redirection for a test filter", () => {
-    expect(familiesOf("Bash", "npx vitest run --project components 2>&1 | tail -30")).toEqual(["gates"]);
-    expect(familiesOf("Bash", "npx vitest run > out.txt")).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run --project components 2>&1 | tail -30")).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run > out.txt")).toEqual(["gates"]);
   });
 
   it("keeps a quoted pipe inside one command, and does not take a test:e2e run for vitest", () => {
     expect(splitChain('grep -E "a|b" tasks/open/x.md | wc -l')).toEqual(['grep -E "a|b" tasks/open/x.md ', " wc -l"]);
-    expect(familiesOf("Bash", 'grep -E "a|b" tasks/open/x.md')).toEqual(["ledger"]);
-    expect(isTargetedRun("npm run test:e2e -- tests/e2e/login.spec.ts")).toBe(false);
-    expect(familiesOf("Bash", "npm run -s test -- tests/unit/x.test.ts")).toEqual(["targeted tests"]);
-    expect(familiesOf("PowerShell", "npm test *>&1")).toEqual(["gates"]);
+    expect(families("Bash", 'grep -E "a|b" tasks/open/x.md')).toEqual(["ledger"]);
+    expect(isTargetedRun("npm run test:e2e -- tests/e2e/login.spec.ts", VITEST)).toBe(false);
+    expect(families("Bash", "npm run -s test:components -- tests/components/x.test.tsx")).toEqual(["targeted tests"]);
+    expect(families("PowerShell", "npm test *>&1")).toEqual(["gates"]);
   });
 
   it("counts Glob and Grep over the ledger as ledger reads, by the path they were given", () => {
@@ -273,21 +279,26 @@ describe("agent usage: workflow families", () => {
     expect(file.calls.map((c: { families: string[] }) => c.families)).toEqual([["ledger"], ["ledger"], []]);
   });
 
+  it("does not take a write into the ledger, or making a folder there, for a read", () => {
+    expect(families("Bash", "cat > tasks/open/x.md <<'EOF'")).toEqual([]);
+    expect(families("Bash", "mkdir -p tasks/lessons")).toEqual([]);
+  });
+
   it("counts a shell read of any ledger file, not only todo.md", () => {
     for (const cmd of ["cat tasks/open/a.md", "sed -n 1,80p tasks/open/a.md", "head -20 tasks/decisions/x.md"]) {
-      expect(familiesOf("Bash", cmd), cmd).toEqual(["ledger"]);
+      expect(families("Bash", cmd), cmd).toEqual(["ledger"]);
     }
-    expect(familiesOf("PowerShell", "Get-Content tasks/lessons/README.md")).toEqual(["ledger"]);
+    expect(families("PowerShell", "Get-Content tasks/lessons/README.md")).toEqual(["ledger"]);
   });
 
   it("files a run over a whole test directory as a gate, not a targeted run", () => {
-    expect(familiesOf("Bash", "npm run test -- tests/unit")).toEqual(["gates"]);
-    expect(familiesOf("Bash", "npx vitest run --project unit")).toEqual(["gates"]);
-    expect(familiesOf("PowerShell", "npx vitest run .\\tests\\unit")).toEqual(["gates"]);
-    expect(familiesOf("PowerShell", 'npx vitest run "tests/unit"')).toEqual(["gates"]);
-    expect(familiesOf("Bash", "npx vitest run tests/unit --bail 1 --retry 2")).toEqual(["gates"]);
-    expect(familiesOf("Bash", "npx vitest run --exclude e2e --hookTimeout 20000")).toEqual(["gates"]);
-    expect(familiesOf("PowerShell", "npm.cmd run lint")).toEqual(["gates"]);
+    expect(families("Bash", "npm run test -- tests/unit")).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run --project unit")).toEqual(["gates"]);
+    expect(families("PowerShell", "npx vitest run .\\tests\\unit")).toEqual(["gates"]);
+    expect(families("PowerShell", 'npx vitest run "tests/unit"')).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run tests/unit --bail 1 --retry 2")).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run --exclude e2e --hookTimeout 20000")).toEqual(["gates"]);
+    expect(families("PowerShell", "npm.cmd run lint")).toEqual(["gates"]);
   });
 
   it("files a run narrowed by a name filter or a test pattern as targeted", () => {
@@ -296,28 +307,28 @@ describe("agent usage: workflow families", () => {
       "npm run test:components -- AdminInvitePage",
       'npx vitest run -t "prices"',
       "npx vitest run --testNamePattern=prices",
-      "npm test tests/unit/foo.test.ts",
+      "npm run test:integration tests/integration/foo.test.ts",
       "npx vitest run --project unit tests/unit/a.test.ts",
     ]) {
-      expect(isTargetedRun(cmd), cmd).toBe(true);
-      expect(familiesOf("Bash", cmd), cmd).toEqual(["targeted tests"]);
+      expect(isTargetedRun(cmd, VITEST), cmd).toBe(true);
+      expect(families("Bash", cmd), cmd).toEqual(["targeted tests"]);
     }
   });
 
   it("classes each command of a chain on its own", () => {
-    expect(familiesOf("Bash", "npx vitest run tests/unit/a.test.ts && npm run lint")).toEqual(["gates", "targeted tests"]);
-    expect(familiesOf("Bash", "npm test -- tests/unit/a.test.ts")).toEqual(["targeted tests"]);
+    expect(families("Bash", "npx vitest run tests/unit/a.test.ts && npm run lint")).toEqual(["gates", "targeted tests"]);
+    expect(families("Bash", "npm run test:components -- tests/components/a.test.tsx")).toEqual(["targeted tests"]);
   });
 
   it("files every spelling of a whole-suite gate under gates", () => {
     for (const cmd of ["npm run test", "npm test", "npx vitest run", "npm run test:db", "npm run typecheck"]) {
-      expect(familiesOf("Bash", cmd), cmd).toEqual(["gates"]);
+      expect(families("Bash", cmd), cmd).toEqual(["gates"]);
     }
   });
 
   it("counts port checks as ports, not every command carrying a database URL", () => {
-    expect(familiesOf("Bash", "DATABASE_URL=postgresql://u:p@localhost:5432/db npm run db:push:local")).toEqual([]);
-    expect(familiesOf("PowerShell", "Get-NetTCPConnection -LocalPort 5432")).toEqual(["ports"]);
+    expect(families("Bash", "DATABASE_URL=postgresql://u:p@localhost:5432/db npm run db:push:local")).toEqual([]);
+    expect(families("PowerShell", "Get-NetTCPConnection -LocalPort 5432")).toEqual(["ports"]);
   });
 });
 
@@ -541,9 +552,22 @@ describe("agent usage: the analyses", () => {
     expect(coldResumes(file)).toHaveLength(1);
   });
 
-  it("checks a US-only request against the model that served it, not the --price-as model", () => {
-    const record = assistant("r1", { out: 1, geo: "us" }, { model: "claude-opus-5-5" });
-    expect(() => summarize([extract([record])], { priceAs: "claude-opus-4-5" })).not.toThrow();
+  it("checks a US-only request against both the model that served it and the one it is priced at", () => {
+    const record = () => assistant("r1", { out: 1, geo: "us" }, { model: "claude-opus-5-5" });
+    expect(() => summarize([extract([record()])], { priceAs: "claude-opus-5" })).not.toThrow();
+    // Opus 4.5 has no US-only price, so pricing a US-only request at its rates would invent one.
+    expect(() => summarize([extract([record()])], { priceAs: "claude-opus-4-5" })).toThrow(/claude-opus-4-5 with inference_geo us/);
+    const served = assistant("r1", { out: 1, geo: "us" }, { model: "claude-opus-4-5" });
+    expect(() => summarize([extract([served])], { priceAs: "claude-opus-5-5" })).toThrow(/claude-opus-4-5 with inference_geo us/);
+  });
+
+  it("files `npm test` with a file as the whole unit suite, because the script already passes tests/unit", () => {
+    // package.json: "test": "vitest run --project unit tests/unit"; vitest ORs path filters.
+    expect(VITEST.get("test")).toEqual({ filtered: true });
+    for (const cmd of ["npm test -- tests/unit/a.test.ts", "npm test tests/unit/a.test.ts", "npm run -s test -- tests/unit/x.test.ts"]) {
+      expect(families("Bash", cmd), cmd).toEqual(["gates"]);
+    }
+    expect(VITEST.has("test:e2e")).toBe(false);
   });
 
   it("still sees a cold resume as the first new request of a forked transcript", () => {
@@ -747,6 +771,14 @@ describe("agent usage: the command", () => {
       return { code: e.status, out: e.stdout };
     }
   };
+
+  it("reads a parent before its subagents even where the filesystem records no creation time", () => {
+    const parent = { path: "s1.jsonl", born: 0, written: 300, sub: false };
+    const fork = { path: "s1/subagents/agent-a.jsonl", born: 0, written: 200, sub: true };
+    expect(orderTranscripts([fork, parent])).toEqual(["s1.jsonl", "s1/subagents/agent-a.jsonl"]);
+    // With creation times, those decide.
+    expect(orderTranscripts([{ ...parent, born: 20 }, { ...fork, born: 10 }])).toEqual(["s1/subagents/agent-a.jsonl", "s1.jsonl"]);
+  });
 
   it("finds this repo's transcript folders whatever case the drive letter was stored in, and no neighbour's", () => {
     // The folder keeps the case of the cwd that first created it (`d:` typed gives `d--`). One

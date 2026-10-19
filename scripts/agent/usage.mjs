@@ -17,7 +17,7 @@
  * mode, an unknown inference region) is a 2, never a guess.
  */
 
-import { createReadStream, existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
@@ -87,8 +87,10 @@ export function ratesFor({ model, served = model, prompt, speed, geo }) {
   if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
   // "For Claude 4.6 and later models"; earlier ones refuse the parameter, so a US-only request
   // on one is a transcript this table does not understand.
-  if (geo === "us" && BEFORE_4_6.has(priceKey(served))) {
-    throw new UnpriceableError(`no price for ${priceKey(served)} with inference_geo us`);
+  // Neither the model that served a US-only request nor the model it is priced at may be one
+  // that has no US-only price.
+  for (const name of new Set([priceKey(served), base])) {
+    if (geo === "us" && BEFORE_4_6.has(name)) throw new UnpriceableError(`no price for ${name} with inference_geo us`);
   }
   if (BEFORE_4_6.has(base) && prompt > BEFORE_4_6_STANDARD_PROMPT) {
     throw new UnpriceableError(`no published price for ${base} above a ${BEFORE_4_6_STANDARD_PROMPT / 1000}K prompt`);
@@ -145,19 +147,23 @@ export function splitChain(cmd) {
  * is this machine's primary shell.
  */
 export const FAMILIES = {
-  gates: (tool, cmd) =>
+  gates: (tool, cmd, vitest) =>
     SHELLS.has(tool) &&
-    /npm (run (-s )?)?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test:db|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build|npx vitest run/.test(cmd) &&
-    !FAMILIES["targeted tests"](tool, cmd),
-  "targeted tests": (tool, cmd) => SHELLS.has(tool) && isTargetedRun(cmd),
+    !isTargetedRun(cmd, vitest) &&
+    (/npx tsc --noEmit|next build|(?:^|\s)(?:npx\s+)?vitest\s+run\b/.test(cmd) ||
+      GATE_SCRIPTS.has(npmScript(cmd)) ||
+      vitest.has(npmScript(cmd))),
+  "targeted tests": (tool, cmd, vitest) => SHELLS.has(tool) && isTargetedRun(cmd, vitest),
+  // Listing and reading verbs lead the command (familiesOf hands over one command of a chain at a
+  // time), so `mkdir tasks/lessons` is not a listing; and a redirect into a ledger path is a write.
   orient: (tool, cmd) =>
     SHELLS.has(tool) &&
-    /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|(ls|dir|Get-ChildItem) tasks[\\/](open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
+    (/git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|ls -la \.git\/[^ ]*lock/.test(cmd) ||
+      /^\s*(ls|dir|Get-ChildItem)\s+tasks[\\/](open|lessons|decisions)/.test(cmd)),
   ledger: (tool, cmd) =>
     (SHELLS.has(tool) &&
-      // `.*`, not `[^|;&]*`: familiesOf hands over one command of a chain at a time, and a pipe
-      // left in it is inside quotes.
-      /(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd)) ||
+      /^\s*(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd) &&
+      !/>\s*\S*tasks[\\/]/.test(cmd)) ||
     (FILE_TOOLS.has(tool) && /tasks[\\/](todo\.md|(open|lessons|decisions)\b)/.test(cmd)),
   merge: (tool, cmd) => SHELLS.has(tool) && /git merge-tree|HEAD\.\.origin\/master|merge-base HEAD origin\/master/.test(cmd),
   drift: (tool, cmd) => SHELLS.has(tool) && /agent-drift\.log/.test(cmd),
@@ -178,30 +184,32 @@ const VITEST_VALUE_FLAGS = new Set([
 /** Filters that name a whole test tier, which is the gate, not a targeted run. */
 const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/integration"]);
 
+/** Gate scripts that are not test runs. */
+const GATE_SCRIPTS = new Set(["typecheck", "lint", "docs:check", "build", "check"]);
+
+/** The npm script a command runs (`npm test`, `npm run -s lint`), if any. */
+const npmScript = (cmd) => /(?:^|\s)npm\s+(?:run\s+)?(?:-\S+\s+)*([\w:-]+)/.exec(cmd)?.[1];
+
 /**
- * A vitest run narrowed to some tests: a file or name filter, or `-t <pattern>`. Reads the words
- * after `vitest run`, or after `npm test`/`npm run test[:tier]` (with or without `--`, since npm
- * passes either on).
+ * The test filters in the words after `vitest run`: each positional word, normalised, and `-t`'s
+ * pattern. `--testNamePattern=x` reads as the filter "-t".
  *
  * ceiling: a vitest option missing from VITEST_VALUE_FLAGS makes its value read as a filter. The
  * exact parse would use vitest's own CLI definition, which is not available without the package.
  */
-export function isTargetedRun(cmd) {
-  // The npm scripts that run vitest: not test:e2e (Playwright) or test:coverage.
-  const match =
-    /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$|(?:^|\s)npm\s+(?:run\s+)?(?:-\S+\s+)*test(?::(?:components|integration|db|all|watch))?(?:\s+(.*))?$/.exec(
-      String(cmd).trim(),
-    );
-  if (!match) return false;
-  const words = (match[1] ?? match[2] ?? "")
+function filtersIn(args) {
+  const words = String(args)
     .trim()
     .split(/\s+/)
     .filter((w) => w && w !== "--")
     .map((w) => w.replace(/^(["'])(.*)\1$/, "$2"));
+  const filters = [];
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
-    // `-t <pattern>` needs no case: its pattern reads as a filter below.
-    if (word.startsWith("--testNamePattern")) return true;
+    if (word.startsWith("--testNamePattern")) {
+      filters.push("-t");
+      continue;
+    }
     // A redirection (`2>&1`, `> out.txt`, PowerShell's `*>&1`) is the shell's, not a filter; a
     // bare operator takes the next word as its target.
     if (/^[\d*]?(>>?|<)/.test(word)) {
@@ -212,20 +220,48 @@ export function isTargetedRun(cmd) {
       if (VITEST_VALUE_FLAGS.has(word)) i++;
       continue;
     }
-    if (!WHOLE_SUITE.has(word.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, ""))) return true;
+    filters.push(word.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, ""));
   }
-  return false;
+  return filters;
+}
+
+/**
+ * The repo's npm scripts that run vitest once, from package.json, and whether each already passes
+ * a test path. Vitest ORs its path filters, so a file added to `npm test` (which passes
+ * `tests/unit`) still runs the whole unit suite.
+ */
+export function vitestScripts(scripts = {}) {
+  const out = new Map();
+  for (const [name, body] of Object.entries(scripts)) {
+    const run = /\bvitest\s+run\b(.*)$/.exec(String(body));
+    if (run) out.set(name, { filtered: filtersIn(run[1]).length > 0 });
+  }
+  return out;
+}
+
+/**
+ * A vitest run narrowed to some tests: a file or name filter that is not a whole tier, given
+ * after `vitest run` or after an npm script that runs vitest and passes no path of its own.
+ */
+export function isTargetedRun(cmd, vitest = new Map()) {
+  const text = String(cmd).trim();
+  const direct = /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$/.exec(text);
+  if (direct) return filtersIn(direct[1]).some((f) => !WHOLE_SUITE.has(f));
+  const npm = /(?:^|\s)npm\s+(?:run\s+)?(?:-\S+\s+)*([\w:-]+)(?:\s+(.*))?$/.exec(text);
+  const script = npm && vitest.get(npm[1]);
+  if (!script || script.filtered) return false;
+  return filtersIn(npm[2] ?? "").some((f) => !WHOLE_SUITE.has(f));
 }
 
 /** `npm.cmd run lint` is `npm run lint`: PowerShell on Windows often names the shim. */
 const withoutExeSuffix = (cmd) => cmd.replace(/\b(npm|npx|node|git|gh)\.(cmd|exe)\b/gi, "$1");
 
 /** Families a call belongs to. A call can count toward more than one. */
-export function familiesOf(tool, cmd) {
+export function familiesOf(tool, cmd, vitest = new Map()) {
   // Each command of a chain is classed on its own, so `vitest run <file> && npm run lint` is both
   // a targeted run and a gate.
   const parts = SHELLS.has(tool) ? splitChain(withoutExeSuffix(String(cmd))) : [cmd];
-  return Object.keys(FAMILIES).filter((name) => parts.some((part) => FAMILIES[name](tool, part)));
+  return Object.keys(FAMILIES).filter((name) => parts.some((part) => FAMILIES[name](tool, part, vitest)));
 }
 
 /**
@@ -318,9 +354,10 @@ const USAGE_FIELDS = ["input_tokens", "cache_read_input_tokens", "cache_creation
  * Lines of one request share a `requestId` and need not be adjacent; their usage is merged by
  * taking the maximum of each field, because streamed lines carry a growing `output_tokens`.
  * `seen` is shared across files: a request copied into a second file (a fork, a relocated
- * subagent) is counted once, in the first file read.
+ * subagent) is counted once, in the first file read. `vitest` is `vitestScripts(package.json)`,
+ * which tells a targeted test run from a gate.
  */
-export function createExtractor({ session, sub }, seen = new Set()) {
+export function createExtractor({ session, sub }, seen = new Set(), vitest = new Map()) {
   const requests = [];
   const byKey = new Map();
   const calls = new Map();
@@ -421,7 +458,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
             request: request.index,
             tool: String(block.name),
             class: commandClass(String(block.name), cmd),
-            families: familiesOf(String(block.name), cmd),
+            families: familiesOf(String(block.name), cmd, vitest),
           });
         }
       } else if (record.type === "user") {
@@ -945,8 +982,8 @@ export async function* jsonlLines(chunks) {
   if (pending.join("")) yield pending.join("");
 }
 
-async function readFile(file, seen) {
-  const extractor = createExtractor(fileMeta(file), seen);
+async function readFile(file, seen, vitest) {
+  const extractor = createExtractor(fileMeta(file), seen, vitest);
   let malformed = 0;
   for await (const line of jsonlLines(createReadStream(file, { encoding: "utf8" }))) {
     if (!line.trim()) continue;
@@ -974,12 +1011,25 @@ function byCreation(files) {
   // ceiling: about 20 s for 300 transcripts here, read one at a time. Reading them in parallel
   // would have to hold every parsed record until its turn (some 600 MB here); an index of each
   // file's request ids would let old files be skipped without changing ownership.
-  return files
-    .map((path) => {
+  //
+  return orderTranscripts(
+    files.map((path) => {
       const s = statSync(path);
-      return { path, born: s.birthtimeMs || s.mtimeMs };
-    })
-    .sort((a, b) => a.born - b.born || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+      return { path, born: s.birthtimeMs, written: s.mtimeMs, sub: fileMeta(path).sub };
+    }),
+  );
+}
+
+/**
+ * Paths in creation order. Where the filesystem records no creation time, a parent session is
+ * still being written after its subagents fork from it, so its modification time would sort it
+ * last; then every main-session file goes before every subagent file, the order they were made.
+ */
+export function orderTranscripts(stats) {
+  const byBirth = stats.every((f) => f.born > 0);
+  const byPath = (a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  return [...stats]
+    .sort((a, b) => (byBirth ? a.born - b.born : Number(a.sub) - Number(b.sub) || a.written - b.written) || byPath(a, b))
     .map((f) => f.path);
 }
 
@@ -1011,9 +1061,9 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
   }
 
   const projectsDir = join(env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
+  const root = mainCheckoutRoot(cwd);
   let dirs = opts.dirs;
   if (!dirs.length) {
-    const root = mainCheckoutRoot(cwd);
     if (!root) return fail(`git could not name this repo's main checkout from ${cwd}\nnext: pass --dir <transcript folder>`);
     dirs = defaultDirs(projectsDir, root);
   }
@@ -1021,9 +1071,14 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
   const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
+  // The test scripts as this checkout defines them; without a package.json, npm test runs are
+  // not told apart from other npm scripts.
+  const packageJson = join(cwd, "package.json");
+  const vitest = vitestScripts(existsSync(packageJson) ? JSON.parse(readFileSync(packageJson, "utf8")).scripts : {});
+
   const seen = new Set();
   const extracted = [];
-  for (const file of files) extracted.push(await readFile(file, seen));
+  for (const file of files) extracted.push(await readFile(file, seen, vitest));
 
   let report;
   try {
