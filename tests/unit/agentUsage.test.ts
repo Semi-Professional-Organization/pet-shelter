@@ -13,6 +13,7 @@ import {
   commandClass,
   createExtractor,
   defaultDirs,
+  projectFolderName,
   commonClasses,
   parseArgs,
   RARE_CLASS,
@@ -318,6 +319,16 @@ describe("agent usage: workflow families", () => {
     const commit = 'git commit -m "$(cat <<\'EOF\'\nfix: quote the "x path\n\nnpm run build\nEOF\n)"';
     expect(families("Bash", commit)).toEqual([]);
     expect(families("Bash", "echo $((1 << n))\nnpm run lint")).toEqual(["gates"]);
+  });
+
+  it("does not take a here-string or a quoted `<<` for a heredoc", () => {
+    expect(families("Bash", "tr a-z A-Z <<< hello\nnpm run lint")).toEqual(["gates"]);
+    expect(families("Bash", 'echo "a << b"\nnpm run lint')).toEqual(["gates"]);
+  });
+
+  it("labels past PowerShell's call operator and npx's flags", () => {
+    expect(commandClass("PowerShell", "& npm run lint")).toBe("npm run lint");
+    expect(commandClass("Bash", "npx -y vitest run")).toBe("npx vitest");
   });
 
   it("labels an npm call by the same parser the families use", () => {
@@ -961,12 +972,16 @@ describe("agent usage: the command", () => {
   it("finds this repo's transcript folders whatever case the drive letter was stored in, and no neighbour's", () => {
     // The folder keeps the case of the cwd that first created it (`d:` typed gives `d--`). One
     // case per name, because Windows folders are case-insensitive and the second mkdir would fail.
+    // The checkout path is this platform's own, so the folder name comes out as Claude Code would
+    // write it here; the stored copy differs from it only in case.
     const projects = mkdtempSync(join(tmpdir(), "agent-usage-projects-"));
-    for (const d of ["d--Dev-Repos-pet-shelter", "D--Dev-Repos-pet-shelter--claude-worktrees-x", "D--Dev-Repos-pet-shelter2"]) {
+    const name = projectFolderName(ROOT);
+    const flipped = name[0] === name[0].toLowerCase() ? name[0].toUpperCase() + name.slice(1) : name[0].toLowerCase() + name.slice(1);
+    for (const d of [flipped, `${name}--claude-worktrees-x`, `${name}2`]) {
       mkdirSync(join(projects, d));
     }
-    const found = defaultDirs(projects, "D:\\Dev\\Repos\\pet-shelter").map((d: string) => d.slice(projects.length + 1)).sort();
-    expect(found).toEqual(["D--Dev-Repos-pet-shelter--claude-worktrees-x", "d--Dev-Repos-pet-shelter"]);
+    const found = defaultDirs(projects, ROOT).map((d: string) => d.slice(projects.length + 1)).sort();
+    expect(found).toEqual([flipped, `${name}--claude-worktrees-x`].sort());
   });
 
   it("lists usage in --help with its side-effect class", () => {

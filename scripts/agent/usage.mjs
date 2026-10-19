@@ -177,7 +177,18 @@ export function splitChain(cmd, tool = "Bash") {
     }
     // `<<EOF`, `<< 'EOF'`, `<<"EOF"`, `<<\EOF`, and `<<-EOF`, whose closing line may be tabbed;
     // not a shift inside `$(( ))` or `[[ ]]`.
-    if (quote !== "'" && ch === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<" && !/\$\(\([^)]*$|\[\[[^\]]*$/.test(current)) {
+    // Inside double quotes only a command substitution (`"$(cat <<'EOF'`) can hold one, and `<<<`
+    // is a here-string, at either of its first two `<`.
+    const heredocCanStart =
+      !quote || (quote === '"' && /\$\([^)]*$/.test(current));
+    if (
+      heredocCanStart &&
+      ch === "<" &&
+      cmd[i + 1] === "<" &&
+      cmd[i + 2] !== "<" &&
+      cmd[i - 1] !== "<" &&
+      !/\$\(\([^)]*$|\[\[[^\]]*$/.test(current)
+    ) {
       const m = /^<<(-?)\s*\\?(['"]?)([A-Za-z_][\w-]*)\2/.exec(cmd.slice(i));
       if (m) {
         heredoc = { word: m[3], tabs: m[1] === "-" };
@@ -453,10 +464,12 @@ export function commandClass(tool, cmd) {
     if (!match) break;
     rest = rest.slice(match[0].length);
   }
-  // Only the first command of a chain; an npm call is read by the same parser the families use.
-  const first = splitChain(rest, tool)[0];
+  // Only the first command of a chain, past PowerShell's call operator (`& npm …`); an npm call
+  // is read by the same parser the families use, and npx's own flags are skipped.
+  const first = splitChain(rest.replace(/^&\s+/, ""), tool)[0];
   const npm = npmCall(first);
   const words = first.split(/\s+/).filter(Boolean);
+  if (words[0] === "npx") while (/^-/.test(words[1] ?? "")) words.splice(1, 1);
   const take = SUBCOMMAND.has(words[0]) ? 2 : 1;
   const label = npm ? (npm.viaRun ? ["npm", "run", npm.script] : ["npm", npm.script]) : words.slice(0, take);
   const plain = label.length > 0 && label.every((w, i) => (i === 2 ? SCRIPT : VERB).test(w));
@@ -528,7 +541,6 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
   let synthetic = 0;
   let duplicates = 0;
   const dupKeys = new Set();
-  const started = new Set();
   let lastStart;
   let prevStart;
   // What woke the session since the last request. A person outranks an event, which outranks a
@@ -571,8 +583,8 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
         // has streamed; transcripts do not record when a request was sent, so near a lifetime's
         // edge a long first block can move a resume across it.
         let trigger;
-        if (!started.has(key)) {
-          started.add(key);
+        // A key in neither map is a request this file has not seen before.
+        if (!byKey.has(key) && !dupKeys.has(key)) {
           prevStart = lastStart;
           lastStart = record.timestamp;
           trigger = pendingTrigger;
