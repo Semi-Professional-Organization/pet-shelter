@@ -32,17 +32,17 @@ later change of model cannot pose as a saving. Dollars are API list-price equiva
 | Mean cost per subagent request | $0.056 |
 | Cost split: cache reads / cache writes / output | 57.1% / 30.6% / 12.3% |
 | Share of cost from requests made above 400K context | 56.4% |
-| Cold resumes: whole context re-written on a person's message after the cache expired | 43, 10.7% of cost |
-| The same re-write woken by anything else (a long tool, a notice) | 11, 1.8% of cost |
+| Cold resumes: whole context re-written on a person's message after the cache expired | 41, 10.3% of cost |
+| The same re-write woken by anything else (a long tool, a notice) | 13, 2.1% of cost |
 | Carrying old tool output (estimated) | 12.9% of cost |
-| Workflow families, saving at one command call per burst | 5.4% of cost combined |
+| Workflow families, saving at one command call per burst | 5.5% of cost combined |
 
 A cold resume's cost is the re-write beyond the cache read a warm request would have paid for the
 same tokens, which is what a hand-off could save.
 
 A workflow family is the set of calls one command would replace. The eight measured, with the
-saving each would make at one call per burst: gates 1.3%, targeted test runs 0.7%, orient 0.3%,
-ledger reads 1.6%, merge checks 0.2%, drift-log reads 0.1%, pull-request checks 1.1%, port checks
+saving each would make at one call per burst: gates 1.4%, targeted test runs 0.7%, orient 0.3%,
+ledger reads 1.7%, merge checks 0.2%, drift-log reads 0.1%, pull-request checks 1.1%, port checks
 0.1%. A call can belong to two families, so the sum is an upper bound. A burst is a run of
 requests that each call the family, and it ends at the end of a turn; calls issued in parallel
 from one request save nothing, since one command would remove no request. The plan estimated

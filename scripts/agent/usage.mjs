@@ -25,6 +25,8 @@ import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
+import { caseFolder } from "../lib/invokedAs.mjs";
+
 // ================================ prices ================================
 
 export const PRICE_SOURCE = "https://platform.claude.com/docs/en/about-claude/pricing";
@@ -186,14 +188,13 @@ export function splitChain(cmd, tool = "Bash") {
     // not a shift inside `$(( ))`, `(( ))`, `let` or `[[ ]]`.
     // Inside double quotes only a command substitution (`"$(cat <<'EOF'`) can hold one, and `<<<`
     // is a here-string, at either of its first two `<`.
-    const heredocCanStart =
-      !quote || (quote === '"' && /\$\([^)]*$/.test(current));
+    // The cheap character tests come first: the context tests scan all of `current`.
     if (
-      heredocCanStart &&
       ch === "<" &&
       cmd[i + 1] === "<" &&
       cmd[i + 2] !== "<" &&
       cmd[i - 1] !== "<" &&
+      (!quote || (quote === '"' && /\$\([^)]*$/.test(current))) &&
       !/\(\([^)]*$|\[\[[^\]]*$|(^|\s)let\s[^;]*$/.test(current)
     ) {
       const m = /^<<(-?)\s*\\?(['"]?)([A-Za-z_][\w-]*)\2/.exec(cmd.slice(i));
@@ -220,7 +221,12 @@ export function splitChain(cmd, tool = "Bash") {
       current += "$'";
       i++;
     } else if (ch === escape && i + 1 < cmd.length) {
-      current += ch + cmd[++i];
+      // An escaped line end continues the command on the next line, as one line.
+      const continued = /^\r?\n/.exec(cmd.slice(i + 1));
+      if (continued) {
+        current += " ";
+        i += continued[0].length;
+      } else current += ch + cmd[++i];
     } else if (quote === '"') {
       if (ch === '"') quote = null;
       current += ch;
@@ -383,8 +389,8 @@ function filtersIn(args) {
     }
     // A redirection (`2>&1`, `> out.txt`, PowerShell's `*>&1`) is the shell's, not a filter; a
     // bare operator takes the next word as its target.
-    if (/^[\d*]?(>>?|<)/.test(word)) {
-      if (/^[\d*]?(>>?|<)$/.test(word)) i++;
+    if (/^[\d*&]?(>>?|<)/.test(word)) {
+      if (/^[\d*&]?(>>?|<)$/.test(word)) i++;
       continue;
     }
     if (word.startsWith("-")) {
@@ -570,6 +576,9 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
   const noteTrigger = (trigger) => {
     if (trigger && (RANK[trigger] ?? 0) > (RANK[pendingTrigger] ?? 0)) pendingTrigger = trigger;
   };
+  // Whether a tool (not one that waits on a person) returned since the last request: the session
+  // was then waiting on that tool, whatever else was queued meanwhile.
+  let pendingAfterTool = false;
 
   return {
     add(record) {
@@ -603,12 +612,15 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
         // has streamed; transcripts do not record when a request was sent, so near a lifetime's
         // edge a long first block can move a resume across it.
         let trigger;
+        let afterTool = false;
         // A key in neither map is a request this file has not seen before.
         if (!byKey.has(key) && !dupKeys.has(key)) {
           prevStart = lastStart;
           lastStart = record.timestamp;
           trigger = pendingTrigger;
+          afterTool = pendingAfterTool;
           pendingTrigger = undefined;
+          pendingAfterTool = false;
         }
         const prevTs = prevStart;
         if (dupKeys.has(key)) return;
@@ -624,8 +636,10 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
             index: requests.length,
             ts: record.timestamp,
             prevTs,
-            // What the request answered: a person, a background event, or a tool's result.
+            // What the request answered: a person, a background event, or a tool's result; and
+            // whether a tool returned in the gap, whatever else came with it.
             trigger,
+            afterTool,
             model: message.model,
             speed: undefined,
             geo: undefined,
@@ -671,6 +685,7 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
           // A tool that waits for an answer returns when the person gives it.
           // ceiling: a permission prompt also waits on a person, but leaves no mark in the record.
           if (PERSON_TOOLS.has(calls.get(block.tool_use_id)?.tool)) noteTrigger("person");
+          else pendingAfterTool = true;
         }
         // A text block beside a tool result is not a person: in this repo's transcripts the only
         // ones (4 of 19,315 results, 2026-10-20) are a fork's injected boilerplate. A message
@@ -851,7 +866,9 @@ export function coldResumes(file, breaks = segmentBreaks(file)) {
     if (!(idle > ttl)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
     const warm = (r.cache_creation_input_tokens * r.rates.cacheRead) / 1e6;
-    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger: r.trigger ?? "unknown" });
+    // A session a tool kept busy was not waiting on its person, even if they also typed meanwhile.
+    const trigger = r.afterTool && r.trigger === "person" ? "tool" : (r.trigger ?? "unknown");
+    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger });
   }
   return out;
 }
@@ -881,8 +898,9 @@ export function familyUsage(files) {
       const f = out[name];
       let inBurst = false;
       for (const r of file.requests) {
-        // A person or an event starts new work; a compaction summary or a meta record does not.
-        if (r.trigger === "person" || r.trigger === "event") inBurst = false;
+        // A person starts new work, and so does an event that woke the session on its own; a
+        // notice that came in beside a tool's result, a compaction summary or a meta record do not.
+        if (r.trigger === "person" || (r.trigger === "event" && !r.afterTool)) inBurst = false;
         const mine = (byRequest.get(r.index) ?? []).filter((c) => c.families.includes(name));
         if (!mine.length) {
           inBurst = false;
@@ -1116,7 +1134,7 @@ export function defaultDirs(projectsDir, root, platform = process.platform) {
   if (!existsSync(projectsDir)) return [];
   // Claude Code keeps the case of the path as typed (`d:` gives `d--`), so where the file system
   // ignores case, so does this; on Linux `Repo` and `repo` are two checkouts.
-  const fold = platform === "win32" || platform === "darwin" ? (s) => s.toLowerCase() : (s) => s;
+  const fold = caseFolder(platform);
   const name = fold(projectFolderName(root));
   return readdirSync(projectsDir)
     .filter((d) => fold(d) === name || fold(d).startsWith(`${name}--claude-worktrees-`))

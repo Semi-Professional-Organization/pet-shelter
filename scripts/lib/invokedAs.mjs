@@ -14,10 +14,13 @@
  *   checkout holding it without `scripts/lib/` would fail every commit on a missing import.
  * Both are invoked by fixed lowercase paths (the workflow, the hook), where the case cannot differ.
  */
+/** A path as a file system on `platform` compares it: Windows and macOS ignore case by default. */
+export const caseFolder = (platform = process.platform) =>
+  platform === "win32" || platform === "darwin" ? (path) => path.toLowerCase() : (path) => path;
+
 export const invokedAs = (script) => {
   if (!process.argv[1]) return false;
-  // Windows and macOS file systems are case-insensitive by default.
-  const fold = (path) => (process.platform === "win32" || process.platform === "darwin" ? path.toLowerCase() : path);
+  const fold = caseFolder();
   const path = fold(process.argv[1].replace(/\\/g, "/"));
   const wanted = fold(script);
   return path === wanted || path.endsWith(`/${wanted}`);

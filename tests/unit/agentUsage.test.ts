@@ -321,6 +321,19 @@ describe("agent usage: workflow families", () => {
     expect(families("Bash", "echo $((1 << n))\nnpm run lint")).toEqual(["gates"]);
   });
 
+  it("joins a command continued onto the next line, and reads &> as a redirection", () => {
+    expect(families("Bash", "npx vitest run \\\n  --project unit")).toEqual(["gates"]);
+    expect(commandClass("Bash", "npm test \\\n -- --reporter dot")).toBe("npm test");
+    expect(families("PowerShell", "npx vitest run `\n --project unit")).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest run --project unit &> out.txt")).toEqual(["gates"]);
+  });
+
+  it("keeps the scan of a long quoted string linear", () => {
+    const started = Date.now();
+    splitChain(`node -e "${"x".repeat(200_000)}"`);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
   it("does not take a here-string or a quoted `<<` for a heredoc", () => {
     expect(families("Bash", "tr a-z A-Z <<< hello\nnpm run lint")).toEqual(["gates"]);
     expect(families("Bash", 'echo "a << b"\nnpm run lint')).toEqual(["gates"]);
@@ -615,6 +628,32 @@ describe("agent usage: the analyses", () => {
     delete (record as { timestamp?: string }).timestamp;
     const files = [extract([record, assistant("r2", { out: 1 }, { ts: "2026-10-05T10:00:00.000Z" })])];
     expect(summarize(files, { since: "2026-10-02" }).totals.requests).toBe(1);
+  });
+
+  it("files a re-write after a long tool under the tool, though the person typed meanwhile", () => {
+    const queuedPerson = { type: "attachment", attachment: { type: "queued_command", commandMode: "prompt", origin: { kind: "human" } } };
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z", tools: [{ id: "t", name: "Bash", command: "npm test" }] }),
+        queuedPerson,
+        toolResult("t", 10),
+        assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T11:10:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)[0].trigger).toBe("tool");
+  });
+
+  it("keeps a burst going when a notice arrives beside a tool's result", () => {
+    const notice = { type: "attachment", attachment: { type: "queued_command", origin: { kind: "task-notification" } } };
+    const file = priceFile(
+      extract([
+        assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "gh pr checks 5" }] }),
+        notice,
+        toolResult("a", 10),
+        assistant("r2", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "gh pr checks 5" }] }),
+      ]),
+    );
+    expect(familyUsage([file]).pr).toMatchObject({ bursts: 1 });
   });
 
   it("keeps a burst going across a compaction mid-turn", () => {

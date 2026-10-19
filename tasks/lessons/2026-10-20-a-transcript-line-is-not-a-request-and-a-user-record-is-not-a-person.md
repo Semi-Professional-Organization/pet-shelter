@@ -14,8 +14,8 @@ obvious reading of a Claude Code transcript was wrong:
 - A `user` record with no tool result is a person only when `origin.kind` is `human` (or, in
   older transcripts, absent). Background-task notices, other sessions' messages, meta records and
   compaction summaries are user records too, and a message typed while a turn runs is not a user
-  record at all but a `queued_command` attachment. Telling them apart moved the count of "cold
-  resumes on a person's message" from 51 to 43.
+  record at all but a `queued_command` attachment. Telling them apart moved about one in six of
+  the "cold resumes on a person's message" to wakes no person caused.
 - A cache re-write after an hour idle is not always avoidable idleness: a compaction re-writes a
   new context anyway, and a 5-minute cache expires after 5 minutes.
 
