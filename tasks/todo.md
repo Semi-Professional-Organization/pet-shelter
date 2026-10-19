@@ -15,6 +15,50 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Every role lands on, is shown and is offered only what it can use
+
+**Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`
+
+A fresh STAFF account's first screen after signing in was a refusal: every sign-in pushed to
+`/admin/pets`. The brief asked for that fixed first and the same class swept across every role,
+admin page, action and the sponsor portal, with the role × page × action matrix as evidence.
+
+- [x] Audit: lessons and open entries for role, permission, redirect, nav and suspension; no open
+      PR overlaps. Five read-only readers built the matrix, one per area.
+- [x] Landing: sign-in, registration, demo sign-in and invite acceptance enter the console by a
+      document load of `/admin`, which redirects to the first section the live role opens. The
+      first design (a client push) died on its kill condition: the admin layout, mounted on the
+      sign-in page while signed out, bounced every fresh-browser sign-in back to it.
+- [x] One section table for the nav, the landing and a gate every section page calls; FAQ
+      editing moved to `MANAGE_CONTENT`; the nav and `getCurrentUserAction` read the live role.
+- [x] Controls follow permissions: applications (decide, delete), settings (a coordinator gets
+      only the test email tool), transparency (no upload without `MANAGE_PET_MEDIA`), own-row
+      role edit.
+- [x] Signed out or suspended: the 401 page on every section, `/admin` to sign-in, the client
+      drops a cached user the server no longer recognises; the proxy's 401 links to sign-in.
+- [x] Sponsor portal: the sign-in/dashboard loop for a sponsor whose record is gone; "Become a
+      sponsor" now leads to the rescues; "Claim your portal" offered to sponsors, not every donor.
+- [x] Tests for every fix, each shown failing against the base branch's code through an alias
+      probe; local browser run for Staff, Coordinator, Content Editor and Animal Manager.
+- [ ] `/code-review high` until a clean round; draft PR; CI.
+
+## Review
+
+Deliberately not done, and why:
+
+- The applications board never sends a decision on a real application to the server (it checks
+  the browser's sample copy first). Every role is affected, so it is not a role dead end and was
+  filed rather than fixed: `tasks/open/application-review-is-gated-by-the-browser-copy.md`.
+- Content Editors cannot upload report PDFs; the button is hidden rather than `/api/upload`
+  widened, because widening who can store files is the owner's call:
+  `tasks/decisions/2026-10-19-content-editors-paste-report-links-rather-than-upload.md`.
+- The proxy still reads the cookie, so a member promoted since signing in is refused at Staff &
+  Permissions until they sign in again; its 403 text now says so.
+- Sign-in has no return-to, staff account flows have further dead ends, and the sponsor portal has
+  loose ends unrelated to sessions: `tasks/open/staff-account-flows-with-no-way-forward.md`,
+  `tasks/open/admin-console-loose-ends-from-the-role-sweep.md`,
+  `tasks/open/sponsor-portal-loose-ends.md`.
+
 # A short staff invite code no longer takes the site down
 
 **Branch:** `fix/invite-code-any-length` · opened 2026-10-17 · base `d6dd030`
