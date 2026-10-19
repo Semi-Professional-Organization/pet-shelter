@@ -34,9 +34,13 @@ export function helpText() {
 
 async function run(argv) {
   const [name, ...rest] = argv;
-  if (!name || name === "--help" || name === "-h" || name === "help") {
+  if (!name) {
+    process.stdout.write(`agent: ERROR no command\nnext: node scripts/agent.mjs --help\n`);
+    return 2;
+  }
+  if (name === "--help" || name === "-h" || name === "help") {
     process.stdout.write(`${helpText()}\n`);
-    return name ? 0 : 2;
+    return 0;
   }
   const command = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
   if (!command) {

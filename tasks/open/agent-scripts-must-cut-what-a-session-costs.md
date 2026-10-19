@@ -11,22 +11,22 @@ is claimed. The kill conditions below are immutable; a later edit to them is an 
 ## Baseline
 
 Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 16,219 model
+transcript Claude Code still held for this repo: 17 sessions and their subagents, 16,310 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
 | Measure | Baseline |
 |---|---:|
-| Mean cost per main-session request | $0.143 |
+| Mean cost per main-session request | $0.144 |
 | Mean cost per subagent request | $0.056 |
-| Cost split: cache reads / cache writes / output | 57.8% / 29.7% / 12.4% |
-| Share of cost from requests made above 400K context | 56.2% |
-| Cold resumes (whole context re-written after over an hour idle) | 54, 12.0% of cost |
+| Cost split: cache reads / cache writes / output | 58.0% / 29.6% / 12.4% |
+| Share of cost from requests made above 400K context | 56.3% |
+| Cold resumes (whole context re-written after over an hour idle) | 54, 11.9% of cost |
 | Carrying old tool output (estimated) | 13.2% of cost |
-| Workflow families, saving at one command call per burst | 5.2% of cost combined |
+| Workflow families, saving at one command call per burst | 6.0% of cost combined |
 
 The families' combined saving is the sum of the eight families in the catalog's section 4 (gates
-0.8%, targeted tests 0.7%, orient 0.5%, ledger 0.3%, merge 0.2%, drift 0.1%, pr 2.4%, ports 0.2%);
+0.9%, targeted tests 0.8%, orient 0.6%, ledger 0.4%, merge 0.2%, drift 0.1%, pr 2.8%, ports 0.3%);
 a call can belong to two families, so the sum is an upper bound. Calls issued in parallel from
 one request save nothing, since one command would remove no request. The catalog estimated about
 9% from a different weighting; this is the priced figure.
@@ -40,7 +40,7 @@ measured), and `node:readline` cut 78 transcript records in half at a raw U+2028
 Measured with `usage --price-as claude-opus-5-5 --since <merge date>` over the first five main
 sessions after the context meter (build order PR 2) merges:
 
-- mean cost per main-session request at least 20% below $0.143, the floor of the catalog's
+- mean cost per main-session request at least 20% below $0.144, the floor of the catalog's
   20% to 31% hand-off estimate; and
 - cold resumes below 5% of cost.
 
@@ -50,7 +50,7 @@ five sessions, go through the command.
 ## Kill conditions
 
 1. If, once build-order PRs 2 to 4 have merged and five main sessions have run since the last of
-   them, mean cost per main-session request at Opus 5.5 rates is not at least 10% below $0.143,
+   them, mean cost per main-session request at Opus 5.5 rates is not at least 10% below $0.144,
    building further commands stops and the plan is re-measured before anything else is built.
 2. A command whose family's calls go through it less than half the time over five sessions after
    it lands is deleted.

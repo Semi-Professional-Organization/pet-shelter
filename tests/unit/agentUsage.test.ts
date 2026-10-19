@@ -99,6 +99,10 @@ describe("agent usage: prices", () => {
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "eu" })).toThrow(/inference_geo eu/);
   });
 
+  it("prices a dated snapshot id as its model", () => {
+    expect(ratesFor({ model: "claude-haiku-4-5-20251001", prompt: 1 })).toEqual(PRICES["claude-haiku-4-5"]);
+  });
+
   it("charges US-only inference 1.1x on every category", () => {
     const us = ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "us" });
     expect(us.output).toBeCloseTo(22);
@@ -183,6 +187,8 @@ describe("agent usage: command classes", () => {
     expect(commandClass("Bash", "./scripts/deploy-prod.sh --token=abc")).toBe("Bash other");
     expect(commandClass("Bash", "C:/Users/User/secret-notes.txt")).toBe("Bash other");
     expect(commandClass("Bash", "git --no-pager log")).toBe("Bash other");
+    // A key pasted where a command goes: digits keep it out of the report.
+    expect(commandClass("Bash", "sk-ant-api03-abcDEF")).toBe("Bash other");
   });
 });
 
@@ -273,6 +279,28 @@ describe("agent usage: the analyses", () => {
     const gates = familyUsage([file]).gates;
     expect(gates).toMatchObject({ calls: 3, bursts: 2, sessions: 1 });
     expect(gates.saving).toBeCloseTo(1); // r2: 50K output at $20 per million
+  });
+
+  it("keeps a burst going past a Read made in parallel with a family call", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "git fetch origin master" }, { id: "b", name: "Read" }] }),
+        assistant("r2", { out: 50_000 }, { tools: [{ id: "c", name: "Bash", command: "git worktree list" }] }),
+      ]),
+    );
+    expect(familyUsage([file]).orient).toMatchObject({ calls: 2, bursts: 1 });
+    expect(familyUsage([file]).orient.saving).toBeCloseTo(1);
+  });
+
+  it("prices only the --since window, so an unpriceable request before it cannot stop the measurement", () => {
+    const files = () => [
+      extract([
+        assistant("r1", { out: 1 }, { model: "claude-x-1", ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("r2", { out: 1_000_000 }, { ts: "2026-10-02T10:00:00.000Z" }),
+      ]),
+    ];
+    expect(() => summarize(files())).toThrow(UnpriceableError);
+    expect(summarize(files(), { since: "2026-10-02" }).totals.output).toBeCloseTo(20);
   });
 
   it("saves nothing for calls issued in parallel from one request, since one command removes no request", () => {
@@ -386,6 +414,7 @@ describe("agent usage: the command", () => {
     expect(cli(["usage", "--dir", mkdtempSync(join(tmpdir(), "agent-usage-empty-"))]).code).toBe(2);
     expect(cli(["usage", "--frobnicate"]).code).toBe(2);
     expect(cli(["nonesuch"]).code).toBe(2);
+    expect(cli([])).toMatchObject({ code: 2, out: expect.stringMatching(/^agent: ERROR no command/) });
   });
 
   it("takes --since only as a UTC date or a time with a zone, which mean the same on every machine", () => {

@@ -60,23 +60,25 @@ export class UnpriceableError extends Error {}
 
 /**
  * The rates one request pays, or a throw. `model` is the model that served the request
- * (`message.model`), not the one asked for: a fallback bills at the model that answered.
+ * (`message.model`), not the one asked for: a fallback bills at the model that answered. A dated
+ * snapshot id (`claude-haiku-4-5-20251001`) prices as its model, as the pricing page lists it.
  *
  * @param {{ model: string, prompt: number, speed?: string | null, geo?: string | null }} request
  */
 export function ratesFor({ model, prompt, speed, geo }) {
-  const table = Object.hasOwn(PRICES, model) ? PRICES[model] : undefined;
+  const base = String(model).replace(/-\d{8}$/, "");
+  const table = Object.hasOwn(PRICES, base) ? PRICES[base] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
   if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
   const multiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
   if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
-  const base = table.over && prompt > table.over.prompt ? table.over : table;
+  const tier = table.over && prompt > table.over.prompt ? table.over : table;
   return {
-    input: base.input * multiplier,
-    write5m: base.write5m * multiplier,
-    write1h: base.write1h * multiplier,
-    cacheRead: base.cacheRead * multiplier,
-    output: base.output * multiplier,
+    input: tier.input * multiplier,
+    write5m: tier.write5m * multiplier,
+    write1h: tier.write1h * multiplier,
+    cacheRead: tier.cacheRead * multiplier,
+    output: tier.output * multiplier,
   };
 }
 
@@ -117,8 +119,12 @@ export function familiesOf(tool, cmd) {
   return Object.keys(FAMILIES).filter((name) => FAMILIES[name](tool, cmd));
 }
 
-/** A command word: starts with a letter; no path separator, flag, quote or substitution. */
-const VERB = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;
+/**
+ * A command word: letters with `_`, `.` or `-`; no digit, path separator, flag, quote or
+ * substitution. Digits are out because a key or token pasted where a command goes has them, and
+ * command names rarely do.
+ */
+const VERB = /^[A-Za-z][A-Za-z_.-]{0,29}$/;
 /** An npm script name may also carry colons (`test:components`). */
 const SCRIPT = /^[A-Za-z][A-Za-z0-9_.:-]{0,39}$/;
 const SUBCOMMAND = new Set(["git", "gh", "npx"]);
@@ -276,23 +282,22 @@ export function priceFile(file, { priceAs } = {}) {
  */
 function priceRequest(r, priceAs) {
   r.ctx = promptOf(r);
-    const p = ratesFor({ model: priceAs ?? r.model, prompt: r.ctx, speed: r.speed, geo: r.geo });
-    r.rates = p;
-    // The two cache lifetimes are priced differently, so a write the split does not account for
-    // has no known price. Every line in this repo's transcripts carries a split that sums to the
-    // total (36,459 of 36,459 on 2026-10-20); one that does not is refused, never guessed.
-    if (r.w5 + r.w1h !== r.cache_creation_input_tokens) {
-      throw new UnpriceableError("cache write without a 5m/1h split that sums to its total");
-    }
-    const { w5, w1h } = r;
-    r.usd = {
-      read: (r.cache_read_input_tokens * p.cacheRead) / 1e6,
-      write: (w5 * p.write5m + w1h * p.write1h) / 1e6,
-      output: (r.output_tokens * p.output) / 1e6,
-      input: (r.input_tokens * p.input) / 1e6,
-      search: r.webSearch * WEB_SEARCH_USD,
-    };
-    r.cost = r.usd.read + r.usd.write + r.usd.output + r.usd.input + r.usd.search;
+  const p = ratesFor({ model: priceAs ?? r.model, prompt: r.ctx, speed: r.speed, geo: r.geo });
+  // The two cache lifetimes are priced differently, so a write the split does not account for
+  // has no known price. Every line in this repo's transcripts carries a split that sums to the
+  // total (36,459 of 36,459 on 2026-10-20); one that does not is refused, never guessed.
+  if (r.w5 + r.w1h !== r.cache_creation_input_tokens) {
+    throw new UnpriceableError("cache write without a 5m/1h split that sums to its total");
+  }
+  r.rates = p;
+  r.usd = {
+    read: (r.cache_read_input_tokens * p.cacheRead) / 1e6,
+    write: (r.w5 * p.write5m + r.w1h * p.write1h) / 1e6,
+    output: (r.output_tokens * p.output) / 1e6,
+    input: (r.input_tokens * p.input) / 1e6,
+    search: r.webSearch * WEB_SEARCH_USD,
+  };
+  r.cost = r.usd.read + r.usd.write + r.usd.output + r.usd.input + r.usd.search;
 }
 
 // ================================ the analyses ================================
@@ -315,7 +320,7 @@ const COMPACTION_DROP = 0.6;
 function segmentEnds(file) {
   const n = file.requests.length;
   const breaks = new Set(file.compactions);
-  for (let i = 1; i < n; i++) if (file.requests[i].ctx < COMPACTION_DROP * file.requests[i - 1].ctx) breaks.add(i);
+  for (let i = 1; i < n; i++) if (promptOf(file.requests[i]) < COMPACTION_DROP * promptOf(file.requests[i - 1])) breaks.add(i);
   const ends = new Array(n);
   let end = n - 1;
   for (let i = n - 1; i >= 0; i--) {
@@ -337,13 +342,14 @@ export function carriedOutput(file) {
   const reqs = file.requests;
   const ends = segmentEnds(file);
   const readPrefix = [0];
-  for (const r of reqs) readPrefix.push(readPrefix[readPrefix.length - 1] + r.rates.cacheRead);
+  for (const r of reqs) readPrefix.push(readPrefix[readPrefix.length - 1] + (r.rates?.cacheRead ?? 0));
   const byClass = {};
   let total = 0;
   for (const call of file.calls) {
     const writeAt = call.request + 1;
     if (!call.resultChars || writeAt >= reqs.length || writeAt > ends[call.request]) continue;
     const w = reqs[writeAt];
+    if (!w.rates) continue;
     const writeRate = w.w1h >= w.w5 ? w.rates.write1h : w.rates.write5m;
     const reads = readPrefix[ends[call.request] + 1] - readPrefix[writeAt + 1];
     const usd = ((call.resultChars / 4) * (writeRate + reads)) / 1e6;
@@ -364,7 +370,7 @@ export function coldResumes(file) {
   if (file.sub) return [];
   const out = [];
   for (const r of file.requests) {
-    if (!r.prevTs) continue;
+    if (!r.prevTs || !r.usd) continue;
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
     if (!(idle > COLD_IDLE_MINUTES)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
@@ -374,11 +380,12 @@ export function coldResumes(file) {
 }
 
 /**
- * Per family: calls, bursts (runs of consecutive matching calls in one file), and the cost a single
- * command per burst would have saved. A call costs its request's cost split evenly across the
- * request's tool calls. Only calls made in a later request than the burst's first count as saved:
- * calls issued in parallel from one request share it, and folding them into one command removes no
- * request.
+ * Per family: calls, bursts, and the cost a single command per burst would have saved. A burst is a
+ * run of consecutive tool-calling requests in one file that each make at least one call of the
+ * family; a request whose calls are all something else ends it, but a parallel Read beside a family
+ * call does not. A call costs its request's cost split evenly across the request's tool calls.
+ * Only calls in a later request than the burst's first count as saved: calls issued in parallel
+ * from one request share it, and folding them into one command removes no request.
  *
  * ceiling: an even split of a request's cost across its calls is a proxy; the true saving is the
  * re-read context of the requests a command removes, which needs a counterfactual replay.
@@ -386,23 +393,29 @@ export function coldResumes(file) {
 export function familyUsage(files) {
   const out = Object.fromEntries(Object.keys(FAMILIES).map((name) => [name, { calls: 0, bursts: 0, sessions: new Set(), cost: 0, saving: 0 }]));
   for (const file of files) {
+    const byRequest = new Map();
+    for (const call of file.calls) {
+      if (!byRequest.has(call.request)) byRequest.set(call.request, []);
+      byRequest.get(call.request).push(call);
+    }
     for (const name of Object.keys(FAMILIES)) {
       const f = out[name];
       let burstStart = null;
-      for (const call of file.calls) {
-        if (!call.families.includes(name)) {
+      for (const [index, calls] of byRequest) {
+        const mine = calls.filter((c) => c.families.includes(name));
+        if (!mine.length) {
           burstStart = null;
           continue;
         }
-        const r = file.requests[call.request];
-        const cost = r.cost / Math.max(1, r.tools);
-        f.calls++;
+        const r = file.requests[index];
+        const cost = (mine.length * r.cost) / Math.max(1, r.tools);
+        f.calls += mine.length;
         f.cost += cost;
         f.sessions.add(file.session);
         if (burstStart === null) {
           f.bursts++;
-          burstStart = call.request;
-        } else if (call.request !== burstStart) f.saving += cost;
+          burstStart = index;
+        } else f.saving += cost;
       }
     }
   }
@@ -428,9 +441,13 @@ export function summarize(files, { since, priceAs } = {}) {
   const sinceMs = since ? Date.parse(since) : -Infinity;
   const inWindow = (ts) => !(Date.parse(ts) < sinceMs);
 
+  // Only requests inside the window are priced, so an unpriceable request before `since` cannot
+  // stop a measurement of the window. Requests outside it stay unpriced and every analysis below
+  // skips them.
   const unpriceable = {};
   for (const f of files) {
     for (const r of f.requests) {
+      if (!inWindow(r.ts)) continue;
       try {
         priceRequest(r, priceAs);
       } catch (error) {
@@ -695,7 +712,12 @@ async function readFile(file, seen) {
  * preserved would sort wrongly, and the exact order needs each file's first timestamp.
  */
 function byCreation(files) {
-  const born = new Map(files.map((f) => [f, statSync(f).birthtimeMs || statSync(f).mtimeMs]));
+  const born = new Map(
+    files.map((f) => {
+      const s = statSync(f);
+      return [f, s.birthtimeMs || s.mtimeMs];
+    }),
+  );
   return [...files].sort((a, b) => born.get(a) - born.get(b) || (a < b ? -1 : a > b ? 1 : 0));
 }
 
