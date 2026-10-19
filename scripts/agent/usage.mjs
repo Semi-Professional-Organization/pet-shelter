@@ -16,7 +16,7 @@
  * mode, an unknown inference region) is a 2, never a guess.
  */
 
-import { createReadStream, existsSync, readdirSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
@@ -227,11 +227,8 @@ export function createExtractor({ session, sub }, seen = new Set()) {
         const usage = message.usage || {};
         for (const field of USAGE_FIELDS) request[field] = Math.max(request[field], Number(usage[field]) || 0);
         const creation = usage.cache_creation || {};
-        const w5 = Number(creation.ephemeral_5m_input_tokens) || 0;
-        // Older lines carry only the total; Claude Code's cache is the 1-hour one.
-        const w1h = Number(creation.ephemeral_1h_input_tokens) || Math.max(0, request.cache_creation_input_tokens - w5);
-        request.w5 = Math.max(request.w5, w5);
-        request.w1h = Math.max(request.w1h, w1h);
+        request.w5 = Math.max(request.w5, Number(creation.ephemeral_5m_input_tokens) || 0);
+        request.w1h = Math.max(request.w1h, Number(creation.ephemeral_1h_input_tokens) || 0);
         if (usage.speed != null) request.speed = usage.speed;
         if (usage.inference_geo != null) request.geo = usage.inference_geo;
         request.webSearch = Math.max(request.webSearch, Number(usage.server_tool_use?.web_search_requests) || 0);
@@ -281,10 +278,13 @@ function priceRequest(r, priceAs) {
   r.ctx = promptOf(r);
     const p = ratesFor({ model: priceAs ?? r.model, prompt: r.ctx, speed: r.speed, geo: r.geo });
     r.rates = p;
-    // The 5m/1h split can disagree with the total on old lines; the total is what was written,
-    // and whatever the split does not attribute to 5m was the 1-hour cache Claude Code uses.
-    const w5 = Math.min(r.w5, r.cache_creation_input_tokens);
-    const w1h = r.cache_creation_input_tokens - w5;
+    // The two cache lifetimes are priced differently, so a write the split does not account for
+    // has no known price. Every line in this repo's transcripts carries a split that sums to the
+    // total (36,459 of 36,459 on 2026-10-20); one that does not is refused, never guessed.
+    if (r.w5 + r.w1h !== r.cache_creation_input_tokens) {
+      throw new UnpriceableError("cache write without a 5m/1h split that sums to its total");
+    }
+    const { w5, w1h } = r;
     r.usd = {
       read: (r.cache_read_input_tokens * p.cacheRead) / 1e6,
       write: (w5 * p.write5m + w1h * p.write1h) / 1e6,
@@ -304,7 +304,11 @@ export const CONTEXT_BUCKETS = [
   { label: "over 600K", max: Infinity },
 ];
 
-/** A context drop larger than this between consecutive requests is a compaction. */
+/**
+ * A context drop larger than this between consecutive requests is a compaction.
+ * ceiling: a heuristic for compactions older transcripts did not mark; `compact_boundary` records
+ * are used where present, and this can go once every transcript in range carries them.
+ */
 const COMPACTION_DROP = 0.6;
 
 /** Index of the last request each request's context survives to. */
@@ -325,6 +329,9 @@ function segmentEnds(file) {
  * What carrying tool output cost. A result enters the context with the next request, which writes
  * it to the cache, and every later request in the same segment reads it again. Tokens are
  * estimated as characters / 4, which is why the report calls this an estimate.
+ *
+ * ceiling: chars/4 over-counts dense code and under-counts non-Latin text; the exact figure is
+ * the cache-write delta of the next request, which mixes in everything else that turn added.
  */
 export function carriedOutput(file) {
   const reqs = file.requests;
@@ -369,17 +376,22 @@ export function coldResumes(file) {
 /**
  * Per family: calls, bursts (runs of consecutive matching calls in one file), and the cost a single
  * command per burst would have saved. A call costs its request's cost split evenly across the
- * request's tool calls.
+ * request's tool calls. Only calls made in a later request than the burst's first count as saved:
+ * calls issued in parallel from one request share it, and folding them into one command removes no
+ * request.
+ *
+ * ceiling: an even split of a request's cost across its calls is a proxy; the true saving is the
+ * re-read context of the requests a command removes, which needs a counterfactual replay.
  */
 export function familyUsage(files) {
   const out = Object.fromEntries(Object.keys(FAMILIES).map((name) => [name, { calls: 0, bursts: 0, sessions: new Set(), cost: 0, saving: 0 }]));
   for (const file of files) {
     for (const name of Object.keys(FAMILIES)) {
       const f = out[name];
-      let inRun = false;
+      let burstStart = null;
       for (const call of file.calls) {
         if (!call.families.includes(name)) {
-          inRun = false;
+          burstStart = null;
           continue;
         }
         const r = file.requests[call.request];
@@ -387,9 +399,10 @@ export function familyUsage(files) {
         f.calls++;
         f.cost += cost;
         f.sessions.add(file.session);
-        if (inRun) f.saving += cost;
-        else f.bursts++;
-        inRun = true;
+        if (burstStart === null) {
+          f.bursts++;
+          burstStart = call.request;
+        } else if (call.request !== burstStart) f.saving += cost;
       }
     }
   }
@@ -556,7 +569,7 @@ const HELP = `usage: node scripts/agent.mjs usage [--since <date>] [--price-as <
 
 What agent sessions in this repo cost, at official per-model API rates. Read-only.
 
-  --since <date>  only requests at or after this date or ISO time
+  --since <date>  only requests at or after YYYY-MM-DD (UTC midnight) or an ISO time with a zone
   --price-as <model>  price every request at this model's rates, so a before/after comparison
                   is not moved by a change of model (e.g. claude-opus-5-5)
   --dir <path>    a transcript directory to read instead of the default (repeatable);
@@ -568,12 +581,17 @@ Exit codes: 0 report produced, 2 could not run (no transcripts, a model with no 
 /** The ~/.claude/projects folder name Claude Code uses for a working directory. */
 export const projectFolderName = (dir) => resolve(dir).replace(/[^A-Za-z0-9]/g, "-");
 
+/** The main checkout, which worktree folders are named after; null when git cannot say. */
 function mainCheckoutRoot(cwd) {
   try {
-    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd, encoding: "utf8" }).trim();
+    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
     return dirname(common);
   } catch {
-    return cwd;
+    return null;
   }
 }
 
@@ -605,6 +623,12 @@ export function fileMeta(file) {
   return { sub, session: sub ? basename(dirname(dirname(file))) : basename(file, ".jsonl") };
 }
 
+/**
+ * A date alone parses as UTC midnight, but a date-time with no zone parses as local time, so the
+ * window would start somewhere else on every machine. Only the two unambiguous forms are taken.
+ */
+const SINCE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
 export function parseArgs(argv) {
   const opts = { dirs: [], json: false, since: undefined, priceAs: undefined, help: false };
   for (let i = 0; i < argv.length; i++) {
@@ -619,8 +643,9 @@ export function parseArgs(argv) {
         if (!Object.hasOwn(PRICES, v)) throw new Error(`--price-as has no price for ${v}`);
         opts.priceAs = v;
       }
-      else if (Number.isNaN(Date.parse(v))) throw new Error(`--since is not a date: ${v}`);
-      else opts.since = v;
+      else if (!SINCE.test(v) || Number.isNaN(Date.parse(v))) {
+        throw new Error(`--since takes YYYY-MM-DD (UTC midnight) or an ISO time with a zone, not ${v}`);
+      } else opts.since = v;
     } else throw new Error(`unknown argument: ${a}`);
   }
   return opts;
@@ -663,7 +688,29 @@ async function readFile(file, seen) {
   return { ...extractor.finish(), malformed };
 }
 
-export async function main(argv, { env = process.env, cwd = process.cwd(), out = process.stdout, err = process.stderr } = {}) {
+/**
+ * Transcripts in the order a request was first written: a forked or relocated transcript copies
+ * its parent's history, and the first file read owns each shared request.
+ * ceiling: creation time stands in for "written first"; a copied file whose creation time was
+ * preserved would sort wrongly, and the exact order needs each file's first timestamp.
+ */
+function byCreation(files) {
+  const born = new Map(files.map((f) => [f, statSync(f).birthtimeMs || statSync(f).mtimeMs]));
+  return [...files].sort((a, b) => born.get(a) - born.get(b) || (a < b ? -1 : a > b ? 1 : 0));
+}
+
+export async function main(argv, io = {}) {
+  const out = io.out ?? process.stdout;
+  try {
+    return await run(argv, io);
+  } catch (error) {
+    // Any failure still answers in this command's line-1 contract.
+    out.write(`usage: ERROR ${error.message}\n`);
+    return 2;
+  }
+}
+
+async function run(argv, { env = process.env, cwd = process.cwd(), out = process.stdout, err = process.stderr } = {}) {
   const fail = (message) => {
     out.write(`usage: ERROR ${message}\n`);
     return 2;
@@ -680,8 +727,13 @@ export async function main(argv, { env = process.env, cwd = process.cwd(), out =
   }
 
   const projectsDir = join(env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
-  const dirs = opts.dirs.length ? opts.dirs : defaultDirs(projectsDir, mainCheckoutRoot(cwd));
-  const files = dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)).sort();
+  let dirs = opts.dirs;
+  if (!dirs.length) {
+    const root = mainCheckoutRoot(cwd);
+    if (!root) return fail(`git could not name this repo's main checkout from ${cwd}\nnext: pass --dir <transcript folder>`);
+    dirs = defaultDirs(projectsDir, root);
+  }
+  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
   const seen = new Set();
@@ -693,7 +745,7 @@ export async function main(argv, { env = process.env, cwd = process.cwd(), out =
     report = summarize(extracted, { since: opts.since, priceAs: opts.priceAs });
   } catch (error) {
     if (!(error instanceof UnpriceableError)) throw error;
-    return fail(`${error.message}\nnext: add the model to PRICES in scripts/agent/usage.mjs from ${PRICE_SOURCE}`);
+    return fail(`${error.message}\nnext: price what is named above in scripts/agent/usage.mjs from ${PRICE_SOURCE}`);
   }
   if (!report.totals.requests) return fail(`no priced requests in ${files.length} transcripts${opts.since ? ` since ${opts.since}` : ""}`);
   report.input = { files: files.length, dirs, malformedLines: extracted.reduce((a, f) => a + f.malformed, 0) };

@@ -275,6 +275,27 @@ describe("agent usage: the analyses", () => {
     expect(gates.saving).toBeCloseTo(1); // r2: 50K output at $20 per million
   });
 
+  it("saves nothing for calls issued in parallel from one request, since one command removes no request", () => {
+    const parallel = priceFile(
+      extract([
+        assistant("r1", { out: 30_000 }, {
+          tools: [
+            { id: "a", name: "Bash", command: "npm run typecheck" },
+            { id: "b", name: "Bash", command: "npm run lint" },
+            { id: "c", name: "Bash", command: "npm run build" },
+          ],
+        }),
+      ]),
+    );
+    expect(familyUsage([parallel]).gates).toMatchObject({ calls: 3, bursts: 1, saving: 0 });
+  });
+
+  it("refuses a cache write whose 5m/1h split does not account for it, rather than pick a rate", () => {
+    const record = assistant("r1", { w1h: 1000, out: 1 });
+    record.message.usage.cache_creation = { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 };
+    expect(() => summarize([extract([record])])).toThrow(/5m\/1h split/);
+  });
+
   it("names every unpriceable request kind at once, and reports nothing partial", () => {
     const files = [extract([assistant("r1", { out: 1 }), assistant("r2", { out: 1 }, { model: "claude-x-1" })])];
     expect(() => summarize(files)).toThrow(/no price for model claude-x-1 \(1 requests\)/);
@@ -323,9 +344,9 @@ describe("agent usage: the command", () => {
     writeFileSync(join(dir, "s1", "subagents", "agent-a1.jsonl"), JSON.stringify(assistant("sub1", { out: 1000 })) + "\n");
     return dir;
   };
-  const cli = (args: string[]) => {
+  const cli = (args: string[], cwd = ROOT) => {
     try {
-      return { code: 0, out: execFileSync("node", [join(ROOT, "scripts", "agent.mjs"), ...args], { encoding: "utf8", env: { ...process.env, CLAUDE_CODE_SESSION_ID: "test" } }) };
+      return { code: 0, out: execFileSync("node", [join(ROOT, "scripts", "agent.mjs"), ...args], { cwd, encoding: "utf8", env: { ...process.env, CLAUDE_CODE_SESSION_ID: "test" } }) };
     } catch (error) {
       const e = error as { status: number; stdout: string };
       return { code: e.status, out: e.stdout };
@@ -365,5 +386,19 @@ describe("agent usage: the command", () => {
     expect(cli(["usage", "--dir", mkdtempSync(join(tmpdir(), "agent-usage-empty-"))]).code).toBe(2);
     expect(cli(["usage", "--frobnicate"]).code).toBe(2);
     expect(cli(["nonesuch"]).code).toBe(2);
+  });
+
+  it("takes --since only as a UTC date or a time with a zone, which mean the same on every machine", () => {
+    const dir = fixtureDir([assistant("r1", { out: 1 })]);
+    expect(cli(["usage", "--dir", dir, "--since", "2026-10-01T09:00"]).code).toBe(2);
+    expect(cli(["usage", "--dir", dir, "--since", "2026-10-01"]).code).toBe(0);
+    expect(cli(["usage", "--dir", dir, "--since", "2026-10-01T09:00:00+08:00"]).code).toBe(0);
+  });
+
+  it("answers any failure in its own line-1 contract, and refuses to guess the repo without git", () => {
+    const notADir = join(fixtureDir([]), "s1.jsonl");
+    expect(cli(["usage", "--dir", notADir])).toMatchObject({ code: 2, out: expect.stringMatching(/^usage: ERROR /) });
+    const outside = mkdtempSync(join(tmpdir(), "agent-usage-nogit-"));
+    expect(cli(["usage"], outside)).toMatchObject({ code: 2, out: expect.stringMatching(/^usage: ERROR git could not name/) });
   });
 });
