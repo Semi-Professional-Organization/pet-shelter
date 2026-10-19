@@ -481,6 +481,10 @@ describe("agent guard", () => {
         // Quoted command word, and a leading git option before the subcommand.
         "'rm' -rf build",
         "git -c core.pager=cat reset --hard",
+        // npm's own other spellings of `npm run <script>`.
+        "npm run -s secrets:run -- npm start",
+        "npm --silent run db:migrate:bulletins",
+        "npm run-script secrets:decrypt:local",
         // Under the npm scripts: the sops binary they call, and another way to load tsx.
         "sops --decrypt --input-type dotenv --output-type dotenv .env.production.enc",
         "node --import tsx scripts/migrate-bulletins.ts",
@@ -498,6 +502,8 @@ describe("agent guard", () => {
         "npx tsx ./scripts/migrate-bulletins.ts",
         "node .\\scripts\\secrets.mjs decrypt-to-local",
         "node scripts\\secrets.mjs run -- npm start",
+        // The Windows shim, which PowerShell agents here often name.
+        "npm.cmd run secrets:run -- npm start",
         // The commonest PowerShell shape in this repo's transcripts: a leading statement. The
         // reference says PowerShell rules are checked per subcommand of the parsed command, which
         // would catch these; this prefix model cannot, and nobody here has observed either.

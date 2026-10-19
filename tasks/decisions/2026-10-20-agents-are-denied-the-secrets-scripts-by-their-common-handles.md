@@ -1,4 +1,4 @@
-# Agents are denied the secrets scripts by every npm and node handle, not just the three asked
+# Agents are denied the secrets scripts by their common handles, not just the three asked
 
 **Decided:** 2026-10-20
 
@@ -29,8 +29,10 @@ approved in band. If that happens often, `secrets:run` could move from `deny` to
 **What this does not close.** These rules cover the secrets *scripts*. They do not stop an agent
 reading `.env.local` itself (`cat`, the Read tool), or running a command that connects with it:
 `npm run db:check-drift`, `npm run db:studio`, `npx prisma studio`, `npx prisma db pull`. Earlier
-sessions here saw the auto-mode classifier refuse production reads, but no rule in this file does. Prefix rules also miss shapes: a leading `Set-Location`, another path
-spelling, the `sops` binary the scripts call, `node --import tsx`. Those are enumerated in
+sessions here saw the auto-mode classifier refuse production reads, but no rule in this file
+does. Prefix rules also miss shapes: npm's other spellings (`npm run -s`, `npm --silent run`,
+`npm run-script`, the `npm.cmd` shim), a leading `Set-Location`, another path spelling, the `sops`
+binary the scripts call, `node --import tsx`. Those are enumerated in
 `tests/unit/agentGuard.test.ts`; whether the PowerShell tool honours rules per subcommand is open
 in `tasks/open/permission-rules-bind-bash-only.md`.
 

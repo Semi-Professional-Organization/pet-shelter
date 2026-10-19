@@ -36,7 +36,7 @@ command can prove what it saved. Plus three permission gaps the plan named.
       `tasks/open/agent-scripts-must-cut-what-a-session-costs.md`.
 - [x] AGENTS.md: the pointer to `--help`, and no sleep-polling CI in the desktop app.
 - [x] Permission gaps closed in Bash and PowerShell, wider than asked:
-      `tasks/decisions/2026-10-20-agents-are-denied-the-secrets-scripts-by-every-handle.md`.
+      `tasks/decisions/2026-10-20-agents-are-denied-the-secrets-scripts-by-their-common-handles.md`.
 - [x] `/code-review high` rounds repeated until one left nothing to fix. Every fix was verified
       by a mutant that fails a test; each declined finding is named, with its reason, in the
       commit message that declined it (`git log --grep Declined`).

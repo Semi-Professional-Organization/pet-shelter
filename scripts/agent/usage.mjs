@@ -217,6 +217,12 @@ const VITEST_VALUE_FLAGS = new Set([
 /** Filters that name a whole test tier, which is the gate, not a targeted run. */
 const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/integration"]);
 
+/**
+ * The start of one command, past `VAR=value` assignments and `cross-env`, so a program name is
+ * matched where it runs and not where it is merely mentioned (`grep vitest notes.md`).
+ */
+const COMMAND_START = String.raw`^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:cross-env\s+(?:[A-Za-z_]\w*=\S*\s+)*)?`;
+
 /** Gate scripts that are not test runs. */
 const GATE_SCRIPTS = new Set(["typecheck", "lint", "docs:check", "build", "check"]);
 
@@ -225,12 +231,16 @@ const GATE_SCRIPTS = new Set(["typecheck", "lint", "docs:check", "build", "check
  * `npm -s run test:components -- x`.
  */
 function npmCall(cmd) {
-  const m = /(?:^|\s)npm\s+(.*)$/.exec(cmd);
+  const m = new RegExp(`${COMMAND_START}npm\\s+(.*)$`).exec(cmd);
   if (!m) return undefined;
   const words = m[1].trim().split(/\s+/);
   let i = 0;
   const skipFlags = () => {
-    while (words[i]?.startsWith("-")) i++;
+    while (words[i]?.startsWith("-")) {
+      // `--prefix <dir>` and `-w <name>` take the next word with them.
+      if (NPM_VALUE_FLAGS.has(words[i])) i++;
+      i++;
+    }
   };
   skipFlags();
   if (words[i] === "run" || words[i] === "run-script") {
@@ -240,9 +250,14 @@ function npmCall(cmd) {
   return words[i] ? { script: words[i], args: words.slice(i + 1).join(" ") } : undefined;
 }
 const npmScript = (cmd) => npmCall(cmd)?.script;
+/** npm options that take a value as the next word. */
+const NPM_VALUE_FLAGS = new Set(["--prefix", "-w", "--workspace", "--userconfig", "--cache", "--loglevel"]);
 
-/** `vitest run …`, `npx vitest --run …`: the words after it. */
-const VITEST_RUN = /(?:^|\s)(?:npx\s+)?vitest\s+(?:run|--run)\b(.*)$/;
+/**
+ * `vitest run …`, `npx vitest --run …`, or bare `vitest …`, which runs once in a shell with no
+ * terminal, as an agent's is: the words after it. `vitest.config.ts` is not `vitest`.
+ */
+const VITEST_RUN = new RegExp(`${COMMAND_START}(?:npx\\s+)?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$))(.*)$`);
 
 /**
  * The test filters in the words after `vitest run`: each positional word, normalised, and "-t"
@@ -288,28 +303,39 @@ function filtersIn(args) {
 export function vitestScripts(scripts = {}) {
   const out = new Map();
   for (const [name, body] of Object.entries(scripts)) {
-    const run = /\bvitest\s+run\b(.*)$/.exec(String(body));
-    if (run) out.set(name, { filtered: filtersIn(run[1]).length > 0 });
+    // Only the command that runs vitest; anything chained after it is not its arguments.
+    for (const part of splitChain(String(body))) {
+      const run = VITEST_RUN.exec(part);
+      if (run) out.set(name, { filtered: filtersIn(run[1]).some((f) => f !== "-t") });
+    }
   }
   return out;
 }
 
 /**
- * A vitest run narrowed to some tests: a file or name filter that is not a whole tier, given
- * after `vitest run` or after an npm script that runs vitest and passes no path of its own.
+ * Whether a set of filters narrows a run. A name filter always does (vitest ANDs it with the
+ * paths). Paths narrow only when none of them is a whole tier, since vitest ORs paths: a file
+ * beside `tests/unit` still runs the whole unit suite.
+ */
+const narrows = (filters) => {
+  if (filters.includes("-t")) return true;
+  const paths = filters.filter((f) => f !== "-t");
+  return paths.length > 0 && !paths.some((f) => WHOLE_SUITE.has(f));
+};
+
+/**
+ * A vitest run narrowed to some tests, given after `vitest run` or after an npm script that runs
+ * vitest. A script that passes a path of its own is narrowed only by a name filter.
  */
 export function isTargetedRun(cmd, vitest = new Map()) {
   const text = String(cmd).trim();
   const direct = VITEST_RUN.exec(text);
-  if (direct) return filtersIn(direct[1]).some((f) => !WHOLE_SUITE.has(f));
+  if (direct) return narrows(filtersIn(direct[1]));
   const npm = npmCall(text);
   const script = npm && vitest.get(npm.script);
   if (!script) return false;
   const filters = filtersIn(npm.args);
-  // A name filter narrows any run (vitest ANDs it with the paths); a path only narrows a script
-  // that passes none of its own (vitest ORs paths).
-  if (filters.includes("-t")) return true;
-  return !script.filtered && filters.some((f) => !WHOLE_SUITE.has(f));
+  return script.filtered ? filters.includes("-t") : narrows(filters);
 }
 
 /**
@@ -928,6 +954,10 @@ export function formatReport(report, { logPath } = {}) {
       .map(([id, s]) => `${id.slice(0, 8)} ${usd(s.cost)} peak ${kTok(s.peakContext)}`)
       .join(" | ")}`,
   );
+  // What was read but not counted, so a short total says why it is short.
+  const skipped = report.skipped;
+  const malformed = report.input?.malformedLines ?? 0;
+  lines.push(`not counted: ${malformed} unreadable lines, ${skipped.duplicates} copied requests, ${skipped.synthetic} synthetic messages`);
   if (logPath) lines.push(`log: ${logPath}`);
   return lines.join("\n");
 }
@@ -1141,6 +1171,8 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
     dirs = defaultDirs(projectsDir, root);
   }
   dirs = dirs.map((d) => resolve(cwd, d));
+  const missing = dirs.filter((d) => !existsSync(d));
+  if (missing.length) return fail(`no such transcript folder: ${missing.join(", ")}`);
   const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 

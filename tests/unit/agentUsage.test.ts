@@ -301,6 +301,27 @@ describe("agent usage: workflow families", () => {
     expect(families("Bash", 'git -C "D:/a b" merge-tree --write-tree HEAD origin/master')).toEqual(["merge"]);
   });
 
+  it("files a run that names a whole tier beside a file as the whole tier", () => {
+    // vitest ORs paths, so the file adds nothing to tests/unit.
+    expect(families("Bash", "npx vitest run tests/unit/a.test.ts tests/unit")).toEqual(["gates"]);
+    expect(families("Bash", "npm run test:components -- tests/components/F.test.tsx tests/components")).toEqual(["gates"]);
+  });
+
+  it("matches a program where it runs, not where it is mentioned", () => {
+    expect(families("Bash", "grep vitest notes.md")).toEqual([]);
+    expect(families("Bash", "echo npm test")).toEqual([]);
+    expect(families("Bash", "npx vitest tests/unit/a.test.ts")).toEqual(["targeted tests"]);
+    expect(families("Bash", "FOO=1 npx vitest run")).toEqual(["gates"]);
+    expect(families("Bash", "npm --prefix . run lint")).toEqual(["gates"]);
+  });
+
+  it("reads a package.json script only up to the end of its vitest command", () => {
+    const scripts = vitestScripts({ a: "vitest run --project unit && eslint", b: "vitest --run --project x", c: "playwright test" });
+    expect(scripts.get("a")).toEqual({ filtered: false });
+    expect(scripts.get("b")).toEqual({ filtered: false });
+    expect(scripts.has("c")).toBe(false);
+  });
+
   it("splits a chain at a newline, and keeps an escaped quote inside its string", () => {
     expect(families("Bash", "npx vitest run tests/unit/a.test.ts\nnpm run lint")).toEqual(["gates", "targeted tests"]);
     expect(families("Bash", 'echo "a\\"b" && cat tasks/todo.md')).toEqual(["ledger"]);
@@ -821,6 +842,7 @@ describe("agent usage: the analyses", () => {
     expect(lines[0]).toMatch(/^usage: PASS \$\d/);
     expect(lines.length).toBeLessThanOrEqual(30);
     expect(lines.at(-1)).toBe("log: /tmp/log.json");
+    expect(lines.at(-2)).toBe("not counted: 0 unreadable lines, 0 copied requests, 0 synthetic messages");
     expect(text).not.toContain(SECRET);
   });
 });
@@ -881,6 +903,9 @@ describe("agent usage: the command", () => {
       out: expect.stringMatching(/^usage: ERROR no price for model claude-x-1/),
     });
     expect(cli(["usage", "--dir", mkdtempSync(join(tmpdir(), "agent-usage-empty-"))]).code).toBe(2);
+    // One folder that does not exist fails the run, rather than leaving its sessions out.
+    const real = fixtureDir([assistant("r1", { out: 1 })]);
+    expect(cli(["usage", "--dir", real, "--dir", join(real, "typo")])).toMatchObject({ code: 2, out: expect.stringMatching(/no such transcript folder/) });
     expect(cli(["usage", "--frobnicate"]).code).toBe(2);
     expect(cli(["nonesuch"]).code).toBe(2);
     expect(cli([])).toMatchObject({ code: 2, out: expect.stringMatching(/^agent: ERROR no command/) });
