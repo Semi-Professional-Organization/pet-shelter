@@ -1,0 +1,35 @@
+# What Dependabot proposes, and how its pull requests meet this repo's gates. The reasoning is in
+# tasks/decisions/2026-10-20-dependabot-updates-actions-weekly-and-npm-only-for-security.md.
+#
+# Its pull requests run the full CI and need the same required checks as anyone's. Their titles
+# carry a Conventional Commits type and scope, because .github/workflows/commit-messages.yml lints
+# every title against docs/reference/COMMIT_MESSAGES.md.
+version: 2
+updates:
+  # Keeps the commit pins in .github/workflows current: one grouped pull request a week. A release
+  # must be a week old before it is proposed, so one that is hijacked, caught and withdrawn within
+  # days is never picked up.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+      include: scope
+
+  # Security fixes only. A limit of 0 turns version updates off and leaves security updates, which
+  # the repository settings enable, untouched. Upgrading Next.js, React or Prisma on a schedule is
+  # not a chore here: each needs a person to read its migration notes first (AGENTS.md).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: build
+      include: scope
