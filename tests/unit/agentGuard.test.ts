@@ -383,19 +383,26 @@ describe("agent guard", () => {
     // This is a LEDGER, not a fence. Nothing here is enforced. If a shape becomes
     // covered, move it to COVERED and say what covers it — an entry silently changing
     // sides is the regression this exists to catch.
+    // A trailing ` *` also matches the bare command (`Bash(ls *)` matches `ls`), per the
+    // permissions reference at code.claude.com/docs/en/permissions.
     const matchesRule = (rule: string, command: string): boolean => {
-      const body = rule.replace(/^Bash\(/, "").replace(/\)$/, "");
-      return body.endsWith("*") ? command.startsWith(body.slice(0, -1)) : command === body;
+      const body = rule.replace(/^\w+\(/, "").replace(/\)$/, "");
+      if (!body.endsWith("*")) return command === body;
+      const prefix = body.slice(0, -1);
+      return command.startsWith(prefix) || (prefix.endsWith(" ") && command === prefix.trimEnd());
     };
-    const covered = (command: string): boolean =>
+    const covered = (command: string, tool = "Bash"): boolean =>
       [...settings.permissions.deny, ...settings.permissions.ask]
-        .filter(r => r.startsWith("Bash("))
+        .filter(r => r.startsWith(`${tool}(`))
         .some(r => matchesRule(r, command));
 
-    it("denies the two scripts that touch production through .env.local, and not their local variant", () => {
+    // These three are the agent-scripts catalog's permission gaps, closed for both shells: this
+    // repo's agents run PowerShell as often as Bash, and a Bash rule does not bind PowerShell.
+    // The older rules above are still Bash-only — tasks/open/permission-rules-bind-bash-only.md.
+    it.each(["Bash", "PowerShell"])("denies the two scripts that touch production through .env.local, in %s", (tool) => {
       // In the main checkout `.env.local` is production: db:migrate:bulletins reads it, and
       // secrets:decrypt:local overwrites it. db:migrate:bulletins:local is the rehearsal and must
-      // stay open, which is why the bulletins rule is exact plus word-bounded, not a bare `*`.
+      // stay open, which is why the bulletins rule is word-bounded, not a bare `*`.
       for (const command of [
         "npm run db:migrate:bulletins",
         "npm run db:migrate:bulletins -- --dry-run",
@@ -403,18 +410,17 @@ describe("agent guard", () => {
         "npm run secrets:decrypt:local",
         "node scripts/secrets.mjs decrypt-to-local .env.production.enc .env.local",
       ]) {
-        expect(covered(command), `expected covered: ${command}`).toBe(true);
+        expect(covered(command, tool), `expected covered: ${command}`).toBe(true);
       }
-      expect(covered("npm run db:migrate:bulletins:local")).toBe(false);
-      expect(settings.permissions.deny).not.toContain("Bash(npm run db:migrate:bulletins*)");
+      expect(covered("npm run db:migrate:bulletins:local", tool)).toBe(false);
+      expect(settings.permissions.deny).not.toContain(`${tool}(npm run db:migrate:bulletins*)`);
     });
 
-    it("asks before the ledger mirror publishes issues, and not for its dry run", () => {
-      const ask = settings.permissions.ask.join("\n");
-      expect(ask).toContain("npm run ledger:issues -- --apply");
-      expect(covered("npm run ledger:issues -- --apply")).toBe(true);
-      expect(covered("node scripts/ledger-issues.mjs --apply")).toBe(true);
-      expect(covered("npm run ledger:issues")).toBe(false);
+    it.each(["Bash", "PowerShell"])("asks before the ledger mirror publishes issues, and not for its dry run, in %s", (tool) => {
+      expect(settings.permissions.ask).toContain(`${tool}(npm run ledger:issues -- --apply*)`);
+      expect(covered("npm run ledger:issues -- --apply", tool)).toBe(true);
+      expect(covered("node scripts/ledger-issues.mjs --apply", tool)).toBe(true);
+      expect(covered("npm run ledger:issues", tool)).toBe(false);
     });
 
     it("catches the destructive commands only when they lead the string", () => {
