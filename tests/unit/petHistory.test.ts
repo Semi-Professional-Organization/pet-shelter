@@ -29,6 +29,8 @@ import {
 import { createPet, updatePet, getPetById } from "@/actions/pets";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
 import { findMemberRow, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
+import { wireTransaction } from "../integration/support/prismaDouble";
+import { prisma } from "@/lib/server/prisma";
 import { Pet, MedicalTimelineEvent, PetUpdate } from "@/types/pet";
 import petsData from "@/data/pets.json";
 
@@ -83,13 +85,8 @@ const prismaSpies = vi.hoisted(() => {
     // member no store knows passed them all. Answered with the row a signed-in
     // test identity has, so the session is refreshed from it as in production.
     userFindUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
-    // Both forms, as `wireTransaction` in tests/integration/support/prismaDouble.ts runs them:
-    // an array of queued operations, or an interactive callback run against the client it was
-    // called on. Answering the callback form with `undefined` would "commit" work never done.
-    transaction: vi.fn(async function (this: unknown, arg: unknown) {
-      if (typeof arg === "function") return (arg as (tx: unknown) => unknown)(this);
-      return Promise.all(arg as Promise<unknown>[]);
-    }),
+    // Wired below by the shared `wireTransaction`, so both forms run as in every other double.
+    transaction: vi.fn(),
   };
 });
 
@@ -125,6 +122,10 @@ vi.mock("@/lib/server/prisma", () => {
   };
   return { prisma: client, default: client };
 });
+
+// An array of queued operations, or an interactive callback run against the client: answering
+// the callback form with `undefined` would "commit" work never done.
+wireTransaction(prisma as unknown as { $transaction: typeof prismaSpies.transaction });
 
 describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () => {
   const timelineIntake: MedicalTimelineEvent = {

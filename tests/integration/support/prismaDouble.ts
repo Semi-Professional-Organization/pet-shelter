@@ -142,10 +142,10 @@ export function createPrismaDouble(): PrismaDouble {
  * of its reads, guards or writes, so an action built on one could report
  * success for work that never happened.
  */
-export function wireTransaction(double: PrismaDouble): void {
+export function wireTransaction<T extends { $transaction: ReturnType<typeof vi.fn> }>(double: T): void {
   double.$transaction.mockImplementation(async (arg: unknown) => {
     if (typeof arg === "function") {
-      return (arg as (tx: PrismaDouble) => Promise<unknown>)(double);
+      return (arg as (tx: T) => Promise<unknown>)(double);
     }
     return Promise.all(arg as Promise<unknown>[]);
   });

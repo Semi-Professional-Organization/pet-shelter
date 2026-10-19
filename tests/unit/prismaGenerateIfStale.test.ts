@@ -6,6 +6,7 @@ import {
   generatedSchemaPath,
   isClientComplete,
   isClientCurrent,
+  readGeneratedSchema,
 } from "../../scripts/lib/prismaClientState.mjs";
 
 /**
@@ -78,7 +79,9 @@ describe("isClientCurrent", () => {
 
     function writeClient(version = "7.9.1"): void {
       dir = mkdtempSync(join(tmpdir(), "prisma-client-"));
-      for (const file of ["default.js", "index.js", "schema.prisma"]) writeFileSync(join(dir, file), "");
+      for (const file of ["default.js", "index.js", "schema.prisma", "query_compiler_fast_bg.wasm"]) {
+        writeFileSync(join(dir, file), "");
+      }
       writeFileSync(join(dir, "package.json"), JSON.stringify({ version }));
     }
 
@@ -93,6 +96,18 @@ describe("isClientCurrent", () => {
       writeClient();
       unlinkSync(join(dir, "default.js"));
       expect(isClientComplete(dir, "7.9.1")).toBe(false);
+    });
+
+    it("is incomplete when the query compiler is missing, which the client loads at run time", () => {
+      writeClient();
+      unlinkSync(join(dir, "query_compiler_fast_bg.wasm"));
+      expect(isClientComplete(dir, "7.9.1")).toBe(false);
+    });
+
+    it("reads a schema removed mid-check as missing, not as a crash", () => {
+      writeClient();
+      unlinkSync(join(dir, "schema.prisma"));
+      expect(readGeneratedSchema(join(dir, "schema.prisma"))).toBeNull();
     });
 
     it("is incomplete when another Prisma version built it", () => {

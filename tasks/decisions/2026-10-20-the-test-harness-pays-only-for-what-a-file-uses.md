@@ -48,6 +48,14 @@ and `passWithNoTests: false` now that every tier has files. With the offline Pri
 (`2026-10-20-no-database-url-means-no-database.md`), a unit, integration or component run reads
 nothing from the machine it runs on.
 
+**Alternative not taken: an allowlist.** Clearing the whole environment except `PATH`, the home
+and temp directories and a few Windows variables would also catch what dependencies read
+(`DEBUG`, `NODE_OPTIONS`, `NODE_TLS_REJECT_UNAUTHORIZED`). It was not done because tools in the
+run need variables nobody listed (Node, Vitest and `next` read their own on every platform), and a
+run broken by a missing one fails far from its cause. The denylist names what the code reads,
+plus `pg`'s own variables, and `tests/unit/hermeticEnvCoversTheCode.test.ts` keeps it complete
+for `src/`.
+
 ## What this closes
 
 `tasks/open/unit-suite-is-order-dependent-in-both-directions.md`, deleted with this change. Each

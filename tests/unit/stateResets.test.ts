@@ -55,6 +55,20 @@ const EXPECTED = [
   "secretWarnings",
 ];
 
+/** Every source file under src/, read once for the guards below. */
+const SRC = fileURLToPath(new URL("../../src", import.meta.url));
+const SOURCES = readdirSync(SRC, { recursive: true, encoding: "utf8" })
+  .filter((file) => /\.tsx?$/.test(file))
+  .map((file) => ({ path: `src/${file.replace(/\\/g, "/")}`, text: readFileSync(join(SRC, file), "utf8") }));
+
+/** The registrations in a file: a `registerStateReset("name", resetFn);` line, not one commented out. */
+function registrations(text: string): Array<{ name: string; reset: string }> {
+  return [...text.matchAll(/^\s*registerStateReset\("([^"]+)",\s*(\w+)\);/gm)].map((match) => ({
+    name: match[1],
+    reset: match[2],
+  }));
+}
+
 describe("module state resets", () => {
   it("registers every store the global hook used to reset by hand", async () => {
     await Promise.all(STORE_OWNERS.map((path) => import(path)));
@@ -67,32 +81,21 @@ describe("module state resets", () => {
     // Names are typed by hand, and the registry keeps one reset per name: a second
     // module registering an existing name would silently replace the first one's
     // reset, and that store would leak between tests.
-    const src = fileURLToPath(new URL("../../src", import.meta.url));
-    const registrations = readdirSync(src, { recursive: true, encoding: "utf8" })
-      .filter((file) => /\.tsx?$/.test(file))
-      .flatMap((file) => {
-        const text = readFileSync(join(src, file), "utf8");
-        return [...text.matchAll(/registerStateReset\("([^"]+)"/g)].map((match) => match[1]);
-      });
+    const names = SOURCES.flatMap(({ text }) => registrations(text).map(({ name }) => name));
 
-    expect(registrations.sort(), "every store registers once, under a name in EXPECTED").toEqual(
-      [...EXPECTED].sort()
-    );
+    expect(names.sort(), "every store registers once, under a name in EXPECTED").toEqual([...EXPECTED].sort());
   });
 
   it("registers every reset src/ exports, so no store is left out of the harness", () => {
     // A store whose reset is exported but never registered leaks its state between tests
     // in any file that does not call it by hand, and the name list above cannot see it.
-    const src = fileURLToPath(new URL("../../src", import.meta.url));
-    const unregistered = readdirSync(src, { recursive: true, encoding: "utf8" })
-      .filter((file) => /\.tsx?$/.test(file))
-      .flatMap((file) => {
-        const text = readFileSync(join(src, file), "utf8");
-        return [...text.matchAll(/export (?:async )?function (reset[A-Z]\w*)/g)]
-          .map((match) => match[1])
-          .filter((name) => name !== "resetRegisteredState" && !text.includes(`, ${name});`))
-          .map((name) => `${name} (src/${file.replace(/\\/g, "/")})`);
-      });
+    const unregistered = SOURCES.flatMap(({ path, text }) => {
+      const registered = new Set(registrations(text).map(({ reset }) => reset));
+      return [...text.matchAll(/export (?:async )?function (reset[A-Z]\w*)/g)]
+        .map((match) => match[1])
+        .filter((name) => name !== "resetRegisteredState" && !registered.has(name))
+        .map((name) => `${name} (${path})`);
+    });
 
     expect(unregistered).toEqual([]);
   });

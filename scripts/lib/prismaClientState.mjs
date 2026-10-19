@@ -3,7 +3,7 @@
  * `scripts/prisma-generate-if-stale.mjs`. Pure apart from reading the files it is
  * pointed at, so the tests import it without running the script.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -30,18 +30,35 @@ export function generatedSchemaPath() {
   return join(generatedClientDir(), "schema.prisma");
 }
 
+/**
+ * The generated schema's text, or null when it cannot be read. A generation
+ * elsewhere can remove the client between the completeness check and this read;
+ * that reads as stale, not as a crash.
+ */
+export function readGeneratedSchema(path = generatedSchemaPath()) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 const CLIENT_FILES = ["default.js", "index.js", "package.json", "schema.prisma"];
 
+/** The query compiler the Prisma 7 client loads at run time, named by its build variant. */
+const QUERY_COMPILER = /^query_compiler.*\.wasm$/;
+
 /**
- * True when every file the runtime loads is there, from the installed Prisma
- * version. A client with a file missing (a generation that was interrupted) or
- * built by another Prisma version is stale whatever its schema.
+ * True when the files the runtime loads are there, the query compiler included,
+ * from the installed Prisma version. A client with one missing (a generation that
+ * was interrupted) or built by another Prisma version is stale whatever its schema.
  *
  * ceiling: a generation interrupted after every checked file was written but
  * before the rest still reads as complete; `npm run db:generate` repairs it.
  */
 export function isClientComplete(clientDir, expectedVersion) {
   if (!CLIENT_FILES.every((file) => existsSync(join(clientDir, file)))) return false;
+  if (!readdirSync(clientDir).some((file) => QUERY_COMPILER.test(file))) return false;
   try {
     const { version } = JSON.parse(readFileSync(join(clientDir, "package.json"), "utf8"));
     return version === expectedVersion;

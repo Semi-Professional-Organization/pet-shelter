@@ -29,16 +29,16 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   generatedClientDir,
-  generatedSchemaPath,
   installedClientVersion,
   isClientComplete,
   isClientCurrent,
+  readGeneratedSchema,
 } from "./lib/prismaClientState.mjs";
 
 const SCHEMA_PATH = fileURLToPath(new URL("../prisma/schema.prisma", import.meta.url));
 
 const complete = isClientComplete(generatedClientDir(), installedClientVersion());
-const generated = complete ? readFileSync(generatedSchemaPath(), "utf8") : null;
+const generated = complete ? readGeneratedSchema() : null;
 
 if (isClientCurrent(readFileSync(SCHEMA_PATH, "utf8"), generated)) {
   console.log("Prisma client is current with prisma/schema.prisma; not regenerating.");
