@@ -419,6 +419,10 @@ describe("agent guard", () => {
       ]) {
         expect(covered(command, tool), `expected covered: ${command}`).toBe(true);
       }
+      // The bare command has its own exact rule, so it is denied even if a trailing ` *` turned
+      // out not to match a command with no arguments, which the reference says but nobody here
+      // has observed.
+      expect(settings.permissions.deny).toContain(`${tool}(npm run db:migrate:bulletins)`);
       expect(covered("npm run db:migrate:bulletins:local", tool)).toBe(false);
       expect(covered("npm run secrets:check", tool)).toBe(false);
       expect(settings.permissions.deny).not.toContain(`${tool}(npm run db:migrate:bulletins*)`);
