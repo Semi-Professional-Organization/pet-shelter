@@ -143,24 +143,41 @@ const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
  * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`, `&`, a newline),
  * leaving any of those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
  * A heredoc's body (`<<'EOF'` … `EOF`) and a PowerShell here-string (`@'` … `'@`) are text, not
- * commands, and are dropped. Only Bash takes a backslash inside double quotes as an escape;
- * PowerShell's escape is the backtick, and `"D:\x\"` is a path there.
+ * commands, and are dropped. Each shell's own escape character applies (Bash's backslash,
+ * PowerShell's backtick, so `"D:\x\"` is a path there), and in both a `#` that starts a word
+ * comments out the rest of its line.
  */
 export function splitChain(cmd, tool = "Bash") {
+  const escape = tool === "PowerShell" ? "`" : "\\";
   const parts = [];
   let current = "";
   let quote = null;
   let heredoc = null;
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i];
+    if (ch === "\n" && heredoc) {
+      // The heredoc's line ends here, and its body runs to the line that is only the delimiter
+      // (after leading tabs, for `<<-`). That holds inside `"$(cat <<'EOF' … )"`, the usual shape
+      // of a commit message, too, so the quote stays open across the body.
+      if (!quote) {
+        parts.push(current);
+        current = "";
+      }
+      const lines = cmd.slice(i + 1).split("\n");
+      const end = lines.findIndex((line) => (heredoc.tabs ? line.replace(/^\t+/, "") : line).replace(/\r$/, "") === heredoc.word);
+      i += end === -1 ? cmd.length : lines.slice(0, end + 1).join("\n").length;
+      heredoc = null;
+      continue;
+    }
     if (!quote && ch === "@" && (cmd[i + 1] === "'" || cmd[i + 1] === '"') && tool === "PowerShell") {
       const close = cmd.indexOf(`\n${cmd[i + 1]}@`, i + 2);
       i = close === -1 ? cmd.length : close + 2;
       current += "@string";
       continue;
     }
-    if (!quote && ch === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
-      // `<<EOF`, `<< 'EOF'`, `<<"EOF"`, `<<\EOF`, and `<<-EOF`, whose closing line may be tabbed.
+    // `<<EOF`, `<< 'EOF'`, `<<"EOF"`, `<<\EOF`, and `<<-EOF`, whose closing line may be tabbed;
+    // not a shift inside `$(( ))` or `[[ ]]`.
+    if (quote !== "'" && ch === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<" && !/\$\(\([^)]*$|\[\[[^\]]*$/.test(current)) {
       const m = /^<<(-?)\s*\\?(['"]?)([A-Za-z_][\w-]*)\2/.exec(cmd.slice(i));
       if (m) {
         heredoc = { word: m[3], tabs: m[1] === "-" };
@@ -169,27 +186,16 @@ export function splitChain(cmd, tool = "Bash") {
         continue;
       }
     }
-    if (quote) {
-      // Inside double quotes a backslash escapes the next character, `\"` included.
-      if (quote === '"' && ch === "\\" && tool === "Bash" && i + 1 < cmd.length) {
-        current += ch + cmd[++i];
-        continue;
-      }
-      if (ch === quote) quote = null;
+    if (quote === "'") {
+      // Neither shell escapes inside single quotes.
+      if (ch === "'") quote = null;
       current += ch;
-    } else if (ch === "\n" && heredoc) {
-      // The command line ends here; its body runs to the line that is only the delimiter (after
-      // leading tabs, for `<<-`).
-      parts.push(current);
-      current = "";
-      const lines = cmd.slice(i + 1).split("\n");
-      const end = lines.findIndex((line) => (heredoc.tabs ? line.replace(/^\t+/, "") : line).replace(/\r$/, "") === heredoc.word);
-      i += end === -1 ? cmd.length : lines.slice(0, end + 1).join("\n").length + 1;
-      heredoc = null;
-    } else if (tool === "Bash" && ch === "\\" && i + 1 < cmd.length) {
-      // Outside quotes Bash escapes the next character, an apostrophe included.
+    } else if (ch === escape && i + 1 < cmd.length) {
       current += ch + cmd[++i];
-    } else if (tool === "Bash" && ch === "#" && /(^|\s)$/.test(current)) {
+    } else if (quote === '"') {
+      if (ch === '"') quote = null;
+      current += ch;
+    } else if (ch === "#" && /(^|\s)$/.test(current)) {
       // A comment runs to the end of the line; an apostrophe in it opens no quote.
       const eol = cmd.indexOf("\n", i);
       i = (eol === -1 ? cmd.length : eol) - 1;
@@ -300,11 +306,12 @@ function npmCall(cmd) {
     }
   };
   skipFlags();
-  if (words[i] === "run" || words[i] === "run-script") {
+  const viaRun = words[i] === "run" || words[i] === "run-script";
+  if (viaRun) {
     i++;
     skipFlags();
   }
-  return words[i] ? { script: words[i], args: words.slice(i + 1).join(" ") } : undefined;
+  return words[i] ? { script: words[i], args: words.slice(i + 1).join(" "), viaRun } : undefined;
 }
 const npmScript = (cmd) => npmCall(cmd)?.script;
 /** npm options that take a value as the next word. */
@@ -315,9 +322,10 @@ const NPM_VALUE_FLAGS = new Set(["--prefix", "-w", "--workspace", "--userconfig"
  * terminal, as an agent's is: the words after it. `vitest.config.ts` is not `vitest`.
  */
 const VITEST_RUN = new RegExp(
-  // Bare `vitest` too, but not its subcommands that run no tests or never finish (`list`, `bench`,
-  // `init`, `watch`, `dev`). `vitest related <files>` reads as a filtered, so targeted, run.
-  `${COMMAND_START}(?:${NPX})?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$)(?!\\s+(?:list|bench|init|watch|dev)\\b))(.*)$`,
+  // Bare `vitest` too, but not its subcommands or options that run no tests or never finish
+  // (`list`, `bench`, `init`, `watch`, `dev`, `--version`, `--help`). `vitest related <files>`
+  // reads as a filtered, so targeted, run.
+  `${COMMAND_START}(?:${NPX})?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$)(?!\\s+(?:list|bench|init|watch|dev|--version|-v|--help|-h)(?=\\s|$)))(.*)$`,
 );
 
 /**
@@ -338,7 +346,7 @@ function filtersIn(args) {
     const word = words[i];
     // A name filter, or `--changed` (only the tests uncommitted changes touch), narrows any run.
     // A name filter's pattern, read on as a path filter too, changes nothing.
-    if (word.startsWith("--testNamePattern") || word === "-t" || word.startsWith("--changed")) {
+    if (word.startsWith("--testNamePattern") || word === "-t" || word.startsWith("-t=") || word.startsWith("--changed")) {
       filters.push("-t");
       continue;
     }
@@ -445,11 +453,12 @@ export function commandClass(tool, cmd) {
     if (!match) break;
     rest = rest.slice(match[0].length);
   }
-  // Only the first command of a chain, and no npm flag between `run` and the script.
-  const words = splitChain(rest, tool)[0].split(/\s+/).filter(Boolean);
-  if (words[0] === "npm" && words[1] === "run") while (/^-/.test(words[2] ?? "")) words.splice(2, 1);
-  const take = words[0] === "npm" && words[1] === "run" ? 3 : SUBCOMMAND.has(words[0]) || words[0] === "npm" ? 2 : 1;
-  const label = words.slice(0, take).filter(Boolean);
+  // Only the first command of a chain; an npm call is read by the same parser the families use.
+  const first = splitChain(rest, tool)[0];
+  const npm = npmCall(first);
+  const words = first.split(/\s+/).filter(Boolean);
+  const take = SUBCOMMAND.has(words[0]) ? 2 : 1;
+  const label = npm ? (npm.viaRun ? ["npm", "run", npm.script] : ["npm", npm.script]) : words.slice(0, take);
   const plain = label.length > 0 && label.every((w, i) => (i === 2 ? SCRIPT : VERB).test(w));
   if (!plain) return `${tool} other`;
   return label.join(" ");
@@ -609,7 +618,10 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
           if (block?.type !== "tool_use" || calls.has(block.id)) continue;
           request.tools++;
           const input = block.input || {};
-          const cmd = String(input.command ?? [input.file_path, input.path, input.pattern].filter(Boolean).join(" "));
+          // For the file tools, the paths they were given: Grep's pattern is what it searches for,
+          // not where, so it is left out; Glob's pattern is itself a path.
+          const where = String(block.name) === "Grep" ? [input.path] : [input.file_path, input.path, input.pattern];
+          const cmd = String(input.command ?? where.filter(Boolean).join(" "));
           calls.set(block.id, {
             request: request.index,
             tool: String(block.name),

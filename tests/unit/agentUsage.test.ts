@@ -309,6 +309,36 @@ describe("agent usage: workflow families", () => {
     expect(families("Bash", "npm run test:components -- tests/components/F.test.tsx tests/components")).toEqual(["gates"]);
   });
 
+  it("reads PowerShell comments and backtick escapes the way PowerShell does", () => {
+    expect(families("PowerShell", "npm run lint # don't skip\nnpx vitest run tests/unit/a.test.ts")).toEqual(["gates", "targeted tests"]);
+    expect(families("PowerShell", 'Write-Host "a`"; npm run lint; b"')).toEqual([]);
+  });
+
+  it("drops a heredoc's body inside a quoted command substitution, the usual commit shape", () => {
+    const commit = 'git commit -m "$(cat <<\'EOF\'\nfix: quote the "x path\n\nnpm run build\nEOF\n)"';
+    expect(families("Bash", commit)).toEqual([]);
+    expect(families("Bash", "echo $((1 << n))\nnpm run lint")).toEqual(["gates"]);
+  });
+
+  it("labels an npm call by the same parser the families use", () => {
+    expect(commandClass("Bash", "npm -s run test:components")).toBe("npm run test:components");
+    expect(commandClass("Bash", "npm run-script lint")).toBe("npm run lint");
+    expect(commandClass("Bash", "npm --prefix x run lint")).toBe("npm run lint");
+    expect(commandClass("Bash", "npm ci")).toBe("npm ci");
+  });
+
+  it("does not count `vitest --version` or `--help` as a run, and reads -t=pattern as a name filter", () => {
+    expect(families("Bash", "npx vitest --version")).toEqual([]);
+    expect(families("Bash", "npx vitest run --project unit -t=agentUsage")).toEqual(["targeted tests"]);
+  });
+
+  it("does not take a Grep that searches for a ledger path for a read of the ledger", () => {
+    const file = extract([
+      assistant("r1", { out: 1 }, { tools: [{ id: "g", name: "Grep", input: { pattern: "tasks/open", path: "scripts" } }] }),
+    ]);
+    expect(file.calls[0].families).toEqual([]);
+  });
+
   it("reads Bash comments, escapes and quoted assignments the way Bash does", () => {
     expect(families("Bash", "# what's changed\nls tasks/open\nnpm run lint")).toEqual(["gates", "orient", "ledger"]);
     expect(families("Bash", "echo it\\'s && npm run lint")).toEqual(["gates"]);
