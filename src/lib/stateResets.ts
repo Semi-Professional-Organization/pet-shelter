@@ -42,7 +42,7 @@ export function registerStateReset(name: string, reset: Reset): void {
   registry().set(name, reset);
 }
 
-/** The names registered so far, in load order. For the harness's own tests. */
+/** The names registered so far, in first-registration order. For the harness's own tests. */
 export function registeredStateResets(): string[] {
   return [...registry().keys()];
 }
@@ -50,10 +50,12 @@ export function registeredStateResets(): string[] {
 /**
  * Runs every registered reset, awaiting the asynchronous ones.
  *
- * In load order, because no reset depends on another: each one only empties or
- * refills its own store, and none starts work that reads a different store. (The
- * sponsor demo, the one place that looks like a dependency, seeds the ledgers
- * lazily inside the next test, after every reset has finished.)
+ * In the order the names were first registered (a module evaluated again keeps
+ * its first place). That is safe because no reset depends on another: each one
+ * only empties or refills its own store, and none starts work that reads a
+ * different store. (The sponsor demo, the one place that looks like a
+ * dependency, seeds the ledgers lazily inside the next test, after every reset
+ * has finished.)
  *
  * ceiling: this resets state, not work. A promise a test started and did not
  * await can still write into a store after the next test's reset; a test that

@@ -5,7 +5,10 @@ description: Read before writing or modifying any Vitest test in this repo - the
 
 # Test harness (`tests/setup/`)
 
-Four setup files, in this order (`vitest.config.mts`):
+Four setup files, in this order (`vitest.config.mts`). `integration-db` swaps the first for
+`integrationEnv.ts`, which loads `.env.local` and then `.env` so `DATABASE_URL` is set before
+Prisma loads; its suites refuse a remote database unless `ALLOW_REMOTE_DB_TESTS=true`
+(`tests/integration/db/support/database.ts`).
 
 1. **`hermeticEnv.ts`** — unit, integration and components only (not `integration-db`).
    - Deletes every environment variable the code reads that a shell might set (`DATABASE_URL`,

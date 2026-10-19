@@ -42,11 +42,12 @@ interface PetFormDialogProps {
   onOpenChange: (open: boolean) => void;
   editingPet?: Pet | null;
   /**
-   * Takes the form once per opening. The dialog then asks to close and keeps Save locked until
-   * it opens again, so a parent that keeps it open after a save must close and reopen it. A
-   * handler that throws instead unlocks Save for another try.
+   * Takes the form once per opening. The dialog waits for it (an async handler's promise) and
+   * then asks to close, keeping Save locked until it opens again, so a parent that keeps it open
+   * after a save must close and reopen it. A handler that throws or rejects unlocks Save for
+   * another try instead, and the dialog stays open.
    */
-  onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void;
+  onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void | Promise<void>;
 }
 
 export function PetFormDialog({
@@ -299,7 +300,7 @@ export function PetFormDialog({
     .filter((url) => url && !existingGallery.includes(url));
   const canNotifySponsors = Boolean(editingPet) && newlyAddedPhotos.length > 0;
 
-  const onSubmit = (data: PetFormInput) => {
+  const onSubmit = async (data: PetFormInput) => {
     if (submittedRef.current) return;
     submittedRef.current = true;
     setSubmitted(true);
@@ -310,22 +311,24 @@ export function PetFormDialog({
       galleryImages: galleryImages.map((img) => img.url),
     };
     try {
-      onSave(
+      // Awaited, so a handler that fails before taking the form is caught whether it throws or,
+      // being async, rejects. The table's handler applies the change locally and syncs with the
+      // server in the background, so this settles at once and the dialog closes as before.
+      await onSave(
         finalData as PetFormInput,
         canNotifySponsors
           ? { notifySponsors, caption: caregiverCaption.trim() || undefined }
           : undefined
       );
     } catch (error) {
-      // A handler that throws before taking the form leaves the dialog open: unlock it so the
-      // operator can try again, and report the error rather than leave it unhandled.
+      // The dialog stays open: unlock it so the operator can try again, and report the error
+      // rather than leave it unhandled.
       submittedRef.current = false;
       setSubmitted(false);
-      console.error("[PetFormDialog] onSave threw before taking the form:", error);
+      console.error("[PetFormDialog] onSave failed before taking the form:", error);
       return;
     }
-    // The form closes itself, so the lock set above lasts only while it animates out. `onSave`
-    // is handed the data, not awaited: an async handler reports its own failure.
+    // The form closes itself, so the lock set above lasts only while it animates out.
     onOpenChange(false);
   };
 

@@ -61,8 +61,11 @@ interface SeedSponsor {
  * The standings themselves are not seeded here — they are derived from the commitments
  * `seedOfflineSponsorships()` records against these accounts, so the demo exercises the
  * real ledger rather than a fixture that can drift from it.
+ *
+ * Frozen, because every reset re-reads it: a change made through this export
+ * would otherwise outlive the reset meant to undo it.
  */
-export const SEED_SPONSORS: SeedSponsor[] = [
+export const SEED_SPONSORS: ReadonlyArray<Readonly<SeedSponsor>> = Object.freeze([
   {
     id: "spn-bronze-01",
     email: "bronze@example.com",
@@ -93,7 +96,7 @@ export const SEED_SPONSORS: SeedSponsor[] = [
     displayOnWall: true,
     createdAt: "2025-11-02T00:00:00.000Z",
   },
-];
+].map((seed) => Object.freeze(seed)));
 
 function ensureInitialised(): Promise<void> {
   if (initialised) return Promise.resolve();

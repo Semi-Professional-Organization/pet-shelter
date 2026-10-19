@@ -48,10 +48,10 @@ developer shell leaking in.
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
 secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
 skipped the regeneration). Unit, integration and component suites together, after merging
-master at `474abbe`: 138 files, 2,297 tests, 40 to 49 s (master: 192 to 216 s). Shuffled test
+master at `474abbe`: 138 files, 2,299 tests, 40 to 50 s (master: 192 to 216 s). Shuffled test
 order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** eight `/code-review` rounds over the whole diff raised 71 findings; each was fixed, or
+**Review:** nine `/code-review` rounds over the whole diff raised 78 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -68,7 +68,9 @@ the docs in line with the components tier's zone. Round 8 sent `npm run build` t
 check too, fixed that check for a string ending in an escaped backslash, kept the 10 s connect
 timeout when its variable is empty, froze the staff seeds, unlocked the pet form when `onSave`
 throws, and gave `adminPetsAuthorization` the one test there the DAL's fallback cannot pass: a
-valid cookie for a member the database does not hold.
+valid cookie for a member the database does not hold. Round 9 made the pet form await `onSave`, so
+the table's async handler failing unlocks Save instead of leaving an unhandled rejection, froze the
+sponsor seeds as well, and pinned the `forks` pool the per-project time zone depends on.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as

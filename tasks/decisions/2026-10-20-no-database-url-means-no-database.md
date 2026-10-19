@@ -27,7 +27,9 @@ The fallback was the mechanism behind most of the local-only test failures on re
 Offline behaviour. Every repository already serves its in-memory store when a query fails, and
 P1001 is one of the codes `isDatabaseUnavailable()` reads as an outage, so callers see exactly what
 a refused connection gave them, minus the network round trip. Production and preview always set
-`DATABASE_URL`. `.env.example` sets it, so the documented onboarding is unaffected, and the `:local`
+`DATABASE_URL`. A production process without it serves fixtures, as it did when it fell back to a
+localhost nobody listened on; making it refuse to start instead is a separate decision, and would
+also have to spare `next build`, which runs as production and needs no database. `.env.example` sets it, so the documented onboarding is unaffected, and the `:local`
 npm scripts (`db:push:local`, `db:seed:local`, `test:db`) set it explicitly.
 
 The one behaviour that did change: running `next dev` with no `DATABASE_URL` and a docker-compose

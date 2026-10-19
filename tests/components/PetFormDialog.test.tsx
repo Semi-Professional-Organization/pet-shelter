@@ -188,14 +188,16 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
-   * A handler that throws before taking the form leaves the dialog open, so the lock must not
-   * outlive the throw: the operator can try again, and the error is reported, not lost.
+   * A handler that fails before taking the form leaves the dialog open, so the lock must not
+   * outlive the failure: the operator can try again, and the error is reported, not lost. The
+   * table's real handler is async, so its failure arrives as a rejection, not a throw.
    */
-  it("unlocks Save when onSave throws, so the operator can try again", async () => {
-    const { onSave, user } = renderDialog();
-    onSave.mockImplementationOnce(() => {
-      throw new Error("the table refused the save");
-    });
+  it.each([
+    ["throws", () => { throw new Error("the table refused the save"); }],
+    ["rejects", () => Promise.reject(new Error("the table refused the save"))],
+  ])("unlocks Save and stays open when onSave %s, so the operator can try again", async (_, failure) => {
+    const { onSave, onOpenChange, user } = renderDialog();
+    onSave.mockImplementationOnce(failure);
     const reported = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
       await fillRequiredFields(user, "2023-04-15");
@@ -204,7 +206,8 @@ describe("PetFormDialog birth date field", () => {
       await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
 
       await waitFor(() => expect(submit).toBeEnabled());
-      expect(reported).toHaveBeenCalledWith(expect.stringContaining("onSave threw"), expect.any(Error));
+      expect(reported).toHaveBeenCalledWith(expect.stringContaining("onSave failed"), expect.any(Error));
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
 
       await user.click(submit);
       await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));

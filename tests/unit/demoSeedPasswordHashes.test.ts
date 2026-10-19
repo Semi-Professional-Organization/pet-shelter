@@ -32,9 +32,12 @@ describe("demo seed password hashes", () => {
     expect(new Set(salts).size).toBe(SEEDS.length);
   });
 
-  it("keeps the staff seeds frozen, since every reset re-reads them", () => {
+  it.each([
+    ["staff", INITIAL_STAFF_USERS],
+    ["sponsor", SEED_SPONSORS],
+  ] as const)("keeps the %s seeds frozen, since every reset re-reads them", (_, seeds) => {
     // A change made through the export would otherwise outlive the reset meant to undo it.
-    expect(Object.isFrozen(INITIAL_STAFF_USERS)).toBe(true);
-    expect(INITIAL_STAFF_USERS.every((seed) => Object.isFrozen(seed))).toBe(true);
+    expect(Object.isFrozen(seeds)).toBe(true);
+    expect(seeds.every((seed) => Object.isFrozen(seed))).toBe(true);
   });
 });

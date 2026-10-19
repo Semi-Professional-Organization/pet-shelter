@@ -19,6 +19,10 @@ const alias = {
  */
 const shared = {
   globals: true,
+  // Each test file in its own process. The setup files write `process.env` and the
+  // time zone per worker, with a different zone for the components tier, and ICU's
+  // zone is process-wide, so threads would let one project's zone leak into another.
+  pool: "forks" as const,
   setupFiles: ["./tests/setup/hermeticEnv.ts", "./tests/setup/hermeticRuntime.ts", "./tests/setup/nextMocks.ts"],
   // Every tier has files now, so an empty run means a moved folder or a broken
   // glob, and must fail rather than report green. A command that may select
