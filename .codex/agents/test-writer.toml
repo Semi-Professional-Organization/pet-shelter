@@ -33,7 +33,8 @@ mark it unrun, and say so; do not silently downgrade it to a tier that mocks the
   *setup file* that imports a repository: it runs first, instantiates the real client, and your
   spies then observe zero calls while the suite passes green. The harness imports none.
 - With no `DATABASE_URL` (the default in every tier but `integration-db`), the real client
-  refuses every query with P1001 and opens no socket; `fetch` is blocked; `TZ` is UTC.
+  refuses every query with P1001 and opens no socket; `fetch` is blocked; `TZ` is UTC, except
+  `Asia/Kuala_Lumpur` in the components tier, which stands in for the users' browsers.
 - `redirect()` and `notFound()` **throw** here, as the real ones do. Assert on the throw.
 - A file's own `vi.mock("next/headers", ...)` overrides the harness for that file; five suites
   predate the harness and rely on it. Do not "tidy" them into the harness without running them.

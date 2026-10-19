@@ -15,10 +15,12 @@ Four setup files, in this order (`vitest.config.mts`):
      by the first test), so never assign `process.env.X =` by hand.
    - `STRICT_PERSISTENCE` is pinned off for unit and components in the config instead, because the
      integration project sets it on purpose.
-2. **`hermeticRuntime.ts`** — every project, `integration-db` included. Pins `TZ=UTC` and replaces
-   `fetch` with a guard: any real network call fails the test, naming the URL and the test that was
-   running when it was made, even if the code under test swallows the error. Stub it with
-   `vi.spyOn(globalThis, "fetch")`.
+2. **`hermeticRuntime.ts`** — every project, `integration-db` included. Pins the time zone (UTC for
+   server code, as on Vercel; `Asia/Kuala_Lumpur` in the components tier, which stands in for the
+   users' browsers) and replaces `fetch` with a guard: any real network call fails the test, naming
+   the URL and the test that was running when it was made, even if the code under test swallows the
+   error. Stub it with `vi.stubGlobal("fetch", ...)`, which `unstubGlobals` undoes before the next
+   test; a `vi.spyOn` on it stays in place for the rest of the file unless you restore it.
 3. **`nextMocks.ts`** — every project.
    - Overload-aware `next/headers` (`cookies()` accepts both `set(name, value, opts)` and
      `set({ name, value, ...opts })`; `maxAge: 0` expires rather than writes), `next/cache`

@@ -28,7 +28,7 @@ import {
 } from "@/lib/validations/pet";
 import { createPet, updatePet, getPetById } from "@/actions/pets";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
-import { memberRowForId, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
+import { findMemberRow, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { Pet, MedicalTimelineEvent, PetUpdate } from "@/types/pet";
 import petsData from "@/data/pets.json";
 
@@ -82,9 +82,7 @@ const prismaSpies = vi.hoisted(() => {
     // mutations below were authorized by a database "outage" — a session for a
     // member no store knows passed them all. Answered with the row a signed-in
     // test identity has, so the session is refreshed from it as in production.
-    userFindUnique: vi.fn(async (args?: { where?: { id?: string } }) =>
-      memberRowForId(args?.where?.id)
-    ),
+    userFindUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
     transaction: vi.fn(async (arg: unknown) => {
       if (Array.isArray(arg)) return Promise.all(arg);
       return undefined;

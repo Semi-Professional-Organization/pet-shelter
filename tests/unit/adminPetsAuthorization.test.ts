@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { getAdminPets, getPublicPets } from "@/actions/pets";
 import { ROLES } from "@/lib/security/permissions";
-import { memberRowForId, signInAs } from "../setup/authSession";
+import { findMemberRow, signInAs } from "../setup/authSession";
 
 /**
  * Regression guard for a real data exposure.
@@ -26,7 +26,7 @@ import { memberRowForId, signInAs } from "../setup/authSession";
  * below passed: against a reachable database with no `actor-1` row, all three
  * were refused as "Authentication required", and the role refusals failed the
  * same way instead of on MANAGE_PETS. `signInAs` seals a real cookie for an
- * identity `memberRowForId` answers for, so every case reaches the permission
+ * identity `findMemberRow` answers for, so every case reaches the permission
  * check with the role the database holds.
  */
 const prismaDouble = vi.hoisted(() => {
@@ -38,7 +38,7 @@ const prismaDouble = vi.hoisted(() => {
     vi.fn(() => Promise.reject(Object.assign(new Error("No database configured"), { code: "P1001" })));
   return {
     user: {
-      findUnique: vi.fn(async (args?: { where?: { id?: string } }) => memberRowForId(args?.where?.id)),
+      findUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
     },
     pet: { findMany: unreachable(), findUnique: unreachable() },
     adoptionApplication: { findMany: unreachable(), count: unreachable() },

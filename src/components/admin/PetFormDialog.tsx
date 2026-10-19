@@ -314,6 +314,9 @@ export function PetFormDialog({
         ? { notifySponsors, caption: caregiverCaption.trim() || undefined }
         : undefined
     );
+    // The form closes itself, so the lock set above lasts only while it animates out. `onSave` is
+    // handed the data, not awaited: the table's handler is async, so a failed save is reported
+    // there and never reaches this point as a throw.
     onOpenChange(false);
   };
 

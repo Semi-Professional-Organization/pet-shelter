@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 import type { AdoptionApplication } from "@prisma/client";
 import type { DbPetRecord } from "@/lib/server/petMappers";
-import { memberRowForId } from "../../setup/authSession";
+import { findMemberRow } from "../../setup/authSession";
 
 /**
  * Shared plumbing for Tier 3a — the strict-persistence suites that do *not*
@@ -114,10 +114,8 @@ export function createPrismaDouble(): PrismaDouble {
       // call, for whichever identity the suite signed in as. Resolving null
       // here used to authorize anyway, via a DAL fall-through to the cookie's
       // own claims that also kept deleted members signed in; see
-      // `memberRowForId`, which this mirrors.
-      findUnique: vi.fn(async (args?: { where?: { id?: string } }) =>
-        memberRowForId(args?.where?.id)
-      ),
+      // `findMemberRow`.
+      findUnique: vi.fn(findMemberRow),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({}),
     },

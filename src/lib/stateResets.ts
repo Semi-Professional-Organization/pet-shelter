@@ -54,6 +54,10 @@ export function registeredStateResets(): string[] {
  * refills its own store, and none starts work that reads a different store. (The
  * sponsor demo, the one place that looks like a dependency, seeds the ledgers
  * lazily inside the next test, after every reset has finished.)
+ *
+ * ceiling: this resets state, not work. A promise a test started and did not
+ * await can still write into a store after the next test's reset; a test that
+ * starts background work awaits it, or the store is not isolated.
  */
 export async function resetRegisteredState(): Promise<void> {
   for (const reset of registry().values()) {

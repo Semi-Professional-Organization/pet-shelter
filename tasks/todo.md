@@ -29,8 +29,8 @@ developer shell leaking in.
 - [x] Demo seed password hashes are constants, with a test that each verifies its password.
 - [x] Store resets register themselves (`src/lib/stateResets.ts`); the hook imports nothing.
 - [x] `tests/setup/hermeticEnv.ts` scrubs the shell env (list in `ambientVariables.ts`, held to
-      what `src/` reads by a guard test); `hermeticRuntime.ts` pins `NODE_ENV` and `TZ=UTC` and
-      blocks `fetch` in every tier; `unstubEnvs`, `unstubGlobals`, `requireAssertions`,
+      what `src/` reads by a guard test); `hermeticRuntime.ts` pins `NODE_ENV` and the time zone
+      (UTC; `Asia/Kuala_Lumpur` for components) and blocks `fetch` in every tier; `unstubEnvs`, `unstubGlobals`, `requireAssertions`,
       `passWithNoTests: false`.
 - [x] `npm test` regenerates the Prisma client only when the schema changed.
 - [x] `setupUser()` types with `delay: null`; `PetFormDialog` lost its artificial 400 ms delay.
@@ -39,7 +39,8 @@ developer shell leaking in.
       proven to fail when authorization refuses. 18 tests that could not fail were removed and
       6 repaired (Hero count-up, pledge-ref suffix, sponsor dispatch), each repair mutation-checked.
 - [x] Closed `unit-tests-write-to-whatever-is-on-localhost-5432` and
-      `unit-suite-is-order-dependent-in-both-directions`.
+      `unit-suite-is-order-dependent-in-both-directions`. The latter's `volunteerForm` lead turned
+      out to be seven suites authorized by the DAL's fallback, re-filed on its own (below).
 
 ## Review
 
@@ -49,7 +50,7 @@ secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pr
 skipped the regeneration). Unit, integration and component suites together, after merging
 master at `474abbe`: 138 files, 2,291 tests, 40 s (master: 192 to 216 s).
 
-**Review:** six `/code-review` rounds over the whole diff raised 54 findings; each was fixed, or
+**Review:** seven `/code-review` rounds over the whole diff raised 61 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -60,7 +61,9 @@ submits before a re-render save once. Round 6 moved the components tier to `Asia
 (it stands in for the users' browsers; server tiers stay UTC), gave the offline client one
 delegate per model, and split the stale-client checks into `scripts/lib/prismaClientState.mjs`
 so the script needs no run-directly test. It also surfaced a product bug, filed rather than fixed
-here: `tasks/open/admin-date-defaults-use-the-utc-day.md`.
+here: `tasks/open/admin-date-defaults-use-the-utc-day.md`. Round 7 put the member-lookup double in
+one helper (`findMemberRow`), made the Silver caretaker test assert the gate itself, and brought
+the docs in line with the components tier's zone.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as
@@ -76,9 +79,11 @@ which the CI job does first.
 yes; blocked here by the same `db push` refusal, so it needs a run on CI or by a human), the
 `guards` project with a shared file index, and `npm run test:related`. Not done at all:
 `isolate: false` (179 failures from per-file mocks), Vitest's experimental `fsModuleCache`,
-happy-dom, and raising `hookTimeout`. Two gaps filed in `tasks/open/`:
-`test-admin-shares-an-id-with-a-seeded-staff-account.md` and
-`behaviours-the-deleted-hollow-tests-claimed-to-cover.md`.
+happy-dom, and raising `hookTimeout`. Gaps filed in `tasks/open/`:
+`seven-unit-suites-are-authorized-by-the-dal-fallback.md` (measured: making the fallback refuse
+fails exactly those seven and the DAL's own test),
+`test-admin-shares-an-id-with-a-seeded-staff-account.md`,
+`behaviours-the-deleted-hollow-tests-claimed-to-cover.md`, and the two above.
 
 # A short staff invite code no longer takes the site down
 

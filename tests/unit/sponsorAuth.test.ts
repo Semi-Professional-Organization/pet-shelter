@@ -495,12 +495,16 @@ describe("Caretaker Q&A (Gold privilege)", () => {
 
   it("does not dispatch anything when the sponsor is under Gold", async () => {
     await sponsorLoginAction({ email: "silver@example.com", password: "silver123" });
-    await submitCaretakerQuestionAction("Can I visit Bella this weekend?");
+    const silver = await submitCaretakerQuestionAction("Can I visit Bella this weekend?");
+
+    // The gate itself: the action refuses a Silver question outright.
+    expect(silver).toMatchObject({ success: false });
 
     // "Not called yet" alone proves nothing for a non-blocking dispatch: one slower
     // than whatever the test waited for passes it. A Gold question sent afterwards
     // takes the same path, so once its email has arrived, one the Silver attempt
-    // queued earlier would have arrived too.
+    // queued earlier would have arrived too; the macrotask after it also lets a
+    // Silver dispatch that took extra awaits finish before the count is read.
     await sponsorLoginAction({ email: "gold@example.com", password: "gold123" });
     await submitCaretakerQuestionAction("How is Luna's hydrotherapy progressing?");
     await vi.waitFor(() =>
@@ -508,6 +512,7 @@ describe("Caretaker Q&A (Gold privilege)", () => {
         expect.objectContaining({ sponsorEmail: "gold@example.com" })
       )
     );
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(sendCaretakerQuestionEmail).toHaveBeenCalledTimes(1);
   });
