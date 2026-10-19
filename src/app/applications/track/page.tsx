@@ -1,6 +1,6 @@
 "use client";
 
-import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
+import { SHELTER_WHATSAPP_URL, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -484,10 +484,10 @@ function ApplicationTrackerContent() {
                   <MessageCircle className="size-3.5" /> {t("tracking.whatsAppBtn", "WhatsApp Coordinator")}
                 </a>
                 <a
-                  href="tel:0378765432"
+                  href={`tel:${SHELTER_PHONE_TEL}`}
                   className="inline-flex items-center gap-1.5 border border-border bg-card text-foreground px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent transition"
                 >
-                  <Phone className="size-3.5" /> {t("tracking.callBtn", "03-7876 5432")}
+                  <Phone className="size-3.5" /> {t("tracking.callBtn", SHELTER_PHONE_DISPLAY)}
                 </a>
               </div>
             </div>

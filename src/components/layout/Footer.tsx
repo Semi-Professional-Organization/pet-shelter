@@ -1,6 +1,6 @@
 "use client";
 
-import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_WHATSAPP_URL, SHELTER_WHATSAPP_DISPLAY } from "@/lib/domain/shelterIdentity";
+import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_WHATSAPP_URL, SHELTER_WHATSAPP_DISPLAY, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import Link from "next/link";
 import { PawPrint, MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/providers/ThemeToggle";
@@ -118,8 +118,8 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="size-4 text-foreground shrink-0" />
-                <a href="tel:+60378765432" className="text-foreground hover:underline font-semibold">
-                  03-7876 5432
+                <a href={`tel:${SHELTER_PHONE_TEL}`} className="text-foreground hover:underline font-semibold">
+                  {SHELTER_PHONE_DISPLAY}
                 </a>
               </li>
               <li className="flex items-center gap-2.5">

@@ -6,6 +6,8 @@ import {
   LHDN_TAX_DEDUCTIBLE_REF,
   PUBLIC_ROS_REGISTRATION_NO,
   SHELTER_LEGAL_NAME,
+  SHELTER_PHONE_DISPLAY,
+  SHELTER_PHONE_TEL,
   SHELTER_WHATSAPP_DISPLAY,
   SHELTER_WHATSAPP_NUMBER,
   SHELTER_WHATSAPP_URL,
@@ -152,5 +154,23 @@ describe("the shelter WhatsApp number", () => {
   // built from data, is correct and must stay.
   it("is linked only through SHELTER_WHATSAPP_URL, never as a hard-coded wa.me number", () => {
     expect(offendersOutsideOwner(/wa\.me\/\d/)).toEqual([]);
+  });
+});
+
+describe("the shelter phone number", () => {
+  it("is the same line as WhatsApp, in E.164 for tel: links", () => {
+    expect(SHELTER_PHONE_TEL).toBe(`+${SHELTER_WHATSAPP_NUMBER}`);
+    expect(SHELTER_PHONE_DISPLAY.replace(/\D/g, "")).toBe(SHELTER_WHATSAPP_NUMBER);
+  });
+
+  // Before 2026-10-20 an unconfirmed landline, 03-7876 5432, was written out sixteen times:
+  // tel: links, the navbar, the footer, default settings, translations and every outgoing email.
+  // A tel: link to an applicant's own phone is built from data and passes.
+  it("is dialled only through SHELTER_PHONE_TEL, never as a hard-coded tel: number", () => {
+    expect(offendersOutsideOwner(/tel:\+?\d/)).toEqual([]);
+  });
+
+  it("no longer carries the unconfirmed landline anywhere in src/", () => {
+    expect(offendersOutsideOwner(/7876 ?5432|78765432/)).toEqual([]);
   });
 });

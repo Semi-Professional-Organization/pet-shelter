@@ -88,6 +88,17 @@ export const SHELTER_WHATSAPP_DISPLAY = "+60 10-550 3056";
 export const SHELTER_WHATSAPP_URL = `https://wa.me/${SHELTER_WHATSAPP_NUMBER}`;
 
 /**
+ * The shelter's phone number for calls, the same line as WhatsApp (the owner's choice,
+ * 2026-10-20). Before then every "Call" link, the navbar, the footer, the FAQ banner, the default
+ * settings, the translations and every outgoing email printed `03-7876 5432`, a landline
+ * nobody had confirmed, from sixteen separate copies.
+ */
+export const SHELTER_PHONE_TEL = `+${SHELTER_WHATSAPP_NUMBER}`;
+
+/** {@link SHELTER_PHONE_TEL} as people read it. */
+export const SHELTER_PHONE_DISPLAY = SHELTER_WHATSAPP_DISPLAY;
+
+/**
  * The identifiers stamped onto a receipt at the moment it is issued.
  *
  * Returned as a snapshot rather than read live at render time so that a receipt
