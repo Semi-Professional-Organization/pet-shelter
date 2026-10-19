@@ -152,12 +152,13 @@ function createPrismaClient(): PrismaClient {
 
   // A managed Postgres like Neon can take several seconds to wake from idle,
   // so the connect timeout is generous; `DB_CONNECT_TIMEOUT_MS` overrides it.
-  // An empty or non-numeric value falls back to 10 s; `Number("")` would be 0,
-  // which `pg` reads as no timeout at all. An explicit 0 is kept: that is how an
+  // An empty, non-numeric or negative value falls back to 10 s: `Number("")`
+  // would be 0, which `pg` reads as no timeout at all, and a negative one would
+  // time every connection out at once. An explicit 0 is kept: that is how an
   // operator turns the timeout off.
-  const configuredTimeout = process.env.DB_CONNECT_TIMEOUT_MS?.trim();
+  const configuredTimeout = Number(process.env.DB_CONNECT_TIMEOUT_MS?.trim() || NaN);
   const connectionTimeoutMillis =
-    configuredTimeout && Number.isFinite(Number(configuredTimeout)) ? Number(configuredTimeout) : 10000;
+    Number.isFinite(configuredTimeout) && configuredTimeout >= 0 ? configuredTimeout : 10000;
 
   // Reused across dev-server reloads, but only for the connection string it was
   // built from. ceiling: a pool replaced because the URL changed is not ended; its
@@ -216,6 +217,10 @@ export async function disconnectPrisma(): Promise<void> {
   } catch {
     // Already closed, or never connected. Teardown must not fail a green run.
   }
+
+  // A disconnected client must not be the one a later evaluation reuses.
+  globalForPrisma.prisma = undefined;
+  globalForPrisma.prismaUrl = undefined;
 
   const pool = globalForPrisma.pgPool;
   if (pool) {

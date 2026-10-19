@@ -27,6 +27,10 @@ const STORE_OWNERS = [
   "@/lib/server/sponsorRepository",
   "@/lib/server/notificationPreferences",
   "@/lib/server/userStore",
+  // Not on that list, and reset by hand in their own suites until they registered.
+  "@/lib/server/clinicalRepository",
+  "@/lib/server/transparencyRepository",
+  "@/lib/security/secrets",
 ];
 
 const EXPECTED = [
@@ -46,6 +50,9 @@ const EXPECTED = [
   "sponsorRepository",
   "notificationPreferences",
   "userStore",
+  "clinical",
+  "transparency",
+  "secretWarnings",
 ];
 
 describe("module state resets", () => {
@@ -71,6 +78,23 @@ describe("module state resets", () => {
     expect(registrations.sort(), "every store registers once, under a name in EXPECTED").toEqual(
       [...EXPECTED].sort()
     );
+  });
+
+  it("registers every reset src/ exports, so no store is left out of the harness", () => {
+    // A store whose reset is exported but never registered leaks its state between tests
+    // in any file that does not call it by hand, and the name list above cannot see it.
+    const src = fileURLToPath(new URL("../../src", import.meta.url));
+    const unregistered = readdirSync(src, { recursive: true, encoding: "utf8" })
+      .filter((file) => /\.tsx?$/.test(file))
+      .flatMap((file) => {
+        const text = readFileSync(join(src, file), "utf8");
+        return [...text.matchAll(/export (?:async )?function (reset[A-Z]\w*)/g)]
+          .map((match) => match[1])
+          .filter((name) => name !== "resetRegisteredState" && !text.includes(`, ${name});`))
+          .map((name) => `${name} (src/${file.replace(/\\/g, "/")})`);
+      });
+
+    expect(unregistered).toEqual([]);
   });
 
   it("keeps one entry per name, so a module re-evaluated by vi.resetModules replaces its own", () => {

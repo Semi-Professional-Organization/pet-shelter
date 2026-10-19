@@ -84,6 +84,7 @@ describe("a configured Prisma client", () => {
     ["2500", 2500],
     ["0", 0], // pg's "no timeout", set on purpose
     ["not a number", 10000],
+    ["-1", 10000], // would time every connection out at once
   ])("reads DB_CONNECT_TIMEOUT_MS=%j as %d", async (value, expected) => {
     vi.stubEnv("DB_CONNECT_TIMEOUT_MS", value);
 

@@ -19,6 +19,7 @@ import {
   sortReportsNewestFirst,
 } from "../domain/transparency";
 import { HOME_METRIC_KEYS, isHomeMetricKey } from "../domain/metrics";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * The home page keeps its five counters in this same table, under keys it owns
@@ -72,6 +73,8 @@ function memory(): MemoryState {
 export function resetTransparencyMemory(): void {
   globalForTransparency.transparencyMemory = getSampleLedger();
 }
+
+registerStateReset("transparency", resetTransparencyMemory);
 
 /**
  * Read at call time, not module scope, so a test can flip it.

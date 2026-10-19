@@ -21,7 +21,8 @@
  * ceiling: checkouts with different schemas cannot share one generated client.
  * Each `npm test` regenerates it for its own schema and can break the other's run
  * as before; a worktree on a branch that changes the schema needs its own
- * `node_modules` (`npm ci`).
+ * `node_modules` (`npm ci`). Likewise a client another process is generating at
+ * that moment reads as incomplete, so this run generates too and the two race.
  */
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";

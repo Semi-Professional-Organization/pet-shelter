@@ -132,6 +132,19 @@ describe("the Prisma client with no DATABASE_URL", () => {
     expect((globalThis as { prisma?: unknown }).prisma).toBeUndefined();
   });
 
+  it("forgets the cached client and pool on disconnect, so a later evaluation builds new ones", async () => {
+    vi.stubGlobal("prisma", { $disconnect: async () => undefined });
+    vi.stubGlobal("prismaUrl", "postgresql://shelter@db.internal:5432/shelter");
+    vi.stubGlobal("pgPool", { end: async () => undefined });
+    vi.stubGlobal("pgPoolUrl", "postgresql://shelter@db.internal:5432/shelter");
+    const { disconnectPrisma } = await import("@/lib/server/prisma");
+
+    await disconnectPrisma();
+
+    const cache = globalThis as Record<string, unknown>;
+    expect([cache.prisma, cache.prismaUrl, cache.pgPool, cache.pgPoolUrl]).toEqual([undefined, undefined, undefined, undefined]);
+  });
+
   it("disconnects cleanly, so teardown that always disconnects still works", async () => {
     const { disconnectPrisma } = await import("@/lib/server/prisma");
 
