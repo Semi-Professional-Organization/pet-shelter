@@ -237,3 +237,19 @@ asks for.
 Until then, **a green `npm test` in this repo is not evidence, and a red one is not necessarily a
 regression** — and as of run 7 a green *CI* does not clear a locally red test either. Check the
 named files in isolation before believing any of the three.
+
+## 2026-10-20: the shared hook's per-test cost was scrypt, and it is gone
+
+Vitest counts the shared `beforeEach` in each test's duration, and on CI (run `39274781525`)
+assertions on in-memory data reported about 235 ms each:
+`tests/unit/adminPetsAuthorization.test.ts (8 tests) 1880ms`. The cost was
+`resetSponsorRepository()` re-deriving three scrypt hashes before every test, not the dynamic
+imports, which load once per file. The hashes are now derived once per process
+(`getSeededSponsors()` in `src/lib/server/sponsorRepository.ts`). On one machine, `test:all`'s
+summed test time went from 1,508 s to 620 s.
+
+**This does not settle job 1, and why is ASSERTED.** The hook timeouts land one per file, which
+fits the *first* hook in each file, where the dynamic imports load cold, and that first hook still
+does the same work. Removing the per-test hashing means the timeout needs a larger slowdown to
+fire, nothing more. It was deliberately not tested under load: loading the shared machine on
+purpose produces exactly the false reds this entry describes, in other sessions' runs.

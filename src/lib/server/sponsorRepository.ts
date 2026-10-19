@@ -87,21 +87,45 @@ export const SEED_SPONSORS: SeedSponsor[] = [
   },
 ];
 
+/**
+ * The seeded accounts, hashed once per process.
+ *
+ * `hashPassword` is scrypt, which is slow on purpose, and the global `beforeEach` in
+ * `tests/setup/nextMocks.ts` resets this repository before every test in the suite. Deriving the
+ * three seed hashes on each reset cost every test about a quarter of a second, which was most of
+ * the unit job's time on CI. The passwords are constants, so the hashes can never go stale: the
+ * same reasoning, and the same shape, as `getSeededStaff()` in `userStore.ts`.
+ *
+ * Deliberately *not* cleared by `resetSponsorRepository()`.
+ */
+let seededSponsorsPromise: Promise<SponsorRecord[]> | null = null;
+
+function getSeededSponsors(): Promise<SponsorRecord[]> {
+  if (!seededSponsorsPromise) {
+    seededSponsorsPromise = Promise.all(
+      SEED_SPONSORS.map(async (seed) => ({
+        id: seed.id,
+        email: seed.email,
+        name: seed.name,
+        passwordHash: await hashPassword(seed.initialPassword),
+        displayOnWall: seed.displayOnWall,
+        createdAt: seed.createdAt,
+        updatedAt: seed.createdAt,
+      }))
+    );
+  }
+  return seededSponsorsPromise;
+}
+
 function ensureInitialised(): Promise<void> {
   if (initialised) return Promise.resolve();
   if (!initPromise) {
     initPromise = (async () => {
       if (SEEDING_ENABLED) {
-        for (const seed of SEED_SPONSORS) {
-          memorySponsors.set(seed.email, {
-            id: seed.id,
-            email: seed.email,
-            name: seed.name,
-            passwordHash: await hashPassword(seed.initialPassword),
-            displayOnWall: seed.displayOnWall,
-            createdAt: seed.createdAt,
-            updatedAt: seed.createdAt,
-          });
+        for (const seed of await getSeededSponsors()) {
+          // Copied per seed: `setSponsorWallPreference` edits the stored record in place,
+          // and that edit must not reach the cached template.
+          memorySponsors.set(seed.email, { ...seed });
         }
       }
       initialised = true;
