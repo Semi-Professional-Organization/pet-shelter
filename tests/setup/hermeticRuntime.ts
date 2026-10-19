@@ -32,6 +32,9 @@ import { afterAll, afterEach, expect } from "vitest";
  * better lead. The end-of-file check catches what the last test left behind. A
  * call made after that check, by work that outlives the file, is still refused,
  * but nothing is left running to report it.
+ *
+ * ceiling: such a late call is refused silently. If one ever matters, log it from
+ * the guard once the end-of-file check has run.
  */
 
 // The browser runs where the shelter's staff and supporters are, so a client-side date bug

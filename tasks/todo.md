@@ -51,7 +51,7 @@ skipped the regeneration). Unit, integration and component suites together, afte
 master at `474abbe`: 138 files, 2,321 tests, 40 to 52 s (master: 192 to 216 s). Shuffled test
 order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** sixteen `/code-review` rounds over the whole diff raised 131 findings; each was fixed, or
+**Review:** seventeen `/code-review` rounds over the whole diff raised 138 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -92,9 +92,12 @@ registration lines, and moved `petHistory` onto the shared `wireTransaction`. Ro
 table's save handler cannot reject after changing the store, and filed the same save-twice gap
 in the FAQ and bulletin dialogs (`tasks/open/faq-and-bulletin-dialogs-can-save-twice-while-closing.md`).
 Round 16 made a failed save visible in the pet form, closed `TARGET_PERSISTENCE_TARGETING`'s P-1,
-and recorded why repositories do not each check for a database. Not done: one shared walker for
-the eight tests that read `src/` (a refactor across files this branch does not otherwise touch),
-and scrubbing `.env.local` out of `integration-db`, which cannot be run here.
+and recorded why repositories do not each check for a database. Round 17 corrected the operational
+runbook's `DATABASE_URL` row and marked the guard's one silent case as a ceiling. Not done, and
+filed: one shared walker for the eight tests that read `src/`
+(`tasks/open/tests-that-read-src-each-walk-it-their-own-way.md`), and scrubbing the environment in
+`integration-db`, which cannot be run here
+(`tasks/open/integration-db-tier-reads-the-developer-environment.md`).
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as
