@@ -24,8 +24,17 @@ export interface AdminUser {
  * the signed-out verdict: it blanked the next page and pushed straight back to
  * /admin/login. A new document mounts the layout with the new cookie. /admin then
  * redirects to the first section the member's live role opens.
+ *
+ * The cached user is dropped first. It describes whoever was signed in before this
+ * change of session, on a shared browser another person, and the new document must
+ * learn who is signed in from the server rather than start from that copy.
  */
 export function enterAdminConsole(): void {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Storage blocked (private mode): there is no cached copy to mislead anyone.
+  }
   // The rule's advice, useRouter().push(), is exactly the navigation the layout bounced.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign("/admin");
@@ -69,9 +78,13 @@ export function useAdminAuth() {
       } catch (e) {
         // A thrown call (network, a Server Action id gone stale after a deploy) is not
         // an answer, so the cached user stays rather than signing a member out on a
-        // blip. Its role can be stale, and the tabs drawn from it with it; each section
-        // still gates on the server, so a stale tab costs a 403 page whose "Back to
-        // Admin" lands correctly, not access.
+        // blip. Each section still gates on the server, so a stale tab costs a 403
+        // page whose "Back to Admin" lands correctly, not access.
+        //
+        // ceiling: on that path the name and tabs come from the last answer this
+        // browser cached, which a role change since then makes stale. The upgrade is
+        // to hand the layout the verified session from a server component instead of
+        // asking for it from the client.
         console.error("Error syncing session:", e);
       } finally {
         if (mounted) setIsLoading(false);
@@ -92,10 +105,9 @@ export function useAdminAuth() {
       try {
         const result = await loginAction({ email, password: pass });
         if (result.success && result.user) {
+          // Not cached here: the caller enters the console with `enterAdminConsole`,
+          // whose new document asks the server who is signed in.
           setUser(result.user);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.user));
-          }
           return { success: true };
         }
         return {
@@ -122,10 +134,8 @@ export function useAdminAuth() {
       try {
         const result = await registerAction(data);
         if (result.success && result.user) {
+          // Not cached, for the same reason as `login`.
           setUser(result.user);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.user));
-          }
           return { success: true };
         }
         return {

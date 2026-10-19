@@ -10,7 +10,7 @@ vi.mock("@/actions/auth", () => ({
   logoutAction: vi.fn(),
 }));
 
-import { useAdminAuth } from "@/lib/client/adminAuth";
+import { enterAdminConsole, useAdminAuth } from "@/lib/client/adminAuth";
 
 const STORAGE_KEY = "hope_for_strays_admin_session";
 const CACHED = { id: "usr-staff-01", email: "staff@hopeforstrays.org", name: "Cached Staff", role: "STAFF" };
@@ -66,5 +66,17 @@ describe("useAdminAuth", () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.user).toEqual(CACHED);
+  });
+
+  it("forgets the cached user when a new session enters the console", () => {
+    // The cache describes whoever was signed in before, on a shared browser another
+    // person; the new document must ask the server, not start from that copy.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHED));
+    // jsdom implements no navigation and reports the attempt on console.error.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    enterAdminConsole();
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });
