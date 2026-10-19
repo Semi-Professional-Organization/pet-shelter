@@ -9,14 +9,10 @@ export default async function AdminApplicationsPage() {
   // got the browser's sample applications with every review control live.
   const session = await requireAdminSection("/admin/applications");
 
-  // getApplications re-checks the same capability. Anything else it throws still
-  // falls through to the client board's local data, as before the gate.
-  let applications;
-  try {
-    applications = await getApplications();
-  } catch {
-    applications = undefined;
-  }
+  // getApplications re-checks the same capability. Not caught: a failure that fell
+  // through to the client board's fallback would show the browser's sample
+  // applicants as though they were the shelter's.
+  const applications = await getApplications();
 
   return (
     <div className="space-y-6">

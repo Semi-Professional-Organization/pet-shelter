@@ -36,7 +36,16 @@ sample-data notice says to run `npm run db:push`.
 writes land on real rows. Removing that branch is already proposed in
 `.claude/commands/remove-legacy-admin-token.md`.
 
-## 6. Smaller ones
+## 6. In a database outage the boards still show demo records
+
+The pets and applications pages no longer catch their read's failure, but in a deployment without
+`STRICT_PERSISTENCE` the repositories do it a level down: `getServerApplicationsAsync` answers a
+failed query with its in-memory mirror, and the pet reads fall back the same way. So during an
+outage the boards show whatever the mirror holds — the bundled demo records on a fresh instance —
+with nothing to say they are not the shelter's. Same family as
+`tasks/open/an-outage-serves-and-bills-fixture-animals.md`.
+
+## 7. Smaller ones
 
 - An Animal Manager can trigger supporter photo-update emails (pet saves need only `MANAGE_PETS`)
   without holding `SEND_SHELTER_EMAIL`.

@@ -16,14 +16,10 @@ export default async function AdminPetsPage() {
   // got the bundled demo animals as an editable inventory.
   await requireAdminSection("/admin/pets");
 
-  // getAdminPets re-checks the same capability. Anything else it throws still
-  // falls through to the client table's local data, as before the gate.
-  let pets;
-  try {
-    pets = await getAdminPets();
-  } catch {
-    pets = undefined;
-  }
+  // getAdminPets re-checks the same capability. Not caught: a failure that fell
+  // through to the client table's fallback would show the browser's demo animals as
+  // though they were the inventory.
+  const pets = await getAdminPets();
 
   return (
     <div className="space-y-6">
