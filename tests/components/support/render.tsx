@@ -32,15 +32,22 @@ export function renderWithLanguage(
 }
 
 /**
- * `userEvent` with the pointer-events precondition disabled.
+ * `userEvent` with the pointer-events precondition disabled and no delay
+ * between keystrokes.
  *
  * Base UI's dialog sets `pointer-events: none` on everything outside the open
  * popup. jsdom computes no layout, so user-event's visibility check reads that
  * inherited value on the popup's own children and refuses to click them —
  * a false negative about the environment, not about the component.
+ *
+ * The default `delay: 0` still yields to the timer queue after every
+ * keystroke, which made the three form-heavy suites (about 2,650 typed
+ * characters) the slowest files in the repo and the ones that hit the 20 s
+ * timeout under load. `null` skips the yield; each keystroke is still a full
+ * keydown, input and keyup sequence, and React still re-renders after each.
  */
 export function setupUser() {
-  return userEvent.setup({ pointerEventsCheck: 0 });
+  return userEvent.setup({ pointerEventsCheck: 0, delay: null });
 }
 
 let petCounter = 0;
