@@ -36,6 +36,8 @@
       "Bash(node scripts/secrets.mjs decrypt-to-local*)",
       "Bash(npm run secrets:run*)",
       "Bash(node scripts/secrets.mjs run*)",
+      "Bash(npm run secrets:edit*)",
+      "Bash(node scripts/secrets.mjs edit*)",
       "PowerShell(npm run db:migrate:bulletins *)",
       "PowerShell(npx tsx scripts/migrate-bulletins.ts*)",
       "PowerShell(tsx scripts/migrate-bulletins.ts*)",
@@ -43,6 +45,8 @@
       "PowerShell(node scripts/secrets.mjs decrypt-to-local*)",
       "PowerShell(npm run secrets:run*)",
       "PowerShell(node scripts/secrets.mjs run*)",
+      "PowerShell(npm run secrets:edit*)",
+      "PowerShell(node scripts/secrets.mjs edit*)",
       "Bash(npx prisma db push*)",
       "Bash(npx prisma db execute*)",
       "Bash(npx prisma migrate*)"

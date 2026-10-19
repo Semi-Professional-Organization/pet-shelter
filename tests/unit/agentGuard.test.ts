@@ -403,7 +403,8 @@ describe("agent guard", () => {
     it.each(["Bash", "PowerShell"])("denies the scripts that reach production secrets, in %s", (tool) => {
       // In the main checkout `.env.local` is production: db:migrate:bulletins reads it, and
       // secrets:decrypt:local overwrites it. secrets:run decrypts the production file into any
-      // command's environment. db:migrate:bulletins:local is the rehearsal and must stay open,
+      // command's environment, and secrets:edit:prod decrypts it into an editor. secrets:check,
+      // which only reports whether decryption works, stays open. db:migrate:bulletins:local is the rehearsal and must stay open,
       // which is why the bulletins rule is word-bounded, not a bare `*`.
       for (const command of [
         "npm run db:migrate:bulletins",
@@ -413,10 +414,13 @@ describe("agent guard", () => {
         "node scripts/secrets.mjs decrypt-to-local .env.production.enc .env.local",
         "npm run secrets:run -- npm run db:seed",
         "node scripts/secrets.mjs run .env.production.enc -- npm start",
+        "npm run secrets:edit:prod",
+        "node scripts/secrets.mjs edit .env.production.enc",
       ]) {
         expect(covered(command, tool), `expected covered: ${command}`).toBe(true);
       }
       expect(covered("npm run db:migrate:bulletins:local", tool)).toBe(false);
+      expect(covered("npm run secrets:check", tool)).toBe(false);
       expect(settings.permissions.deny).not.toContain(`${tool}(npm run db:migrate:bulletins*)`);
     });
 
