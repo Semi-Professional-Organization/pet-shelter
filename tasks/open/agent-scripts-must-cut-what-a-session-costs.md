@@ -20,7 +20,7 @@ edit to them is an automatic DIED.
 ## Baseline
 
 Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 17,433 model
+transcript Claude Code still held for this repo: 17 sessions and their subagents, 17,529 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
@@ -39,7 +39,7 @@ A cold resume's cost is the re-write beyond the cache read a warm request would 
 same tokens, which is what a hand-off could save.
 
 A workflow family is the set of calls one command would replace. The eight measured, with the
-saving each would make at one call per burst: gates 1.3%, targeted test runs 0.9%, orient 0.3%,
+saving each would make at one call per burst: gates 1.3%, targeted test runs 0.9%, orient 0.4%,
 ledger reads 1.6%, merge checks 0.2%, drift-log reads 0.1%, pull-request checks 1.1%, port checks
 0.1%. A call can belong to two families, so the sum is an upper bound. A burst is a run of
 requests that each call the family, and it ends at the end of a turn; calls issued in parallel

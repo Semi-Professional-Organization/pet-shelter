@@ -279,6 +279,15 @@ describe("agent usage: workflow families", () => {
     expect(file.calls.map((c: { families: string[] }) => c.families)).toEqual([["ledger"], ["ledger"], []]);
   });
 
+  it("reads the other spellings of the same commands", () => {
+    expect(families("Bash", "npm -s run lint")).toEqual(["gates"]);
+    expect(families("Bash", "npx tsc -p . --noEmit")).toEqual(["gates"]);
+    expect(families("Bash", "npx vitest --run tests/unit/foo.test.ts")).toEqual(["targeted tests"]);
+    expect(families("Bash", "npm -s run test:components -- tests/components/A.test.tsx")).toEqual(["targeted tests"]);
+    expect(families("Bash", "git -C /d/x worktree list")).toEqual(["orient"]);
+    expect(families("Bash", 'git -C "D:/a b" merge-tree --write-tree HEAD origin/master')).toEqual(["merge"]);
+  });
+
   it("does not take a write into the ledger, or making a folder there, for a read", () => {
     expect(families("Bash", "cat > tasks/open/x.md <<'EOF'")).toEqual([]);
     expect(families("Bash", "mkdir -p tasks/lessons")).toEqual([]);
@@ -445,6 +454,19 @@ describe("agent usage: the analyses", () => {
     expect(summarize(files, { since: "2026-10-02" }).totals.requests).toBe(1);
   });
 
+  it("keeps a burst going across a compaction mid-turn", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "gh pr checks 5" }] }),
+        // No result, then only a compaction's summary: nothing named woke the next request.
+        { type: "user", isCompactSummary: true, message: { content: "summary" } },
+        assistant("r2", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "gh pr checks 5" }] }),
+      ]),
+    );
+    expect(file.requests[1].trigger).toBeUndefined();
+    expect(familyUsage([file]).pr).toMatchObject({ bursts: 1 });
+  });
+
   it("ends a burst when a person's message arrives mid-turn", () => {
     const file = priceFile(
       extract([
@@ -529,7 +551,32 @@ describe("agent usage: the analyses", () => {
     expect(file.requests[2].prevTs).toBe("2026-10-01T10:01:00.000Z");
   });
 
-  it("charges no cache write for a result the next request did not write", () => {
+  it("times a cold resume by the lifetime holding most of the context, not the last small write", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { w5: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("r2", { read: 400_000, w1h: 5_000, out: 1 }, { ts: "2026-10-01T10:01:00.000Z" }),
+        // 30 minutes later: the 5-minute bulk has expired and is written again.
+        assistant("r3", { read: 5_000, w5: 400_000, out: 1 }, { ts: "2026-10-01T10:31:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)).toHaveLength(1);
+  });
+
+  it("counts the lifetimes afresh after a compaction, which replaced the context", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { w1h: 800_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        { type: "system", subtype: "compact_boundary", uuid: "cb-lifetimes" },
+        assistant("r2", { w5: 100_000, out: 1 }, { ts: "2026-10-01T10:01:00.000Z" }),
+        // 30 minutes on: the new context was all 5-minute cache, so it expired.
+        assistant("r3", { w5: 100_000, out: 1 }, { ts: "2026-10-01T10:31:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)).toHaveLength(1);
+  });
+
+  it("charges an uncached result at the input rate where it first went in", () => {
     const file = priceFile(
       extract([
         assistant("r1", { read: 10_000, out: 1 }, { tools: [{ id: "t1", name: "Read" }] }),
@@ -538,8 +585,8 @@ describe("agent usage: the analyses", () => {
         assistant("r3", { read: 1_010_000, out: 1 }),
       ]),
     );
-    // Only r3's read of it, at $0.20 per million.
-    expect(carriedOutput(file).total).toBeCloseTo(0.2);
+    // r2 took it as fresh input at $4 per million, then r3 read it at $0.20.
+    expect(carriedOutput(file).total).toBeCloseTo(4.2);
   });
 
   it("takes a 5-minute cache as expired after 5 minutes, not an hour", () => {
@@ -814,6 +861,14 @@ describe("agent usage: the command", () => {
     expect(cli(["usage", "--frobnicate"]).code).toBe(2);
     expect(cli(["nonesuch"]).code).toBe(2);
     expect(cli([])).toMatchObject({ code: 2, out: expect.stringMatching(/^agent: ERROR no command/) });
+  });
+
+  it("reads the test scripts from the checkout's top level when run from a subdirectory", async () => {
+    const dir = fixtureDir([assistant("r1", { out: 1 }, { tools: [{ id: "t", name: "Bash", command: "npm test" }] })]);
+    let out = "";
+    const code = await main(["--dir", dir, "--json"], { cwd: join(ROOT, "src"), out: { write: (s: string) => (out += s) } });
+    expect(code).toBe(0);
+    expect(JSON.parse(out).families.gates.calls).toBe(1);
   });
 
   it("resolves --dir against the working directory it was given", async () => {

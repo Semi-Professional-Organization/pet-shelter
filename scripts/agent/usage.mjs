@@ -150,7 +150,8 @@ export const FAMILIES = {
   gates: (tool, cmd, vitest) =>
     SHELLS.has(tool) &&
     !isTargetedRun(cmd, vitest) &&
-    (/npx tsc --noEmit|next build|(?:^|\s)(?:npx\s+)?vitest\s+run\b/.test(cmd) ||
+    (/npx tsc\b[^;&|]*--noEmit|next build/.test(cmd) ||
+      VITEST_RUN.test(cmd) ||
       GATE_SCRIPTS.has(npmScript(cmd)) ||
       vitest.has(npmScript(cmd))),
   "targeted tests": (tool, cmd, vitest) => SHELLS.has(tool) && isTargetedRun(cmd, vitest),
@@ -187,8 +188,29 @@ const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/i
 /** Gate scripts that are not test runs. */
 const GATE_SCRIPTS = new Set(["typecheck", "lint", "docs:check", "build", "check"]);
 
-/** The npm script a command runs (`npm test`, `npm run -s lint`), if any. */
-const npmScript = (cmd) => /(?:^|\s)npm\s+(?:run\s+)?(?:-\S+\s+)*([\w:-]+)/.exec(cmd)?.[1];
+/**
+ * The npm script a command runs and the words after it, if any: `npm test`, `npm run -s lint`,
+ * `npm -s run test:components -- x`.
+ */
+function npmCall(cmd) {
+  const m = /(?:^|\s)npm\s+(.*)$/.exec(cmd);
+  if (!m) return undefined;
+  const words = m[1].trim().split(/\s+/);
+  let i = 0;
+  const skipFlags = () => {
+    while (words[i]?.startsWith("-")) i++;
+  };
+  skipFlags();
+  if (words[i] === "run" || words[i] === "run-script") {
+    i++;
+    skipFlags();
+  }
+  return words[i] ? { script: words[i], args: words.slice(i + 1).join(" ") } : undefined;
+}
+const npmScript = (cmd) => npmCall(cmd)?.script;
+
+/** `vitest run …`, `npx vitest --run …`: the words after it. */
+const VITEST_RUN = /(?:^|\s)(?:npx\s+)?vitest\s+(?:run|--run)\b(.*)$/;
 
 /**
  * The test filters in the words after `vitest run`: each positional word, normalised, and `-t`'s
@@ -245,16 +267,20 @@ export function vitestScripts(scripts = {}) {
  */
 export function isTargetedRun(cmd, vitest = new Map()) {
   const text = String(cmd).trim();
-  const direct = /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$/.exec(text);
+  const direct = VITEST_RUN.exec(text);
   if (direct) return filtersIn(direct[1]).some((f) => !WHOLE_SUITE.has(f));
-  const npm = /(?:^|\s)npm\s+(?:run\s+)?(?:-\S+\s+)*([\w:-]+)(?:\s+(.*))?$/.exec(text);
-  const script = npm && vitest.get(npm[1]);
+  const npm = npmCall(text);
+  const script = npm && vitest.get(npm.script);
   if (!script || script.filtered) return false;
-  return filtersIn(npm[2] ?? "").some((f) => !WHOLE_SUITE.has(f));
+  return filtersIn(npm.args).some((f) => !WHOLE_SUITE.has(f));
 }
 
-/** `npm.cmd run lint` is `npm run lint`: PowerShell on Windows often names the shim. */
-const withoutExeSuffix = (cmd) => cmd.replace(/\b(npm|npx|node|git|gh)\.(cmd|exe)\b/gi, "$1");
+/**
+ * One spelling per command: `npm.cmd run lint` is `npm run lint` (PowerShell often names the
+ * Windows shim), and `git -C <dir> fetch` is `git fetch` (subagents with a reset cwd use `-C`).
+ */
+const withoutExeSuffix = (cmd) =>
+  cmd.replace(/\b(npm|npx|node|git|gh)\.(cmd|exe)\b/gi, "$1").replace(/\bgit\s+(?:-[Cc]\s+("[^"]*"|'[^']*'|\S+)\s+)+/g, "git ");
 
 /** Families a call belongs to. A call can count toward more than one. */
 export function familiesOf(tool, cmd, vitest = new Map()) {
@@ -605,10 +631,10 @@ export function carriedOutput(file, breaks = segmentBreaks(file)) {
     const writeAt = call.request + 1;
     if (!call.resultChars || writeAt >= reqs.length || writeAt > ends[call.request]) continue;
     const w = reqs[writeAt];
-    // The rate the next request actually wrote at, blended across the two lifetimes; nothing if
-    // it wrote nothing (the result was then fresh input, which the reads below still cover).
+    // The rate the next request actually wrote at, blended across the two lifetimes; if it wrote
+    // nothing to the cache, the result went in as fresh input at the input rate.
     const written = w.w5 + w.w1h;
-    const writeRate = !w.rates || !written ? 0 : (w.w5 * w.rates.write5m + w.w1h * w.rates.write1h) / written;
+    const writeRate = !w.rates ? 0 : written ? (w.w5 * w.rates.write5m + w.w1h * w.rates.write1h) / written : w.rates.input;
     const reads = readPrefix[ends[call.request] + 1] - readPrefix[writeAt + 1];
     if (!writeRate && !reads) continue;
     const usd = ((call.resultChars / 4) * (writeRate + reads)) / 1e6;
@@ -637,11 +663,15 @@ export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 export function coldResumes(file, breaks = segmentBreaks(file)) {
   if (file.sub) return [];
   const out = [];
-  // The lifetime the context was last written with is the one that expires.
-  let lifetime;
+  // The lifetime that holds most of the context, counted since the last compaction, is the one
+  // whose expiry forces the re-write; one small write in the other lifetime does not change it.
+  let held = { "5m": 0, "1h": 0 };
   for (const r of file.requests) {
-    const ttl = CACHE_TTL_MINUTES[lifetime ?? (r.w5 > r.w1h ? "5m" : "1h")];
-    if (r.w5 + r.w1h) lifetime = r.w5 > r.w1h ? "5m" : "1h";
+    if (breaks.has(r.index)) held = { "5m": 0, "1h": 0 };
+    const total = held["5m"] + held["1h"];
+    const ttl = CACHE_TTL_MINUTES[total ? (held["5m"] > held["1h"] ? "5m" : "1h") : r.w5 > r.w1h ? "5m" : "1h"];
+    held["5m"] += r.w5;
+    held["1h"] += r.w1h;
     if (!r.prevTs || !r.usd || breaks.has(r.index)) continue;
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
     if (!(idle > ttl)) continue;
@@ -677,7 +707,8 @@ export function familyUsage(files) {
       const f = out[name];
       let inBurst = false;
       for (const r of file.requests) {
-        if (r.trigger !== "tool") inBurst = false;
+        // A person or an event starts new work; a compaction summary or a meta record does not.
+        if (r.trigger === "person" || r.trigger === "event") inBurst = false;
         const mine = (byRequest.get(r.index) ?? []).filter((c) => c.families.includes(name));
         if (!mine.length) {
           inBurst = false;
@@ -881,13 +912,14 @@ export const projectFolderName = (dir) => resolve(dir).replace(/[^A-Za-z0-9]/g, 
 
 /** The main checkout, which worktree folders are named after; null when git cannot say. */
 function mainCheckoutRoot(cwd) {
+  const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  return common ? dirname(common) : null;
+}
+
+/** git's answer, trimmed, or null when git cannot give one. */
+function git(cwd, args) {
   try {
-    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
-      cwd,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-    return dirname(common);
+    return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
   }
@@ -1003,7 +1035,9 @@ async function readFile(file, seen, vitest) {
  * Transcripts in the order a request was first written: a forked or relocated transcript copies
  * its parent's history, and the first file read owns each shared request.
  * ceiling: creation time stands in for "written first"; a copied file whose creation time was
- * preserved would sort wrongly, and the exact order needs each file's first timestamp.
+ * preserved would sort wrongly, and so would a main-session fork on a filesystem with no creation
+ * times, since its parent goes on being written after it. The exact order needs each request's
+ * first appearance across all files, which means reading every file twice.
  */
 function byCreation(files) {
   // Every file is read even under --since: skipping the ones written before the window would
@@ -1011,7 +1045,6 @@ function byCreation(files) {
   // ceiling: about 20 s for 300 transcripts here, read one at a time. Reading them in parallel
   // would have to hold every parsed record until its turn (some 600 MB here); an index of each
   // file's request ids would let old files be skipped without changing ownership.
-  //
   return orderTranscripts(
     files.map((path) => {
       const s = statSync(path);
@@ -1071,9 +1104,9 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
   const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
-  // The test scripts as this checkout defines them; without a package.json, npm test runs are
-  // not told apart from other npm scripts.
-  const packageJson = join(cwd, "package.json");
+  // The test scripts as this checkout defines them, from its top level whatever the cwd; without a
+  // package.json, npm test runs are not told apart from other npm scripts.
+  const packageJson = join(git(cwd, ["rev-parse", "--show-toplevel"]) ?? cwd, "package.json");
   const vitest = vitestScripts(existsSync(packageJson) ? JSON.parse(readFileSync(packageJson, "utf8")).scripts : {});
 
   const seen = new Set();
