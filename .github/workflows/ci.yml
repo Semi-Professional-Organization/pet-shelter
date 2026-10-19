@@ -171,7 +171,11 @@ jobs:
           npx prisma db push
           npm run db:seed
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # The headless shell only: the specs run headless with `devices["Desktop Chrome"]` and no
+        # `channel`, which is what the shell serves, so the full Chrome build is never used.
+        # Not cached: half of this step is apt packages, which a cache cannot hold, and
+        # Playwright's CI guide advises against caching the browsers themselves.
+        run: npx playwright install --with-deps --only-shell chromium
       - name: Run the golden paths
         run: npm run test:e2e
       - name: Upload the report on failure
