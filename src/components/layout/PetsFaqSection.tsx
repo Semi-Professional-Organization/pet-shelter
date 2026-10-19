@@ -1,5 +1,6 @@
 "use client";
 
+import { SHELTER_WHATSAPP_URL, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect, useTransition, useRef } from "react";
 import { PhoneCall, HelpCircle, ChevronDown, MessageCircle } from "lucide-react";
 import { useLanguage } from "@/components/providers/LanguageProvider";
@@ -167,14 +168,14 @@ export function PetsFaqSection({
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
             <a
-              href="tel:+60378765432"
+              href={`tel:${SHELTER_PHONE_TEL}`}
               className="inline-flex items-center gap-2 bg-foreground text-background px-4 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-foreground/85 transition-colors rounded-xl"
             >
               <PhoneCall className="size-3.5" />
-              03-7876 5432
+              {SHELTER_PHONE_DISPLAY}
             </a>
             <a
-              href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20have%20a%20question%20regarding%20the%20shelter."
+              href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20I%20have%20a%20question%20regarding%20the%20shelter.`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-brand-whatsapp text-white px-4 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-brand-whatsapp-hover transition-colors rounded-xl"

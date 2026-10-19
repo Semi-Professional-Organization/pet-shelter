@@ -6,6 +6,11 @@ import {
   LHDN_TAX_DEDUCTIBLE_REF,
   PUBLIC_ROS_REGISTRATION_NO,
   SHELTER_LEGAL_NAME,
+  SHELTER_PHONE_DISPLAY,
+  SHELTER_PHONE_TEL,
+  SHELTER_WHATSAPP_DISPLAY,
+  SHELTER_WHATSAPP_NUMBER,
+  SHELTER_WHATSAPP_URL,
   STATUTORY_ROS_REGISTRATION_NO,
   currentIssuerIdentity,
 } from "@/lib/domain/shelterIdentity";
@@ -13,6 +18,34 @@ import {
 // The module reads ROS_REGISTRATION_NO once, when the import above loads it. That load sees the
 // variable unset, and so the default the tests below pin, because tests/setup/hermeticEnv.ts
 // deletes it before any test file loads, whatever the shell exports.
+
+const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
+const SRC = join(ROOT, "src");
+const OWNER = "src/lib/domain/shelterIdentity.ts";
+
+function walk(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.tsx?$/.test(full)) out.push(full);
+  }
+  return out;
+}
+
+/** Every `repoPath:line` under src/, outside shelterIdentity.ts, whose text matches `pattern`. */
+function offendersOutsideOwner(pattern: RegExp): string[] {
+  const offenders: string[] = [];
+  for (const file of walk(SRC)) {
+    const repoPath = relative(ROOT, file).split(sep).join("/");
+    if (repoPath === OWNER) continue;
+    readFileSync(file, "utf8")
+      .split("\n")
+      .forEach((line, index) => {
+        if (pattern.test(line)) offenders.push(`${repoPath}:${index + 1}`);
+      });
+  }
+  return offenders;
+}
 
 describe("statutory identifiers", () => {
   it("exposes the LHDN Subsection 44(6) approval reference", () => {
@@ -88,39 +121,57 @@ describe("statutory literals are confined to this module", () => {
   //
   // Same shape as tests/unit/layerBoundaries.test.ts: a property of the source tree that
   // no behavioural test can see.
-  const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
-  const SRC = join(ROOT, "src");
-  const OWNER = "src/lib/domain/shelterIdentity.ts";
 
   /** ROS registration numbers and the LHDN Sec 44(6) approval reference, in any spelling. */
   const STATUTORY_LITERAL = /PPM-\d{3}-\d{2}-\d{8}|LHDN\.\d{2}\/\d{2}\/\d{2}/;
-
-  function walk(dir: string, out: string[] = []): string[] {
-    for (const entry of readdirSync(dir)) {
-      const full = join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full, out);
-      else if (/\.tsx?$/.test(full)) out.push(full);
-    }
-    return out;
-  }
 
   // Walks the whole src/ tree synchronously, which costs ~6s under full-suite parallel load and
   // once failed as a timeout rather than an assertion. The tier's `testTimeout` in
   // vitest.config.mts covers it; do not re-add a per-test timeout here.
   it("appears in no file under src/ other than shelterIdentity.ts", () => {
-    const offenders: string[] = [];
+    expect(offendersOutsideOwner(STATUTORY_LITERAL)).toEqual([]);
+  });
+});
 
-    for (const file of walk(SRC)) {
-      const repoPath = relative(ROOT, file).split(sep).join("/");
-      if (repoPath === OWNER) continue;
+describe("the shelter WhatsApp number", () => {
+  it("is in the international form wa.me requires", () => {
+    // Country code, no leading 0, no "+", no spaces. "wa.me/0105503056" opens no chat.
+    expect(SHELTER_WHATSAPP_NUMBER).toMatch(/^60\d{8,10}$/);
+    expect(SHELTER_WHATSAPP_URL).toBe(`https://wa.me/${SHELTER_WHATSAPP_NUMBER}`);
+  });
 
-      readFileSync(file, "utf8")
-        .split("\n")
-        .forEach((line, index) => {
-          if (STATUTORY_LITERAL.test(line)) offenders.push(`${repoPath}:${index + 1}`);
-        });
-    }
+  it("shows the same digits it links to", () => {
+    // The footer prints the display form beside a link built from the number; the two must agree.
+    expect(SHELTER_WHATSAPP_DISPLAY.replace(/\D/g, "")).toBe(SHELTER_WHATSAPP_NUMBER);
+  });
 
-    expect(offenders).toEqual([]);
+  it("is no longer the placeholder that shipped", () => {
+    expect(SHELTER_WHATSAPP_NUMBER).not.toBe("60123456789");
+  });
+
+  // Before 2026-10-20 nine links across six files each spelled out a made-up number, which stayed
+  // live because there was nowhere single to change it. Same walk as the statutory test. Only a
+  // literal digit after `wa.me/` is refused: the admin dialog's link to an *applicant's* phone,
+  // built from data, is correct and must stay.
+  it("is linked only through SHELTER_WHATSAPP_URL, never as a hard-coded wa.me number", () => {
+    expect(offendersOutsideOwner(/wa\.me\/\d/)).toEqual([]);
+  });
+});
+
+describe("the shelter phone number", () => {
+  it("is the same line as WhatsApp, in E.164 for tel: links", () => {
+    expect(SHELTER_PHONE_TEL).toBe(`+${SHELTER_WHATSAPP_NUMBER}`);
+    expect(SHELTER_PHONE_DISPLAY.replace(/\D/g, "")).toBe(SHELTER_WHATSAPP_NUMBER);
+  });
+
+  // Before 2026-10-20 an unconfirmed landline, 03-7876 5432, was written out sixteen times:
+  // tel: links, the navbar, the footer, default settings, translations and every outgoing email.
+  // A tel: link to an applicant's own phone is built from data and passes.
+  it("is dialled only through SHELTER_PHONE_TEL, never as a hard-coded tel: number", () => {
+    expect(offendersOutsideOwner(/tel:\+?\d/)).toEqual([]);
+  });
+
+  it("no longer carries the unconfirmed landline anywhere in src/", () => {
+    expect(offendersOutsideOwner(/7876 ?5432|78765432/)).toEqual([]);
   });
 });
