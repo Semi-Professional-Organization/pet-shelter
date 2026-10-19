@@ -161,8 +161,9 @@ function createPrismaClient(): PrismaClient {
     Number.isFinite(configuredTimeout) && configuredTimeout >= 0 ? configuredTimeout : 10000;
 
   // Reused across dev-server reloads, but only for the connection string it was
-  // built from. ceiling: a pool replaced because the URL changed is not ended; its
-  // idle connections close after `idleTimeoutMillis`.
+  // built from. ceiling: a pool replaced because the URL changed, or left behind
+  // when it was removed, is not ended; its idle connections close after
+  // `idleTimeoutMillis`, and pg reconnects if the same URL comes back.
   const pool =
     (globalForPrisma.pgPoolUrl === sslPolicy.connectionString ? globalForPrisma.pgPool : undefined) ??
     new Pool({
@@ -212,10 +213,13 @@ if (process.env.NODE_ENV !== "production" && databaseUrl) {
  * Safe to call more than once, and safe to call when no connection was ever made.
  */
 export async function disconnectPrisma(): Promise<void> {
-  try {
-    await prisma.$disconnect();
-  } catch {
-    // Already closed, or never connected. Teardown must not fail a green run.
+  // This module's client, and the cached one if a later evaluation built another.
+  for (const client of new Set([prisma, globalForPrisma.prisma])) {
+    try {
+      await client?.$disconnect();
+    } catch {
+      // Already closed, or never connected. Teardown must not fail a green run.
+    }
   }
 
   // A disconnected client must not be the one a later evaluation reuses.

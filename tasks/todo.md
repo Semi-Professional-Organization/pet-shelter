@@ -48,10 +48,10 @@ developer shell leaking in.
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
 secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
 skipped the regeneration). Unit, integration and component suites together, after merging
-master at `474abbe`: 138 files, 2,320 tests, 40 to 52 s (master: 192 to 216 s). Shuffled test
+master at `474abbe`: 138 files, 2,321 tests, 40 to 52 s (master: 192 to 216 s). Shuffled test
 order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** fourteen `/code-review` rounds over the whole diff raised 116 findings; each was fixed, or
+**Review:** fifteen `/code-review` rounds over the whole diff raised 123 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -87,7 +87,12 @@ transparency, secret warnings) and added a guard that fails on any exported `res
 unregistered; `disconnectPrisma` now forgets the cached client, and a negative connect timeout
 falls back to 10 s. Round 14 made the stale check read a schema removed mid-check as stale and
 count the query compiler as part of a complete client, tightened the reset guard to real
-registration lines, and moved `petHistory` onto the shared `wireTransaction`.
+registration lines, and moved `petHistory` onto the shared `wireTransaction`. Round 15 made
+`disconnectPrisma` close a cached client that is not the module's own, wrote down why the pet
+table's save handler cannot reject after changing the store, and filed the same save-twice gap
+in the FAQ and bulletin dialogs (`tasks/open/faq-and-bulletin-dialogs-can-save-twice-while-closing.md`).
+Not done: one shared walker for the eight tests that read `src/`, a refactor across files this
+branch does not otherwise touch.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as

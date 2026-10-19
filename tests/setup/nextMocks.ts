@@ -275,7 +275,7 @@ export function resetNextMocks(): void {
  *
  * Each `src/lib` module that keeps module-level state registers its own reset
  * with `@/lib/stateResets` when it loads, so this resets exactly the stores the
- * file has loaded, in the order they loaded: no reset reads another store.
+ * file has loaded, in the order they first registered: no reset reads another store.
  *
  * This hook used to import all eleven store owners itself, dynamically, before
  * every test. That pulled Prisma, `pg` and every repository into files that

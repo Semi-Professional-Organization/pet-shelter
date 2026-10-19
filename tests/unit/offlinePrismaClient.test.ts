@@ -132,6 +132,16 @@ describe("the Prisma client with no DATABASE_URL", () => {
     expect((globalThis as { prisma?: unknown }).prisma).toBeUndefined();
   });
 
+  it("disconnects a cached client that is not this module's, so none is left open", async () => {
+    const $disconnect = vi.fn(async () => undefined);
+    vi.stubGlobal("prisma", { $disconnect });
+    const { disconnectPrisma } = await import("@/lib/server/prisma");
+
+    await disconnectPrisma();
+
+    expect($disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("forgets the cached client and pool on disconnect, so a later evaluation builds new ones", async () => {
     vi.stubGlobal("prisma", { $disconnect: async () => undefined });
     vi.stubGlobal("prismaUrl", "postgresql://shelter@db.internal:5432/shelter");
