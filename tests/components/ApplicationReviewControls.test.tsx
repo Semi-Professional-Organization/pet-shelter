@@ -63,8 +63,6 @@ describe("applications board controls", () => {
 
     expect(statusSelect()).toBeNull();
     expect(deleteButton()).toBeNull();
-    // It rewrites the browser's copy of the board, so it goes with deciding, not reading.
-    expect(screen.queryByRole("button", { name: /Reset Sample Data/i })).toBeNull();
 
     const dialog = await openDetail();
     expect(within(dialog).queryByRole("button", { name: /Save Decision/i })).toBeNull();
@@ -88,5 +86,13 @@ describe("applications board controls", () => {
 
     expect(statusSelect()).not.toBeNull();
     expect(deleteButton()).not.toBeNull();
+  });
+
+  it("offers nobody a reset of sample data the board does not show", () => {
+    // It rewrote the browser's copy, which the board never shows now that the page always
+    // passes the server's applications, so it changed nothing anyone could see.
+    board(true, true);
+
+    expect(screen.queryByRole("button", { name: /Reset Sample Data/i })).toBeNull();
   });
 });

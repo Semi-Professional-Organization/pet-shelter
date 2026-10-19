@@ -77,7 +77,6 @@ export function ApplicationDataTable({
     handleUpdateStatusWithNotes,
     confirmDelete,
     handleExportCsv,
-    resetToDefaultApplications,
   } = handlers;
 
   const columns = useMemo<ColumnDef<AdoptionApplicationRecord>[]>(
@@ -287,20 +286,9 @@ export function ApplicationDataTable({
           >
             <Download className="size-3" /> Export CSV ({filteredData.length})
           </Button>
-
-          {/* Rewrites the browser's copy of the board, so it goes with the controls
-              that change applications rather than with reading them. */}
-          {canReview && (
-            <Button
-              variant="outline"
-              size="xs"
-              onClick={resetToDefaultApplications}
-              title="Reset to sample applications"
-              className="text-xs text-muted-foreground gap-1"
-            >
-              <RotateCcw className="size-3" /> Reset Sample Data
-            </Button>
-          )}
+          {/* No "Reset Sample Data" here. It rewrote the browser's copy of the board,
+              which the board no longer shows (the page always passes the server's
+              applications), so it changed nothing anyone could see. */}
         </div>
       </div>
 

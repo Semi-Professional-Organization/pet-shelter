@@ -15,7 +15,6 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
     applications: storeApplications,
     updateApplicationStatus,
     deleteApplication,
-    resetToDefaultApplications,
   } = useApplicationStore();
 
   const [localApplications, setLocalApplications] = useState<AdoptionApplicationRecord[] | null>(null);
@@ -128,11 +127,6 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
     exportApplicationsToCsv(filteredData);
   };
 
-  const handleReset = () => {
-    resetToDefaultApplications();
-    setLocalApplications(null);
-  };
-
   return {
     state: {
       applications,
@@ -157,7 +151,6 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
       handleUpdateStatusWithNotes,
       confirmDelete,
       handleExportCsv,
-      resetToDefaultApplications: handleReset,
     },
   };
 }
