@@ -42,14 +42,6 @@
   /* Hover wash for ghost / outline controls — one step lighter than `--secondary`. */
   --accent-subtle: #fff1ec;
   --accent-subtle-strong: #fbeee9;
-  /* The ground for the donor-facing narrative pages (/donate, /impact). Those pages run as
-     one continuous field rather than alternating card/muted bands divided by rules, so the
-     colour is the only thing left doing the separating and it has to hold every ink the pages
-     put on it. Lightness is not free here: the pages set `text-primary` on this ground, and a
-     more saturated yellow drops it below AA — #fdf6dd measures 4.38:1. This is 4.52:1, and the
-     contrast guard measures it alongside `--background` and `--card`. */
-  --page-warm: #fefae6;
-
   /* --- Home page shell: neutral gray ground, white cards, colour carried by the text ---
      Tailwind's gray ramp verbatim (100 / white), declared here rather than written as
      `bg-gray-100` at the call site: the palette guard rejects a raw Tailwind utility because
@@ -260,9 +252,6 @@
   --accent-foreground: #221718;
   --accent-subtle: #2d2424;
   --accent-subtle-strong: #34292a;
-  /* The same warm lean re-lit for a dark ground — see the note in `:root`. */
-  --page-warm: #1a1610;
-
   /* gray-900 / gray-800 — the same ramp, one step apart, so the panel still lifts. */
   --work-ground: #111827;
   --work-panel: #1f2937;
@@ -406,7 +395,6 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --color-page-warm: var(--page-warm);
   --color-work-ground: var(--work-ground);
   --color-work-panel: var(--work-panel);
 
