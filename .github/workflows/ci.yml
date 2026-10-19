@@ -58,6 +58,8 @@ jobs:
         run: npx tsc --noEmit
       - name: Layer boundaries
         run: node docs/architecture/layer-graph.mjs
+      - name: Doc invariants
+        run: npm run docs:check
 
   # The commit-message check is .github/workflows/commit-messages.yml, so that a title edit can
   # rerun it without rerunning everything here.
