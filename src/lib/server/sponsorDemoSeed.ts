@@ -13,6 +13,7 @@ import {
   receiptScopeFor,
 } from "./donationLedger";
 import { SEED_SPONSORS } from "./sponsorRepository";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Demo commitments for the three seeded supporter accounts, offline only.
@@ -149,3 +150,5 @@ async function runSeed(): Promise<void> {
 export function resetSponsorDemoSeed(): void {
   seedPromise = null;
 }
+
+registerStateReset("sponsorDemoSeed", resetSponsorDemoSeed, 7);

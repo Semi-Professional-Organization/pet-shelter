@@ -2,6 +2,7 @@ import { prisma } from "@/lib/server/prisma";
 import { isLedgerPersistent } from "@/lib/server/donationLedger";
 import { normalizeEmail } from "@/lib/notificationTokens";
 import { NotificationPreferenceRecord } from "@/types/notifications";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Donor notification consent, keyed by email address.
@@ -68,6 +69,8 @@ export function resetNotificationPreferences(): void {
   preferenceCache.clear();
   memoryPreferences.clear();
 }
+
+registerStateReset("notificationPreferences", resetNotificationPreferences, 9);
 
 interface PreferenceRow {
   email: string;

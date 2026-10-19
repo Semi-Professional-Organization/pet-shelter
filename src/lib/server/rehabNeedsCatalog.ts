@@ -1,6 +1,7 @@
 import initialRehabNeedsData from "@/data/rehabNeeds.json";
 import { RehabNeed, RehabNeedCategory } from "@/types/rehab";
 import { REHAB_CATEGORY_LABELS } from "@/lib/presentation/categoryTabs";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Rehabilitation-house wishlist reads.
@@ -23,6 +24,8 @@ let serverRehabNeeds: RehabNeed[] = freshRehabNeeds();
 export function resetRehabNeeds(): void {
   serverRehabNeeds = freshRehabNeeds();
 }
+
+registerStateReset("rehabNeeds", resetRehabNeeds, 0);
 
 export function getServerRehabNeeds(filters?: string | { category?: string; search?: string }): RehabNeed[] {
   let items = [...serverRehabNeeds];

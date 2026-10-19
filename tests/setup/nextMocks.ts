@@ -1,11 +1,12 @@
 import { beforeEach, vi } from "vitest";
+import { resetRegisteredState } from "@/lib/stateResets";
 
 /**
  * Centralized Next.js 16 App Router test harness.
  *
  * Loaded through `setupFiles` in `vitest.config.mts`, so every suite gets the
  * same `next/headers`, `next/cache`, and `next/navigation` doubles plus a
- * hermetic reset of every module-level cache in `src/lib`.
+ * hermetic reset of every module-level cache in `src/lib` that the file loads.
  *
  * A test file that declares its own `vi.mock("next/headers", ...)` still wins
  * for that file — Vitest gives a file's own registration precedence over a
@@ -272,56 +273,21 @@ export function resetNextMocks(): void {
  * file's own `beforeEach`, so a suite that arranges fixtures in its own hook
  * still gets a clean store first and then layers its arrangement on top.
  *
- * The `src/lib` stores are imported *dynamically, inside the hook*, and that is
- * load-bearing rather than stylistic. A setup file is evaluated before the test
- * file, so a static `import { resetServerStore } from "@/lib/server/fallbackState"`
- * would instantiate the repositories — and through them the real `@/lib/prisma` —
- * before the test file's own `vi.mock("@/lib/server/prisma", ...)` is registered. Suites
- * that spy on the Prisma client would then assert against a client the code
- * under test is not using, and silently observe zero calls. Deferring the
- * import to hook-execution time lets each file's mocks win.
+ * Each `src/lib` module that keeps module-level state registers its own reset
+ * with `@/lib/stateResets` when it loads, so this resets exactly the stores the
+ * file has loaded. The relative order they run in — the ledgers before the
+ * demo-seed flag, so the next test re-seeds — is declared where each registers.
+ *
+ * This hook used to import all eleven store owners itself, dynamically, before
+ * every test. That pulled Prisma, `pg` and every repository into files that
+ * test pure functions, and the cold import in each file's first test was the
+ * slowest work in the suite: under load it crossed the 10 s hook timeout.
+ * `@/lib/stateResets` imports nothing, so importing it statically here cannot
+ * instantiate the real Prisma client before a test file's own
+ * `vi.mock("@/lib/server/prisma", ...)` registers — the hazard the dynamic
+ * imports existed to avoid.
  */
 beforeEach(async () => {
   resetNextMocks();
-
-  const [
-    fallbackState,
-    userStore,
-    auditLog,
-    rateLimit,
-    idempotency,
-    donationLedger,
-    donationPledgeLedger,
-    sponsorshipLedger,
-    sponsorRepository,
-    sponsorDemoSeed,
-    notificationPreferences,
-  ] = await Promise.all([
-    import("@/lib/server/fallbackState"),
-    import("@/lib/server/userStore"),
-    import("@/lib/domain/auditLog"),
-    import("@/lib/security/rateLimit"),
-    import("@/lib/security/idempotency"),
-    import("@/lib/server/donationLedger"),
-    import("@/lib/server/donationPledgeLedger"),
-    import("@/lib/server/sponsorshipLedger"),
-    import("@/lib/server/sponsorRepository"),
-    import("@/lib/server/sponsorDemoSeed"),
-    import("@/lib/server/notificationPreferences"),
-  ]);
-
-  fallbackState.resetServerStore();
-  auditLog.resetAuditLogs();
-  rateLimit.resetRateLimitStore();
-  idempotency.resetIdempotencyStore();
-  donationLedger.resetDonationLedger();
-  donationPledgeLedger.resetDonationPledgeLedger();
-  sponsorshipLedger.resetSponsorshipLedger();
-  // Order matters: clearing the demo-seed flag after the ledger is emptied is what lets
-  // the next suite re-seed. Leaving the flag set would give every test after the first an
-  // empty ledger and no standings.
-  sponsorDemoSeed.resetSponsorDemoSeed();
-  await sponsorRepository.resetSponsorRepository();
-  notificationPreferences.resetNotificationPreferences();
-  await userStore.resetUserStore();
+  await resetRegisteredState();
 });

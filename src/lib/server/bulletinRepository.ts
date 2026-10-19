@@ -33,6 +33,7 @@ import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Bulletin reads and writes over the repository layer.
@@ -128,6 +129,8 @@ export function resetBulletins(): void {
   serverBulletins = freshBulletins();
   warnedTableMissing = false;
 }
+
+registerStateReset("bulletins", resetBulletins, 0);
 
 /**
  * `DbBulletinRow` is Prisma's generated `Bulletin` type, imported above — not a

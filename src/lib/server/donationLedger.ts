@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { Sen, senFromInteger } from "@/lib/domain/money";
 import type { SponsorshipTierId } from "@/types/sponsorship";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Persistence for issued LHDN tax receipts.
@@ -142,6 +143,8 @@ export function resetDonationLedger(): void {
   memoryDonations = [];
   memorySeq = 0;
 }
+
+registerStateReset("donationLedger", resetDonationLedger, 4);
 
 /**
  * The offline branch of issuance. **Synchronous by design.**

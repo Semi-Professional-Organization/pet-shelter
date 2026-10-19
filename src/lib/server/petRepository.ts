@@ -12,6 +12,7 @@ import {
   buildPetUpdatePayload,
   mapDbPetToPet,
 } from "./petMappers";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Pet reads and writes over the repository layer.
@@ -47,6 +48,8 @@ let serverPets: Pet[] = freshPets();
 export function resetPets(): void {
   serverPets = freshPets();
 }
+
+registerStateReset("pets", resetPets, 0);
 
 export function getServerPets(): Pet[] {
   return serverPets;

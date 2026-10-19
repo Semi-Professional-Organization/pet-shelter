@@ -19,6 +19,7 @@ import {
   type AuditEntryInput,
 } from "@/lib/domain/auditLog";
 import { generateGiftRef, type DonationPledgeStatus } from "@/lib/domain/donationPledge";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Repository for general gifts awaiting reconciliation.
@@ -106,6 +107,8 @@ export function resetDonationPledgeLedger(): void {
   memoryPledges = [];
   memorySerial = 0;
 }
+
+registerStateReset("donationPledgeLedger", resetDonationPledgeLedger, 5);
 
 /** Diagnostic read of the in-memory ledger. */
 export function memoryDonationPledgeCount(): number {
