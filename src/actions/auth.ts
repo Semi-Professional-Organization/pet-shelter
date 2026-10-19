@@ -212,12 +212,15 @@ export async function registerAction(data: {
 
   // 1. Rate Limiting on Registrations
   //
-  // Two *independent* budgets, and deliberately not one composite key. The
-  // address budget is what makes the invite guard below non-enumerable, and it
+  // Two *independent* budgets, and deliberately not one composite key. With a
+  // recommended-length (16+) code the address budget is what makes the invite
+  // guard below non-enumerable; a shorter code, which the operator may now
+  // choose, is guessable regardless (`getStaffInviteSecret`). The budget
   // only works because the email is absent from its key.
   //
-  // `register:${email}` alone was the defect — `src/lib/security/secrets.ts`
-  // names it at getStaffInviteSecret(): the email is attacker-supplied, so a
+  // `register:${email}` alone was the defect — recorded in
+  // `tasks/decisions/2026-09-08-rate-limit-keys-carry-no-attacker-supplied-value.md`:
+  // the email is attacker-supplied, so a
   // caller walking the invite code just varies the address and draws a fresh
   // 5-per-minute budget on every single request. Folding the IP *into* that key
   // as `register:${ip}:${email}` does not fix it and is strictly worse: a

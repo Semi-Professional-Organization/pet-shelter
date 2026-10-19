@@ -15,6 +15,53 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# A short staff invite code no longer takes the site down
+
+**Branch:** `fix/invite-code-any-length` · opened 2026-10-17 · base `d6dd030`
+
+On 2026-10-17 a new `STAFF_INVITE_SECRET` under 16 characters failed the startup secret check,
+and every public page returned 500. The owner chose to make the code's length their call. A
+short code now boots with a warning, and the risk accepted is in
+`tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
+
+> **Before deploying this branch:** check the production values of all three secrets. Each now
+> refuses the boot if it is any secret's development default or a placeholder an older
+> `.env.example` published, with or without quotes, and the invite code also in any letter case. That is correct, because such a key is public in this repository. But
+> a production configured that way today would return 500 on every page after the deploy.
+
+- [x] `allowShort` waives only the "short" weakness, and only for the invite code.
+- [x] Still refused: unset, quotes-only (straight, curly or zero-width), the dev defaults, and
+      published credentials (`HOPE2026`, `1234`, the seeded staff passwords), all recognised
+      through surrounding quotes. An accepted code is used as set, and a warning says so if
+      it keeps quote marks.
+- [x] The session and admin keys now also refuse any secret's dev default, quoted or not
+      (exact letter case). These refusals are new; see the note above.
+- [x] The `.env.example` test and the operator-file guard call the real accessors.
+- [x] Twenty-four `/code-review high` rounds. The loop ended at round 24, the first in which
+      every finding was declined with a written reason (the exit rule in the decision entry).
+      Fixes along the way were verified by probe and mutant. Four of my own changes were
+      reverted after review: case-insensitive key matching, stripping quotes from an accepted
+      code, quote-free length measurement, and editing an old decision entry.
+
+## Review
+
+**Verified at the branch tip:** `npm run check`, 0 errors. `npm run test:all` all passing.
+`npm run build` exit 0. `next start` checks: a 4-character code serves pages with 200 and logs
+the warning without the value. `HOPE2026`, `"HOPE2026`, `admin123`, `""`, and a session secret
+set to the admin default all refuse to boot, while an upper-cased session default still boots.
+Mutants are tabulated in the decision entry.
+
+**Deliberately not done:**
+
+- No minimum length: the owner's choice.
+- Not limiting a weak secret's damage to the feature it gates (option 2): the better design,
+  but not chosen. It is tracked in `tasks/open/one-weak-secret-still-takes-the-whole-site-down.md`.
+- The rate limiter stays per-process, so it does not bound guessing on serverless hosts.
+- Quoted invite codes of 8-15 characters inside prose are not scanned by the guard; that is the
+  stated ceiling.
+
+
+
 # Parser fixes from PR #42's review — overflow clamp, `withDerivedAge` type
 
 **Branch:** `fix/approximate-birth-date-shapes` · off master `187593c` · 2026-10-15

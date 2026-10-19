@@ -42,8 +42,18 @@ All eight from §1. Generate each secret with:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Minimums enforced by `src/lib/security/secrets.ts`: `SESSION_SECRET` 32 characters, the other two 16.
-A value equal to that secret's `DEV_SECRET_DEFAULTS` entry is rejected, which is why `.env.example`
+Minimums enforced by `src/lib/security/secrets.ts`: `SESSION_SECRET` 32 characters,
+`ADMIN_SECRET_KEY` 16. `STAFF_INVITE_SECRET` has a *recommended* 16: a shorter value boots with a
+warning in the logs, so check the logs, not the boot, for it. These invite codes are refused at
+any length, and refusing them fails the boot: `HOPE2026`, `1234`, the seeded staff passwords
+(`admin123` and the rest), and any value this repository has published for a secret (a
+development default, an old `.env.example` placeholder, a former hardcoded fallback), in any
+letter case and with or without surrounding quotes. A value made only of quote marks,
+backticks, whitespace or invisible characters (`""`, a zero-width space) counts as unset and is
+refused too. Any other value is used as typed, quotes included, with surrounding whitespace trimmed.
+For all three secrets, a value equal to any secret's `DEV_SECRET_DEFAULTS` entry is rejected,
+including with the `.env.example` quotes left on (for the session and admin keys this match is
+exact in letter case), which is why `.env.example`
 publishes those exact defaults — copying it verbatim into production refuses to boot by design.
 
 ### Preview

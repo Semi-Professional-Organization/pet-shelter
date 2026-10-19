@@ -126,6 +126,15 @@ into a real deploy. Exports `getSessionSecret()`, `getAdminSecretKey()`, `getSta
 `SESSION_SECRET` carries `minLength: 32`; the README already claims that requirement and nothing
 currently enforces it.
 
+> **Superseded in part, 2026-10-17.** `resolveSecret` also takes `allowShort` and `published`.
+> `getStaffInviteSecret()` passes both: a short invite code boots with a warning, and published
+> credentials (the legacy codes `HOPE2026` and `1234`, and the seeded staff passwords) are refused
+> at any length. The session and admin secrets keep their minimums, but are now also refused
+> when set to any value this repository has published for a secret: any dev default, an old
+> `.env.example` placeholder, or one of the hardcoded fallbacks in the table above, exactly or
+> with its quotes left on. A value of only quote marks now reads as unset, for all three. See
+> `tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`.
+
 ### 3.2 Rewrite the invite guard — `src/actions/auth.ts`
 
 1. **Delete** `&& inviteCode !== "HOPE2026" && inviteCode !== "1234"`. Unconditional literals are the

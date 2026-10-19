@@ -245,7 +245,9 @@ describe("assertSecretsConfigured", () => {
       // Distinctive values that cannot collide with the message's own wording.
       vi.stubEnv("SESSION_SECRET", "zqxvw1");
       vi.stubEnv("ADMIN_SECRET_KEY", "jkmpq2");
-      vi.stubEnv("STAFF_INVITE_SECRET", "bhtrv3");
+      // A published code in an unusual case: short codes now boot, so this is
+      // what makes the invite path fail and put its own line in the message.
+      vi.stubEnv("STAFF_INVITE_SECRET", "HoPe2026");
 
       let message = "";
       try {
@@ -254,19 +256,328 @@ describe("assertSecretsConfigured", () => {
         message = (error as Error).message;
       }
 
+      expect(message).toMatch(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
       expect(message).not.toMatch(/zqxvw1/);
       expect(message).not.toMatch(/jkmpq2/);
-      expect(message).not.toMatch(/bhtrv3/);
+      expect(message).not.toMatch(/hope2026/i);
     });
 
-    // A 4-character invite code was proposed; it is rejected because the
-    // registration rate limit is keyed on the attacker-supplied email.
-    it("rejects a 4-character staff invite code", () => {
+    // The invite code's length is the operator's call
+    // (tasks/decisions/2026-10-17-the-staff-invite-code-length-is-the-operators-call.md).
+    // A short one used to fail the boot check and take every public page down.
+    it("boots with a 4-character staff invite code, and warns without the value", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
-      vi.stubEnv("STAFF_INVITE_SECRET", "1234");
+      vi.stubEnv("STAFF_INVITE_SECRET", "q7z4");
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(getStaffInviteSecret()).toBe("q7z4");
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/STAFF_INVITE_SECRET.*recommended 16/));
+      expect(warn.mock.calls.flat().join(" ")).not.toMatch(/q7z4/);
+    });
+
+    it("still refuses the published development default as the invite code", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET);
 
       expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+    });
+
+    // Short, so allowShort alone would accept them; refused because this
+    // repository publishes them, whatever the letter case.
+    it.each(["HOPE2026", "1234", "hope2026"])("still refuses the published invite code %s", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+    });
+
+    // The seeded staff passwords are published too, and short enough that the
+    // old minimum refused them. Reused from the one list that holds them.
+    it.each(["admin123", "STAFF123", "vol123"])("refuses the published staff password %s as the invite code", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+    });
+
+    // Matching case variants of a dev default would be a new boot refusal for
+    // every secret, the outage this policy change removes; it stays exact.
+    it("still boots a session secret that is only a case variant of its dev default", () => {
+      vi.stubEnv("SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET.toUpperCase());
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+    });
+
+    // What someone enters in a hosting dashboard meaning "empty". No real code
+    // is only quote marks, so reading these as unset changes no code.
+    it.each(['""', "''", '"', '" "', "``"])("treats an invite code of only quote marks (%s) as unset", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
+    });
+
+    it.each(['"HOPE2026"', "'admin123'", '"Hope2026"', '""HOPE2026""', `"'HOPE2026'"`, '"HOPE2026', "admin123'"])("refuses a published code wrapped in quotes (%s)", (code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    // The same reading for every secret, so one mistake gets one diagnosis.
+    // `.env.example` publishes each default inside quotes; pasting that value
+    // verbatim used to boot production on a key anyone can read here.
+    it.each([
+      ["SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET],
+      ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY],
+      ["STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET],
+    ])("refuses %s set to its dev default with the quotes left on", (name, devDefault) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, `"${devDefault}"`);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is (still set to the documented|set to a value)`));
+    });
+
+    // The wrong `.env.example` line pasted into the wrong slot.
+    it.each([
+      ["SESSION_SECRET", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY],
+      ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.SESSION_SECRET],
+    ])("refuses %s set to another secret's dev default", (name, otherDefault) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, otherDefault);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+    });
+
+    it("reports a quotes-only admin key as not set, as for the invite code", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", '""');
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY is set to only quote marks/);
+    });
+
+    // Characters pasted from Word, Notion or a rendered page.
+    const LDQ = String.fromCharCode(0x201c);
+    const RDQ = String.fromCharCode(0x201d);
+    const ZWSP = String.fromCharCode(0x200b);
+
+    it("refuses a published code in curly quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", `${LDQ}HOPE2026${RDQ}`);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    // Unicode categories, not a list: every quotation style is recognised.
+    it.each([
+      ["German low quotes", String.fromCharCode(0x201e), String.fromCharCode(0x201c)],
+      ["guillemets", String.fromCharCode(0xab), String.fromCharCode(0xbb)],
+      ["single guillemets", String.fromCharCode(0x2039), String.fromCharCode(0x203a)],
+      ["CJK corner brackets", String.fromCharCode(0x300c), String.fromCharCode(0x300d)],
+      ["fullwidth quotes", String.fromCharCode(0xff02), String.fromCharCode(0xff02)],
+      ["a word joiner", "", String.fromCharCode(0x2060)],
+    ])("refuses a published code wrapped in %s", (_label, open, close) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", `${open}HOPE2026${close}`);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    // Brackets are not quote marks: a bracketed code is a code, not unset, and
+    // draws no "quote mark" warning.
+    it.each(["[shelter-2026]", "(abc)"])("accepts a bracketed code as is, without a quote warning (%s)", (code) => {
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(getStaffInviteSecret()).toBe(code);
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/quote mark/));
+    });
+
+    it.each(["q7z4", "abc-def_123", "a(b)c", "x'y"])("keeps an accepted code's interior punctuation (%s)", (code) => {
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(getStaffInviteSecret()).toBe(code);
+    });
+
+    it("refuses a session dev default in curly quotes", () => {
+      vi.stubEnv("SESSION_SECRET", `${LDQ}${DEV_SECRET_DEFAULTS.SESSION_SECRET}${RDQ}`);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/SESSION_SECRET is still set to the documented/);
+    });
+
+    it.each([
+      ["curly quotes", `${LDQ}${RDQ}`],
+      ["a zero-width space", ZWSP],
+    ])("treats an invite code of only %s as unset", (_label, code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
+    });
+
+    it("warns, without the value, that an accepted admin key keeps curly quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", `${String.fromCharCode(0x201c)}${STRONG_ADMIN}${String.fromCharCode(0x201d)}`);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/ADMIN_SECRET_KEY starts or ends with a quote mark/));
+      expect(warn.mock.calls.flat().join(" ")).not.toContain(STRONG_ADMIN);
+    });
+
+    // An interior run of edge characters must not make stripping quadratic. The
+    // linear scan takes about 7 ms here; the quadratic regex it replaced took 80 s.
+    // The bound is far above the first and far below the second, so a slow CI
+    // runner cannot make it flaky.
+    it("reads a value with a long interior run of spaces in linear time", () => {
+      vi.stubEnv("STAFF_INVITE_SECRET", "a" + " ".repeat(200_000) + "b");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const started = performance.now();
+
+      getStaffInviteSecret();
+      expect(performance.now() - started).toBeLessThan(4000);
+    });
+
+    it("warns, without the value, that an accepted invite code keeps its quotes", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", '"MyLongInviteCode2026xx"');
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/STAFF_INVITE_SECRET starts or ends with a quote mark/));
+      expect(warn.mock.calls.flat().join(" ")).not.toMatch(/MyLongInviteCode/);
+    });
+
+    it("reads the invite code exactly, quotes included", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", '"q7z4"');
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(getStaffInviteSecret()).toBe('"q7z4"');
+    });
+
+    it.each([
+      ["the admin key's default", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY],
+      ["the session secret's default", DEV_SECRET_DEFAULTS.SESSION_SECRET],
+      ["its own default, upper-cased", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET.toUpperCase()],
+    ])("refuses %s as the invite code", (_label, code) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", code);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+    });
+
+    // A published value that itself ends in an edge character must still match:
+    // stripping the configured value alone would never find it.
+    it("refuses a published value that ends in a quote mark", () => {
+      vi.stubEnv("PROBE_SECRET", "pass'word'");
+
+      expect(() =>
+        resolveSecret("PROBE_SECRET", {
+          devDefault: DEV_DEFAULT,
+          minLength: 4,
+          published: ["pass'word'"],
+        })
+      ).toThrow(/publishes/);
+    });
+
+    it("still says a truly unset invite code is not set", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+    });
+
+    // Placeholders earlier versions of .env.example published; still in git history.
+    it.each([
+      ["SESSION_SECRET", "replace-me-with-a-random-32-plus-character-secret"],
+      ["SESSION_SECRET", "generate-a-secure-random-32-character-secret-key-here"],
+      ["ADMIN_SECRET_KEY", "replace-me-with-a-random-admin-secret-key"],
+      ["ADMIN_SECRET_KEY", "generate-a-secure-admin-secret-key-here"],
+      ["STAFF_INVITE_SECRET", "replace-me-with-a-random-staff-invite-code"],
+    ])("refuses %s set to the old placeholder %s", (name, placeholder) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, placeholder);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+    });
+
+    // Hardcoded fallbacks the source used before 3b43293; still in git history.
+    it.each([
+      ["SESSION_SECRET", "hope-for-strays-secret-key-32-chars-long-secure-salt!"],
+      ["ADMIN_SECRET_KEY", "hope_shelter_admin_secret_key_2026"],
+    ])("refuses %s set to its former hardcoded fallback", (name, fallback) => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, fallback);
+
+      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+    });
+
+    it("refuses a published invite code typed in fullwidth characters", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      // HOPE2026 in fullwidth forms, built from code points.
+      const fullwidth = [..."HOPE2026"].map((c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0)).join("");
+      vi.stubEnv("STAFF_INVITE_SECRET", fullwidth);
+
+      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+    });
+
+    it("still refuses a whitespace-only invite code", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", "   ");
+
+      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+    });
+
+    // Length is measured on the value as set. Measuring it without edge
+    // characters refused a random key that happens to end in a quote mark.
+    it("still boots a random admin key that happens to end with a quote mark", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", "7d3e1a95c4820bf'");
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+    });
+
+    it("keeps the length minimum for every other secret", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", "short-admin");
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY/);
     });
   });
 
@@ -282,6 +593,79 @@ describe("assertSecretsConfigured", () => {
       vi.spyOn(console, "warn").mockImplementation(() => {});
 
       expect(() => assertSecretsConfigured()).not.toThrow();
+    });
+
+    it("falls back to the dev default for a quotes-only value, as the warning says", () => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", '""');
+
+      expect(getStaffInviteSecret()).toBe(DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET);
+    });
+
+    it("says a published value is used as configured, not that a fallback is in use", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", "HOPE2026");
+
+      expect(getStaffInviteSecret()).toBe("HOPE2026");
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/publishes; using it as configured/));
+      expect(warn).not.toHaveBeenCalledWith(expect.stringMatching(/fallback/));
+    });
+
+    it("warns again when the invite code is rotated to another quoted code", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", '"a-long-quoted-invite-code"');
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", '"another-quoted-invite-code-here"');
+      getStaffInviteSecret();
+
+      const quotedWarnings = warn.mock.calls.filter((c) => /starts or ends with a quote mark/.test(String(c[0])));
+      expect(quotedWarnings).toHaveLength(2);
+    });
+
+    it("warns again when the invite code is rotated to a different short length", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", "twelve-chars");
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", "q7z");
+      getStaffInviteSecret();
+
+      const shortWarnings = warn.mock.calls.filter((c) => /shorter than the recommended/.test(String(c[0])));
+      expect(shortWarnings).toHaveLength(2);
+    });
+
+    it("warns again when rotated from one published code to another", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", "HOPE2026");
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", "content123");
+      getStaffInviteSecret();
+
+      const published = warn.mock.calls.filter((c) => /publishes/.test(String(c[0])));
+      expect(published).toHaveLength(2);
+    });
+
+    it("warns separately for an unset value and a quotes-only one", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", '""');
+      getStaffInviteSecret();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/STAFF_INVITE_SECRET is not set/));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/set to only quote marks/));
+    });
+
+    it("still warns that the invite code is short after warning that it was unset", () => {
+      // warnOnce used to be keyed on the name alone, so the first warning
+      // swallowed every later one for the same secret.
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      getStaffInviteSecret();
+      vi.stubEnv("STAFF_INVITE_SECRET", "q7z4");
+      getStaffInviteSecret();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/not set/));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/shorter than the recommended 16/));
     });
 
     it("surfaces the warning for each weak secret once, at startup", () => {
@@ -323,10 +707,13 @@ describe(".env.example authentication secrets", () => {
     }
   }
 
+  // Each with the app's own accessor, so the "refuses to boot" check below runs
+  // the policy the app runs (including `allowShort` on the invite code) rather
+  // than a second copy of it.
   const SECRETS = [
-    ["SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET, 32],
-    ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY, 16],
-    ["STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET, 16],
+    ["SESSION_SECRET", DEV_SECRET_DEFAULTS.SESSION_SECRET, getSessionSecret],
+    ["ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY, getAdminSecretKey],
+    ["STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET, getStaffInviteSecret],
   ] as const;
 
   beforeEach(() => {
@@ -342,12 +729,13 @@ describe(".env.example authentication secrets", () => {
     expect(documented[name]).toBe(devDefault);
   });
 
-  it.each(SECRETS)("refuses to boot production with the documented %s", (name, devDefault, minLength) => {
+  it.each(SECRETS)("refuses to boot production with the documented %s", (name, _devDefault, accessor) => {
     expect(documented[name], `${name} is not documented in .env.example`).toBeDefined();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv(name, documented[name]);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    expect(() => resolveSecret(name, { devDefault, minLength })).toThrow(SecretConfigurationError);
+    expect(() => accessor()).toThrow(SecretConfigurationError);
   });
 
   it("names EMAIL_FROM rather than the unread SENDER_EMAIL", () => {
@@ -379,10 +767,13 @@ describe(".env.example authentication secrets", () => {
  * itself must refuse each published value under `NODE_ENV=production`.
  */
 describe("no operator-facing file publishes a secret that boots in production", () => {
+  // The app's own accessors, not a copy of their options, so this guard tests
+  // exactly what production accepts. A short invite code now boots, so a
+  // published one fails here; what the scan reads is set out in `collect`.
   const GUARDED = {
-    SESSION_SECRET: { devDefault: DEV_SECRET_DEFAULTS.SESSION_SECRET, minLength: 32 },
-    ADMIN_SECRET_KEY: { devDefault: DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY, minLength: 16 },
-    STAFF_INVITE_SECRET: { devDefault: DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET, minLength: 16 },
+    SESSION_SECRET: getSessionSecret,
+    ADMIN_SECRET_KEY: getAdminSecretKey,
+    STAFF_INVITE_SECRET: getStaffInviteSecret,
   } as const;
   type GuardedName = keyof typeof GUARDED;
   const NAMES = Object.keys(GUARDED) as GuardedName[];
@@ -414,9 +805,21 @@ describe("no operator-facing file publishes a secret that boots in production", 
       /^[A-Z][A-Z0-9_]*$/.test(value) ||
       value.includes("/") ||
       /\.(ts|tsx|mjs|js|json|md|env)$/.test(value) ||
-      /^[A-Z][A-Za-z]+Error$/.test(value)
+      /^[A-Z][A-Za-z]+Error$/.test(value) ||
+      // Placeholders an operator replaces, not values: <your-code>, ..., $VAR,
+      // ${VAR}, $(command), and a shell comment ("# ..."). Narrow on purpose: a
+      // real value may start with # or $ (#hope42), and that must still be checked.
+      /^(<.*>|\.{3,}|\$[A-Z_][A-Z0-9_]*|\$\{[^}]+\}|\$\(.*|#)$/.test(value)
     );
   }
+
+  const QUOTED_8_PLUS = /[`"']([^`"']{8,})[`"']/g;
+  const QUOTED_16_PLUS = /[`"']([^`"']{16,})[`"']/g;
+  /** `NAME=value` with no quotes, as in an env block in a runbook. */
+  // A single `=` only: `===` and `=>` in a code sample are not assignments.
+  const UNQUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=(?![=>])\s*([^\s"'`]+)/g;
+  /** `NAME="value"` or `export NAME='value'`: an assignment, so read at any length. */
+  const QUOTED_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)\s*=(?![=>])\s*(["'`])([^"'`]+)\2/g;
 
   type Published = { file: string; line: number; name: GuardedName; value: string };
 
@@ -429,8 +832,21 @@ describe("no operator-facing file publishes a secret that boots in production", 
         const named = NAMES.filter((n) => line.includes(n));
         if (named.length !== 1) return; // a line listing several names states no value
         const name = named[0];
-        for (const match of line.matchAll(/[`"']([^`"']{8,})[`"']/g)) {
-          const value = match[1];
+        // An assignment (`NAME=value`, quoted or not) is always a value, so it is
+        // read at any length. A quoted token elsewhere may be prose ("strong",
+        // "none"), so it is read only at 8+ characters, or 16+ on invite-code
+        // lines, where any shorter quoted word would count as a code that boots.
+        // ceiling: an invite code under 16 characters written in quotes inside a
+        // sentence, not as an assignment, is not scanned.
+        const values = [
+          ...[...line.matchAll(name === "STAFF_INVITE_SECRET" ? QUOTED_16_PLUS : QUOTED_8_PLUS)].map(
+            (m) => m[1]
+          ),
+          ...[...line.matchAll(UNQUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[2]),
+          ...[...line.matchAll(QUOTED_ASSIGNMENT)].filter((m) => m[1] === name).map((m) => m[3]),
+        ];
+        // A quoted assignment is matched by both quoted patterns; check it once.
+        for (const value of new Set(values)) {
           if (value === name || (NAMES as string[]).includes(value)) continue;
           if (looksLikeCode(value)) continue;
           out.push({ file, line: index + 1, name, value });
@@ -463,17 +879,13 @@ describe("no operator-facing file publishes a secret that boots in production", 
   });
 
   it.each(published.map((p) => [`${p.file}:${p.line} ${p.name}`, p] as const))(
-    "%s is refused by resolveSecret under NODE_ENV=production",
+    "%s is refused by its accessor under NODE_ENV=production",
     (_label, entry) => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv(entry.name, entry.value);
 
-      expect(() =>
-        resolveSecret(entry.name, {
-          devDefault: GUARDED[entry.name].devDefault,
-          minLength: GUARDED[entry.name].minLength,
-        })
-      ).toThrow(SecretConfigurationError);
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(() => GUARDED[entry.name]()).toThrow(SecretConfigurationError);
     }
   );
 });
