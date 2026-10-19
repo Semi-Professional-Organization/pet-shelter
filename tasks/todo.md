@@ -23,11 +23,12 @@ The first pull request of the agent-scripts plan: one entry point, `node scripts
 its first command, `usage`, which prices this repo's Claude Code transcripts so every later
 command can prove what it saved. Plus three permission gaps the plan named.
 
-- [x] `scripts/agent.mjs` with `--help`; `scripts/agent/usage.mjs` as a pure core and an I/O
+- [x] `scripts/agent.mjs` with `--help`; `scripts/agent/usage.mjs` as a core with no I/O and a
       shell, no dependencies, exit 0 or 2 (a measurement has no finding).
 - [x] Each request priced at the model that served it, from the pricing page as checked on
-      2026-10-20; Haiku 5.5's 100K step; anything unpriceable (unknown model, fast mode, a region,
-      a pre-4.6 model over 200K, a cache write without its 5m/1h split) exits 2, never guesses.
+      2026-10-20: Haiku 5.5's 100K step, fast mode, US-only inference. Anything unpriceable (an
+      unknown model, a speed or region with no price, a pre-4.6 model over 200K, a cache write
+      without its 5m/1h split) exits 2, never guesses.
 - [x] Reports cost split, cost by context size, cold resumes (on a person's message, apart from
       long tools and background notices), carried tool output, and eight workflow families.
       Aggregates only; command labels seen in one session only are pooled.
@@ -36,9 +37,9 @@ command can prove what it saved. Plus three permission gaps the plan named.
 - [x] AGENTS.md: the pointer to `--help`, and no sleep-polling CI in the desktop app.
 - [x] Permission gaps closed in Bash and PowerShell, wider than asked:
       `tasks/decisions/2026-10-20-agents-are-denied-the-secrets-scripts-by-every-handle.md`.
-- [x] Eight `/code-review high` rounds so far, 78 findings, all fixed except one premise that
-      did not hold (a person's message stored beside a tool result: the only such records are a
-      fork's boilerplate). Every fix verified by a mutant that fails a test.
+- [x] `/code-review high` rounds repeated until one left nothing to fix. Every fix was verified
+      by a mutant that fails a test; each declined finding is named, with its reason, in the
+      commit message that declined it (`git log --grep Declined`).
 
 ## Review
 
