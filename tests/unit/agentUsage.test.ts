@@ -20,6 +20,7 @@ import {
   familiesOf,
   familyUsage,
   formatReport,
+  isTargetedRun,
   jsonlLines,
   main,
   priceFile,
@@ -102,6 +103,12 @@ describe("agent usage: prices", () => {
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "constructor" })).toThrow(UnpriceableError);
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast" })).toThrow(/speed fast/);
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "eu" })).toThrow(/inference_geo eu/);
+  });
+
+  it("refuses a prompt over 200K on a model from before 4.6, which has no published price for it", () => {
+    expect(() => ratesFor({ model: "claude-sonnet-4-5", prompt: 200_001 })).toThrow(/above a 200K prompt/);
+    expect(ratesFor({ model: "claude-sonnet-4-5", prompt: 200_000 }).input).toBe(3);
+    expect(ratesFor({ model: "claude-opus-4-6", prompt: 900_000 }).input).toBe(5);
   });
 
   it("refuses US-only inference on a model from before 4.6, which does not take it", () => {
@@ -218,6 +225,20 @@ describe("agent usage: workflow families", () => {
 
   it("files a run over a whole test directory as a gate, not a targeted run", () => {
     expect(familiesOf("Bash", "npm run test -- tests/unit")).toEqual(["gates"]);
+    expect(familiesOf("Bash", "npx vitest run --project unit")).toEqual(["gates"]);
+  });
+
+  it("files a run narrowed by a name filter or a test pattern as targeted", () => {
+    for (const cmd of [
+      "npx vitest run agentUsage",
+      "npm run test:components -- AdminInvitePage",
+      'npx vitest run -t "prices"',
+      "npx vitest run --testNamePattern=prices",
+      "npx vitest run --project unit tests/unit/a.test.ts",
+    ]) {
+      expect(isTargetedRun(cmd), cmd).toBe(true);
+      expect(familiesOf("Bash", cmd), cmd).toEqual(["targeted tests"]);
+    }
   });
 
   it("classes each command of a chain on its own", () => {
@@ -316,6 +337,33 @@ describe("agent usage: the analyses", () => {
     ];
     // Written before the window, read once inside it at $0.20 per million.
     expect(summarize([extract(records)], { since: "2026-10-02" }).carried.cost).toBeCloseTo(0.2);
+  });
+
+  it("leaves a compaction copied into a fork to the parent that had it", () => {
+    const seen = new Set<string>();
+    const history = [
+      assistant("r0", { read: 800_000, out: 1 }, { ts: "2026-10-01T09:00:00.000Z" }),
+      { type: "system", subtype: "compact_boundary", uuid: "cb1" },
+      assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+    ];
+    extract(history, { session: "s1", sub: false }, seen);
+    const fork = priceFile(
+      extract([...history, assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T14:00:00.000Z" })], { session: "s2", sub: false }, seen),
+    );
+    expect(fork.compactions).toEqual([]);
+    expect(coldResumes(fork)).toHaveLength(1);
+  });
+
+  it("measures idle time from when the previous request started, when its cache was last read", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("r1", { read: 400_000, out: 900 }, { ts: "2026-10-01T10:03:00.000Z" }),
+        assistant("r2", { w5: 400_000, out: 1 }, { ts: "2026-10-01T10:06:30.000Z" }),
+      ]),
+    );
+    // 6.5 minutes after r1 started, though only 3.5 after its last line: past a 5-minute cache.
+    expect(coldResumes(file)).toHaveLength(1);
   });
 
   it("does not count the first request after a compaction, which re-writes a new context anyway", () => {

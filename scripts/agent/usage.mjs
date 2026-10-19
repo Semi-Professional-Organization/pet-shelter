@@ -56,8 +56,14 @@ const WEB_SEARCH_USD = 0.01;
 
 /** `inference_geo` values priced at standard rates. "us" is 1.1x on every category. */
 const GEO_MULTIPLIER = { global: 1, not_available: 1, us: 1.1 };
-/** Models before Claude 4.6, which do not take `inference_geo`. */
-const NO_INFERENCE_GEO = new Set(["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]);
+/** Models before Claude 4.6, which do not take `inference_geo` and have no flat 1M pricing. */
+const BEFORE_4_6 = new Set(["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]);
+/**
+ * The pricing page promises the 1M context at standard rates for "Claude 4.6 and later models"
+ * only, and publishes no long-context rates for the earlier ones, so a prompt over 200K on one of
+ * them has no known price.
+ */
+const BEFORE_4_6_STANDARD_PROMPT = 200_000;
 
 export class UnpriceableError extends Error {}
 
@@ -81,8 +87,11 @@ export function ratesFor({ model, served = model, prompt, speed, geo }) {
   if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
   // "For Claude 4.6 and later models"; earlier ones refuse the parameter, so a US-only request
   // on one is a transcript this table does not understand.
-  if (geo === "us" && NO_INFERENCE_GEO.has(priceKey(served))) {
+  if (geo === "us" && BEFORE_4_6.has(priceKey(served))) {
     throw new UnpriceableError(`no price for ${priceKey(served)} with inference_geo us`);
+  }
+  if (BEFORE_4_6.has(base) && prompt > BEFORE_4_6_STANDARD_PROMPT) {
+    throw new UnpriceableError(`no published price for ${base} above a ${BEFORE_4_6_STANDARD_PROMPT / 1000}K prompt`);
   }
   const tier = table.over && prompt > table.over.prompt ? table.over : table;
   return {
@@ -110,8 +119,7 @@ export const FAMILIES = {
     SHELLS.has(tool) &&
     /npm (run (-s )?)?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test:db|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build|npx vitest run/.test(cmd) &&
     !FAMILIES["targeted tests"](tool, cmd),
-  "targeted tests": (tool, cmd) =>
-    SHELLS.has(tool) && /(vitest run|npm (run )?test[^;&|]* --)[^;&|]*tests[\\/][^ ]+\.test\.tsx?/.test(cmd),
+  "targeted tests": (tool, cmd) => SHELLS.has(tool) && isTargetedRun(cmd),
   orient: (tool, cmd) =>
     SHELLS.has(tool) &&
     /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|(ls|dir|Get-ChildItem) tasks[\\/](open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
@@ -128,6 +136,32 @@ export const FAMILIES = {
     SHELLS.has(tool) &&
     /Get-NetTCPConnection|Test-NetConnection|netstat|lsof -i|net\.connect|Stop-Process|taskkill|Get-CimInstance Win32_Process/.test(cmd),
 };
+
+/** Vitest options that take a value as the next word, which is therefore not a file filter. */
+const VITEST_VALUE_FLAGS = new Set(["--project", "--reporter", "--config", "-c", "--pool", "--root", "-r", "--dir", "--environment", "--maxWorkers", "--minWorkers", "--shard", "--outputFile"]);
+/** Filters that name a whole test tier, which is the gate, not a targeted run. */
+const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/integration"]);
+
+/**
+ * A vitest run narrowed to some tests: a file or name filter, or `-t <pattern>`. Reads the words
+ * after `vitest run`, or after `--` in `npm test`/`npm run test[:tier]`.
+ */
+export function isTargetedRun(cmd) {
+  const match = /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$|(?:^|\s)npm\s+(?:run\s+)?test(?::[\w-]+)?\s+--(?:\s(.*))?$/.exec(String(cmd).trim());
+  if (!match) return false;
+  const words = (match[1] ?? match[2] ?? "").trim().split(/\s+/).filter(Boolean);
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    // `-t <pattern>` needs no case: its pattern reads as a filter below.
+    if (word.startsWith("--testNamePattern")) return true;
+    if (word.startsWith("-")) {
+      if (VITEST_VALUE_FLAGS.has(word)) i++;
+      continue;
+    }
+    if (!WHOLE_SUITE.has(word.replace(/\\/g, "/").replace(/\/$/, ""))) return true;
+  }
+  return false;
+}
 
 /** Families a call belongs to. A call can count toward more than one, as in the catalog. */
 export function familiesOf(tool, cmd) {
@@ -216,13 +250,20 @@ export function createExtractor({ session, sub }, seen = new Set()) {
   let synthetic = 0;
   let duplicates = 0;
   const dupKeys = new Set();
-  let lastTs;
+  let lastKey;
+  let lastStart;
+  let prevStart;
   let lastTrigger;
 
   return {
     add(record) {
       if (!record || typeof record !== "object") return;
       if (record.type === "system" && record.subtype === "compact_boundary") {
+        // A fork copies its parent's boundaries along with its history; only the first file to
+        // carry one owns it, as with requests.
+        const key = `compact:${record.uuid}`;
+        if (record.uuid && seen.has(key)) return;
+        if (record.uuid) seen.add(key);
         compactions.push(requests.length);
         return;
       }
@@ -235,10 +276,15 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           return;
         }
         const key = record.requestId || message.id || record.uuid;
-        // The previous assistant line's time, copied history included, so the first new request
-        // of a forked or relocated transcript still knows how long the session sat idle.
-        const prevTs = lastTs;
-        lastTs = record.timestamp;
+        // When the previous request started, copied history included, so the first new request of
+        // a forked or relocated transcript still knows how long the session sat idle. The start,
+        // not the last streamed line: the cache's clock restarts when a request reads it.
+        if (key !== lastKey) {
+          prevStart = lastStart;
+          lastStart = record.timestamp;
+          lastKey = key;
+        }
+        const prevTs = prevStart;
         if (dupKeys.has(key)) return;
         let request = byKey.get(key);
         if (!request) {
@@ -294,6 +340,9 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           toolResult = true;
           results.push({ id: block.tool_use_id, chars: textLength(block.content) });
         }
+        // A text block beside a tool result is not a person: in this repo's transcripts the only
+        // ones (4 of 19,315 results, 2026-10-20) are a fork's injected boilerplate. A message
+        // typed mid-turn arrives as its own record.
         const trigger = toolResult ? "tool" : triggerOf(record);
         if (trigger) lastTrigger = trigger;
       }
