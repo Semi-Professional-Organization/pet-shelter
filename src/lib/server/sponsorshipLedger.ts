@@ -108,7 +108,7 @@ export function resetSponsorshipLedger(): void {
   memorySerial = 0;
 }
 
-registerStateReset("sponsorshipLedger", resetSponsorshipLedger, 6);
+registerStateReset("sponsorshipLedger", resetSponsorshipLedger);
 
 /** Diagnostic read of the in-memory ledger. */
 export function memorySponsorshipCount(): number {

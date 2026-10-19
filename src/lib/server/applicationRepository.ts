@@ -73,7 +73,7 @@ export function resetApplications(): void {
   serverApplications = freshApplications();
 }
 
-registerStateReset("applications", resetApplications, 0);
+registerStateReset("applications", resetApplications);
 
 export function getServerApplications(): AdoptionApplicationRecord[] {
   return serverApplications;

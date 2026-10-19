@@ -3,12 +3,19 @@ import { afterAll, afterEach, expect } from "vitest";
 /**
  * The parts of a hermetic run every tier shares, `integration-db` included.
  *
- *  1. The time zone. CI and Vercel run in UTC; this machine runs UTC+8, so date
+ *  1. The mode. Vitest sets `NODE_ENV=test` only when the shell has not set it,
+ *     and the code branches on it in about twenty places: a shell exporting
+ *     `production` failed whole files at import (the session secret becomes
+ *     mandatory), and `development` switched on dev-only paths. A test that needs
+ *     another mode stubs it with `vi.stubEnv`.
+ *  2. The time zone. CI and Vercel run in UTC; this machine runs UTC+8, so date
  *     arithmetic near midnight could pass in one and fail in the other.
- *  2. The network. Nothing here may reach a real host. A call that is not
- *     stubbed fails the test, with the URL — even when the code under test
- *     catches the error and carries on, which is exactly the case a plain
- *     rejection would hide.
+ *  3. The network, through `fetch`, which is the only HTTP client the code under
+ *     test has (email; the storage providers only build URLs). The database is
+ *     covered separately: with no `DATABASE_URL` the Prisma client opens no
+ *     socket. A `fetch` that is not stubbed fails the test, with the URL — even
+ *     when the code under test catches the error and carries on, which is
+ *     exactly the case a plain rejection would hide.
  *
  * The network check runs after each test and once more after the file, and names
  * the test that was running when the call was made. Background work (an email
@@ -17,7 +24,8 @@ import { afterAll, afterEach, expect } from "vitest";
  * the better lead. The end-of-file check catches what the last test left behind.
  */
 
-process.env.TZ = "UTC";
+// Object.assign because Next types NODE_ENV as read-only, which it is not at runtime.
+Object.assign(process.env, { NODE_ENV: "test", TZ: "UTC" });
 
 interface UnexpectedRequest {
   url: string;

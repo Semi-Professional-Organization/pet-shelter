@@ -70,7 +70,7 @@ export function resetNotificationPreferences(): void {
   memoryPreferences.clear();
 }
 
-registerStateReset("notificationPreferences", resetNotificationPreferences, 9);
+registerStateReset("notificationPreferences", resetNotificationPreferences);
 
 interface PreferenceRow {
   email: string;

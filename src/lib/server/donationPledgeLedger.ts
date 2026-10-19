@@ -108,7 +108,7 @@ export function resetDonationPledgeLedger(): void {
   memorySerial = 0;
 }
 
-registerStateReset("donationPledgeLedger", resetDonationPledgeLedger, 5);
+registerStateReset("donationPledgeLedger", resetDonationPledgeLedger);
 
 /** Diagnostic read of the in-memory ledger. */
 export function memoryDonationPledgeCount(): number {

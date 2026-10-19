@@ -143,9 +143,10 @@ Check [`src/lib/prisma.ts`](file:///c:/Users/User/pet-shelter/src/lib/prisma.ts#
 
 ```typescript
 function createPrismaClient(): PrismaClient {
-  const connectionString =
-    process.env.DATABASE_URL ||
-    "postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public";
+  // No DATABASE_URL: an offline client, no localhost fallback (see the decision
+  // tasks/decisions/2026-10-20-no-database-url-means-no-database.md).
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return createOfflineClient();
 
   try {
     const sslPolicy = resolveDatabaseSsl(connectionString);

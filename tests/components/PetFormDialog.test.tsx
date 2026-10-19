@@ -152,6 +152,26 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
+   * The parent owns `open`, so the dialog stays mounted after the first submit until the parent
+   * closes it, and longer while it animates out. `onOpenChange` here is a spy that closes nothing,
+   * which holds that window open: a second click in it must not save the same animal twice.
+   */
+  it("hands the form to onSave once when the submit button is clicked twice", async () => {
+    const { onSave, user } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    const submit = screen.getByRole("button", { name: /create pet record/i });
+    await user.click(submit);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    // The same element: its label has changed to "Saving...", but it is the button a
+    // double-click lands on twice.
+    await user.click(submit);
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
    * `petFormSchema` also rejects this ("...is after the intake date"), but the dialog never gets
    * that far and cannot render the message: the field carries `max={intakeDate}`, so the value is
    * `rangeOverflow` and constraint validation refuses the submit before react-hook-form runs the

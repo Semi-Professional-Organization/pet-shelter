@@ -101,9 +101,11 @@ import { Pool } from "pg";
 import { resolveDatabaseSsl } from "./databaseSsl";
 
 function createPrismaClient(): PrismaClient {
-  const connectionString =
-    process.env.DATABASE_URL ||
-    "postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public";
+  // No DATABASE_URL means no database: an offline client that refuses every query
+  // with P1001 and opens no socket. There is no localhost fallback; see
+  // tasks/decisions/2026-10-20-no-database-url-means-no-database.md.
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return createOfflineClient();
 
   // Verified TLS for a public host such as Neon; see src/lib/server/databaseSsl.ts
   const sslPolicy = resolveDatabaseSsl(connectionString);

@@ -28,10 +28,12 @@ mark it unrun, and say so; do not silently downgrade it to a tier that mocks the
 
 ## The rules that are specific to this harness
 
-- **`vi.mock("@/lib/server/prisma")` only works if nothing static-imports first.** Import the
-  module under test *dynamically inside the test*, after the mock registers. A static import
-  instantiates the repositories and the real client, and your Prisma spies then observe zero calls
-  while the suite passes green.
+- **`vi.mock("@/lib/server/prisma")` is hoisted above a test file's imports**, so the module under
+  test can be imported statically and still binds to your double. What breaks a Prisma mock is a
+  *setup file* that imports a repository: it runs first, instantiates the real client, and your
+  spies then observe zero calls while the suite passes green. The harness imports none.
+- With no `DATABASE_URL` (the default in every tier but `integration-db`), the real client
+  refuses every query with P1001 and opens no socket; `fetch` is blocked; `TZ` is UTC.
 - `redirect()` and `notFound()` **throw** here, as the real ones do. Assert on the throw.
 - A file's own `vi.mock("next/headers", ...)` overrides the harness for that file; five suites
   predate the harness and rely on it. Do not "tidy" them into the harness without running them.

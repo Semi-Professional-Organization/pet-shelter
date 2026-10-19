@@ -99,8 +99,14 @@ export function PetFormDialog({
   const [prevKey, setPrevKey] = useState<string | null>(null);
   const currentKey = open ? (editingPet ? `edit-${editingPet.id}` : "create-new") : null;
 
+  // True from the first submit until the dialog opens again. The dialog stays
+  // mounted while it animates closed, and a second click in that window must not
+  // hand the same form to `onSave` twice: that is two pet records.
+  const [submitted, setSubmitted] = useState(false);
+
   if (currentKey !== prevKey) {
     setPrevKey(currentKey);
+    setSubmitted(false);
     // Reset alongside every other per-pet field. Without this, a caregiver note
     // typed for one animal survives closing the dialog and would be emailed to a
     // different animal's supporters.
@@ -279,6 +285,8 @@ export function PetFormDialog({
   const canNotifySponsors = Boolean(editingPet) && newlyAddedPhotos.length > 0;
 
   const onSubmit = (data: PetFormInput) => {
+    if (submitted) return;
+    setSubmitted(true);
     // Update with current image selections
     const finalData = {
       ...data,
@@ -762,8 +770,8 @@ export function PetFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="text-sm font-semibold px-5">
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="text-sm font-semibold px-7">
-              {isSubmitting ? (
+            <Button type="submit" disabled={isSubmitting || submitted} className="text-sm font-semibold px-7">
+              {isSubmitting || submitted ? (
                 <>
                   <Loader2 className="size-4 animate-spin mr-1.5" />
                   Saving...

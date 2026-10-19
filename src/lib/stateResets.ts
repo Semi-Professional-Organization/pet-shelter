@@ -21,8 +21,23 @@
 
 type Reset = () => void | Promise<void>;
 
+/**
+ * When a reset runs relative to the others. Almost all module state is
+ * independent and resets in the default phase. The two later phases exist for
+ * the one real dependency, in the sponsor demo: its seed flag must be cleared
+ * only once every ledger is empty, or the next test starts with stale standings.
+ */
+export const RESET_PHASE = {
+  /** No dependency on another store's state. */
+  default: 0,
+  /** After every ledger is empty: the sponsor demo-seed flag, so the next test re-seeds. */
+  afterLedgers: 1,
+  /** After the demo-seed flag: the seeded sponsor accounts the demo commitments name. */
+  afterDemoSeed: 2,
+} as const;
+
 interface RegisteredReset {
-  /** Lower runs first. Only relative order matters; see the callers for why. */
+  /** A `RESET_PHASE`; lower runs first, and resets in one phase run in load order. */
   order: number;
   reset: Reset;
 }
@@ -40,7 +55,7 @@ function registry(): Map<string, RegisteredReset> {
 }
 
 /** Called once at module scope by each owner of module-level state. */
-export function registerStateReset(name: string, reset: Reset, order = 0): void {
+export function registerStateReset(name: string, reset: Reset, order: number = RESET_PHASE.default): void {
   registry().set(name, { order, reset });
 }
 

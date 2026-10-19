@@ -300,4 +300,4 @@ export async function resetUserStore(): Promise<void> {
   await ensureInitialized();
 }
 
-registerStateReset("userStore", resetUserStore, 10);
+registerStateReset("userStore", resetUserStore);

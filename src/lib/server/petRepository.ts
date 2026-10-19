@@ -49,7 +49,7 @@ export function resetPets(): void {
   serverPets = freshPets();
 }
 
-registerStateReset("pets", resetPets, 0);
+registerStateReset("pets", resetPets);
 
 export function getServerPets(): Pet[] {
   return serverPets;

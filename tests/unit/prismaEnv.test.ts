@@ -17,8 +17,8 @@ import { withEnvFiles, snapshotProcessEnv } from "../support/envFiles";
  *
  * Static import is safe here: `prisma/env.ts` imports only dotenv and runs
  * nothing at module scope, so there is no client to instantiate ahead of a mock.
- * The harness's dynamic-import rule is about `@/lib/server/prisma`, which this
- * module never touches.
+ * The harness's rule about early imports is about `@/lib/server/prisma`, which
+ * this module never touches.
  *
  * The repo root is never the cwd inside a test. `withEnvFiles` moves the process
  * into a temp directory first; without it these tests would read the real

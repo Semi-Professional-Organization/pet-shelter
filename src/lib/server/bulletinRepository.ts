@@ -130,7 +130,7 @@ export function resetBulletins(): void {
   warnedTableMissing = false;
 }
 
-registerStateReset("bulletins", resetBulletins, 0);
+registerStateReset("bulletins", resetBulletins);
 
 /**
  * `DbBulletinRow` is Prisma's generated `Bulletin` type, imported above — not a

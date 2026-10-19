@@ -144,7 +144,7 @@ export function resetDonationLedger(): void {
   memorySeq = 0;
 }
 
-registerStateReset("donationLedger", resetDonationLedger, 4);
+registerStateReset("donationLedger", resetDonationLedger);
 
 /**
  * The offline branch of issuance. **Synchronous by design.**

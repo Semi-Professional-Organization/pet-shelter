@@ -80,4 +80,4 @@ export function resetRateLimitStore(): void {
   rateLimitStore.clear();
 }
 
-registerStateReset("rateLimit", resetRateLimitStore, 2);
+registerStateReset("rateLimit", resetRateLimitStore);

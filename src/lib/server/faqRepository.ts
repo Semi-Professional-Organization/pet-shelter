@@ -67,7 +67,7 @@ export function resetFaqs(): void {
   serverFaqs = freshFaqs();
 }
 
-registerStateReset("faqs", resetFaqs, 0);
+registerStateReset("faqs", resetFaqs);
 
 interface DbFaqRow {
   id: string;

@@ -53,7 +53,7 @@ export function resetSettings(): void {
   serverSettings = freshSettings();
 }
 
-registerStateReset("settings", resetSettings, 0);
+registerStateReset("settings", resetSettings);
 
 /** Synchronous cached read. */
 export function getServerSettings(): ShelterSettingsOutput {

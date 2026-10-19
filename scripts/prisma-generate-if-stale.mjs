@@ -17,7 +17,11 @@
  *
  * Spacing within a line is ignored: `prisma format` realigns columns without
  * changing the schema. Line breaks are not, because joining two lines can move a
- * field into a `//` comment.
+ * field into a `//` comment. A client with a file missing (a generation that was
+ * interrupted) or built by another Prisma version is stale whatever its schema.
+ *
+ * ceiling: a generation interrupted after every checked file was written but
+ * before the rest still reads as current; `npm run db:generate` repairs it.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -27,10 +31,27 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SCHEMA_PATH = fileURLToPath(new URL("../prisma/schema.prisma", import.meta.url));
 
-/** The schema copy beside the client `@prisma/client` loads: `node_modules/.prisma/client`. */
+/** The package `@prisma/client` loads from: its `node_modules/@prisma/client` directory. */
+function clientPackageDir() {
+  return dirname(createRequire(import.meta.url).resolve("@prisma/client"));
+}
+
+/** The generated client beside it, which `@prisma/client` requires: `node_modules/.prisma/client`. */
+export function generatedClientDir() {
+  return join(clientPackageDir(), "..", "..", ".prisma", "client");
+}
+
 export function generatedSchemaPath() {
-  const clientEntry = createRequire(import.meta.url).resolve("@prisma/client");
-  return join(dirname(clientEntry), "..", "..", ".prisma", "client", "schema.prisma");
+  return join(generatedClientDir(), "schema.prisma");
+}
+
+const CLIENT_FILES = ["default.js", "index.js", "package.json", "schema.prisma"];
+
+/** True when every file the runtime loads is there, from the installed Prisma version. */
+export function isClientComplete(clientDir, expectedVersion) {
+  if (!CLIENT_FILES.every((file) => existsSync(join(clientDir, file)))) return false;
+  const { version } = JSON.parse(readFileSync(join(clientDir, "package.json"), "utf8"));
+  return version === expectedVersion;
 }
 
 /** True when the generated client was built from this schema, spacing within lines aside. */
@@ -41,8 +62,9 @@ export function isClientCurrent(schemaText, generatedSchemaText) {
 }
 
 function main() {
-  const generatedPath = generatedSchemaPath();
-  const generated = existsSync(generatedPath) ? readFileSync(generatedPath, "utf8") : null;
+  const { version } = JSON.parse(readFileSync(join(clientPackageDir(), "package.json"), "utf8"));
+  const complete = isClientComplete(generatedClientDir(), version);
+  const generated = complete ? readFileSync(generatedSchemaPath(), "utf8") : null;
 
   if (isClientCurrent(readFileSync(SCHEMA_PATH, "utf8"), generated)) {
     console.log("Prisma client is current with prisma/schema.prisma; not regenerating.");

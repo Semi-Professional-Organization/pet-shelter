@@ -12,6 +12,11 @@ import { createPetSponsorshipAction } from "@/actions/sponsorships";
 import { SponsorshipModal } from "@/components/features/pets/SponsorshipModal";
 import { makePet, renderWithLanguage, setupUser } from "./support/render";
 
+/** What the client receipt store holds, as its own storage key has it. */
+function storedReceipts(): unknown[] {
+  return JSON.parse(localStorage.getItem(STORAGE_RECEIPTS_KEY) ?? "[]");
+}
+
 const mockedSubmitDonation = vi.mocked(submitDonationPledgeAction);
 const mockedCreateSponsorship = vi.mocked(createPetSponsorshipAction);
 
@@ -352,8 +357,9 @@ describe("SponsorshipModal checkout contract", () => {
     expect(mockedCreateSponsorship).not.toHaveBeenCalled();
     // The client receipt store holds receipts. A claim reference is not one, and
     // writing it there would rebuild the confusion this boundary removed. Checked on
-    // the store's own storage key, so it holds however the store is reached.
-    expect(localStorage.getItem(STORAGE_RECEIPTS_KEY)).toBeNull();
+    // the store's own storage key, so it holds however the store is reached, and on
+    // its entries, because merely mounting the store writes an empty list there.
+    expect(storedReceipts()).toEqual([]);
   });
 
   it("blocks RM 5, then sends the exact RM 10 target-pet boundary", async () => {
@@ -446,7 +452,7 @@ describe("SponsorshipModal checkout contract", () => {
     expect(
       screen.queryByRole("button", { name: /print|save receipt/i }),
     ).not.toBeInTheDocument();
-    expect(localStorage.getItem(STORAGE_RECEIPTS_KEY)).toBeNull();
+    expect(storedReceipts()).toEqual([]);
   });
 
   it("does not claim an acknowledgement email was delivered from ledger success alone", async () => {

@@ -86,7 +86,7 @@ export function resetAuditLogs(): void {
   lastAuditWriteError = null;
 }
 
-registerStateReset("auditLog", resetAuditLogs, 1);
+registerStateReset("auditLog", resetAuditLogs);
 
 function auditLogCreateData(entry: AuditEntryInput) {
   return {

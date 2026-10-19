@@ -93,4 +93,4 @@ export function resetIdempotencyStore(): void {
   lastSweepAt = 0;
 }
 
-registerStateReset("idempotency", resetIdempotencyStore, 3);
+registerStateReset("idempotency", resetIdempotencyStore);

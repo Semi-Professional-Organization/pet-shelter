@@ -25,7 +25,7 @@ export function resetRehabNeeds(): void {
   serverRehabNeeds = freshRehabNeeds();
 }
 
-registerStateReset("rehabNeeds", resetRehabNeeds, 0);
+registerStateReset("rehabNeeds", resetRehabNeeds);
 
 export function getServerRehabNeeds(filters?: string | { category?: string; search?: string }): RehabNeed[] {
   let items = [...serverRehabNeeds];

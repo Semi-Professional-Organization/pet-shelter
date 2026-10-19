@@ -29,11 +29,21 @@ import { memberRowForId, signInAs } from "../setup/authSession";
  * identity `memberRowForId` answers for, so every case reaches the permission
  * check with the role the database holds.
  */
-const prismaDouble = vi.hoisted(() => ({
-  user: {
-    findUnique: vi.fn(async (args?: { where?: { id?: string } }) => memberRowForId(args?.where?.id)),
-  },
-}));
+const prismaDouble = vi.hoisted(() => {
+  // Everything but the member lookup answers the way the real client does with no
+  // database configured: a P1001 refusal, which the repositories read as an outage.
+  // Without these delegates `prisma.pet` was undefined, and the catalogue read only
+  // reached its fallback by swallowing a TypeError.
+  const unreachable = () =>
+    vi.fn(() => Promise.reject(Object.assign(new Error("No database configured"), { code: "P1001" })));
+  return {
+    user: {
+      findUnique: vi.fn(async (args?: { where?: { id?: string } }) => memberRowForId(args?.where?.id)),
+    },
+    pet: { findMany: unreachable(), findUnique: unreachable() },
+    adoptionApplication: { findMany: unreachable(), count: unreachable() },
+  };
+});
 
 vi.mock("@/lib/server/prisma", () => ({
   prisma: prismaDouble,
