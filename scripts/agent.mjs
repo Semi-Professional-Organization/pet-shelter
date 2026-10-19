@@ -11,6 +11,8 @@
  * Dependency-free on purpose, like `commit-msg.mjs`.
  */
 
+import { invokedAs } from "./lib/invokedAs.mjs";
+
 /** Listed in `--help`, classed by side effect so a reader knows what running one can touch. */
 export const COMMANDS = {
   usage: {
@@ -51,8 +53,7 @@ async function run(argv) {
   return loaded.main(rest);
 }
 
-const invokedDirectly = process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/agent.mjs");
-if (invokedDirectly) {
+if (invokedAs("scripts/agent.mjs")) {
   run(process.argv.slice(2)).then(
     (code) => {
       process.exitCode = code;

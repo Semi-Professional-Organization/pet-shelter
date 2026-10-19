@@ -55,6 +55,8 @@ const WEB_SEARCH_USD = 0.01;
 
 /** `inference_geo` values priced at standard rates. "us" is 1.1x on every category. */
 const GEO_MULTIPLIER = { global: 1, not_available: 1, us: 1.1 };
+/** Models before Claude 4.6, which do not take `inference_geo`. */
+const NO_INFERENCE_GEO = new Set(["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]);
 
 export class UnpriceableError extends Error {}
 
@@ -72,6 +74,9 @@ export function ratesFor({ model, prompt, speed, geo }) {
   if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
   const multiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
   if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
+  // "For Claude 4.6 and later models"; earlier ones refuse the parameter, so a US-only request
+  // on one is a transcript this table does not understand.
+  if (geo === "us" && NO_INFERENCE_GEO.has(base)) throw new UnpriceableError(`no price for ${base} with inference_geo us`);
   const tier = table.over && prompt > table.over.prompt ? table.over : table;
   return {
     input: tier.input * multiplier,
@@ -93,7 +98,7 @@ const SHELLS = new Set(["Bash", "PowerShell"]);
 export const FAMILIES = {
   gates: (tool, cmd) =>
     SHELLS.has(tool) &&
-    /npm run (-s )?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build/.test(cmd) &&
+    /npm (run (-s )?)?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test:db|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build|npx vitest run/.test(cmd) &&
     !FAMILIES["targeted tests"](tool, cmd),
   "targeted tests": (tool, cmd) =>
     SHELLS.has(tool) && /vitest run[^;&|]*tests\/[^ ]+\.test\.tsx?|npm run test[^;&|]* -- [^;&|]*tests\//.test(cmd),
@@ -184,6 +189,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
   let duplicates = 0;
   const dupKeys = new Set();
   let lastTs;
+  let lastTrigger;
 
   return {
     add(record) {
@@ -218,6 +224,8 @@ export function createExtractor({ session, sub }, seen = new Set()) {
             index: requests.length,
             ts: record.timestamp,
             prevTs,
+            // What the request answered: a person's message, or a tool's result.
+            trigger: lastTrigger,
             model: message.model,
             speed: undefined,
             geo: undefined,
@@ -239,7 +247,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
         if (usage.inference_geo != null) request.geo = usage.inference_geo;
         request.webSearch = Math.max(request.webSearch, Number(usage.server_tool_use?.web_search_requests) || 0);
         for (const block of Array.isArray(message.content) ? message.content : []) {
-          if (block?.type !== "tool_use") continue;
+          if (block?.type !== "tool_use" || calls.has(block.id)) continue;
           request.tools++;
           const input = block.input || {};
           const cmd = String(input.command ?? input.file_path ?? input.pattern ?? "");
@@ -250,10 +258,15 @@ export function createExtractor({ session, sub }, seen = new Set()) {
             families: familiesOf(String(block.name), cmd),
           });
         }
-      } else if (record.type === "user" && Array.isArray(message.content)) {
-        for (const block of message.content) {
-          if (block?.type === "tool_result") results.push({ id: block.tool_use_id, chars: textLength(block.content) });
+      } else if (record.type === "user") {
+        const blocks = Array.isArray(message.content) ? message.content : [];
+        let toolResult = false;
+        for (const block of blocks) {
+          if (block?.type !== "tool_result") continue;
+          toolResult = true;
+          results.push({ id: block.tool_use_id, chars: textLength(block.content) });
         }
+        lastTrigger = toolResult ? "tool" : "person";
       }
     },
     finish() {
@@ -364,7 +377,9 @@ export const COLD_IDLE_MINUTES = 60;
 /**
  * Main-session requests that came after the 1-hour cache expired and re-wrote the whole context.
  * "Whole" is a write of at least half the context and at least 50K tokens, so a cold resume of a
- * small session is not counted.
+ * small session is not counted. `trigger` says what the session waited on: "person" when the
+ * request answered a message (someone was away, which a hand-off could avoid), "tool" when it
+ * answered a tool that ran over an hour (a long subagent or build, which it could not).
  */
 export function coldResumes(file) {
   if (file.sub) return [];
@@ -374,7 +389,7 @@ export function coldResumes(file) {
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
     if (!(idle > COLD_IDLE_MINUTES)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
-    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write });
+    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write, trigger: r.trigger === "tool" ? "tool" : "person" });
   }
   return out;
 }
@@ -401,13 +416,14 @@ export function familyUsage(files) {
     for (const name of Object.keys(FAMILIES)) {
       const f = out[name];
       let burstStart = null;
-      for (const [index, calls] of byRequest) {
-        const mine = calls.filter((c) => c.families.includes(name));
+      for (const r of file.requests) {
+        const index = r.index;
+        // A request with no calls is the end of a turn: whatever follows answers a new message.
+        const mine = (byRequest.get(index) ?? []).filter((c) => c.families.includes(name));
         if (!mine.length) {
           burstStart = null;
           continue;
         }
-        const r = file.requests[index];
         const cost = (mine.length * r.cost) / Math.max(1, r.tools);
         f.calls += mine.length;
         f.cost += cost;
@@ -422,6 +438,13 @@ export function familyUsage(files) {
   for (const f of Object.values(out)) f.sessions = f.sessions.size;
   return out;
 }
+
+const coldSummary = (cold) => ({
+  count: cold.length,
+  cost: cold.reduce((a, x) => a + x.cost, 0),
+  medianContext: median(cold.map((x) => x.ctx)),
+  medianIdleHours: median(cold.map((x) => x.idleMinutes / 60)),
+});
 
 const median = (xs) => {
   if (!xs.length) return 0;
@@ -512,12 +535,8 @@ export function summarize(files, { since, priceAs } = {}) {
     models,
     who,
     contextBuckets: buckets,
-    coldResumes: {
-      count: cold.length,
-      cost: cold.reduce((a, x) => a + x.cost, 0),
-      medianContext: median(cold.map((x) => x.ctx)),
-      medianIdleHours: median(cold.map((x) => x.idleMinutes / 60)),
-    },
+    coldResumes: coldSummary(cold.filter((x) => x.trigger === "person")),
+    coldAfterLongTool: coldSummary(cold.filter((x) => x.trigger === "tool")),
     carried,
     families: familyUsage(windowed),
     sessions,
@@ -556,8 +575,9 @@ export function formatReport(report, { logPath } = {}) {
   ];
   const c = report.coldResumes;
   lines.push(
-    `cold resumes: ${c.count} main-session re-writes of the whole context after >1h idle, ${usd(c.cost)} = ${pct(c.cost, t.cost)}` +
-      (c.count ? `; median context ${kTok(c.medianContext)}, median idle ${c.medianIdleHours.toFixed(1)}h` : ""),
+    `cold resumes: ${c.count} whole-context re-writes on a message after >1h idle, ${usd(c.cost)} = ${pct(c.cost, t.cost)}` +
+      (c.count ? `; median context ${kTok(c.medianContext)}, median idle ${c.medianIdleHours.toFixed(1)}h` : "") +
+      `; ${report.coldAfterLongTool.count} more after a tool ran >1h, ${pct(report.coldAfterLongTool.cost, t.cost)}`,
   );
   lines.push(
     `carried tool output (estimate, chars/4): ${usd(report.carried.cost)} = ${pct(report.carried.cost, t.cost)}; top: ` +
@@ -646,6 +666,13 @@ export function fileMeta(file) {
  */
 const SINCE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
 
+/** Date.parse rolls 2026-02-30 over to March 2 instead of refusing it. */
+const realDate = (v) => {
+  const [y, m, d] = v.slice(0, 10).split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+};
+
 export function parseArgs(argv) {
   const opts = { dirs: [], json: false, since: undefined, priceAs: undefined, help: false };
   for (let i = 0; i < argv.length; i++) {
@@ -660,7 +687,7 @@ export function parseArgs(argv) {
         if (!Object.hasOwn(PRICES, v)) throw new Error(`--price-as has no price for ${v}`);
         opts.priceAs = v;
       }
-      else if (!SINCE.test(v) || Number.isNaN(Date.parse(v))) {
+      else if (!SINCE.test(v) || !realDate(v) || Number.isNaN(Date.parse(v))) {
         throw new Error(`--since takes YYYY-MM-DD (UTC midnight) or an ISO time with a zone, not ${v}`);
       } else opts.since = v;
     } else throw new Error(`unknown argument: ${a}`);
@@ -755,7 +782,10 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
     if (!root) return fail(`git could not name this repo's main checkout from ${cwd}\nnext: pass --dir <transcript folder>`);
     dirs = defaultDirs(projectsDir, root);
   }
-  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
+  // A transcript last written before the window holds no request in it, and any copy of its
+  // requests in a later file is before the window too, so it is skipped unread.
+  const sinceMs = opts.since ? Date.parse(opts.since) : -Infinity;
+  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d))).filter((f) => !(statSync(f).mtimeMs < sinceMs));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
   const seen = new Set();

@@ -23,6 +23,8 @@
 
 import { execFileSync } from "node:child_process";
 
+import { invokedAs } from "./lib/invokedAs.mjs";
+
 export const LEDGER_DIR = "tasks/open/";
 export const LABEL = "ledger";
 
@@ -323,9 +325,7 @@ async function main(argv) {
 }
 
 // Only run the CLI when executed directly, so the module stays importable by tests.
-const invokedDirectly =
-  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/ledger-issues.mjs");
-if (invokedDirectly) {
+if (invokedAs("scripts/ledger-issues.mjs")) {
   main(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`ledger-issues: ${error.message}\n`);
     process.exit(1);

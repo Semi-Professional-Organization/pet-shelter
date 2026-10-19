@@ -83,8 +83,9 @@ drifts. What the descriptions cannot say:
 ## Agent scripts
 
 - `node scripts/agent.mjs --help` lists the commands that replace procedures agents repeat by hand.
-- Never sleep-poll CI (`sleep` loops, `gh pr checks --watch`, `gh run watch`): the desktop app's CI
-  monitor wakes the session when checks finish.
+- In the Claude desktop app, never sleep-poll CI (`sleep` loops, `gh pr checks --watch`,
+  `gh run watch`): its CI monitor wakes the session when checks finish. Anywhere else, check once
+  when you need the result rather than in a loop.
 
 ## Verification
 

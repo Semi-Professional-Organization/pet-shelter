@@ -99,6 +99,11 @@ describe("agent usage: prices", () => {
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "eu" })).toThrow(/inference_geo eu/);
   });
 
+  it("refuses US-only inference on a model from before 4.6, which does not take it", () => {
+    expect(() => ratesFor({ model: "claude-haiku-4-5", prompt: 1, geo: "us" })).toThrow(UnpriceableError);
+    expect(ratesFor({ model: "claude-opus-4-6", prompt: 1, geo: "us" }).input).toBeCloseTo(5.5);
+  });
+
   it("prices a dated snapshot id as its model", () => {
     expect(ratesFor({ model: "claude-haiku-4-5-20251001", prompt: 1 })).toEqual(PRICES["claude-haiku-4-5"]);
   });
@@ -196,7 +201,12 @@ describe("agent usage: workflow families", () => {
   it("files a targeted test run under targeted tests only, whichever way it is invoked", () => {
     expect(familiesOf("Bash", "npm run test -- tests/unit/x.test.ts")).toEqual(["targeted tests"]);
     expect(familiesOf("Bash", "npx vitest run tests/unit/x.test.ts")).toEqual(["targeted tests"]);
-    expect(familiesOf("Bash", "npm run test")).toEqual(["gates"]);
+  });
+
+  it("files every spelling of a whole-suite gate under gates", () => {
+    for (const cmd of ["npm run test", "npm test", "npx vitest run", "npm run test:db", "npm run typecheck"]) {
+      expect(familiesOf("Bash", cmd), cmd).toEqual(["gates"]);
+    }
   });
 
   it("counts port checks as ports, not every command carrying a database URL", () => {
@@ -224,6 +234,23 @@ describe("agent usage: the analyses", () => {
     expect(cold).toHaveLength(1);
     expect(cold[0].cost).toBeCloseTo(3.2); // 400K at the $8 one-hour write rate
     expect(coldResumes(priceFile(extract(records, { session: "s1", sub: true })))).toHaveLength(0);
+  });
+
+  it("tells a cold resume on a person's message from one after a tool that ran over an hour", () => {
+    const person = { type: "user", message: { content: "back again" } };
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z", tools: [{ id: "t1", name: "Agent" }] }),
+        toolResult("t1", 10),
+        assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T11:30:00.000Z" }),
+        person,
+        assistant("r3", { w1h: 400_000, out: 1 }, { ts: "2026-10-02T09:00:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file).map((c: { trigger: string }) => c.trigger)).toEqual(["tool", "person"]);
+    const report = summarize([file]);
+    expect(report.coldResumes.count).toBe(1);
+    expect(report.coldAfterLongTool.count).toBe(1);
   });
 
   it("still sees a cold resume as the first new request of a forked transcript", () => {
@@ -279,6 +306,24 @@ describe("agent usage: the analyses", () => {
     const gates = familyUsage([file]).gates;
     expect(gates).toMatchObject({ calls: 3, bursts: 2, sessions: 1 });
     expect(gates.saving).toBeCloseTo(1); // r2: 50K output at $20 per million
+  });
+
+  it("ends a burst at the end of a turn, since a call after the person's next message is new work", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "gh pr checks 5" }] }),
+        assistant("r2", { out: 10 }),
+        assistant("r3", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "gh pr checks 5" }] }),
+      ]),
+    );
+    expect(familyUsage([file]).pr).toMatchObject({ calls: 2, bursts: 2, saving: 0 });
+  });
+
+  it("counts a tool_use block repeated on a second line of its request once", () => {
+    const tool = [{ id: "a", name: "Bash", command: "npm run lint" }];
+    const file = priceFile(extract([assistant("r1", { out: 10 }, { tools: tool }), assistant("r1", { out: 20 }, { tools: tool })]));
+    expect(file.requests[0].tools).toBe(1);
+    expect(file.calls).toHaveLength(1);
   });
 
   it("keeps a burst going past a Read made in parallel with a family call", () => {
@@ -420,6 +465,7 @@ describe("agent usage: the command", () => {
   it("takes --since only as a UTC date or a time with a zone, which mean the same on every machine", () => {
     const dir = fixtureDir([assistant("r1", { out: 1 })]);
     expect(cli(["usage", "--dir", dir, "--since", "2026-10-01T09:00"]).code).toBe(2);
+    expect(cli(["usage", "--dir", dir, "--since", "2026-02-30"]).code).toBe(2);
     expect(cli(["usage", "--dir", dir, "--since", "2026-10-01"]).code).toBe(0);
     expect(cli(["usage", "--dir", dir, "--since", "2026-10-01T09:00:00+08:00"]).code).toBe(0);
   });
