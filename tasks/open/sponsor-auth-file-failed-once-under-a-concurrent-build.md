@@ -10,8 +10,12 @@ error text was lost.
 
 The file passed on its own straight after (30 tests, 3.4 s), and the whole unit tier passed in
 three more runs beside a build (110 files, 1,953 tests each). Other sessions on the machine may
-have been running suites of their own during the first run. A Vitest worker or RPC timeout under
-a saturated CPU fits that pattern, but nothing observed confirms it.
+have been running suites of their own during the first run. Two causes fit the pattern, and
+neither is confirmed. One is a Vitest worker or RPC timeout under a saturated CPU. The other is
+the build itself: `npm run build` ran `prisma generate` unconditionally, which deletes and
+rewrites the generated client a loading test file needs. The build now skips that when the client
+is current. Running the unit tier beside six back-to-back `prisma generate` runs did not reproduce
+the failure (110 files, 1,966 tests, all passed), and neither did eight shuffled-order runs.
 
 **Settles when:** a recurrence is caught with its full output (`npm test > run.log 2>&1`, not
 filtered) and the error shows whether it is load (then decide on capping `maxWorkers`) or a

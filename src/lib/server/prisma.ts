@@ -36,7 +36,8 @@ export class DatabaseNotConfiguredError extends Error {
  * (`tasks/decisions/2026-10-20-no-database-url-means-no-database.md`). Offline
  * behaviour is otherwise unchanged: the repositories already serve their
  * in-memory stores whenever a query fails. A local database is still one
- * `DATABASE_URL` away, and the `:local` npm scripts set it explicitly.
+ * `DATABASE_URL` away: `db:push:local` and `db:seed:local` set it for the CLI,
+ * and the app needs it in `.env.local` or the shell to read that database.
  */
 function createOfflineClient(): PrismaClient {
   // Said once per process, outside tests (a build prints it from each worker).
@@ -93,6 +94,9 @@ function createOfflineClient(): PrismaClient {
     $executeRaw: refuse,
     $executeRawUnsafe: refuse,
     $on: () => client,
+    // ceiling: the extension is not applied, so a model method it adds is
+    // undefined offline. Nothing in src/ extends the client; apply its `model`
+    // methods here if something ever does.
     $extends: () => client,
   } satisfies Record<ClientMethod, unknown>;
   const client = new Proxy(
@@ -161,7 +165,9 @@ function createPrismaClient(): PrismaClient {
 
   // A managed Postgres like Neon can take several seconds to wake from idle,
   // so the connect timeout is generous; `DB_CONNECT_TIMEOUT_MS` overrides it.
-  const connectionTimeoutMillis = Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10000);
+  // `||`, not `??`: an empty value would otherwise be 0, which `pg` reads as no
+  // timeout at all.
+  const connectionTimeoutMillis = Number(process.env.DB_CONNECT_TIMEOUT_MS) || 10000;
 
   // Reuse connection pool across Turbopack hot reloads in dev mode
   const pool =

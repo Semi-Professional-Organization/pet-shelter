@@ -49,6 +49,14 @@ describe("isClientCurrent", () => {
     expect(isClientCurrent(after, before)).toBe(false);
   });
 
+  it("ignores realigned spacing after a string that ends in an escaped backslash", () => {
+    // `"C:\\"` closes on its last quote. Reading that quote as escaped would keep the rest of the
+    // line inside the string, and every realignment there would force a regeneration.
+    const aligned = SCHEMA.replace("  name   String", '  path   String @default("C:\\\\")   @map("p")');
+    const realigned = SCHEMA.replace("  name   String", '  path String @default("C:\\\\") @map("p")');
+    expect(isClientCurrent(aligned, realigned)).toBe(true);
+  });
+
   it("is stale when no client has been generated yet", () => {
     expect(isClientCurrent(SCHEMA, null)).toBe(false);
   });

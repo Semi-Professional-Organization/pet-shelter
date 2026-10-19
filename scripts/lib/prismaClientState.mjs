@@ -51,20 +51,34 @@ export function isClientComplete(clientDir, expectedVersion) {
   }
 }
 
-/** One line with runs of spaces and tabs collapsed, except inside double-quoted strings. */
+/**
+ * One line with runs of spaces and tabs collapsed, except inside double-quoted
+ * strings. A backslash inside a string escapes the character after it, so
+ * `"C:\\"` closes on its last quote and `"say \"hi\""` does not close early.
+ */
 function normalizeLine(line) {
   let out = "";
   let inString = false;
   let pendingSpace = false;
   for (let i = 0; i < line.length; i += 1) {
     const ch = line[i];
-    if (!inString && (ch === " " || ch === "\t")) {
+    if (inString) {
+      out += ch;
+      if (ch === "\\") {
+        out += line[i + 1] ?? "";
+        i += 1;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === " " || ch === "\t") {
       pendingSpace = true;
       continue;
     }
     if (pendingSpace && out !== "") out += " ";
     pendingSpace = false;
-    if (ch === '"' && line[i - 1] !== "\\") inString = !inString;
+    if (ch === '"') inString = true;
     out += ch;
   }
   return out;

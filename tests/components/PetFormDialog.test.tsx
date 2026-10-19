@@ -188,6 +188,32 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
+   * A handler that throws before taking the form leaves the dialog open, so the lock must not
+   * outlive the throw: the operator can try again, and the error is reported, not lost.
+   */
+  it("unlocks Save when onSave throws, so the operator can try again", async () => {
+    const { onSave, user } = renderDialog();
+    onSave.mockImplementationOnce(() => {
+      throw new Error("the table refused the save");
+    });
+    const reported = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await fillRequiredFields(user, "2023-04-15");
+      const submit = screen.getByRole("button", { name: /create pet record/i });
+      await user.click(submit);
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+      await waitFor(() => expect(submit).toBeEnabled());
+      expect(reported).toHaveBeenCalledWith(expect.stringContaining("onSave threw"), expect.any(Error));
+
+      await user.click(submit);
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    } finally {
+      reported.mockRestore();
+    }
+  });
+
+  /**
    * Two submits dispatched before the dialog re-renders both run against the same render, so a
    * guard kept only in state would let both through to onSave.
    */

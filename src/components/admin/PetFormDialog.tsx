@@ -43,7 +43,8 @@ interface PetFormDialogProps {
   editingPet?: Pet | null;
   /**
    * Takes the form once per opening. The dialog then asks to close and keeps Save locked until
-   * it opens again, so a parent that keeps it open after a save must close and reopen it.
+   * it opens again, so a parent that keeps it open after a save must close and reopen it. A
+   * handler that throws instead unlocks Save for another try.
    */
   onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void;
 }
@@ -308,15 +309,23 @@ export function PetFormDialog({
       image: primaryImage || data.image,
       galleryImages: galleryImages.map((img) => img.url),
     };
-    onSave(
-      finalData as PetFormInput,
-      canNotifySponsors
-        ? { notifySponsors, caption: caregiverCaption.trim() || undefined }
-        : undefined
-    );
-    // The form closes itself, so the lock set above lasts only while it animates out. `onSave` is
-    // handed the data, not awaited: the table's handler is async, so a failed save is reported
-    // there and never reaches this point as a throw.
+    try {
+      onSave(
+        finalData as PetFormInput,
+        canNotifySponsors
+          ? { notifySponsors, caption: caregiverCaption.trim() || undefined }
+          : undefined
+      );
+    } catch (error) {
+      // A handler that throws before taking the form leaves the dialog open: unlock it so the
+      // operator can try again, and report the error rather than leave it unhandled.
+      submittedRef.current = false;
+      setSubmitted(false);
+      console.error("[PetFormDialog] onSave threw before taking the form:", error);
+      return;
+    }
+    // The form closes itself, so the lock set above lasts only while it animates out. `onSave`
+    // is handed the data, not awaited: an async handler reports its own failure.
     onOpenChange(false);
   };
 

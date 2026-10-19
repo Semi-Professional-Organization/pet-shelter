@@ -49,7 +49,7 @@ without it fill a database the app will not read; the app says so once at start,
   which Prisma 7 refuses ("requires a driver adapter"), so the catch only swapped the cause for a
   misleading message. Falling back to the offline client there was considered and refused: a
   database that is configured but broken must fail loudly, not quietly serve fixtures.
-  `tests/unit/prismaClientBuildFailure.test.ts` pins it, and fails with the old catch restored.
+  `tests/unit/prismaConfiguredClient.test.ts` pins it, and fails with the old catch restored.
 
 ## Alternative not taken
 

@@ -29,27 +29,22 @@ import { findMemberRow, signInAs } from "../setup/authSession";
  * identity `findMemberRow` answers for, so every case reaches the permission
  * check with the role the database holds.
  */
-const prismaDouble = vi.hoisted(() => {
-  // Everything but the member lookup answers the way the real client does with no
-  // database configured: a P1001 refusal, which the repositories read as an outage.
-  // Without these delegates `prisma.pet` was undefined, and the catalogue read only
-  // reached its fallback by swallowing a TypeError.
-  const unreachable = () =>
-    vi.fn(() => Promise.reject(Object.assign(new Error("No database configured"), { code: "P1001" })));
-  return {
-    user: {
-      findUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
-    },
-    pet: { findMany: unreachable(), findUnique: unreachable() },
-    adoptionApplication: { findMany: unreachable(), count: unreachable() },
-  };
-});
-
-vi.mock("@/lib/server/prisma", () => ({
-  prisma: prismaDouble,
-  default: prismaDouble,
-  disconnectPrisma: vi.fn().mockResolvedValue(undefined),
+const memberLookup = vi.hoisted(() => ({
+  findUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
 }));
+
+// Everything but the member lookup is the real offline client (this tier has no
+// `DATABASE_URL`): its P1001 refusals are what the repositories read as an outage,
+// so the catalogue reads below reach their fallback the way they do in any run with
+// no database. A hand-made double here once left `prisma.pet` undefined, and the
+// read reached its fallback only by swallowing a TypeError.
+vi.mock("@/lib/server/prisma", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server/prisma")>();
+  const prisma = new Proxy(actual.prisma, {
+    get: (target, key) => (key === "user" ? memberLookup : Reflect.get(target, key)),
+  });
+  return { ...actual, prisma, default: prisma };
+});
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
@@ -67,6 +62,15 @@ describe("getAdminPets authorization", () => {
       await expect(getAdminPets()).rejects.toThrow(/MANAGE_PETS/);
     }
   );
+
+  it("refuses a valid cookie for a member the database does not hold", async () => {
+    // The admissions below come from the member re-read, not from the cookie: a
+    // session the DAL could only vouch for by trusting its own claims (as its
+    // fallback for an unreachable database does) is refused here.
+    await signInAs({ id: "usr-no-such-member", email: "ghost@hopeforstrays.org", name: "Ghost", role: ROLES.ADMIN });
+
+    await expect(getAdminPets()).rejects.toThrow(/Authentication required/i);
+  });
 
   it.each([ROLES.SUPER_ADMIN, ROLES.ANIMAL_MANAGER, ROLES.ADMIN])(
     "admits a %s and returns the admin projection",

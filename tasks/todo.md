@@ -48,9 +48,10 @@ developer shell leaking in.
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
 secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
 skipped the regeneration). Unit, integration and component suites together, after merging
-master at `474abbe`: 138 files, 2,291 tests, 40 s (master: 192 to 216 s).
+master at `474abbe`: 138 files, 2,297 tests, 40 to 49 s (master: 192 to 216 s). Shuffled test
+order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** seven `/code-review` rounds over the whole diff raised 61 findings; each was fixed, or
+**Review:** eight `/code-review` rounds over the whole diff raised 71 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -63,7 +64,11 @@ delegate per model, and split the stale-client checks into `scripts/lib/prismaCl
 so the script needs no run-directly test. It also surfaced a product bug, filed rather than fixed
 here: `tasks/open/admin-date-defaults-use-the-utc-day.md`. Round 7 put the member-lookup double in
 one helper (`findMemberRow`), made the Silver caretaker test assert the gate itself, and brought
-the docs in line with the components tier's zone.
+the docs in line with the components tier's zone. Round 8 sent `npm run build` through the stale
+check too, fixed that check for a string ending in an escaped backslash, kept the 10 s connect
+timeout when its variable is empty, froze the staff seeds, unlocked the pet form when `onSave`
+throws, and gave `adminPetsAuthorization` the one test there the DAL's fallback cannot pass: a
+valid cookie for a member the database does not hold.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as

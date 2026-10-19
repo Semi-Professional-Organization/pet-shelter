@@ -31,4 +31,10 @@ describe("demo seed password hashes", () => {
     const salts = SEEDS.map(({ hash }) => hash.split(":")[0]);
     expect(new Set(salts).size).toBe(SEEDS.length);
   });
+
+  it("keeps the staff seeds frozen, since every reset re-reads them", () => {
+    // A change made through the export would otherwise outlive the reset meant to undo it.
+    expect(Object.isFrozen(INITIAL_STAFF_USERS)).toBe(true);
+    expect(INITIAL_STAFF_USERS.every((seed) => Object.isFrozen(seed))).toBe(true);
+  });
 });
