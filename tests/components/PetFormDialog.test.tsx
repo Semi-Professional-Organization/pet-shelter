@@ -169,12 +169,15 @@ describe("PetFormDialog birth date field", () => {
     pickDate(input, "2026-08-01");
     expect(input.validity.rangeOverflow).toBe(true);
 
+    // The refusal happens before any submit event is dispatched, so watch for the event itself
+    // rather than sleeping and hoping `onSave` would have been called by now. The submit spec
+    // above is the positive control: a click on this button does submit and reach `onSave`.
+    const submitted = vi.fn();
+    input.form!.addEventListener("submit", submitted);
+
     await user.click(screen.getByRole("button", { name: /update pet profile/i }));
 
-    // The accepted path resolves a 400 ms timer before it calls back (see the submit spec above,
-    // which proves a click on this button does reach `onSave`), so asserting immediately here
-    // would pass merely by running early.
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(submitted).not.toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
   });
 });

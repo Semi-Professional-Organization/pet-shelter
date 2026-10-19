@@ -278,14 +278,13 @@ export function PetFormDialog({
     .filter((url) => url && !existingGallery.includes(url));
   const canNotifySponsors = Boolean(editingPet) && newlyAddedPhotos.length > 0;
 
-  const onSubmit = async (data: PetFormInput) => {
+  const onSubmit = (data: PetFormInput) => {
     // Update with current image selections
     const finalData = {
       ...data,
       image: primaryImage || data.image,
       galleryImages: galleryImages.map((img) => img.url),
     };
-    await new Promise((r) => setTimeout(r, 400));
     onSave(
       finalData as PetFormInput,
       canNotifySponsors
