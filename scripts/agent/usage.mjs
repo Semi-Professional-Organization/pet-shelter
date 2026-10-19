@@ -145,6 +145,11 @@ export function splitChain(cmd) {
  * Matched against the command string at extraction time; only the family name is kept. Paths
  * match with either separator and listing or reading verbs in either shell, because PowerShell
  * is this machine's primary shell.
+ *
+ * ceiling: these patterns cover the spellings found in this repo's transcripts, not every way to
+ * write each command; a spelling they miss leaves its call out of the family. The families are a
+ * measure of where a command would save, so a miss worth fixing is one that moves a family's
+ * share, which `usage --json` shows per family.
  */
 export const FAMILIES = {
   gates: (tool, cmd, vitest) =>
