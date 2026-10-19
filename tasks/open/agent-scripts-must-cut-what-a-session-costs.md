@@ -11,7 +11,7 @@ is claimed. The kill conditions below are immutable; a later edit to them is an 
 ## Baseline
 
 Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 16,445 model
+transcript Claude Code still held for this repo: 17 sessions and their subagents, 16,625 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
@@ -19,15 +19,18 @@ later change of model cannot pose as a saving. Dollars are API list-price equiva
 |---|---:|
 | Mean cost per main-session request | $0.144 |
 | Mean cost per subagent request | $0.056 |
-| Cost split: cache reads / cache writes / output | 58.1% / 29.5% / 12.4% |
-| Share of cost from requests made above 400K context | 56.3% |
-| Cold resumes (whole context re-written on a message after over an hour idle) | 51, 11.1% of cost |
-| The same re-write after a tool that ran over an hour | 3, 0.7% of cost |
-| Carrying old tool output (estimated) | 13.2% of cost |
-| Workflow families, saving at one command call per burst | 4.6% of cost combined |
+| Cost split: cache reads / cache writes / output | 58.3% / 29.4% / 12.4% |
+| Share of cost from requests made above 400K context | 56.5% |
+| Cold resumes: whole context re-written on a person's message after over an hour idle | 43, 9.8% of cost |
+| The same re-write after a tool or a background notice that took over an hour | 11, 1.6% of cost |
+| Carrying old tool output (estimated) | 13.3% of cost |
+| Workflow families, saving at one command call per burst | 4.3% of cost combined |
+
+A cold resume's cost is the re-write beyond the cache read a warm request would have paid for the
+same tokens, which is what a hand-off could save.
 
 The families' combined saving is the sum of the eight families in the catalog's section 4 (gates
-1.3%, targeted tests 0.8%, orient 0.4%, ledger 0.4%, merge 0.2%, drift 0.1%, pr 1.2%, ports 0.2%);
+1.2%, targeted tests 0.8%, orient 0.4%, ledger 0.4%, merge 0.2%, drift 0.1%, pr 1.1%, ports 0.1%);
 a call can belong to two families, so the sum is an upper bound. A burst is a run of requests
 that each call the family, and it ends at the end of a turn; calls issued in parallel from one
 request save nothing, since one command would remove no request. The catalog estimated about 9%
@@ -44,7 +47,7 @@ sessions after the context meter (build order PR 2) merges:
 
 - mean cost per main-session request at least 20% below $0.144, the floor of the catalog's
   20% to 31% hand-off estimate; and
-- cold resumes on a message below 5% of cost.
+- cold resumes on a person's message below 5% of cost.
 
 For each command after it lands: at least half of the calls in its workflow family, over the next
 five sessions, go through the command.

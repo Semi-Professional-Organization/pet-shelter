@@ -101,7 +101,8 @@ export const FAMILIES = {
     /npm (run (-s )?)?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test:db|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build|npx vitest run/.test(cmd) &&
     !FAMILIES["targeted tests"](tool, cmd),
   "targeted tests": (tool, cmd) =>
-    SHELLS.has(tool) && /vitest run[^;&|]*tests\/[^ ]+\.test\.tsx?|npm run test[^;&|]* -- [^;&|]*tests\//.test(cmd),
+    // Either separator: PowerShell spells the path `tests\unit\x.test.ts`.
+    SHELLS.has(tool) && /vitest run[^;&|]*tests[\\/][^ ]+\.test\.tsx?|npm run test[^;&|]* -- [^;&|]*tests[\\/]/.test(cmd),
   orient: (tool, cmd) =>
     SHELLS.has(tool) &&
     /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|ls tasks\/(open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
@@ -168,6 +169,20 @@ const textLength = (content) =>
       ? content.reduce((n, block) => n + (block && block.type === "text" ? String(block.text).length : 0), 0)
       : 0;
 
+/**
+ * What woke the session, for a user record that carries no tool result: "person" for a message
+ * someone sent, "event" for a background task's notice or another session's message, and nothing
+ * for a meta record, which rides along with something else.
+ *
+ * ceiling: transcripts written before Claude Code recorded `origin` carry neither field, and their
+ * non-meta records are taken as a person's message.
+ */
+export function triggerOf(record) {
+  if (record.isMeta) return undefined;
+  const kind = record.origin?.kind;
+  return kind === undefined || kind === "human" ? "person" : "event";
+}
+
 /** Token fields a request's lines are merged on. Streamed lines repeat them; output grows. */
 const USAGE_FIELDS = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens"];
 
@@ -224,7 +239,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
             index: requests.length,
             ts: record.timestamp,
             prevTs,
-            // What the request answered: a person's message, or a tool's result.
+            // What the request answered: a person, a background event, or a tool's result.
             trigger: lastTrigger,
             model: message.model,
             speed: undefined,
@@ -266,7 +281,8 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           toolResult = true;
           results.push({ id: block.tool_use_id, chars: textLength(block.content) });
         }
-        lastTrigger = toolResult ? "tool" : "person";
+        const trigger = toolResult ? "tool" : triggerOf(record);
+        if (trigger) lastTrigger = trigger;
       }
     },
     finish() {
@@ -283,11 +299,32 @@ export function createExtractor({ session, sub }, seen = new Set()) {
 
 const promptOf = (r) => r.input_tokens + r.cache_read_input_tokens + r.cache_creation_input_tokens;
 
-/** Prices every request in an extracted file in place. Throws UnpriceableError. */
-export function priceFile(file, { priceAs } = {}) {
-  for (const r of file.requests) priceRequest(r, priceAs);
-  return file;
+/**
+ * Prices, in place, every request of the extracted files that falls in the window. Throws one
+ * UnpriceableError naming every unpriceable kind of request, so no run reports a partial total.
+ * Requests outside the window stay unpriced, so one before `since` cannot stop a measurement of
+ * the window, and every analysis skips unpriced requests.
+ */
+export function priceFiles(files, { priceAs, inWindow = () => true } = {}) {
+  const unpriceable = {};
+  for (const f of files) {
+    for (const r of f.requests) {
+      if (!inWindow(r.ts)) continue;
+      try {
+        priceRequest(r, priceAs);
+      } catch (error) {
+        if (!(error instanceof UnpriceableError)) throw error;
+        unpriceable[error.message] = (unpriceable[error.message] || 0) + 1;
+      }
+    }
+  }
+  if (Object.keys(unpriceable).length) {
+    throw new UnpriceableError(Object.entries(unpriceable).map(([m, n]) => `${m} (${n} requests)`).join("; "));
+  }
+  return files;
 }
+
+export const priceFile = (file, opts) => priceFiles([file], opts)[0];
 
 /**
  * Prices one request in place. `priceAs` prices it at another model's rates (speed and region
@@ -348,6 +385,9 @@ function segmentEnds(file) {
  * it to the cache, and every later request in the same segment reads it again. Tokens are
  * estimated as characters / 4, which is why the report calls this an estimate.
  *
+ * Only priced requests are charged, so under `--since` a result from before the window still
+ * counts for the reads inside it, and its write counts only if that fell inside too.
+ *
  * ceiling: chars/4 over-counts dense code and under-counts non-Latin text; the exact figure is
  * the cache-write delta of the next request, which mixes in everything else that turn added.
  */
@@ -362,9 +402,9 @@ export function carriedOutput(file) {
     const writeAt = call.request + 1;
     if (!call.resultChars || writeAt >= reqs.length || writeAt > ends[call.request]) continue;
     const w = reqs[writeAt];
-    if (!w.rates) continue;
-    const writeRate = w.w1h >= w.w5 ? w.rates.write1h : w.rates.write5m;
+    const writeRate = !w.rates ? 0 : w.w1h >= w.w5 ? w.rates.write1h : w.rates.write5m;
     const reads = readPrefix[ends[call.request] + 1] - readPrefix[writeAt + 1];
+    if (!writeRate && !reads) continue;
     const usd = ((call.resultChars / 4) * (writeRate + reads)) / 1e6;
     total += usd;
     byClass[call.class] = (byClass[call.class] || 0) + usd;
@@ -376,10 +416,14 @@ export const COLD_IDLE_MINUTES = 60;
 
 /**
  * Main-session requests that came after the 1-hour cache expired and re-wrote the whole context.
- * "Whole" is a write of at least half the context and at least 50K tokens, so a cold resume of a
- * small session is not counted. `trigger` says what the session waited on: "person" when the
- * request answered a message (someone was away, which a hand-off could avoid), "tool" when it
- * answered a tool that ran over an hour (a long subagent or build, which it could not).
+ * `trigger` says what the session waited on: "person" when the request answered someone's message
+ * (they were away, which a hand-off could avoid), otherwise a tool that ran over an hour or a
+ * background notice (which it could not). `cost` is what the re-write cost beyond the cache read a
+ * warm request would have paid for the same tokens.
+ *
+ * ceiling: "whole" is a write of at least half the context and at least 50K tokens, a heuristic
+ * for "the cache had expired"; the exact test needs the cache's own expiry, which transcripts
+ * do not record.
  */
 export function coldResumes(file) {
   if (file.sub) return [];
@@ -389,16 +433,19 @@ export function coldResumes(file) {
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
     if (!(idle > COLD_IDLE_MINUTES)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
-    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write, trigger: r.trigger === "tool" ? "tool" : "person" });
+    const warm = (r.cache_creation_input_tokens * r.rates.cacheRead) / 1e6;
+    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger: r.trigger ?? "person" });
   }
   return out;
 }
 
 /**
  * Per family: calls, bursts, and the cost a single command per burst would have saved. A burst is a
- * run of consecutive tool-calling requests in one file that each make at least one call of the
- * family; a request whose calls are all something else ends it, but a parallel Read beside a family
- * call does not. A call costs its request's cost split evenly across the request's tool calls.
+ * run of consecutive requests in one file, within one turn, that each make at least one call of
+ * the family. A request whose calls are all something else ends it, and so does the end of a turn
+ * (a request with no calls) or a request that answers a person or an event rather than a tool; a
+ * parallel Read beside a family call does not. A call costs its request's cost split evenly across
+ * the request's tool calls.
  * Only calls in a later request than the burst's first count as saved: calls issued in parallel
  * from one request share it, and folding them into one command removes no request.
  *
@@ -415,23 +462,21 @@ export function familyUsage(files) {
     }
     for (const name of Object.keys(FAMILIES)) {
       const f = out[name];
-      let burstStart = null;
+      let inBurst = false;
       for (const r of file.requests) {
-        const index = r.index;
-        // A request with no calls is the end of a turn: whatever follows answers a new message.
-        const mine = (byRequest.get(index) ?? []).filter((c) => c.families.includes(name));
+        if (r.trigger !== "tool") inBurst = false;
+        const mine = (byRequest.get(r.index) ?? []).filter((c) => c.families.includes(name));
         if (!mine.length) {
-          burstStart = null;
+          inBurst = false;
           continue;
         }
         const cost = (mine.length * r.cost) / Math.max(1, r.tools);
         f.calls += mine.length;
         f.cost += cost;
         f.sessions.add(file.session);
-        if (burstStart === null) {
-          f.bursts++;
-          burstStart = index;
-        } else f.saving += cost;
+        if (inBurst) f.saving += cost;
+        else f.bursts++;
+        inBurst = true;
       }
     }
   }
@@ -454,34 +499,14 @@ const median = (xs) => {
 };
 
 /**
- * The whole report, from extracted files. Prices everything first and throws one
- * UnpriceableError naming every unpriceable request kind, so a run never reports a partial total.
- *
- * `since` filters requests, and the calls they made, after pricing, so segments and idle gaps are
- * still measured against the requests before the window.
+ * The whole report, from extracted files. Prices the window first (see `priceFiles`), so a run
+ * never reports a partial total. Segments and idle gaps are still measured against the requests
+ * before the window.
  */
 export function summarize(files, { since, priceAs } = {}) {
   const sinceMs = since ? Date.parse(since) : -Infinity;
   const inWindow = (ts) => !(Date.parse(ts) < sinceMs);
-
-  // Only requests inside the window are priced, so an unpriceable request before `since` cannot
-  // stop a measurement of the window. Requests outside it stay unpriced and every analysis below
-  // skips them.
-  const unpriceable = {};
-  for (const f of files) {
-    for (const r of f.requests) {
-      if (!inWindow(r.ts)) continue;
-      try {
-        priceRequest(r, priceAs);
-      } catch (error) {
-        if (!(error instanceof UnpriceableError)) throw error;
-        unpriceable[error.message] = (unpriceable[error.message] || 0) + 1;
-      }
-    }
-  }
-  if (Object.keys(unpriceable).length) {
-    throw new UnpriceableError(Object.entries(unpriceable).map(([m, n]) => `${m} (${n} requests)`).join("; "));
-  }
+  priceFiles(files, { priceAs, inWindow });
 
   const totals = { cost: 0, read: 0, write: 0, output: 0, input: 0, search: 0, requests: 0 };
   const models = {};
@@ -520,12 +545,11 @@ export function summarize(files, { since, priceAs } = {}) {
       if (!last || r.ts > last) last = r.ts;
     }
     if (!f.requests.length) continue;
-    const calls = f.calls.filter((c) => inWindow(f.requests[c.request].ts));
-    const c = carriedOutput({ ...f, calls });
+    const c = carriedOutput(f);
     carried.cost += c.total;
     for (const [k, v] of Object.entries(c.byClass)) carried.byClass[k] = (carried.byClass[k] || 0) + v;
-    cold.push(...coldResumes(f).filter((x) => inWindow(x.ts)));
-    windowed.push({ ...f, calls });
+    cold.push(...coldResumes(f));
+    windowed.push({ ...f, calls: f.calls.filter((call) => f.requests[call.request].usd) });
   }
 
   return {
@@ -536,7 +560,7 @@ export function summarize(files, { since, priceAs } = {}) {
     who,
     contextBuckets: buckets,
     coldResumes: coldSummary(cold.filter((x) => x.trigger === "person")),
-    coldAfterLongTool: coldSummary(cold.filter((x) => x.trigger === "tool")),
+    coldOnToolOrEvent: coldSummary(cold.filter((x) => x.trigger !== "person")),
     carried,
     families: familyUsage(windowed),
     sessions,
@@ -566,7 +590,7 @@ export function formatReport(report, { logPath } = {}) {
     `usage: PASS ${usd(t.cost)} across ${sessionCount} sessions, ${t.requests.toLocaleString("en-US")} requests (${day(report.window.first)} to ${day(report.window.last)})`,
     `prices: per request at ${report.prices.priceAs ? `${report.prices.priceAs} rates for every model` : "the serving model's rates"}, ${report.prices.source} checked ${report.prices.checked}`,
     `split: cache reads ${pct(t.read, t.cost)} | cache writes ${pct(t.write, t.cost)} | output ${pct(t.output, t.cost)} | fresh input ${pct(t.input + t.search, t.cost)}`,
-    `models: ${top(report.models, 6, (m) => m.cost)
+    `models${report.prices.priceAs ? ` (all at ${report.prices.priceAs} rates)` : ""}: ${top(report.models, 6, (m) => m.cost)
       .map(([name, m]) => `${name} ${usd(m.cost)} (${m.requests})`)
       .join(" | ")}`,
     `who: main sessions ${usd(report.who.main.cost)} (${report.who.main.requests}) | subagents ${usd(report.who.subagents.cost)} (${report.who.subagents.requests})`,
@@ -577,7 +601,7 @@ export function formatReport(report, { logPath } = {}) {
   lines.push(
     `cold resumes: ${c.count} whole-context re-writes on a message after >1h idle, ${usd(c.cost)} = ${pct(c.cost, t.cost)}` +
       (c.count ? `; median context ${kTok(c.medianContext)}, median idle ${c.medianIdleHours.toFixed(1)}h` : "") +
-      `; ${report.coldAfterLongTool.count} more after a tool ran >1h, ${pct(report.coldAfterLongTool.cost, t.cost)}`,
+      `; ${report.coldOnToolOrEvent.count} more on a long tool or a background notice, ${pct(report.coldOnToolOrEvent.cost, t.cost)}`,
   );
   lines.push(
     `carried tool output (estimate, chars/4): ${usd(report.carried.cost)} = ${pct(report.carried.cost, t.cost)}; top: ` +
@@ -738,14 +762,17 @@ async function readFile(file, seen) {
  * ceiling: creation time stands in for "written first"; a copied file whose creation time was
  * preserved would sort wrongly, and the exact order needs each file's first timestamp.
  */
-function byCreation(files) {
-  const born = new Map(
-    files.map((f) => {
-      const s = statSync(f);
-      return [f, s.birthtimeMs || s.mtimeMs];
-    }),
-  );
-  return [...files].sort((a, b) => born.get(a) - born.get(b) || (a < b ? -1 : a > b ? 1 : 0));
+function byCreation(files, sinceMs) {
+  // A transcript last written before the window holds no request in it, and any copy of its
+  // requests in a later file is before the window too, so it is skipped unread.
+  return files
+    .map((path) => {
+      const s = statSync(path);
+      return { path, born: s.birthtimeMs || s.mtimeMs, written: s.mtimeMs };
+    })
+    .filter((f) => !(f.written < sinceMs))
+    .sort((a, b) => a.born - b.born || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .map((f) => f.path);
 }
 
 export async function main(argv, io = {}) {
@@ -782,10 +809,8 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
     if (!root) return fail(`git could not name this repo's main checkout from ${cwd}\nnext: pass --dir <transcript folder>`);
     dirs = defaultDirs(projectsDir, root);
   }
-  // A transcript last written before the window holds no request in it, and any copy of its
-  // requests in a later file is before the window too, so it is skipped unread.
   const sinceMs = opts.since ? Date.parse(opts.since) : -Infinity;
-  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d))).filter((f) => !(statSync(f).mtimeMs < sinceMs));
+  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)), sinceMs);
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
   const seen = new Set();

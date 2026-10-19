@@ -13,6 +13,7 @@ import {
   commandClass,
   createExtractor,
   defaultDirs,
+  triggerOf,
   familiesOf,
   familyUsage,
   formatReport,
@@ -201,6 +202,7 @@ describe("agent usage: workflow families", () => {
   it("files a targeted test run under targeted tests only, whichever way it is invoked", () => {
     expect(familiesOf("Bash", "npm run test -- tests/unit/x.test.ts")).toEqual(["targeted tests"]);
     expect(familiesOf("Bash", "npx vitest run tests/unit/x.test.ts")).toEqual(["targeted tests"]);
+    expect(familiesOf("PowerShell", "npx vitest run tests\\unit\\x.test.ts")).toEqual(["targeted tests"]);
   });
 
   it("files every spelling of a whole-suite gate under gates", () => {
@@ -232,7 +234,8 @@ describe("agent usage: the analyses", () => {
     const main = priceFile(extract(records));
     const cold = coldResumes(main);
     expect(cold).toHaveLength(1);
-    expect(cold[0].cost).toBeCloseTo(3.2); // 400K at the $8 one-hour write rate
+    // 400K at the $8 one-hour write rate, less the $0.20 read a warm cache would have charged.
+    expect(cold[0].cost).toBeCloseTo(3.12);
     expect(coldResumes(priceFile(extract(records, { session: "s1", sub: true })))).toHaveLength(0);
   });
 
@@ -250,7 +253,48 @@ describe("agent usage: the analyses", () => {
     expect(coldResumes(file).map((c: { trigger: string }) => c.trigger)).toEqual(["tool", "person"]);
     const report = summarize([file]);
     expect(report.coldResumes.count).toBe(1);
-    expect(report.coldAfterLongTool.count).toBe(1);
+    expect(report.coldOnToolOrEvent.count).toBe(1);
+  });
+
+  it("does not take a background notice, or a meta record riding along, for a person's message", () => {
+    const notice = { type: "user", origin: { kind: "task-notification" }, message: { content: "task done" } };
+    const meta = { type: "user", isMeta: true, message: { content: "reminder" } };
+    const human = { type: "user", origin: { kind: "human" }, message: { content: "hi" } };
+    expect(triggerOf(notice)).toBe("event");
+    expect(triggerOf(meta)).toBeUndefined();
+    expect(triggerOf(human)).toBe("person");
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        notice,
+        meta,
+        assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T12:00:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)[0].trigger).toBe("event");
+  });
+
+  it("ends a burst when a person's message arrives mid-turn", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "gh pr checks 5" }] }),
+        { type: "user", origin: { kind: "human" }, message: { content: "stop, check again" } },
+        assistant("r2", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "gh pr checks 5" }] }),
+      ]),
+    );
+    expect(familyUsage([file]).pr).toMatchObject({ bursts: 2, saving: 0 });
+  });
+
+  it("still charges a result from before --since for the reads made inside the window", () => {
+    const records = [
+      assistant("r1", { read: 10_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z", tools: [{ id: "t1", name: "Read" }] }),
+      toolResult("t1", 4_000_000),
+      assistant("r2", { read: 10_000, w1h: 1_000_000, out: 1 }, { ts: "2026-10-01T10:01:00.000Z", tools: [{ id: "t2", name: "Read" }] }),
+      toolResult("t2", 0),
+      assistant("r3", { read: 1_010_000, out: 1 }, { ts: "2026-10-02T10:00:00.000Z" }),
+    ];
+    // Written before the window, read once inside it at $0.20 per million.
+    expect(summarize([extract(records)], { since: "2026-10-02" }).carried.cost).toBeCloseTo(0.2);
   });
 
   it("still sees a cold resume as the first new request of a forked transcript", () => {
@@ -298,8 +342,11 @@ describe("agent usage: the analyses", () => {
     const file = priceFile(
       extract([
         assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "npm run typecheck" }] }),
+        toolResult("a", 10),
         assistant("r2", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "npm run lint" }] }),
+        toolResult("b", 10),
         assistant("r3", { out: 50_000 }, { tools: [{ id: "c", name: "Bash", command: "ls" }] }),
+        toolResult("c", 10),
         assistant("r4", { out: 50_000 }, { tools: [{ id: "d", name: "Bash", command: "npm run build" }] }),
       ]),
     );
@@ -312,7 +359,9 @@ describe("agent usage: the analyses", () => {
     const file = priceFile(
       extract([
         assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "gh pr checks 5" }] }),
+        toolResult("a", 10),
         assistant("r2", { out: 10 }),
+        { type: "user", origin: { kind: "human" }, message: { content: "next day" } },
         assistant("r3", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "gh pr checks 5" }] }),
       ]),
     );
@@ -330,6 +379,8 @@ describe("agent usage: the analyses", () => {
     const file = priceFile(
       extract([
         assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "git fetch origin master" }, { id: "b", name: "Read" }] }),
+        toolResult("a", 10),
+        toolResult("b", 10),
         assistant("r2", { out: 50_000 }, { tools: [{ id: "c", name: "Bash", command: "git worktree list" }] }),
       ]),
     );
