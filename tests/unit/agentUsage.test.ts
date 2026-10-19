@@ -13,6 +13,9 @@ import {
   commandClass,
   createExtractor,
   defaultDirs,
+  commonClasses,
+  parseArgs,
+  RARE_CLASS,
   triggerOf,
   familiesOf,
   familyUsage,
@@ -205,6 +208,11 @@ describe("agent usage: workflow families", () => {
     expect(familiesOf("PowerShell", "npx vitest run tests\\unit\\x.test.ts")).toEqual(["targeted tests"]);
   });
 
+  it("classes each command of a chain on its own", () => {
+    expect(familiesOf("Bash", "npx vitest run tests/unit/a.test.ts && npm run lint")).toEqual(["gates", "targeted tests"]);
+    expect(familiesOf("Bash", "npm test -- tests/unit/a.test.ts")).toEqual(["targeted tests"]);
+  });
+
   it("files every spelling of a whole-suite gate under gates", () => {
     for (const cmd of ["npm run test", "npm test", "npx vitest run", "npm run test:db", "npm run typecheck"]) {
       expect(familiesOf("Bash", cmd), cmd).toEqual(["gates"]);
@@ -263,6 +271,7 @@ describe("agent usage: the analyses", () => {
     expect(triggerOf(notice)).toBe("event");
     expect(triggerOf(meta)).toBeUndefined();
     expect(triggerOf(human)).toBe("person");
+    expect(triggerOf({ type: "user", isCompactSummary: true, message: { content: "summary" } })).toBeUndefined();
     const file = priceFile(
       extract([
         assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
@@ -425,6 +434,25 @@ describe("agent usage: the analyses", () => {
     expect(() => summarize(files)).toThrow(/no price for model claude-x-1 \(1 requests\)/);
   });
 
+  it("gives the same report twice from the same records, whatever window came before", () => {
+    const files = [
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-03T10:00:00.000Z" }),
+        assistant("r3", { w1h: 400_000, out: 1 }, { ts: "2026-10-05T10:00:00.000Z" }),
+      ]),
+    ];
+    summarize(files, { since: "2026-09-01" });
+    const later = summarize(files, { since: "2026-10-04" });
+    expect(later.totals.requests).toBe(1);
+    expect(later.coldResumes.count).toBe(1);
+  });
+
+  it("pools a command class seen in one session only, so a pasted secret cannot surface as a label", () => {
+    const sessions = { git: new Set(["s1", "s2"]), hunter_secretpassword: new Set(["s1"]) };
+    expect(commonClasses({ git: 1, hunter_secretpassword: 2 }, sessions)).toEqual({ git: 1, [RARE_CLASS]: 2 });
+  });
+
   it("prices every request at one model's rates when asked, so a model change cannot pose as a saving", () => {
     const files = () => [extract([assistant("r1", { read: 1_000_000 }, { model: "claude-opus-5" })])];
     expect(summarize(files()).totals.read).toBeCloseTo(0.5);
@@ -511,6 +539,11 @@ describe("agent usage: the command", () => {
     expect(cli(["usage", "--frobnicate"]).code).toBe(2);
     expect(cli(["nonesuch"]).code).toBe(2);
     expect(cli([])).toMatchObject({ code: 2, out: expect.stringMatching(/^agent: ERROR no command/) });
+  });
+
+  it("will not take the next flag as an option's value, and takes a dated id for --price-as", () => {
+    expect(() => parseArgs(["--dir", "--json"])).toThrow(/--dir needs a value/);
+    expect(parseArgs(["--price-as", "claude-haiku-4-5-20251001"]).priceAs).toBe("claude-haiku-4-5-20251001");
   });
 
   it("takes --since only as a UTC date or a time with a zone, which mean the same on every machine", () => {

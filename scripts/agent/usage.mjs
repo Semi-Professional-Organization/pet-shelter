@@ -60,6 +60,9 @@ const NO_INFERENCE_GEO = new Set(["claude-opus-4-5", "claude-sonnet-4-5", "claud
 
 export class UnpriceableError extends Error {}
 
+/** The PRICES key for a model id: a dated snapshot (`claude-haiku-4-5-20251001`) prices as its model. */
+const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
+
 /**
  * The rates one request pays, or a throw. `model` is the model that served the request
  * (`message.model`), not the one asked for: a fallback bills at the model that answered. A dated
@@ -68,7 +71,7 @@ export class UnpriceableError extends Error {}
  * @param {{ model: string, prompt: number, speed?: string | null, geo?: string | null }} request
  */
 export function ratesFor({ model, prompt, speed, geo }) {
-  const base = String(model).replace(/-\d{8}$/, "");
+  const base = priceKey(model);
   const table = Object.hasOwn(PRICES, base) ? PRICES[base] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
   if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
@@ -102,7 +105,7 @@ export const FAMILIES = {
     !FAMILIES["targeted tests"](tool, cmd),
   "targeted tests": (tool, cmd) =>
     // Either separator: PowerShell spells the path `tests\unit\x.test.ts`.
-    SHELLS.has(tool) && /vitest run[^;&|]*tests[\\/][^ ]+\.test\.tsx?|npm run test[^;&|]* -- [^;&|]*tests[\\/]/.test(cmd),
+    SHELLS.has(tool) && /vitest run[^;&|]*tests[\\/][^ ]+\.test\.tsx?|npm (run )?test[^;&|]* -- [^;&|]*tests[\\/]/.test(cmd),
   orient: (tool, cmd) =>
     SHELLS.has(tool) &&
     /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|ls tasks\/(open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
@@ -122,7 +125,10 @@ export const FAMILIES = {
 
 /** Families a call belongs to. A call can count toward more than one, as in the catalog. */
 export function familiesOf(tool, cmd) {
-  return Object.keys(FAMILIES).filter((name) => FAMILIES[name](tool, cmd));
+  // Each command of a chain is classed on its own, so `vitest run <file> && npm run lint` is both
+  // a targeted run and a gate.
+  const parts = SHELLS.has(tool) ? String(cmd).split(/&&|\|\||[;|]/) : [cmd];
+  return Object.keys(FAMILIES).filter((name) => parts.some((part) => FAMILIES[name](tool, part)));
 }
 
 /**
@@ -178,7 +184,8 @@ const textLength = (content) =>
  * non-meta records are taken as a person's message.
  */
 export function triggerOf(record) {
-  if (record.isMeta) return undefined;
+  // A compaction's summary is written as a user record too; no one sent it.
+  if (record.isMeta || record.isCompactSummary) return undefined;
   const kind = record.origin?.kind;
   return kind === undefined || kind === "human" ? "person" : "event";
 }
@@ -309,6 +316,11 @@ export function priceFiles(files, { priceAs, inWindow = () => true } = {}) {
   const unpriceable = {};
   for (const f of files) {
     for (const r of f.requests) {
+      // A price is how every analysis knows a request is in the window, so a previous call's
+      // prices must not survive into this one.
+      delete r.rates;
+      delete r.usd;
+      delete r.cost;
       if (!inWindow(r.ts)) continue;
       try {
         priceRequest(r, priceAs);
@@ -484,6 +496,22 @@ export function familyUsage(files) {
   return out;
 }
 
+export const RARE_CLASS = "seen in one session only";
+
+/**
+ * Command classes seen in at least two sessions, the rest pooled. A command word is a name, but a
+ * secret pasted where a command goes would look like one; it would also appear in one session
+ * only, so this keeps it out of the report without having to recognise it.
+ */
+export function commonClasses(byClass, classSessions) {
+  const out = {};
+  for (const [k, v] of Object.entries(byClass)) {
+    const key = classSessions[k]?.size >= 2 ? k : RARE_CLASS;
+    out[key] = (out[key] || 0) + v;
+  }
+  return out;
+}
+
 const coldSummary = (cold) => ({
   count: cold.length,
   cost: cold.reduce((a, x) => a + x.cost, 0),
@@ -514,6 +542,7 @@ export function summarize(files, { since, priceAs } = {}) {
   const buckets = CONTEXT_BUCKETS.map((b) => ({ label: b.label, requests: 0, cost: 0 }));
   const sessions = {};
   const carried = { cost: 0, byClass: {} };
+  const classSessions = {};
   const cold = [];
   const windowed = [];
   let first = null;
@@ -547,7 +576,10 @@ export function summarize(files, { since, priceAs } = {}) {
     if (!f.requests.length) continue;
     const c = carriedOutput(f);
     carried.cost += c.total;
-    for (const [k, v] of Object.entries(c.byClass)) carried.byClass[k] = (carried.byClass[k] || 0) + v;
+    for (const [k, v] of Object.entries(c.byClass)) {
+      carried.byClass[k] = (carried.byClass[k] || 0) + v;
+      (classSessions[k] ||= new Set()).add(f.session);
+    }
     cold.push(...coldResumes(f));
     windowed.push({ ...f, calls: f.calls.filter((call) => f.requests[call.request].usd) });
   }
@@ -561,7 +593,7 @@ export function summarize(files, { since, priceAs } = {}) {
     contextBuckets: buckets,
     coldResumes: coldSummary(cold.filter((x) => x.trigger === "person")),
     coldOnToolOrEvent: coldSummary(cold.filter((x) => x.trigger !== "person")),
-    carried,
+    carried: { cost: carried.cost, byClass: commonClasses(carried.byClass, classSessions) },
     families: familyUsage(windowed),
     sessions,
     skipped: {
@@ -705,10 +737,10 @@ export function parseArgs(argv) {
     else if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--since" || a === "--dir" || a === "--price-as") {
       const v = argv[++i];
-      if (v === undefined) throw new Error(`${a} needs a value`);
+      if (v === undefined || v.startsWith("--")) throw new Error(`${a} needs a value`);
       if (a === "--dir") opts.dirs.push(v);
       else if (a === "--price-as") {
-        if (!Object.hasOwn(PRICES, v)) throw new Error(`--price-as has no price for ${v}`);
+        if (!Object.hasOwn(PRICES, priceKey(v))) throw new Error(`--price-as has no price for ${v}`);
         opts.priceAs = v;
       }
       else if (!SINCE.test(v) || !realDate(v) || Number.isNaN(Date.parse(v))) {
