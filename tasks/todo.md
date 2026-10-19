@@ -34,8 +34,9 @@ admin page, action and the sponsor portal, with the role × page × action matri
 - [x] Controls follow permissions: applications (decide, delete), settings (a coordinator gets
       only the test email tool), transparency (no upload without `MANAGE_PET_MEDIA`), own-row
       role edit.
-- [x] Signed out or suspended: the 401 page on every section and on `/admin`, the client drops a
-      cached user the server no longer recognises; the proxy's 401 links to sign-in.
+- [x] Signed out or suspended: nobody signed in goes to the sign-in form from every section, from
+      `/admin` and from the proxy; a session the DAL will not honour gets the 401 page; the client
+      drops a cached user the server no longer recognises.
 - [x] Sponsor portal: the sign-in/dashboard loop for a sponsor whose record is gone; "Become a
       sponsor" now leads to the rescues; "Claim your portal" offered to sponsors, not every donor.
 - [x] Tests for every fix, each shown failing against the base branch's code through an alias

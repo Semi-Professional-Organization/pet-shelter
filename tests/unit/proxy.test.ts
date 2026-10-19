@@ -36,9 +36,13 @@ function isPassThrough(response: { status: number; headers: Headers }): boolean 
 
 describe("Proxy route guard", () => {
   describe("/admin/members", () => {
-    it("returns 401 with no session cookie", () => {
+    it("sends a visitor with no session cookie to sign in", () => {
+      // Was a 401, "Your session has ended", for a session that never existed. The section
+      // gates send nobody to the sign-in form, and so does this
+      // (tasks/decisions/2026-10-19-sessions-change-by-document-load.md).
       const res = proxy(request("/admin/members"));
-      expect(res.status).toBe(401);
+      expect(res.status).toBe(307);
+      expect(new URL(res.headers.get("location")!).pathname).toBe("/admin/login");
     });
 
     it("returns 401 for a malformed or tampered cookie", () => {
@@ -85,7 +89,7 @@ describe("Proxy route guard", () => {
     });
 
     it("guards nested paths under the prefix", () => {
-      expect(proxy(request("/admin/members/usr-1")).status).toBe(401);
+      expect(proxy(request("/admin/members/usr-1", sessionFor(ROLES.STAFF))).status).toBe(403);
     });
   });
 
@@ -107,8 +111,8 @@ describe("Proxy route guard", () => {
       expect(body).not.toContain("/admin/pets");
     });
 
-    it("send a signed-out visitor to sign in, not to a Super Admin about their role", async () => {
-      const body = await proxy(request("/admin/members")).text();
+    it("send an ended session to sign in, not to a Super Admin about their role", async () => {
+      const body = await proxy(request("/admin/members", sessionFor(ROLES.SUPER_ADMIN, -60))).text();
 
       expect(body).toContain('href="/admin/login"');
       expect(body).toContain("Go to Sign In");

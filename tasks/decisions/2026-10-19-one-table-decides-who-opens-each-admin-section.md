@@ -7,9 +7,10 @@ open each (any one of them suffices). Three things read it:
 
 - the nav in `src/app/admin/layout.tsx`, through `adminSectionsFor(user.role)`;
 - the `/admin` landing, through `adminHomeFor(session.role)`;
-- every section's page, through `requireAdminSection(href)` in `adminSectionGate.ts`, which renders
-  the 401 page for a member who is signed out, suspended or gone and the 403 page for a role the
-  section does not open.
+- every section's page, through `requireAdminSection(href)` in `adminSectionGate.ts`, which sends
+  nobody signed in to the sign-in form, renders the 401 page for a session the DAL will not honour
+  (suspended, deleted) and the 403 page for a role the section does not open;
+- the proxy, for `/admin/members`, through `canOpenAdminSection` on the cookie's role.
 
 ## Why
 

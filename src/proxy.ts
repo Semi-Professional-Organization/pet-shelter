@@ -123,8 +123,14 @@ export function proxy(request: NextRequest): NextResponse {
   if (!section) return NextResponse.next();
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-  const session = token ? unsealSession(token) : null;
 
+  // Nobody signed in: the sign-in form, as the section gates answer, not "Your
+  // session has ended" for a session that never existed.
+  if (!token) {
+    return NextResponse.redirect(new URL("/admin/login", request.url));
+  }
+
+  const session = unsealSession(token);
   if (!session) {
     return denialResponse(401, "Sign in required", "Your session has ended");
   }

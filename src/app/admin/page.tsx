@@ -1,7 +1,8 @@
-import { redirect, unauthorized } from "next/navigation";
+import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
-import { getVerifiedSession, hasSessionCookie } from "@/lib/security/dal";
+import { getVerifiedSession } from "@/lib/security/dal";
 import { adminHomeFor } from "@/lib/security/adminSections";
+import { refuseMissingSession } from "@/lib/security/adminSectionGate";
 
 // The destination depends on the member's live role, so it must never come from
 // the full route cache.
@@ -21,16 +22,9 @@ export const dynamic = "force-dynamic";
  * send a demoted member into a section that then refuses them.
  */
 export default async function AdminIndexPage() {
-  const session = await getVerifiedSession();
-
-  if (!session) {
-    // Nobody signed in: the front door's answer is the sign-in form.
-    if (!(await hasSessionCookie())) redirect("/admin/login");
-    // Signed in as someone the DAL will not honour — suspended, deleted, or an
-    // account only the in-memory store holds, which sign-in accepts. The 401 page
-    // says so; a redirect to the form would bring it straight back with no reason.
-    unauthorized();
-  }
+  // The same answer as every section's gate when nobody is verified: the sign-in form
+  // for no session, the 401 page for one the DAL will not honour.
+  const session = (await getVerifiedSession()) ?? (await refuseMissingSession());
 
   const home = adminHomeFor(session.role);
   if (home) redirect(home);

@@ -26,8 +26,12 @@ Two separate things were wrong with signing in:
   the new cookie.
 - `/admin` (`src/app/admin/page.tsx`) is a Server Component that reads the verified session and
   redirects to the first section, in nav order, that the live role opens; a role that opens none
-  (legacy VOLUNTEER) is told so; a signed-out or suspended visitor gets the 401 page, as on every
-  section, rather than a silent redirect to the sign-in form.
+  (legacy VOLUNTEER) is told so. When the DAL vouches for nobody it answers as every section's
+  gate does (`refuseMissingSession`): no session cookie, or an expired one, goes to the sign-in
+  form; a cookie the DAL will not honour (suspended, deleted, or an account only the in-memory
+  store holds, which sign-in accepts) gets the 401 page, because a redirect to the form would
+  bring that member straight back with no reason given. The proxy sends a request with no
+  cookie at all to the sign-in form too, where it used to answer 401 "Your session has ended".
 - "Back to Admin" on the 403 page and in the proxy's 403 document points at `/admin` too.
 
 Observed (K2, K2b in the session's build gate): signed out in the app, then the demo Staff button —

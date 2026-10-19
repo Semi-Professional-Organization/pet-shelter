@@ -71,14 +71,19 @@ async function liveRowIs(role: Role, status = "ACTIVE"): Promise<void> {
   });
 }
 
-/** Renders a section's page and returns the interrupt it threw, or "rendered". */
+/**
+ * Renders a section's page and returns the interrupt it threw — `redirect:<target>` for a
+ * redirect — or "rendered".
+ */
 async function open(href: AdminSectionHref): Promise<string> {
   const { default: Page } = await PAGES[href]();
   try {
     await Page();
     return "rendered";
   } catch (error) {
-    if (error instanceof MockNavigationError) return error.digest;
+    if (error instanceof MockNavigationError) {
+      return error.target ? `redirect:${error.target}` : error.digest;
+    }
     throw error;
   }
 }
@@ -122,8 +127,10 @@ describe("each section's page applies the table's gate", () => {
     expect(await open(href)).toBe(FORBIDDEN);
   });
 
-  it.each(sections)("%s answers a signed-out visitor with the 401 page", async (href) => {
-    expect(await open(href)).toBe(UNAUTHORIZED);
+  it.each(sections)("%s sends a visitor with no session to the sign-in form", async (href) => {
+    // Not the 401 page's "Your session has ended", for a session that never existed: a
+    // bookmark or an emailed link is the usual way in.
+    expect(await open(href)).toBe("redirect:/admin/login");
   });
 
   it.each(sections)("%s answers a suspended member it would admit with the 401 page", async (href) => {
