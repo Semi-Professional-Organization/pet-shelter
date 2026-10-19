@@ -497,8 +497,19 @@ describe("Caretaker Q&A (Gold privilege)", () => {
     await sponsorLoginAction({ email: "silver@example.com", password: "silver123" });
     await submitCaretakerQuestionAction("Can I visit Bella this weekend?");
 
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(sendCaretakerQuestionEmail).not.toHaveBeenCalled();
+    // "Not called yet" alone proves nothing for a non-blocking dispatch: one slower
+    // than whatever the test waited for passes it. A Gold question sent afterwards
+    // takes the same path, so once its email has arrived, one the Silver attempt
+    // queued earlier would have arrived too.
+    await sponsorLoginAction({ email: "gold@example.com", password: "gold123" });
+    await submitCaretakerQuestionAction("How is Luna's hydrotherapy progressing?");
+    await vi.waitFor(() =>
+      expect(sendCaretakerQuestionEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ sponsorEmail: "gold@example.com" })
+      )
+    );
+
+    expect(sendCaretakerQuestionEmail).toHaveBeenCalledTimes(1);
   });
 
   it("rejects an empty or oversized message from a Gold sponsor", async () => {

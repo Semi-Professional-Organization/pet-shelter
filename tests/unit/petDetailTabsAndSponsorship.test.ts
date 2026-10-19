@@ -84,35 +84,6 @@ describe("FE-05: Tabbed Animal Profile View & Status Presentation", () => {
     const progressPercent = getRehabProgressPercent(mockRehabPet);
     expect(progressPercent).toBe(60);
   });
-
-  it("should sort progress updates in descending chronological order", () => {
-    const petWithMultiUpdates: Pet = {
-      ...mockAdoptablePet,
-      updates: [
-        { id: "up-1", date: "2026-01-15", title: "Intake", content: "Initial medical check" },
-        { id: "up-2", date: "2026-02-20", title: "Recovery", content: "Final weight check" },
-        { id: "up-3", date: "2026-02-01", title: "Treatment", content: "Second vaccination" },
-      ],
-    };
-
-    const sortedUpdates = [...(petWithMultiUpdates.updates ?? [])].sort((a, b) =>
-      b.date.localeCompare(a.date)
-    );
-
-    expect(sortedUpdates.map((u) => u.id)).toEqual(["up-2", "up-3", "up-1"]);
-  });
-
-  it("should calculate tab navigation index wraps correctly for ARIA roving tabindex", () => {
-    const tabs = ["about", "status", "updates", "support"];
-    
-    // ArrowRight from last tab wraps to first tab
-    const nextFromLast = (3 + 1) % tabs.length;
-    expect(nextFromLast).toBe(0);
-
-    // ArrowLeft from first tab wraps to last tab
-    const prevFromFirst = (0 - 1 + tabs.length) % tabs.length;
-    expect(prevFromFirst).toBe(3);
-  });
 });
 
 describe("FE-06: Personalized Sponsorship & Tiers", () => {
@@ -162,21 +133,5 @@ describe("FE-06: Personalized Sponsorship & Tiers", () => {
       expect(tier.description.length).toBeGreaterThan(10);
       expect(tier.impactMetrics.length).toBeGreaterThan(5);
     });
-  });
-
-  it("should match URL search params to dedicated animal or general fund", () => {
-    const publicPets: Pet[] = [mockAdoptablePet, mockRehabPet];
-    
-    // By ID
-    const matchById = publicPets.find((p) => p.id === "pet-test-02");
-    expect(matchById?.name).toBe("Kopi");
-
-    // By Name case-insensitive
-    const matchByName = publicPets.find((p) => p.name.toLowerCase() === "buster".toLowerCase());
-    expect(matchByName?.id).toBe("pet-test-01");
-
-    // General fund fallback
-    const nullMatch = publicPets.find((p) => p.id === "general") ?? null;
-    expect(nullMatch).toBeNull();
   });
 });

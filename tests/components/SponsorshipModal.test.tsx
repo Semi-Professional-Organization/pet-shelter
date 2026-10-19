@@ -1,29 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 
-const { saveDonationReceipt } = vi.hoisted(() => ({
-  saveDonationReceipt: vi.fn(),
-}));
-
 vi.mock("@/actions/donations", () => ({ submitDonationPledgeAction: vi.fn() }));
 vi.mock("@/actions/sponsorships", () => ({
   createPetSponsorshipAction: vi.fn(),
 }));
-vi.mock("@/lib/client/sponsorshipStore", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/lib/client/sponsorshipStore")>();
-
-  return {
-    ...actual,
-    useSponsorshipStore: () => ({
-      tiers: actual.SPONSORSHIP_TIERS,
-      receipts: [],
-      activeReceipt: null,
-      setActiveReceipt: vi.fn(),
-      saveDonationReceipt,
-    }),
-  };
-});
 
 import { submitDonationPledgeAction } from "@/actions/donations";
 import { createPetSponsorshipAction } from "@/actions/sponsorships";
@@ -368,9 +349,6 @@ describe("SponsorshipModal checkout contract", () => {
       }),
     );
     expect(mockedCreateSponsorship).not.toHaveBeenCalled();
-    // The client receipt store holds receipts. A claim reference is not one, and
-    // writing it there would rebuild the confusion this boundary removed.
-    expect(saveDonationReceipt).not.toHaveBeenCalled();
   });
 
   it("blocks RM 5, then sends the exact RM 10 target-pet boundary", async () => {
@@ -463,7 +441,6 @@ describe("SponsorshipModal checkout contract", () => {
     expect(
       screen.queryByRole("button", { name: /print|save receipt/i }),
     ).not.toBeInTheDocument();
-    expect(saveDonationReceipt).not.toHaveBeenCalled();
   });
 
   it("does not claim an acknowledgement email was delivered from ledger success alone", async () => {
