@@ -26,8 +26,8 @@
 
 > **2026-10-19: the `pets` expand and contract migrations are applied, and the catalogue reads
 > the database again.** The owner ran expand on 2026-10-16 and contract on 2026-10-19, and a live
-> probe confirmed `/pets` serving real rows. Not recorded: whether `cleanup.sql` ran. Not
-> re-measured: drift. Details and what is still open are in the last section,
+> probe confirmed `/pets` serving real rows. The owner also ran `cleanup.sql` on 2026-10-19, so
+> the conversion is now irreversible. Not re-measured: drift. Details and what is still open are in the last section,
 > "Applied: the `pets` conversion". The 2026-09-22 note below is history.
 
 > **2026-09-22: the remaining pet drift is losing reads, not just blocking a push.** The deployed
@@ -379,9 +379,11 @@ production branch, using the files as merged on master (expand as of #113, `1b6d
    `BEGIN`, `SELECT 1`, `DO`, `COMMIT`. `SELECT count(*) FROM pets_age_archive_20260922` returned
    8. Afterwards `/`, `/pets`, `/pets?species=dog` and `/sponsors` all returned 200. The deployed
    `Pet` model on master declares no `age` or `ageCategory`, so nothing reads the dropped columns.
-- **Cleanup (`cleanup.sql`)** was handed to the owner the same day, with the warning that it makes the
-   conversion irreversible. Whether it ran is not recorded here. If it has, `rollback.sql` can no
-   longer restore the age prose.
+- **Cleanup, 2026-10-19.** The owner ran `cleanup.sql` the same day, having been warned that it
+  makes the conversion irreversible. Neon printed `BEGIN`, `SELECT 1`, `DROP`, `COMMIT`.
+  `pets_age_archive_20260922` is gone, `rollback.sql` can no longer restore the age prose, and no
+  copy of that prose remains. The last views of it are the owner's own saved query outputs, if
+  they kept them.
 
 **Not to be confused with this:** on 2026-10-19 `/pets` and `/sponsors` returned 500 for a few
 minutes. The Vercel log showed `SecretConfigurationError`: the build before #128 refused a
@@ -392,8 +394,8 @@ migration.
 **Still open, so this entry stays open:**
 
 - **`db:check-drift` has not been re-run since.** This section is a record of what the owner
-  ran, not a drift measurement. Expect the `pets` statement to be gone, and expect one
-  `DROP TABLE "pets_age_archive_20260922"` until cleanup runs.
+  ran, not a drift measurement. Expect no `pets` statement and no archive-table statement, since
+  cleanup has run. Whatever remains should be the settings migration below.
 - **The settings migration, `20260922_settings_and_defaults/migration.sql`, has no record of being
   applied.** The
   `shelter_settings` columns and the `notification_preferences.updatedAt` default may still drift.
