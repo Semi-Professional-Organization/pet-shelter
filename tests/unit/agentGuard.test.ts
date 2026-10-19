@@ -343,9 +343,12 @@ describe("agent guard", () => {
       expect(deny).not.toContain("npm run db:seed:local");
       expect(deny).not.toContain("Bash(npm run db:push*)");
       // The FAQ and bulletin migrations are the same shape of script, so both deny the direct
-      // invocation as well as the npm one.
+      // invocation, in both shells. (The FAQ npm rule predates PowerShell rules here; see
+      // tasks/open/permission-rules-bind-bash-only.md.)
       for (const script of ["migrate-faqs", "migrate-bulletins"]) {
-        expect(covered(`npx tsx scripts/${script}.ts`), script).toBe(true);
+        for (const tool of ["Bash", "PowerShell"]) {
+          expect(covered(`npx tsx scripts/${script}.ts`, tool), `${script} in ${tool}`).toBe(true);
+        }
       }
     });
 
@@ -401,7 +404,7 @@ describe("agent guard", () => {
         .filter(r => r.startsWith(`${tool}(`))
         .some(r => matchesRule(r, command));
 
-    // The agent-scripts catalog's permission gaps, closed for both shells: this repo's agents run
+    // Permission gaps found while planning the agent scripts, closed for both shells: this repo's agents run
     // PowerShell as often as Bash, and the permissions reference documents PowerShell rules as
     // their own `PowerShell(...)` shape. Whether a Bash rule also binds PowerShell is unobserved;
     // the older rules above are Bash-only — tasks/open/permission-rules-bind-bash-only.md.

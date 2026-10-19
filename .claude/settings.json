@@ -41,6 +41,8 @@
       "Bash(node scripts/secrets.mjs run*)",
       "Bash(npm run secrets:edit*)",
       "Bash(node scripts/secrets.mjs edit*)",
+      "PowerShell(npx tsx scripts/migrate-faqs.ts*)",
+      "PowerShell(tsx scripts/migrate-faqs.ts*)",
       "PowerShell(npm run db:migrate:bulletins)",
       "PowerShell(npm run db:migrate:bulletins *)",
       "PowerShell(npx tsx scripts/migrate-bulletins.ts*)",

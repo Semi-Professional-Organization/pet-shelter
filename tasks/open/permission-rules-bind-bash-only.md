@@ -11,7 +11,8 @@ PowerShell tool. This machine runs Windows, PowerShell is the primary shell, and
 both tools.
 
 The rules added on 2026-10-20 (`db:migrate:bulletins`, `secrets:decrypt:local`, `secrets:run`,
-`secrets:edit`, `ledger:issues -- --apply`) are written for both tools. The older ones were left
+`secrets:edit`, `ledger:issues -- --apply`, and the direct `tsx` form of both migrations) are
+written for both tools. The older ones were left
 alone to keep that change to the gaps it was asked to close.
 
 A second unobserved question rides on the same test. Agents here usually start a PowerShell
