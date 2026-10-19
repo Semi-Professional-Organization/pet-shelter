@@ -245,6 +245,7 @@ describe("agent usage: workflow families", () => {
   it("files a run over a whole test directory as a gate, not a targeted run", () => {
     expect(familiesOf("Bash", "npm run test -- tests/unit")).toEqual(["gates"]);
     expect(familiesOf("Bash", "npx vitest run --project unit")).toEqual(["gates"]);
+    expect(familiesOf("PowerShell", "npx vitest run .\\tests\\unit")).toEqual(["gates"]);
   });
 
   it("files a run narrowed by a name filter or a test pattern as targeted", () => {
@@ -324,6 +325,9 @@ describe("agent usage: the analyses", () => {
     expect(triggerOf(meta)).toBeUndefined();
     expect(triggerOf(human)).toBe("person");
     expect(triggerOf({ type: "user", isCompactSummary: true, message: { content: "summary" } })).toBeUndefined();
+    // Another session's message carries isMeta as well, and still woke the session.
+    expect(triggerOf({ type: "user", isMeta: true, origin: { kind: "peer" }, message: { content: "note" } })).toBe("event");
+    expect(triggerOf({ type: "attachment", attachment: { type: "queued_command", isMeta: true, origin: { kind: "peer" } } })).toBe("event");
     const file = priceFile(
       extract([
         assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),

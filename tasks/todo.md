@@ -35,7 +35,7 @@ command can prove what it saved. Plus three permission gaps the plan named.
       `tasks/open/agent-scripts-must-cut-what-a-session-costs.md`.
 - [x] AGENTS.md: the pointer to `--help`, and no sleep-polling CI in the desktop app.
 - [x] Permission gaps closed in Bash and PowerShell, wider than asked:
-      `tasks/decisions/2026-10-20-agents-are-denied-every-way-into-the-production-secrets.md`.
+      `tasks/decisions/2026-10-20-agents-are-denied-the-secrets-scripts-by-every-handle.md`.
 - [x] Eight `/code-review high` rounds so far, 78 findings, all fixed except one premise that
       did not hold (a person's message stored beside a tool result: the only such records are a
       fork's boilerplate). Every fix verified by a mutant that fails a test.

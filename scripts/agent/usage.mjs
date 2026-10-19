@@ -164,7 +164,7 @@ export function isTargetedRun(cmd) {
       if (VITEST_VALUE_FLAGS.has(word)) i++;
       continue;
     }
-    if (!WHOLE_SUITE.has(word.replace(/\\/g, "/").replace(/\/$/, ""))) return true;
+    if (!WHOLE_SUITE.has(word.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, ""))) return true;
   }
   return false;
 }
@@ -217,6 +217,11 @@ export function commandClass(tool, cmd) {
 
 // ================================ extraction ================================
 
+/**
+ * The text a tool result put into context.
+ * ceiling: image blocks count as nothing. Their token cost depends on pixel size, which the
+ * transcript does not record; 3 tool results here carried one (2026-10-20).
+ */
 const textLength = (content) =>
   typeof content === "string"
     ? content.length
@@ -233,18 +238,23 @@ const textLength = (content) =>
  * non-meta records are taken as a person's message.
  */
 export function triggerOf(record) {
+  // The origin decides first: another session's message is written with `isMeta` set too, and it
+  // still woke the session.
   if (record.type === "attachment") {
     // Anything that arrives while a turn runs (a person's message, a background notice, another
     // session's message) is queued and written as a `queued_command` attachment. Older ones carry
     // no origin; their `commandMode` is "task-notification", so only "human" is a person here.
     const queued = record.attachment;
-    if (queued?.type !== "queued_command" || queued.isMeta) return undefined;
-    return queued.origin?.kind === "human" ? "person" : "event";
+    if (queued?.type !== "queued_command") return undefined;
+    const kind = queued.origin?.kind;
+    if (kind) return kind === "human" ? "person" : "event";
+    return queued.isMeta ? undefined : "event";
   }
+  const kind = record.origin?.kind;
+  if (kind) return kind === "human" ? "person" : "event";
   // A compaction's summary is written as a user record too; no one sent it.
   if (record.isMeta || record.isCompactSummary) return undefined;
-  const kind = record.origin?.kind;
-  return kind === undefined || kind === "human" ? "person" : "event";
+  return "person";
 }
 
 /** Token fields a request's lines are merged on. Streamed lines repeat them; output grows. */
@@ -462,12 +472,18 @@ const COMPACTION_DROP = 0.6;
 
 /** Indexes of the requests that start a new context, after a compaction. */
 function segmentBreaks(file) {
+  const cached = breaksOf.get(file);
+  if (cached) return cached;
   const breaks = new Set(file.compactions);
   for (let i = 1; i < file.requests.length; i++) {
     if (promptOf(file.requests[i]) < COMPACTION_DROP * promptOf(file.requests[i - 1])) breaks.add(i);
   }
+  breaksOf.set(file, breaks);
   return breaks;
 }
+
+/** Breaks depend only on token counts and compaction records, so one pass per file serves all. */
+const breaksOf = new WeakMap();
 
 /** Index of the last request each request's context survives to. */
 function segmentEnds(file) {
@@ -651,7 +667,8 @@ export function summarize(files, { since, priceAs } = {}) {
 
   for (const f of files) {
     for (const r of f.requests) {
-      if (!inWindow(r.ts)) continue;
+      // A price is the one marker of "in the window", as in every analysis below.
+      if (!r.usd) continue;
       totals.requests++;
       totals.cost += r.cost;
       for (const k of ["read", "write", "output", "input", "search"]) totals[k] += r.usd[k];

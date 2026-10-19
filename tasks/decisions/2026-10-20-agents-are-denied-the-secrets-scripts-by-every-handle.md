@@ -1,4 +1,4 @@
-# Agents are denied every npm and node way into the production secrets, not just the three asked
+# Agents are denied the secrets scripts by every npm and node handle, not just the three asked
 
 **Decided:** 2026-10-20
 
@@ -7,8 +7,8 @@ The agent-scripts plan named three permission gaps, and the owner chose to close
 deny `npm run secrets:decrypt:local` (it overwrites `.env.local`), and ask before
 `npm run ledger:issues -- --apply` (it publishes GitHub issues).
 
-Review of that change found the same door open by other handles, and these were closed too, in
-`.claude/settings.json`, for both the Bash and the PowerShell tool:
+Review of that change found the same scripts reachable by other handles, and these were closed
+too, in `.claude/settings.json`, for both the Bash and the PowerShell tool:
 
 - `secrets:run`, which decrypts `.env.production.enc` into any command's environment, and
   `secrets:edit:prod`, which decrypts it into an editor. Both are denied. `secrets:check`, which
@@ -24,10 +24,12 @@ bulletins rule is word-bounded rather than a bare `*`.
 
 **Reversible, and why someone might:** a human who wants an agent to run `secrets:run` for a
 one-off task can approve it in the moment only by changing the rule, because a deny cannot be
-approved in band. If that happens often, `secrets:run` could move from `deny` to `ask`. It was
-denied because the repo's standing position is that agents do not reach the production database.
+approved in band. If that happens often, `secrets:run` could move from `deny` to `ask`.
 
-Prefix rules still miss shapes: a leading `Set-Location`, another path spelling, the `sops` binary
-the scripts call, `node --import tsx`. They are enumerated in `tests/unit/agentGuard.test.ts`;
-whether the PowerShell tool honours rules per subcommand is open in
-`tasks/open/permission-rules-bind-bash-only.md`.
+**What this does not close.** These rules cover the secrets *scripts*. They do not stop an agent
+reading `.env.local` itself (`cat`, the Read tool), or running a command that connects with it:
+`npm run db:check-drift`, `npm run db:studio`, `npx prisma studio`, `npx prisma db pull`. Earlier
+sessions here saw the auto-mode classifier refuse production reads, but no rule in this file does. Prefix rules also miss shapes: a leading `Set-Location`, another path
+spelling, the `sops` binary the scripts call, `node --import tsx`. Those are enumerated in
+`tests/unit/agentGuard.test.ts`; whether the PowerShell tool honours rules per subcommand is open
+in `tasks/open/permission-rules-bind-bash-only.md`.
