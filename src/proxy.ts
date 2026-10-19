@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, unsealSession } from "@/lib/security/sessionToken";
 import { canOpenAdminSection, type AdminSectionHref } from "@/lib/security/adminSections";
 import { EMAIL_BRAND, EMAIL_TONE } from "@/lib/presentation/emailTokens";
+import { FORBIDDEN_COPY } from "@/lib/presentation/accessDenialCopy";
 
 /**
  * Pre-render authorization for privileged admin routes.
@@ -60,26 +61,18 @@ const GUARDED_SECTIONS: AdminSectionHref[] = ["/admin/members"];
  * member's live role when the console loads (from the browser's cached copy if
  * that check fails), and this function reads the role sealed into the cookie at
  * sign-in, so a member promoted since signing in is offered the tab and refused
- * here; and a cookie that expires while the console is open is refused here on
- * the next click. The texts below say what ends each: signing in again.
+ * here. The sentence this document adds to the shared 403 words says what ends
+ * it: signing in again.
  */
-const NEXT_STEP: Record<401 | 403, { hint: string; href: string; label: string }> = {
-  // A signed-out visitor needs the sign-in page, not advice about their role.
-  401: { hint: "Sign in again to continue to the shelter staff portal.", href: "/admin/login", label: "Go to Sign In" },
-  // /admin, not a section: it sends each role to the first section it can open.
-  403: {
-    hint:
-      "Ask a Super Admin to review your role under Staff &amp; Permissions. If your role was " +
-      "changed since you signed in, sign out and sign in again.",
-    href: "/admin",
-    label: "Back to Admin",
-  },
-};
+const STALE_ROLE_HINT = "If your role was changed since you signed in, sign out and sign in again.";
 
-function denialResponse(status: 401 | 403, title: string, message: string): NextResponse {
-  const next = NEXT_STEP[status];
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function forbiddenResponse(): NextResponse {
   // Deliberately minimal: this is a network-boundary rejection, and the styled
-  // in-app equivalents are src/app/forbidden.tsx and src/app/unauthorized.tsx.
+  // in-app equivalent is src/app/forbidden.tsx, whose words it shares.
   //
   // Colours come from the email hex mirror rather than literals. This document
   // is assembled outside the CSS pipeline, so it cannot use the design-system
@@ -92,20 +85,20 @@ function denialResponse(status: 401 | 403, title: string, message: string): Next
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>${status} ${title}</title>
+<title>${escapeHtml(FORBIDDEN_COPY.label)}</title>
 </head>
 <body style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;background:${EMAIL_BRAND.muted};color:${EMAIL_BRAND.foreground}">
 <main style="max-width:32rem;padding:2rem;text-align:center">
-<p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${EMAIL_TONE.danger.text};margin:0 0 .5rem">${status} — ${title}</p>
-<h1 style="font-size:1.5rem;margin:0 0 .75rem">${message}</h1>
-<p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">${next.hint}</p>
-<a href="${next.href}" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">${next.label}</a>
+<p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${EMAIL_TONE.danger.text};margin:0 0 .5rem">${escapeHtml(FORBIDDEN_COPY.label)}</p>
+<h1 style="font-size:1.5rem;margin:0 0 .75rem">${escapeHtml(FORBIDDEN_COPY.heading)}</h1>
+<p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">${escapeHtml(`${FORBIDDEN_COPY.body} ${STALE_ROLE_HINT}`)}</p>
+<a href="${FORBIDDEN_COPY.backHref}" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">${escapeHtml(FORBIDDEN_COPY.backLabel)}</a>
 </main>
 </body>
 </html>`;
 
   return new NextResponse(body, {
-    status,
+    status: 403,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
@@ -123,22 +116,19 @@ export function proxy(request: NextRequest): NextResponse {
   if (!section) return NextResponse.next();
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const session = token ? unsealSession(token) : null;
 
-  // Nobody signed in: the sign-in form, as the section gates answer, not "Your
-  // session has ended" for a session that never existed.
-  if (!token) {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
-  }
-
-  const session = unsealSession(token);
+  // No valid session — none, expired or tampered with: the sign-in form, as the
+  // section gates answer (`refuseMissingSession`). It used to be a 401 reading
+  // "Your session has ended", wrong for a session that never existed.
   if (!session) {
-    return denialResponse(401, "Sign in required", "Your session has ended");
+    return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
   // The table resolves deprecated aliases, so a cookie issued before the RBAC
   // migration (role "ADMIN") is still recognised as a Super Admin here.
   if (!canOpenAdminSection(session.role, section)) {
-    return denialResponse(403, "Forbidden", "You do not have access to this area");
+    return forbiddenResponse();
   }
 
   return NextResponse.next();

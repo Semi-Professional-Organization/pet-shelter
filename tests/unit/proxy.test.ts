@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { proxy, config } from "@/proxy";
 import { sealSession, SESSION_COOKIE_NAME } from "@/lib/security/sessionToken";
 import { ROLES, type Role } from "@/lib/security/permissions";
+import { FORBIDDEN_COPY } from "@/lib/presentation/accessDenialCopy";
 
 /**
  * The proxy is the only thing that can attach a real HTTP status to an
@@ -36,27 +37,29 @@ function isPassThrough(response: { status: number; headers: Headers }): boolean 
 
 describe("Proxy route guard", () => {
   describe("/admin/members", () => {
+    // These three were 401s reading "Your session has ended". A request without a valid
+    // session now goes to the sign-in form, which is what every section's page gate answers
+    // for the same request (tasks/decisions/2026-10-19-sessions-change-by-document-load.md).
+    function sentToSignIn(res: { status: number; headers: Headers }): boolean {
+      return res.status === 307 && new URL(res.headers.get("location")!).pathname === "/admin/login";
+    }
+
     it("sends a visitor with no session cookie to sign in", () => {
-      // Was a 401, "Your session has ended", for a session that never existed. The section
-      // gates send nobody to the sign-in form, and so does this
-      // (tasks/decisions/2026-10-19-sessions-change-by-document-load.md).
-      const res = proxy(request("/admin/members"));
-      expect(res.status).toBe(307);
-      expect(new URL(res.headers.get("location")!).pathname).toBe("/admin/login");
+      expect(sentToSignIn(proxy(request("/admin/members")))).toBe(true);
     });
 
-    it("returns 401 for a malformed or tampered cookie", () => {
+    it("sends a malformed or tampered cookie to sign in", () => {
       const valid = sessionFor(ROLES.SUPER_ADMIN);
       const tampered = `${valid.slice(0, -2)}ff`;
 
-      expect(proxy(request("/admin/members", "not-a-token")).status).toBe(401);
-      expect(proxy(request("/admin/members", tampered)).status).toBe(401);
+      expect(sentToSignIn(proxy(request("/admin/members", "not-a-token")))).toBe(true);
+      expect(sentToSignIn(proxy(request("/admin/members", tampered)))).toBe(true);
     });
 
-    it("returns 401 for an expired session", () => {
+    it("sends an expired session to sign in", () => {
       // sealSession stamps expiry from now; a negative TTL is already past.
       const expired = sessionFor(ROLES.SUPER_ADMIN, -60);
-      expect(proxy(request("/admin/members", expired)).status).toBe(401);
+      expect(sentToSignIn(proxy(request("/admin/members", expired)))).toBe(true);
     });
 
     it.each([
@@ -111,12 +114,14 @@ describe("Proxy route guard", () => {
       expect(body).not.toContain("/admin/pets");
     });
 
-    it("send an ended session to sign in, not to a Super Admin about their role", async () => {
-      const body = await proxy(request("/admin/members", sessionFor(ROLES.SUPER_ADMIN, -60))).text();
+    it("say what the in-app 403 page says, and what only the proxy can be wrong about", async () => {
+      // Two hand-kept copies of these words had drifted apart. The proxy reads the cookie's
+      // role, so it alone adds the line for a member whose role changed since sign-in.
+      const body = await proxy(request("/admin/members", sessionFor(ROLES.STAFF))).text();
 
-      expect(body).toContain('href="/admin/login"');
-      expect(body).toContain("Go to Sign In");
-      expect(body).not.toMatch(/review your role/);
+      expect(body).toContain(FORBIDDEN_COPY.heading);
+      expect(body).toContain(FORBIDDEN_COPY.body.replace("&", "&amp;"));
+      expect(body).toContain("sign out and sign in again");
     });
 
     it("leak nothing about the protected resource", async () => {

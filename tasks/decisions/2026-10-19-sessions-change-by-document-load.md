@@ -30,8 +30,11 @@ Two separate things were wrong with signing in:
   gate does (`refuseMissingSession`): no session cookie, or an expired one, goes to the sign-in
   form; a cookie the DAL will not honour (suspended, deleted, or an account only the in-memory
   store holds, which sign-in accepts) gets the 401 page, because a redirect to the form would
-  bring that member straight back with no reason given. The proxy sends a request with no
-  cookie at all to the sign-in form too, where it used to answer 401 "Your session has ended".
+  bring that member straight back with no reason given. The proxy, which can read only the
+  cookie, sends any request without a valid one (none, expired, tampered with) to the sign-in
+  form too, where it used to answer 401 "Your session has ended"; its tests that pinned the 401
+  now pin the redirect. Its 403 document takes its words from `FORBIDDEN_COPY`, which the in-app
+  403 page shares, plus one line for a role changed since sign-in.
 - "Back to Admin" on the 403 page and in the proxy's 403 document points at `/admin` too.
 
 Observed (K2, K2b in the session's build gate): signed out in the app, then the demo Staff button —
