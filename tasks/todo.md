@@ -15,6 +15,52 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# The test suite runs hermetic and pays only for what a test uses
+
+**Branch:** `claude/project-thread-jdktt3` · opened 2026-10-20 · base `f1f448a`
+
+From the measured plan in the "Test suite redesign plan" doc (owner said "go" on all five
+recommendations). Local `test:all` on this machine: 192-216 s on master, about 52 s here. The
+cause of the local-only failures was never test order: it was per-test scrypt in the shared hook,
+tests reaching whatever listened on `localhost:5432`, cold imports under a 5 s timeout, and the
+developer shell leaking in.
+
+- [x] `prisma.ts`: no `DATABASE_URL` means an offline client (lazy P1001 refusals, no socket).
+- [x] Demo seed password hashes are constants, with a test that each verifies its password.
+- [x] Store resets register themselves (`src/lib/stateResets.ts`); the hook imports nothing.
+- [x] `tests/setup/hermeticEnv.ts`: scrubbed env, `TZ=UTC`, fetch guard; `unstubEnvs`,
+      `unstubGlobals`, `requireAssertions`, `passWithNoTests: false`.
+- [x] `npm test` regenerates the Prisma client only when the schema changed.
+- [x] `setupUser()` types with `delay: null`; `PetFormDialog` lost its artificial 400 ms delay.
+- [x] Env hygiene in 9 files (`vi.stubEnv` instead of hand-assigned `process.env`).
+- [x] Four authorization tests that passed for the wrong reason now pass the real check, each
+      proven to fail when authorization refuses. 18 tests that could not fail were removed and
+      6 repaired (Hero count-up, pledge-ref suffix, sponsor dispatch), each repair mutation-checked.
+- [x] Closed `unit-tests-write-to-whatever-is-on-localhost-5432` and
+      `unit-suite-is-order-dependent-in-both-directions`.
+
+## Review
+
+**Verified on this branch:** `tsc --noEmit` exit 0. `npm run lint` 0 errors (13 warnings, all in
+lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
+secrets and no `DATABASE_URL`. `npm test` 1,941 passed in 21 s (pre-test hook skipped the
+regeneration). Unit, integration and component suites together three times under other
+sessions' load: 135 files, 2,261 tests, all passing every run, 47 to 52 s (master: 192 to 216 s).
+
+**Not verified here:** `npm run test:db`. The Prisma CLI's `db push` is refused to agents on this
+machine and no local Postgres runs, so the database tier is CI's to check. It now runs with
+`requireAssertions` and `passWithNoTests: false`; the one conditional assertion it has
+(`schemaIntegrity`, "leaves rehab columns null") asserts whenever the catalogue is seeded,
+which the CI job does first.
+
+**Deliberately not done (next PR):** the local database tier on embedded Postgres (owner said
+yes; blocked here by the same `db push` refusal, so it needs a run on CI or by a human), the
+`guards` project with a shared file index, and `npm run test:related`. Not done at all:
+`isolate: false` (179 failures from per-file mocks), Vitest's experimental `fsModuleCache`,
+happy-dom, and raising `hookTimeout`. Two gaps filed in `tasks/open/`:
+`test-admin-shares-an-id-with-a-seeded-staff-account.md` and
+`behaviours-the-deleted-hollow-tests-claimed-to-cover.md`.
+
 # A short staff invite code no longer takes the site down
 
 **Branch:** `fix/invite-code-any-length` · opened 2026-10-17 · base `d6dd030`
