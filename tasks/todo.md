@@ -47,9 +47,12 @@ admin page, action and the sponsor portal, with the role × page × action matri
 
 Deliberately not done, and why:
 
-- The applications board never sends a decision on a real application to the server (it checks
-  the browser's sample copy first). Every role is affected, so it is not a role dead end and was
-  filed rather than fixed: `tasks/open/application-review-is-gated-by-the-browser-copy.md`.
+- The applications board never sent a decision on a real application to the server: it checked
+  the browser's sample copy first and stopped at "Application not found". First filed as not a
+  role dead end, then fixed in the sixth review round, because the controls this branch offers
+  reviewers could not work without it. What is left of that board — the dialog reporting success
+  before the server answers, scheduling reopening a decided application — is in
+  `tasks/open/application-review-dialog-answers-before-the-server.md`.
 - Content Editors cannot upload report PDFs; the button is hidden rather than `/api/upload`
   widened, because widening who can store files is the owner's call:
   `tasks/decisions/2026-10-19-content-editors-paste-report-links-rather-than-upload.md`.

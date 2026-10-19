@@ -10,12 +10,17 @@ import {
   deleteApplication as serverDeleteApplication,
 } from "@/actions/applications";
 
+/**
+ * State and handlers for the applications board.
+ *
+ * Decisions go straight to the server, which enforces the status state machine and the
+ * reviewer's permission. They used to be checked against the browser's application store
+ * first, which holds only the three bundled samples and what this browser created, so for
+ * every real application the check answered "Application not found" and the server was
+ * never asked: no role, Super Admin included, could record a decision on one.
+ */
 export function useApplicationTableController(initialApplications?: AdoptionApplicationRecord[]) {
-  const {
-    applications: storeApplications,
-    updateApplicationStatus,
-    deleteApplication,
-  } = useApplicationStore();
+  const { applications: storeApplications } = useApplicationStore();
 
   const [localApplications, setLocalApplications] = useState<AdoptionApplicationRecord[] | null>(null);
   const applications = localApplications || initialApplications || storeApplications;
@@ -47,26 +52,21 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
   const handleQuickStatus = (id: string, nextStatus: ApplicationStatus) => {
     setStatusError(null);
     const prevApplications = applications;
-    const res = updateApplicationStatus(id, nextStatus);
-    if (res && !res.success) {
-      setStatusError(res.error || "Failed to update application status.");
-    } else {
-      setLocalApplications((prev) =>
-        (prev || applications).map((app) => (app.id === id ? { ...app, status: nextStatus } : app))
-      );
-      serverUpdateStatus({ id, status: nextStatus })
-        .then((serverRes) => {
-          if (serverRes && !serverRes.success) {
-            setLocalApplications(prevApplications);
-            setStatusError(serverRes.error || "Failed to update application status.");
-          }
-        })
-        .catch((err) => {
-          console.warn("Background server action sync:", err);
+    setLocalApplications((prev) =>
+      (prev || applications).map((app) => (app.id === id ? { ...app, status: nextStatus } : app))
+    );
+    serverUpdateStatus({ id, status: nextStatus })
+      .then((serverRes) => {
+        if (serverRes && !serverRes.success) {
           setLocalApplications(prevApplications);
-          setStatusError(err instanceof Error ? err.message : "Failed to update application status.");
-        });
-    }
+          setStatusError(serverRes.error || "Failed to update application status.");
+        }
+      })
+      .catch((err) => {
+        console.warn("Background server action sync:", err);
+        setLocalApplications(prevApplications);
+        setStatusError(err instanceof Error ? err.message : "Failed to update application status.");
+      });
   };
 
   const handleUpdateStatusWithNotes = (
@@ -77,27 +77,26 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
   ) => {
     setStatusError(null);
     const prevApplications = applications;
-    const res = updateApplicationStatus(id, status, notes);
-    if (res && res.success) {
-      setLocalApplications((prev) =>
-        (prev || applications).map((app) =>
-          app.id === id ? { ...app, status, adminReviewNotes: notes } : app
-        )
-      );
-      serverUpdateStatus({ id, status, adminReviewNotes: notes, notifyApplicant })
-        .then((serverRes) => {
-          if (serverRes && !serverRes.success) {
-            setLocalApplications(prevApplications);
-            setStatusError(serverRes.error || "Failed to update application status.");
-          }
-        })
-        .catch((err) => {
-          console.warn("Background server update sync:", err);
+    setLocalApplications((prev) =>
+      (prev || applications).map((app) =>
+        app.id === id ? { ...app, status, adminReviewNotes: notes } : app
+      )
+    );
+    serverUpdateStatus({ id, status, adminReviewNotes: notes, notifyApplicant })
+      .then((serverRes) => {
+        if (serverRes && !serverRes.success) {
           setLocalApplications(prevApplications);
-          setStatusError(err instanceof Error ? err.message : "Failed to update application status.");
-        });
-    }
-    return res;
+          setStatusError(serverRes.error || "Failed to update application status.");
+        }
+      })
+      .catch((err) => {
+        console.warn("Background server update sync:", err);
+        setLocalApplications(prevApplications);
+        setStatusError(err instanceof Error ? err.message : "Failed to update application status.");
+      });
+    // Applied on screen at once and confirmed by the server afterwards; a refusal rolls
+    // the row back and shows in the board's banner.
+    return { success: true };
   };
 
   const confirmDelete = async () => {
@@ -106,7 +105,6 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
       const candidateId = deleteCandidate.id;
       const prevApplications = applications;
 
-      deleteApplication(candidateId);
       setLocalApplications((prev) => (prev || applications).filter((app) => app.id !== candidateId));
       setDeleteCandidate(null);
 

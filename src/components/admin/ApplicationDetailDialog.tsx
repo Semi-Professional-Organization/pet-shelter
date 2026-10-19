@@ -29,6 +29,15 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { scheduleApplicationInterview } from "@/actions/applications";
+import { CANONICAL_ROLES, PERMISSIONS, ROLE_LABELS, roleHasPermission } from "@/lib/security/permissions";
+
+// Who a reader should ask, read from the permission matrix rather than named here, so the
+// notice follows the matrix the actions enforce. "Super Admin or Volunteer Coordinator" today.
+const REVIEWER_ROLES = new Intl.ListFormat("en", { type: "disjunction" }).format(
+  CANONICAL_ROLES.filter((role) => roleHasPermission(role, PERMISSIONS.REVIEW_APPLICATIONS)).map(
+    (role) => ROLE_LABELS[role]
+  )
+);
 import {
   APPLICATION_STATUS_SEQUENCE,
   getApplicationStatusPresentation,
@@ -305,7 +314,7 @@ export function ApplicationDetailDialog({
             <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
               <p className="text-xs text-muted-foreground leading-relaxed">
                 You can read this application. Recording a decision or scheduling a meet and
-                greet needs a coordinator or a Super Admin.
+                greet needs the {REVIEWER_ROLES} role.
               </p>
               <Button
                 type="button"

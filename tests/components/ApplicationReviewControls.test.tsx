@@ -1,13 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { setupUser } from "./support/render";
 import type { AdoptionApplicationRecord } from "@/types/application";
 
-vi.mock("@/actions/applications", () => ({
-  updateApplicationStatus: vi.fn().mockResolvedValue({ success: true }),
-  deleteApplication: vi.fn().mockResolvedValue({ success: true }),
-  scheduleApplicationInterview: vi.fn().mockResolvedValue({ success: true }),
+const actions = vi.hoisted(() => ({
+  updateApplicationStatus: vi.fn(),
+  deleteApplication: vi.fn(),
+  scheduleApplicationInterview: vi.fn(),
 }));
+
+vi.mock("@/actions/applications", () => actions);
 
 import { ApplicationDataTable } from "@/components/admin/ApplicationDataTable";
 
@@ -58,6 +60,12 @@ async function openDetail() {
 }
 
 describe("applications board controls", () => {
+  beforeEach(() => {
+    actions.updateApplicationStatus.mockReset().mockResolvedValue({ success: true });
+    actions.deleteApplication.mockReset().mockResolvedValue({ success: true });
+    actions.scheduleApplicationInterview.mockReset().mockResolvedValue({ success: true });
+  });
+
   it("offers a member who may only read (STAFF, Animal Manager) no decision and no delete", async () => {
     board(false, false);
 
@@ -67,7 +75,10 @@ describe("applications board controls", () => {
     const dialog = await openDetail();
     expect(within(dialog).queryByRole("button", { name: /Save Decision/i })).toBeNull();
     expect(within(dialog).queryByRole("button", { name: /Schedule Meet & Greet/i })).toBeNull();
-    expect(within(dialog).getByText(/You can read this application/)).toBeInTheDocument();
+    // Names whoever the matrix lets review, rather than roles written into the text.
+    expect(within(dialog).getByText(/You can read this application/)).toHaveTextContent(
+      "needs the Super Admin or Volunteer Coordinator role"
+    );
   });
 
   it("offers a Volunteer Coordinator decisions but not delete", async () => {
@@ -94,5 +105,16 @@ describe("applications board controls", () => {
     board(true, true);
 
     expect(screen.queryByRole("button", { name: /Reset Sample Data/i })).toBeNull();
+  });
+
+  it("sends a decision on a real application to the server", async () => {
+    // The board checked the browser's sample store first, which holds no real application,
+    // answered "Application not found" and never asked the server. Fails against that.
+    board(true, false);
+
+    await setupUser().selectOptions(statusSelect()!, "UNDER_REVIEW");
+
+    expect(actions.updateApplicationStatus).toHaveBeenCalledWith({ id: APPLICATION.id, status: "UNDER_REVIEW" });
+    expect(screen.queryByText(/Application not found/)).toBeNull();
   });
 });
