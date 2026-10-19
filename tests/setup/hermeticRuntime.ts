@@ -35,7 +35,8 @@ import { afterAll, afterEach, expect } from "vitest";
  */
 
 // The browser runs where the shelter's staff and supporters are, so a client-side date bug
-// (a UTC day shown as today before 08:00 there) can show up in the components tier.
+// (a UTC day shown as today before 08:00 there) can show up in the components tier. Chosen by
+// environment: any jsdom file runs in that zone, which today means the components tier.
 const TIME_ZONE = typeof window === "undefined" ? "UTC" : "Asia/Kuala_Lumpur";
 
 // Object.assign because Next types NODE_ENV as read-only, which it is not at runtime.

@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, X, Loader2, Star, Eye, Send } from "lucide-react";
+import { AlertCircle, Plus, X, Loader2, Star, Eye, Send } from "lucide-react";
 import type { PhotoNotificationOptions } from "@/actions/pets";
 import {
   AGE_BANDS,
@@ -117,6 +117,8 @@ export function PetFormDialog({
   // pass; the state is what locks the button.
   const submittedRef = useRef(false);
   const [submitted, setSubmitted] = useState(false);
+  // Shown when `onSave` fails before taking the form, so a retry is a decision, not a guess.
+  const [saveFailed, setSaveFailed] = useState(false);
   // Which opening this is, so a save that settles after the dialog was closed and
   // opened again cannot close or unlock the new opening.
   const openingRef = useRef(0);
@@ -132,7 +134,10 @@ export function PetFormDialog({
 
   if (currentKey !== prevKey) {
     setPrevKey(currentKey);
-    if (currentKey !== null) setSubmitted(false);
+    if (currentKey !== null) {
+      setSubmitted(false);
+      setSaveFailed(false);
+    }
     // Reset alongside every other per-pet field. Without this, a caregiver note
     // typed for one animal survives closing the dialog and would be emailed to a
     // different animal's supporters.
@@ -314,6 +319,7 @@ export function PetFormDialog({
     if (submittedRef.current) return;
     submittedRef.current = true;
     setSubmitted(true);
+    setSaveFailed(false);
     const opening = openingRef.current;
     // Update with current image selections
     const finalData = {
@@ -338,6 +344,7 @@ export function PetFormDialog({
       if (openingRef.current === opening) {
         submittedRef.current = false;
         setSubmitted(false);
+        setSaveFailed(true);
       }
       return;
     }
@@ -810,6 +817,16 @@ export function PetFormDialog({
               </Label>
             </div>
           </div>
+
+          {saveFailed && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 border border-destructive/40 bg-destructive/10 px-4 py-3 rounded-xl text-sm text-destructive"
+            >
+              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+              <span>The pet record was not saved. Check the form and try again.</span>
+            </div>
+          )}
 
           {/* Submit */}
           <div className="border-t border-border pt-5 flex justify-end gap-3">

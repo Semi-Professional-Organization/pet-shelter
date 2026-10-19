@@ -53,7 +53,12 @@ without it fill a database the app will not read; the app says so once at start,
   database that is configured but broken must fail loudly, not quietly serve fixtures.
   `tests/unit/prismaConfiguredClient.test.ts` pins it, and fails with the old catch restored.
 
-## Alternative not taken
+## Alternatives not taken
+
+Each repository checking `isDatabasePersistent()` before it queries, instead of a client that
+refuses. The checks exist and some repositories use them, but every query site would need one, and
+a site that forgot would reach the localhost fallback again; one client that cannot connect closes
+the hazard in one place.
 
 A Prisma double installed by the test harness for the non-database tiers. It would have fixed the
 tests without touching product code, but left local e2e and dev exposed to the same accident, and

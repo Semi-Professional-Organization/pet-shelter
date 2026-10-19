@@ -208,6 +208,8 @@ describe("PetFormDialog birth date field", () => {
       await waitFor(() => expect(submit).toBeEnabled());
       expect(reported).toHaveBeenCalledWith(expect.stringContaining("onSave failed"), expect.any(Error));
       expect(onOpenChange).not.toHaveBeenCalledWith(false);
+      // The operator is told, so a retry is a decision rather than a guess.
+      expect(screen.getByRole("alert")).toHaveTextContent(/not saved/i);
 
       await user.click(submit);
       await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));

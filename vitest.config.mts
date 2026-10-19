@@ -19,9 +19,9 @@ const alias = {
  */
 const shared = {
   globals: true,
-  // Each test file in its own process. The setup files write `process.env` and the
-  // time zone per worker, with a different zone for the components tier, and ICU's
-  // zone is process-wide, so threads would let one project's zone leak into another.
+  // Workers are processes, not threads (Vitest's default, stated because it is
+  // relied on). The setup files set the time zone per worker, differently for the
+  // components tier, and ICU's zone is process-wide: threads would share one.
   pool: "forks" as const,
   setupFiles: ["./tests/setup/hermeticEnv.ts", "./tests/setup/hermeticRuntime.ts", "./tests/setup/nextMocks.ts"],
   // Every tier has files now, so an empty run means a moved folder or a broken
