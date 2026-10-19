@@ -13,10 +13,14 @@
  * Prisma, `pg` and every repository into files that test pure functions, and
  * made that cold import the slowest part of the suite.
  *
- * The registry lives on `globalThis`, under a `Symbol.for` key, so a module
- * re-evaluated after `vi.resetModules()` replaces its own entry by name rather
- * than adding a second, stale one beside it. Production code never runs the
- * resets; registering costs one map entry per owner.
+ * The registry lives on `globalThis`, under a `Symbol.for` key, and keeps one
+ * reset per name. A module evaluated again (after `vi.resetModules()`, or on a
+ * dev-server reload) replaces its earlier copy's entry instead of adding one, so
+ * the registry cannot grow, and the harness resets the copy loaded last. A test
+ * that goes on using a copy it loaded before `vi.resetModules()` owns that
+ * copy's state, as it did when the harness imported each store itself.
+ * Production code never runs the resets; registering costs one map entry per
+ * owner.
  */
 
 type Reset = () => void | Promise<void>;

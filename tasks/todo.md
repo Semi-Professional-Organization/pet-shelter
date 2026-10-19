@@ -28,8 +28,10 @@ developer shell leaking in.
 - [x] `prisma.ts`: no `DATABASE_URL` means an offline client (lazy P1001 refusals, no socket).
 - [x] Demo seed password hashes are constants, with a test that each verifies its password.
 - [x] Store resets register themselves (`src/lib/stateResets.ts`); the hook imports nothing.
-- [x] `tests/setup/hermeticEnv.ts`: scrubbed env, `TZ=UTC`, fetch guard; `unstubEnvs`,
-      `unstubGlobals`, `requireAssertions`, `passWithNoTests: false`.
+- [x] `tests/setup/hermeticEnv.ts` scrubs the shell env (list in `ambientVariables.ts`, held to
+      what `src/` reads by a guard test); `hermeticRuntime.ts` pins `NODE_ENV` and `TZ=UTC` and
+      blocks `fetch` in every tier; `unstubEnvs`, `unstubGlobals`, `requireAssertions`,
+      `passWithNoTests: false`.
 - [x] `npm test` regenerates the Prisma client only when the schema changed.
 - [x] `setupUser()` types with `delay: null`; `PetFormDialog` lost its artificial 400 ms delay.
 - [x] Env hygiene in 9 files (`vi.stubEnv` instead of hand-assigned `process.env`).
@@ -43,9 +45,19 @@ developer shell leaking in.
 
 **Verified on this branch:** `tsc --noEmit` exit 0. `npm run lint` 0 errors (13 warnings, all in
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
-secrets and no `DATABASE_URL`. `npm test` 1,941 passed in 21 s (pre-test hook skipped the
-regeneration). Unit, integration and component suites together three times under other
-sessions' load: 135 files, 2,261 tests, all passing every run, 47 to 52 s (master: 192 to 216 s).
+secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
+skipped the regeneration). Unit, integration and component suites together: 137 files, 2,276
+tests, 42 s (master: 192 to 216 s).
+
+**Review:** four `/code-review` rounds over the whole diff raised 39 findings; each was fixed, or
+checked by probe and answered, in the commit after it, and the loop runs until a round comes back
+clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
+the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
+env guard fail on any `process.env` read it cannot name.
+
+**Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
+`npm test` runs made beside `npm run build`, and the error text was lost; filed as
+`tasks/open/sponsor-auth-file-failed-once-under-a-concurrent-build.md`.
 
 **Not verified here:** `npm run test:db`. The Prisma CLI's `db push` is refused to agents on this
 machine and no local Postgres runs, so the database tier is CI's to check. It now runs with

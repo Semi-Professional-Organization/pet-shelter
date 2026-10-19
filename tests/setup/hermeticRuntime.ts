@@ -22,6 +22,8 @@ import { afterAll, afterEach, expect } from "vitest";
  * sent after the response, say) can call out after its own test has finished, so
  * that name may be a later test than the one that started the work; the URL is
  * the better lead. The end-of-file check catches what the last test left behind.
+ * A call made after that check, by work that outlives the file, is still refused,
+ * but nothing is left running to report it.
  */
 
 // Object.assign because Next types NODE_ENV as read-only, which it is not at runtime.

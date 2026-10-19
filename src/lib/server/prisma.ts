@@ -72,26 +72,36 @@ function createOfflineClient(): PrismaClient {
   ) as unknown as PrismaClient;
 }
 
-/** The query methods on a model delegate, as `prisma.pet.findMany`. */
-const MODEL_METHODS = new Set<string | symbol>([
-  "findUnique",
-  "findUniqueOrThrow",
-  "findFirst",
-  "findFirstOrThrow",
-  "findMany",
-  "create",
-  "createMany",
-  "createManyAndReturn",
-  "update",
-  "updateMany",
-  "updateManyAndReturn",
-  "upsert",
-  "delete",
-  "deleteMany",
-  "count",
-  "aggregate",
-  "groupBy",
-]);
+/** A query method on a model delegate, as the generated client declares them. */
+type ModelMethod = Exclude<keyof PrismaClient["pet"], symbol | "fields">;
+
+/**
+ * The query methods on a model delegate, as `prisma.pet.findMany`. The `satisfies`
+ * makes `typecheck` fail when a Prisma upgrade adds or drops one; otherwise the
+ * offline client would answer a new method with `undefined`, and the call would
+ * throw a TypeError the fallbacks cannot read as "database down".
+ */
+const MODEL_METHODS = new Set<string | symbol>(
+  Object.keys({
+    findUnique: true,
+    findUniqueOrThrow: true,
+    findFirst: true,
+    findFirstOrThrow: true,
+    findMany: true,
+    create: true,
+    createMany: true,
+    createManyAndReturn: true,
+    update: true,
+    updateMany: true,
+    updateManyAndReturn: true,
+    upsert: true,
+    delete: true,
+    deleteMany: true,
+    count: true,
+    aggregate: true,
+    groupBy: true,
+  } satisfies Record<ModelMethod, true>)
+);
 
 /** The client methods that would reach the database. */
 const CLIENT_METHODS = new Set<string | symbol>([
@@ -112,41 +122,37 @@ function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return createOfflineClient();
 
-  try {
-    const sslPolicy = resolveDatabaseSsl(connectionString);
+  // No fallback if building the pool or the client throws. There used to be
+  // one, `new PrismaClient()` without an adapter, but Prisma 7 refuses that
+  // ("requires a driver adapter"), so it only hid the real error behind its own.
+  // A database that is configured and cannot be built must fail loudly, not
+  // quietly serve fixtures.
+  const sslPolicy = resolveDatabaseSsl(connectionString);
 
-    // A managed Postgres like Neon can take several seconds to wake from idle,
-    // so the connect timeout is generous; `DB_CONNECT_TIMEOUT_MS` overrides it.
-    const connectionTimeoutMillis = Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10000);
+  // A managed Postgres like Neon can take several seconds to wake from idle,
+  // so the connect timeout is generous; `DB_CONNECT_TIMEOUT_MS` overrides it.
+  const connectionTimeoutMillis = Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10000);
 
-    // Reuse connection pool across Turbopack hot reloads in dev mode
-    const pool =
-      globalForPrisma.pgPool ??
-      new Pool({
-        connectionString: sslPolicy.connectionString,
-        ssl: sslPolicy.ssl,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis,
-      });
-
-    if (process.env.NODE_ENV !== "production") {
-      globalForPrisma.pgPool = pool;
-    }
-
-    const adapter = new PrismaPg(pool);
-    return new PrismaClient({
-      adapter,
-      log: process.env.PRISMA_LOG === "true" ? ["error", "warn"] : [],
+  // Reuse connection pool across Turbopack hot reloads in dev mode
+  const pool =
+    globalForPrisma.pgPool ??
+    new Pool({
+      connectionString: sslPolicy.connectionString,
+      ssl: sslPolicy.ssl,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis,
     });
-  } catch (err) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[Prisma] Pool initialization fallback:", err);
-    }
-    return new PrismaClient({
-      log: process.env.PRISMA_LOG === "true" ? ["error", "warn"] : [],
-    });
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.pgPool = pool;
   }
+
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({
+    adapter,
+    log: process.env.PRISMA_LOG === "true" ? ["error", "warn"] : [],
+  });
 }
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();

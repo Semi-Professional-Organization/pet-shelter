@@ -27,7 +27,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const SCHEMA_PATH = fileURLToPath(new URL("../prisma/schema.prisma", import.meta.url));
 
@@ -102,6 +102,12 @@ function main() {
   return result.status ?? 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Only run when executed directly, so the module stays importable by tests. By
+// the path's end, as `scripts/commit-msg.mjs` does: Node resolves the entry
+// script's symlinks and junctions in `import.meta.url` but not in `argv[1]`, so
+// comparing the two skipped the check silently when run through a link.
+const invokedDirectly =
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/prisma-generate-if-stale.mjs");
+if (invokedDirectly) {
   process.exit(main());
 }

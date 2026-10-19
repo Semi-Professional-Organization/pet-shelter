@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { PetFormDialog } from "@/components/admin/PetFormDialog";
 import {
@@ -164,6 +164,26 @@ describe("PetFormDialog birth date field", () => {
     fireEvent.click(submit);
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * After a save the dialog closes, but it stays mounted while it animates out (which jsdom
+   * cannot show). Save stays locked through that window, and a submit that does not come from
+   * the button, as `form.requestSubmit()` can make, does not reach onSave a second time either.
+   */
+  it("keeps Save locked after a save while the dialog closes", async () => {
+    const { onSave, user } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    const submit = screen.getByRole("button", { name: /create pet record/i });
+    await user.click(submit);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    // The submit handler awaits only promises, so one macrotask runs it to the end.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 

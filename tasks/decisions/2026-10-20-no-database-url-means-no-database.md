@@ -42,6 +42,12 @@ Postgres up no longer finds that database by accident. Set `DATABASE_URL` to it 
   an eager rejection fails one).
 - `prisma/env.ts` keeps its own localhost fallback. That one serves the Prisma CLI and the seed
   script, not the running app, and is a different decision.
+- With `DATABASE_URL` set, a client that cannot be built fails the import with its own error.
+  `createPrismaClient` used to catch that and build `new PrismaClient()` without a driver adapter,
+  which Prisma 7 refuses ("requires a driver adapter"), so the catch only swapped the cause for a
+  misleading message. Falling back to the offline client there was considered and refused: a
+  database that is configured but broken must fail loudly, not quietly serve fixtures.
+  `tests/unit/prismaClientBuildFailure.test.ts` pins it, and fails with the old catch restored.
 
 ## Alternative not taken
 

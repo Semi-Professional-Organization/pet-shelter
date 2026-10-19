@@ -20,7 +20,9 @@ import { resetSettings } from "./settingsRepository";
  * Test-only. The global `beforeEach` in `tests/setup/nextMocks.ts` no longer
  * calls this: each of the six stores registers its own reset with
  * `@/lib/stateResets`, so a test file resets only the stores it loaded. This
- * stays for suites that restore all six by hand in the middle of a test.
+ * stays for the suites that call it themselves (`faqs`, `rehabNeeds`,
+ * `setupMocks`). A new fallback store registers its reset for the harness and
+ * is listed here as well.
  */
 export function resetServerStore(): void {
   resetPets();

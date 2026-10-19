@@ -14,8 +14,8 @@ const alias = {
  *
  * `hermeticEnv.ts` runs first and scrubs the developer's shell environment;
  * `hermeticRuntime.ts` pins the time zone and blocks the network. Both run
- * before anything under test loads. `integration-db` replaces this list
- * without the scrub, because that tier needs its database.
+ * before anything under test loads. `integration-db` takes this list without
+ * the scrub, because that tier needs its database.
  */
 const shared = {
   globals: true,
@@ -108,14 +108,17 @@ export default defineConfig({
           environment: "node",
           include: ["tests/integration/db/**/*.test.{ts,tsx}"],
 
-          // Not the shared list: `hermeticEnv.ts` would delete the
+          // The shared list without `hermeticEnv.ts`, which would delete the
           // `DATABASE_URL` this tier exists to use. `integrationEnv.ts` comes
           // first because the repositories build the Prisma pool from
           // `DATABASE_URL` when they load; loading `.env.local` after them would
           // hand Prisma no database at all, and every assertion below would
           // then fail for a missing connection instead of the real schema —
           // which is indistinguishable from a genuine schema failure.
-          setupFiles: ["./tests/setup/integrationEnv.ts", "./tests/setup/hermeticRuntime.ts", "./tests/setup/nextMocks.ts"],
+          setupFiles: [
+            "./tests/setup/integrationEnv.ts",
+            ...shared.setupFiles.filter((file) => file !== "./tests/setup/hermeticEnv.ts"),
+          ],
 
           // Tier 3b: the only suites that talk to a real PostgreSQL server.
           //
