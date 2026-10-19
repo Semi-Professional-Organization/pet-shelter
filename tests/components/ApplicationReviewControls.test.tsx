@@ -63,6 +63,8 @@ describe("applications board controls", () => {
 
     expect(statusSelect()).toBeNull();
     expect(deleteButton()).toBeNull();
+    // It rewrites the browser's copy of the board, so it goes with deciding, not reading.
+    expect(screen.queryByRole("button", { name: /Reset Sample Data/i })).toBeNull();
 
     const dialog = await openDetail();
     expect(within(dialog).queryByRole("button", { name: /Save Decision/i })).toBeNull();

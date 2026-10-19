@@ -288,15 +288,19 @@ export function ApplicationDataTable({
             <Download className="size-3" /> Export CSV ({filteredData.length})
           </Button>
 
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={resetToDefaultApplications}
-            title="Reset to sample applications"
-            className="text-xs text-muted-foreground gap-1"
-          >
-            <RotateCcw className="size-3" /> Reset Sample Data
-          </Button>
+          {/* Rewrites the browser's copy of the board, so it goes with the controls
+              that change applications rather than with reading them. */}
+          {canReview && (
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={resetToDefaultApplications}
+              title="Reset to sample applications"
+              className="text-xs text-muted-foreground gap-1"
+            >
+              <RotateCcw className="size-3" /> Reset Sample Data
+            </Button>
+          )}
         </div>
       </div>
 
