@@ -125,7 +125,7 @@ export const FAMILIES = {
     /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|(ls|dir|Get-ChildItem) tasks[\\/](open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
   ledger: (tool, cmd) =>
     (SHELLS.has(tool) &&
-      /(ls|dir|Get-ChildItem) tasks[\\/](lessons|open|decisions)|(grep|Select-String) [^|;&]*tasks[\\/](lessons|open|decisions)|(cat|head|sed -n|tail|grep|awk|Get-Content|Select-String)[^|;&]*tasks[\\/]todo\.md/.test(cmd)) ||
+      /(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s[^|;&]*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd)) ||
     (tool === "Read" && /tasks[\\/]((open|lessons|decisions)[\\/][^\\/]+|todo\.md)$/.test(cmd)),
   merge: (tool, cmd) => SHELLS.has(tool) && /git merge-tree|HEAD\.\.origin\/master|merge-base HEAD origin\/master/.test(cmd),
   drift: (tool, cmd) => SHELLS.has(tool) && /agent-drift\.log/.test(cmd),
@@ -154,6 +154,12 @@ export function isTargetedRun(cmd) {
     const word = words[i];
     // `-t <pattern>` needs no case: its pattern reads as a filter below.
     if (word.startsWith("--testNamePattern")) return true;
+    // A redirection (`2>&1`, `> out.txt`) is the shell's, not a filter; a bare operator takes
+    // the next word as its target.
+    if (/^\d*(>>?|<)/.test(word)) {
+      if (/^\d*(>>?|<)$/.test(word)) i++;
+      continue;
+    }
     if (word.startsWith("-")) {
       if (VITEST_VALUE_FLAGS.has(word)) i++;
       continue;
@@ -194,11 +200,14 @@ export function commandClass(tool, cmd) {
   for (;;) {
     const cd = /^(cd|Set-Location|pushd)\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*/.exec(rest);
     const env = /^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|[^\s"';&|]*)\s+/.exec(rest);
-    const match = cd || env;
+    const psEnv = /^\$env:[A-Za-z_][A-Za-z0-9_]*\s*=\s*("[^"]*"|'[^']*'|[^\s;]*)\s*;\s*/.exec(rest);
+    const match = cd || env || psEnv;
     if (!match) break;
     rest = rest.slice(match[0].length);
   }
-  const words = rest.split(/\s+/);
+  // Only the first command of a chain, and no npm flag between `run` and the script.
+  const words = rest.split(/&&|\|\||[;|]/)[0].split(/\s+/).filter(Boolean);
+  if (words[0] === "npm" && words[1] === "run") while (/^-/.test(words[2] ?? "")) words.splice(2, 1);
   const take = words[0] === "npm" && words[1] === "run" ? 3 : SUBCOMMAND.has(words[0]) || words[0] === "npm" ? 2 : 1;
   const label = words.slice(0, take).filter(Boolean);
   const plain = label.length > 0 && label.every((w, i) => (i === 2 ? SCRIPT : VERB).test(w));
@@ -224,6 +233,14 @@ const textLength = (content) =>
  * non-meta records are taken as a person's message.
  */
 export function triggerOf(record) {
+  if (record.type === "attachment") {
+    // Anything that arrives while a turn runs (a person's message, a background notice, another
+    // session's message) is queued and written as a `queued_command` attachment. Older ones carry
+    // no origin; their `commandMode` is "task-notification", so only "human" is a person here.
+    const queued = record.attachment;
+    if (queued?.type !== "queued_command" || queued.isMeta) return undefined;
+    return queued.origin?.kind === "human" ? "person" : "event";
+  }
   // A compaction's summary is written as a user record too; no one sent it.
   if (record.isMeta || record.isCompactSummary) return undefined;
   const kind = record.origin?.kind;
@@ -250,10 +267,16 @@ export function createExtractor({ session, sub }, seen = new Set()) {
   let synthetic = 0;
   let duplicates = 0;
   const dupKeys = new Set();
-  let lastKey;
+  const started = new Set();
   let lastStart;
   let prevStart;
-  let lastTrigger;
+  // What woke the session since the last request. A person outranks an event, which outranks a
+  // tool result, whatever order their records were written in.
+  let pendingTrigger;
+  const RANK = { tool: 1, event: 2, person: 3 };
+  const noteTrigger = (trigger) => {
+    if (trigger && (RANK[trigger] ?? 0) > (RANK[pendingTrigger] ?? 0)) pendingTrigger = trigger;
+  };
 
   return {
     add(record) {
@@ -265,6 +288,10 @@ export function createExtractor({ session, sub }, seen = new Set()) {
         if (record.uuid && seen.has(key)) return;
         if (record.uuid) seen.add(key);
         compactions.push(requests.length);
+        return;
+      }
+      if (record.type === "attachment") {
+        noteTrigger(triggerOf(record));
         return;
       }
       const message = record.message;
@@ -279,10 +306,13 @@ export function createExtractor({ session, sub }, seen = new Set()) {
         // When the previous request started, copied history included, so the first new request of
         // a forked or relocated transcript still knows how long the session sat idle. The start,
         // not the last streamed line: the cache's clock restarts when a request reads it.
-        if (key !== lastKey) {
+        let trigger;
+        if (!started.has(key)) {
+          started.add(key);
           prevStart = lastStart;
           lastStart = record.timestamp;
-          lastKey = key;
+          trigger = pendingTrigger;
+          pendingTrigger = undefined;
         }
         const prevTs = prevStart;
         if (dupKeys.has(key)) return;
@@ -299,7 +329,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
             ts: record.timestamp,
             prevTs,
             // What the request answered: a person, a background event, or a tool's result.
-            trigger: lastTrigger,
+            trigger,
             model: message.model,
             speed: undefined,
             geo: undefined,
@@ -342,9 +372,8 @@ export function createExtractor({ session, sub }, seen = new Set()) {
         }
         // A text block beside a tool result is not a person: in this repo's transcripts the only
         // ones (4 of 19,315 results, 2026-10-20) are a fork's injected boilerplate. A message
-        // typed mid-turn arrives as its own record.
-        const trigger = toolResult ? "tool" : triggerOf(record);
-        if (trigger) lastTrigger = trigger;
+        // typed mid-turn arrives as a queued_command attachment, which `triggerOf` reads.
+        noteTrigger(toolResult ? "tool" : triggerOf(record));
       }
     },
     finish() {
@@ -390,8 +419,6 @@ export function priceFiles(files, { priceAs, inWindow = () => true } = {}) {
   }
   return files;
 }
-
-export const priceFile = (file, opts) => priceFiles([file], opts)[0];
 
 /**
  * Prices one request in place. `priceAs` prices it at another model's rates (speed and region
@@ -477,7 +504,10 @@ export function carriedOutput(file) {
     const writeAt = call.request + 1;
     if (!call.resultChars || writeAt >= reqs.length || writeAt > ends[call.request]) continue;
     const w = reqs[writeAt];
-    const writeRate = !w.rates ? 0 : w.w1h >= w.w5 ? w.rates.write1h : w.rates.write5m;
+    // The rate the next request actually wrote at, blended across the two lifetimes; nothing if
+    // it wrote nothing (the result was then fresh input, which the reads below still cover).
+    const written = w.w5 + w.w1h;
+    const writeRate = !w.rates || !written ? 0 : (w.w5 * w.rates.write5m + w.w1h * w.rates.write1h) / written;
     const reads = readPrefix[ends[call.request] + 1] - readPrefix[writeAt + 1];
     if (!writeRate && !reads) continue;
     const usd = ((call.resultChars / 4) * (writeRate + reads)) / 1e6;
@@ -492,7 +522,7 @@ export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 
 /**
  * Main-session requests that came after the cache expired and re-wrote the whole context: idle
- * longer than the lifetime the request writes with (1 hour, or 5 minutes for 5-minute writes),
+ * longer than the lifetime the context was last written with (1 hour, or 5 minutes),
  * and not the first request after a compaction, which re-writes a new, smaller context anyway.
  * `trigger` says what the session waited on: "person" when the request answered someone's message
  * (they were away, which a hand-off could avoid), otherwise a long tool or a background notice
@@ -507,10 +537,14 @@ export function coldResumes(file) {
   if (file.sub) return [];
   const breaks = segmentBreaks(file);
   const out = [];
+  // The lifetime the context was last written with is the one that expires.
+  let lifetime;
   for (const r of file.requests) {
+    const ttl = CACHE_TTL_MINUTES[lifetime ?? (r.w5 > r.w1h ? "5m" : "1h")];
+    if (r.w5 + r.w1h) lifetime = r.w5 > r.w1h ? "5m" : "1h";
     if (!r.prevTs || !r.usd || breaks.has(r.index)) continue;
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
-    if (!(idle > CACHE_TTL_MINUTES[r.w5 > r.w1h ? "5m" : "1h"])) continue;
+    if (!(idle > ttl)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
     const warm = (r.cache_creation_input_tokens * r.rates.cacheRead) / 1e6;
     out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger: r.trigger ?? "person" });
@@ -865,8 +899,9 @@ async function readFile(file, seen) {
 function byCreation(files) {
   // Every file is read even under --since: skipping the ones written before the window would
   // change which file owns a copied request, and with it the numbers inside the window.
-  // ceiling: about 20 s for 300 transcripts here; an index of each file's request ids would let
-  // old files be skipped without changing ownership.
+  // ceiling: about 20 s for 300 transcripts here, read one at a time. Reading them in parallel
+  // would have to hold every parsed record until its turn (some 600 MB here); an index of each
+  // file's request ids would let old files be skipped without changing ownership.
   return files
     .map((path) => {
       const s = statSync(path);

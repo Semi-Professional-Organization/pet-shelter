@@ -23,7 +23,7 @@ import {
   isTargetedRun,
   jsonlLines,
   main,
-  priceFile,
+  priceFiles,
   ratesFor,
   summarize,
 } from "../../scripts/agent/usage.mjs";
@@ -83,6 +83,9 @@ const toolResult = (id: string, chars: number) => ({
   type: "user",
   message: { content: [{ type: "tool_result", tool_use_id: id, content: [{ type: "text", text: "x".repeat(chars) }] }] },
 });
+
+/** One file through the same pricing path the command uses. */
+const priceFile = (file: ReturnType<typeof extract>) => priceFiles([file])[0];
 
 function extract(records: unknown[], meta = { session: "s1", sub: false }, seen = new Set<string>()) {
   const e = createExtractor(meta, seen);
@@ -204,6 +207,10 @@ describe("agent usage: command classes", () => {
     expect(commandClass("Bash", "./scripts/deploy-prod.sh --token=abc")).toBe("Bash other");
     expect(commandClass("Bash", "C:/Users/User/secret-notes.txt")).toBe("Bash other");
     expect(commandClass("Bash", "git --no-pager log")).toBe("Bash other");
+    // Separators and npm flags do not hide the verb.
+    expect(commandClass("Bash", "npm run typecheck; echo done")).toBe("npm run typecheck");
+    expect(commandClass("Bash", "npm run -s test")).toBe("npm run test");
+    expect(commandClass("PowerShell", "$env:FOO='1'; npm run lint")).toBe("npm run lint");
     // A key pasted where a command goes: digits keep it out of the report.
     expect(commandClass("Bash", "sk-ant-api03-abcDEF")).toBe("Bash other");
   });
@@ -221,6 +228,18 @@ describe("agent usage: workflow families", () => {
     expect(familiesOf("PowerShell", "Get-Content tasks\\todo.md")).toEqual(["ledger"]);
     expect(familiesOf("Read", "D:\\x\\tasks\\open\\a.md")).toEqual(["ledger"]);
     expect(familiesOf("Read", "D:/x/src/tasks.ts")).toEqual([]);
+  });
+
+  it("does not take a shell redirection for a test filter", () => {
+    expect(familiesOf("Bash", "npx vitest run --project components 2>&1 | tail -30")).toEqual(["gates"]);
+    expect(familiesOf("Bash", "npx vitest run > out.txt")).toEqual(["gates"]);
+  });
+
+  it("counts a shell read of any ledger file, not only todo.md", () => {
+    for (const cmd of ["cat tasks/open/a.md", "sed -n 1,80p tasks/open/a.md", "head -20 tasks/decisions/x.md"]) {
+      expect(familiesOf("Bash", cmd), cmd).toEqual(["ledger"]);
+    }
+    expect(familiesOf("PowerShell", "Get-Content tasks/lessons/README.md")).toEqual(["ledger"]);
   });
 
   it("files a run over a whole test directory as a gate, not a targeted run", () => {
@@ -316,6 +335,27 @@ describe("agent usage: the analyses", () => {
     expect(coldResumes(file)[0].trigger).toBe("event");
   });
 
+  it("takes a queued message from a person for a person, whatever record comes after it", () => {
+    const queued = (kind: string | undefined, mode = "prompt") => ({
+      type: "attachment",
+      attachment: { type: "queued_command", commandMode: mode, ...(kind ? { origin: { kind } } : {}) },
+    });
+    expect(triggerOf(queued("human"))).toBe("person");
+    expect(triggerOf(queued("peer"))).toBe("event");
+    expect(triggerOf(queued(undefined, "task-notification"))).toBe("event");
+    expect(triggerOf({ type: "attachment", attachment: { type: "date" } })).toBeUndefined();
+    const file = priceFile(
+      extract([
+        assistant("r1", { out: 50_000 }, { tools: [{ id: "a", name: "Bash", command: "gh pr checks 5" }] }),
+        queued("human"),
+        toolResult("a", 10),
+        assistant("r2", { out: 50_000 }, { tools: [{ id: "b", name: "Bash", command: "gh pr checks 5" }] }),
+      ]),
+    );
+    expect(file.requests[1].trigger).toBe("person");
+    expect(familyUsage([file]).pr).toMatchObject({ bursts: 2, saving: 0 });
+  });
+
   it("ends a burst when a person's message arrives mid-turn", () => {
     const file = priceFile(
       extract([
@@ -375,6 +415,42 @@ describe("agent usage: the analyses", () => {
       ]),
     );
     expect(coldResumes(file)).toHaveLength(0);
+  });
+
+  it("times a cold resume by the lifetime the context was last written with", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        // 10 minutes later, a 5-minute write: the 1-hour entry was still warm.
+        assistant("r2", { read: 100_000, w5: 300_000, out: 1 }, { ts: "2026-10-01T10:10:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)).toHaveLength(0);
+  });
+
+  it("measures idle time from a request's start even when its lines interleave with another's", () => {
+    const file = priceFile(
+      extract([
+        assistant("a", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("b", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:01:00.000Z" }),
+        assistant("a", { read: 400_000, out: 9 }, { ts: "2026-10-01T10:02:00.000Z" }),
+        assistant("c", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T11:30:00.000Z" }),
+      ]),
+    );
+    expect(file.requests[2].prevTs).toBe("2026-10-01T10:01:00.000Z");
+  });
+
+  it("charges no cache write for a result the next request did not write", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 10_000, out: 1 }, { tools: [{ id: "t1", name: "Read" }] }),
+        toolResult("t1", 4_000_000),
+        assistant("r2", { input: 1_000_000, read: 10_000, out: 1 }),
+        assistant("r3", { read: 1_010_000, out: 1 }),
+      ]),
+    );
+    // Only r3's read of it, at $0.20 per million.
+    expect(carriedOutput(file).total).toBeCloseTo(0.2);
   });
 
   it("takes a 5-minute cache as expired after 5 minutes, not an hour", () => {

@@ -37,6 +37,17 @@ describe("agent scripts entry point", () => {
     expect(missing).toEqual([]);
   });
 
+  it("keeps the two inline copies of the invocation check identical to the shared one", () => {
+    // scripts/lib/invokedAs.mjs says why these two keep their own copy; this keeps them equal.
+    for (const script of ["scripts/commit-msg.mjs", "scripts/ledger-issues.mjs"]) {
+      const source = readFileSync(join(ROOT, script), "utf8");
+      expect(source, script).toContain(`process.argv[1] && process.argv[1].replace(/\\\\/g, "/").endsWith("${script}")`);
+    }
+    expect(readFileSync(join(ROOT, "scripts/lib/invokedAs.mjs"), "utf8")).toContain(
+      `Boolean(process.argv[1]) && process.argv[1].replace(/\\\\/g, "/").endsWith(script)`,
+    );
+  });
+
   it("reads a command name the way a doc writes it, and not the --help pointer", () => {
     // Pins the pattern itself, so the scan above cannot go quietly blind.
     expect(commandsNamed("run `node scripts/agent.mjs usage --json`, then node scripts/agent.mjs --help")).toEqual(["usage"]);
