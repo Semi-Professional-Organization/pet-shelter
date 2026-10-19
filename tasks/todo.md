@@ -415,6 +415,28 @@ Round 5, on the narrowed design, found a hidden sub-issue under a group parent p
 (now refused), a CRLF checkout always reading as changed, an overclaimed character count, and stale
 text. All fixed.
 
+# Rebase `feature/frontend` onto master
+
+**Branch:** `rebase/frontend-onto-master` · opened 2026-10-20 · base `origin/master`
+
+`feature/frontend` was 233 commits behind master. Replayed as a port: each commit re-expressed on
+master's code. Why and what was kept: `tasks/decisions/2026-10-20-feature-frontend-is-rebased-as-a-port.md`.
+
+- [x] 27 commits replayed; the upstream `6d7c159` skipped; five adopt/foster commits folded into
+      one; the `.gitignore` commit dropped (its rules broke a master guard).
+- [x] Owner decisions applied: `/impact` dropped for `/transparency`; hero without the cut-outs.
+- [x] Gates: typecheck, lint, docs:check, unit, components, integration, build.
+- [ ] Move `feature/frontend` here: abort the paused rebase in the main checkout first, then
+      force-push. Waiting on the owner.
+
+## Review
+
+Deliberately not done: the receipt feature's remaining 44(6) claims (step 2 of
+`tasks/open/shelter-not-registered-tax-receipts.md`); the production FAQ edits
+(`tasks/open/production-faqs-need-the-edits-the-fixture-made.md`); `PetDetailDialog` still offers
+adoption for an animal tagged Needs Socialising (the branch never touched it); WhatsApp numbers
+disagree (`60123456789` in the page links, `60127876543` in the profile controller). The "UM"
+wordmark and the visuals are overhaul work, not merge work.
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

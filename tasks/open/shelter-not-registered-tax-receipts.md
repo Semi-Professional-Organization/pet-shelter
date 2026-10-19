@@ -23,6 +23,21 @@ claim registration or tax deductibility. See `tasks/today.md`.
 - `src/lib/presentation/exportCsv.ts`: ROS CSV export. `globals.css` `--receipt-*` print styles.
 - Admin audit views (`AuditLogViewer.tsx`, `useAuditLogController.ts`) label receipt events.
 
+**After the 2026-10-20 rebase onto master.** Master kept building on 44(6) approval while this
+branch was open (`19e4b7c` receipts after reconciliation, `e16cb5d` the opt-in). Step 1 was
+re-applied to master's surfaces, including ones this branch never saw (the `/transparency` badges
+and its "official LHDN tax-deductible e-Receipt instantly" line, the `/donate` and `/faq`
+metadata). Still claiming, all part of the receipt feature or a banking fact, left for step 2:
+
+- `DonationWidget.tsx`: the Section 44(6) opt-in checkbox and the post-submit "your official
+  Section 44(6) receipt is emailed" line;
+- `SponsorshipModal.tsx`: the "Pertubuhan Kebajikan" name and `STATUTORY_ROS_REGISTRATION_NO` in
+  its receipt block; `donations.receiptSubtitle`; the admin "Export Receipts CSV (LHDN)" label;
+- `donations.accountHolder` ("Pertubuhan Kebajikan Hope for Strays") — the bank account's name,
+  a banking fact to confirm with the shelter, not copy to reword;
+- `src/data/transparency.json`'s sample "LHDN tax-deductible receipts issued" stat;
+- production faq-005: `tasks/open/production-faqs-need-the-edits-the-fixture-made.md`.
+
 Unanswered questions that decide step 2:
 
 1. Is "not registered" **confirmed**, or a belief? If the shelter is registered some other way
