@@ -219,10 +219,13 @@ export function MemberDataTable({
               <Button
                 variant="outline"
                 size="xs"
-                disabled={isBusy}
+                // Only a Super Admin reaches this table, and on their own row the server
+                // refuses every role but Super Admin, which they already hold. The dialog
+                // offered all five.
+                disabled={isBusy || isSelf}
                 onClick={() => handleOpenRoleEdit(member)}
-                className="text-xs gap-1"
-                title="Change this member's access level"
+                className="text-xs gap-1 disabled:opacity-40"
+                title={isSelf ? "You cannot change your own role" : "Change this member's access level"}
               >
                 <UserCog className="size-3" />
                 Edit Role
