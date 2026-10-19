@@ -10,11 +10,13 @@ on:
 permissions:
   contents: read
 
-# A new push supersedes an in-flight run on the same ref. Playwright and the
-# jsdom suite are the slow jobs, and there is no value in finishing them for a
-# commit that has already been replaced.
+# A new push to a pull request supersedes the run in flight on it. Playwright and the jsdom suite
+# are the slow jobs, and there is no value in finishing them for a commit that has already been
+# replaced. A push to master is never cancelled: every master commit is a production deploy, and
+# while master shared one group, 13 of 100 master runs were cancelled by the next merge, leaving
+# those deploys with no verdict. Keying master runs on the commit gives each one its own group.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 env:
