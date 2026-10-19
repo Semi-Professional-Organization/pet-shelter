@@ -15,9 +15,11 @@ first: the old settings page keeps its test-email button on a second tab, so the
 not finding that button instead of on the "Save All Settings" button it was about. Only the
 failure message showed it; reordering the assertions made the probe fail on the real defect.
 
-Two traps: an old module that imports a file the branch deleted needs that file overridden too
-(the old FAQ page needed `src/lib/domain/faqAccess.ts`), and a copy placed outside `node_modules`
-fails on its first bare import.
+Three traps: an old module that imports a file the branch deleted needs that file overridden too
+(the old FAQ page needed `src/lib/domain/faqAccess.ts`); a copy placed outside `node_modules`
+fails on its first bare import; and a copy's relative imports (`./supporterTier`) resolve next to
+the copy, so rewrite them to absolute paths into the real tree before writing it — every case
+"failed" with "Cannot find module" until that was done, which a count alone would have passed.
 
 **Rule:** to show a test discriminates, alias the changed modules to their base-branch copies under
 `node_modules/.probe/` and run the unchanged test; read the failure message, not just the count.
