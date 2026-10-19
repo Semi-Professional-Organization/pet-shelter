@@ -1,5 +1,6 @@
 import { PetDataTable } from "@/components/admin/PetDataTable";
 import { getAdminPets } from "@/actions/pets";
+import { requireAdminSection } from "@/lib/security/adminSectionGate";
 
 /**
  * Saving a pet can schedule a supporter photo-update fan-out via `after()`,
@@ -10,9 +11,13 @@ import { getAdminPets } from "@/actions/pets";
 export const maxDuration = 60;
 
 export default async function AdminPetsPage() {
-  // getAdminPets is authorization-guarded and throws for an unauthorized
-  // caller. Mirror /admin/applications and fall through to the client shell,
-  // which redirects to the sign-in page, rather than crashing the route.
+  // Refuses a role without MANAGE_PETS here, with the 403 page. The data load
+  // below used to be the only check, and its refusal was swallowed, so such a role
+  // got the bundled demo animals as an editable inventory.
+  await requireAdminSection("/admin/pets");
+
+  // getAdminPets re-checks the same capability. Anything else it throws still
+  // falls through to the client table's local data, as before the gate.
   let pets;
   try {
     pets = await getAdminPets();

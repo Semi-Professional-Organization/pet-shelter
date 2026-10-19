@@ -1,9 +1,5 @@
-import { ShieldAlert } from "lucide-react";
-
 import { FaqDataTable } from "@/components/admin/FaqDataTable";
-import { getVerifiedSession } from "@/lib/security/dal";
-import { hasRole } from "@/lib/security/rbac";
-import { FAQ_EDITOR_ROLES } from "@/lib/domain/faqAccess";
+import { requireAdminSection } from "@/lib/security/adminSectionGate";
 import { listFaqRecords } from "@/lib/server/faqRepository";
 
 export const dynamic = "force-dynamic";
@@ -11,29 +7,12 @@ export const dynamic = "force-dynamic";
 /**
  * FAQ content management.
  *
- * The same role list is enforced again inside every action in `@/actions/faqs`,
+ * The same capability is enforced again inside every action in `@/actions/faqs`,
  * so this check controls what is rendered rather than what is permitted.
  */
 export default async function AdminFaqsPage() {
   // Verified, so a suspended editor's unexpired cookie does not render the drafts.
-  const session = await getVerifiedSession();
-
-  if (!hasRole(session, [...FAQ_EDITOR_ROLES])) {
-    return (
-      <div className="max-w-xl border border-border bg-background rounded-2xl p-8 space-y-3">
-        <ShieldAlert className="size-7 text-destructive" />
-        <h1 className="font-heading text-xl font-bold text-foreground">
-          You do not have access to FAQ management
-        </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Editing the public FAQ knowledge base is restricted to Administrator and
-          Coordinator accounts. You are currently signed in as{" "}
-          <strong className="text-foreground">{session?.role ?? "a guest"}</strong>.
-          Please ask an administrator if you need this permission.
-        </p>
-      </div>
-    );
-  }
+  await requireAdminSection("/admin/faqs");
 
   const faqs = await listFaqRecords();
 

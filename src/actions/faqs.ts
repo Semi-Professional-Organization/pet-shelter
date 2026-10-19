@@ -10,9 +10,8 @@ import {
   FaqFormInput,
 } from "@/lib/validations/faq";
 import type { SessionUser } from "@/lib/security/session";
-import { getVerifiedSession } from "@/lib/security/dal";
-import { assertAuthorized } from "@/lib/security/rbac";
-import { FAQ_EDITOR_ROLES } from "@/lib/domain/faqAccess";
+import { requirePermission } from "@/lib/security/dal";
+import { PERMISSIONS } from "@/lib/security/permissions";
 import {
   deleteServerFaq,
   findServerFaqById,
@@ -37,9 +36,13 @@ import {
 async function requireFaqEditor(): Promise<SessionUser> {
   // The DAL, not the raw cookie: a suspended or deleted editor's unexpired cookie still
   // verifies its signature, and only the DAL re-reads status.
-  const session = await getVerifiedSession();
-  assertAuthorized(session, [...FAQ_EDITOR_ROLES]);
-  return session;
+  //
+  // MANAGE_CONTENT, the capability the FAQ tab, the bulletin and transparency editors and
+  // the Content Editor's role description all name. This was a role list,
+  // `[ADMIN, COORDINATOR]`, written before CONTENT_EDITOR existed, so the one role
+  // described as managing FAQs was refused here while a Volunteer Coordinator, offered
+  // no FAQ tab, was admitted (tasks/decisions/2026-10-19-faq-editing-is-manage-content.md).
+  return requirePermission(PERMISSIONS.MANAGE_CONTENT);
 }
 
 /** Refreshes every surface that renders FAQ content. */

@@ -44,6 +44,11 @@ interface ApplicationDetailDialogProps {
     notes: string,
     notifyApplicant?: boolean
   ) => { success: boolean; error?: string } | void;
+  /**
+   * REVIEW_APPLICATIONS. Without it the decision and scheduling tabs are not
+   * offered: both actions refuse a member who may only read applications.
+   */
+  canReview: boolean;
 }
 
 export function ApplicationDetailDialog({
@@ -51,6 +56,7 @@ export function ApplicationDetailDialog({
   open,
   onOpenChange,
   onUpdateStatus,
+  canReview,
 }: ApplicationDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<"review" | "interview">("review");
   const [status, setStatus] = useState<ApplicationStatus>("SUBMITTED");
@@ -295,7 +301,26 @@ export function ApplicationDetailDialog({
             </div>
           )}
 
+          {!canReview && (
+            <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You can read this application. Recording a decision or scheduling a meet and
+                greet needs a coordinator or a Super Admin.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                className="text-xs shrink-0"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
           {/* Tab Navigation */}
+          {canReview && (
           <div className="border-b border-border flex gap-4 pt-2">
             <button
               type="button"
@@ -321,9 +346,10 @@ export function ApplicationDetailDialog({
               Schedule Meet & Greet
             </button>
           </div>
+          )}
 
           {/* Tab 1: Review & Decision */}
-          {activeTab === "review" && (
+          {canReview && activeTab === "review" && (
             <div className="space-y-4">
               
               {/* Quick 1-Click Status Selection Pills */}
@@ -401,7 +427,7 @@ export function ApplicationDetailDialog({
           )}
 
           {/* Tab 2: Schedule Meet & Greet */}
-          {activeTab === "interview" && (
+          {canReview && activeTab === "interview" && (
             <form onSubmit={handleScheduleInterview} className="space-y-4">
               <div className="p-3 tone-soft tone-info border rounded-lg text-xs">
                 Scheduling a Meet & Greet transitions the application to <strong>Under Review</strong>, dispatches a formal invitation email, and adds the session to the applicant&apos;s live tracking dashboard.

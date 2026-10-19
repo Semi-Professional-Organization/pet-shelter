@@ -32,10 +32,9 @@ import {
  * revalidation of all three public surfaces that render bulletins.
  *
  * Authorisation is by CAPABILITY (`MANAGE_CONTENT`) rather than a role list, so
- * a future role rename cannot silently widen or close this gate. It follows
- * `src/actions/transparency.ts`, not `src/actions/faqs.ts` — the latter still
- * carries a legacy role list that the 2026-09-18 decision deliberately left in
- * place rather than extended to new code.
+ * a future role rename cannot silently widen or close this gate. It followed
+ * `src/actions/transparency.ts`; `src/actions/faqs.ts` carried a legacy role list
+ * until 2026-10-19 and now asks for the same capability.
  *
  * WHAT THIS REPLACES MATTERS FOR REVIEW. Until this file existed there was no
  * authorisation on bulletins at all, because there was no server path at all:

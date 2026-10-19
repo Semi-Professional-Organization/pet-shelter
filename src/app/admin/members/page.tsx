@@ -1,6 +1,4 @@
-import { forbidden, unauthorized } from "next/navigation";
-import { getVerifiedSession } from "@/lib/security/dal";
-import { hasPermission, PERMISSIONS } from "@/lib/security/rbac";
+import { requireAdminSection } from "@/lib/security/adminSectionGate";
 import { listMembers } from "@/actions/members";
 import { MemberDataTable } from "@/components/admin/MemberDataTable";
 
@@ -22,15 +20,7 @@ export const dynamic = "force-dynamic";
  * to the table as a prop — the client never fetches the list itself.
  */
 export default async function AdminMembersPage() {
-  const session = await getVerifiedSession();
-
-  if (!session) {
-    unauthorized();
-  }
-
-  if (!hasPermission(session, PERMISSIONS.MANAGE_MEMBERS)) {
-    forbidden();
-  }
+  const session = await requireAdminSection("/admin/members");
 
   // Reuses the guarded action rather than reaching for the store directly, so
   // there is one authorized read path. Its permission check resolves from the

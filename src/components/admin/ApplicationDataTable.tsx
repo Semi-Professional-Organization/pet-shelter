@@ -44,9 +44,15 @@ import { ApplicationStatusIcon } from "@/components/admin/ApplicationStatusIcon"
 
 export function ApplicationDataTable({
   initialApplications,
+  canReview,
+  canDelete,
 }: {
   initialApplications?: AdoptionApplicationRecord[];
-} = {}) {
+  /** REVIEW_APPLICATIONS: change a status, record a decision, schedule a meet and greet. */
+  canReview: boolean;
+  /** DELETE_APPLICATIONS: remove a record. */
+  canDelete: boolean;
+}) {
   const { state, handlers } = useApplicationTableController(initialApplications);
   const {
     applications,
@@ -147,18 +153,20 @@ export function ApplicationDataTable({
           const app = row.original;
           return (
             <div className="flex items-center gap-1.5 justify-end">
-              <select
-                value={app.status}
-                onChange={(e) => handleQuickStatus(app.id, e.target.value as ApplicationStatus)}
-                className="bg-background border border-input text-xs font-medium px-2 py-1 focus:ring-1 focus:ring-foreground"
-                aria-label={`Change status for application from ${app.applicantName}`}
-              >
-                {APPLICATION_STATUS_SEQUENCE.map((status) => (
-                  <option key={status} value={status}>
-                    {getApplicationStatusPresentation(status).label}
-                  </option>
-                ))}
-              </select>
+              {canReview && (
+                <select
+                  value={app.status}
+                  onChange={(e) => handleQuickStatus(app.id, e.target.value as ApplicationStatus)}
+                  className="bg-background border border-input text-xs font-medium px-2 py-1 focus:ring-1 focus:ring-foreground"
+                  aria-label={`Change status for application from ${app.applicantName}`}
+                >
+                  {APPLICATION_STATUS_SEQUENCE.map((status) => (
+                    <option key={status} value={status}>
+                      {getApplicationStatusPresentation(status).label}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               <Button
                 variant="outline"
@@ -173,21 +181,23 @@ export function ApplicationDataTable({
                 <Eye className="size-3" /> View
               </Button>
 
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setDeleteCandidate(app)}
-                className="text-xs text-destructive hover:text-destructive"
-                title="Archive / Delete application"
-              >
-                <Trash2 className="size-3" />
-              </Button>
+              {canDelete && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setDeleteCandidate(app)}
+                  className="text-xs text-destructive hover:text-destructive"
+                  title="Archive / Delete application"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              )}
             </div>
           );
         },
       },
     ],
-    [handleQuickStatus, setActiveAppForDetail, setIsDetailOpen, setDeleteCandidate]
+    [canReview, canDelete, handleQuickStatus, setActiveAppForDetail, setIsDetailOpen, setDeleteCandidate]
   );
 
   const table = useReactTable({
@@ -369,6 +379,7 @@ export function ApplicationDataTable({
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         onUpdateStatus={handleUpdateStatusWithNotes}
+        canReview={canReview}
       />
 
       {/* Delete / Archive Confirmation */}

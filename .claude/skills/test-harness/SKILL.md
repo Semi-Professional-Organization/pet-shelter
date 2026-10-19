@@ -10,7 +10,8 @@ Loads before every test file (`setupFiles`) and provides:
 - Overload-aware `next/headers` (`cookies()` accepts both `set(name, value, opts)` and
   `set({ name, value, ...opts })`; `maxAge: 0` expires rather than writes), `next/cache`
   (`revalidatePath`/`revalidateTag`/`updateTag` spies plus `getRevalidatedPaths()`), and
-  `next/navigation` (`redirect`/`notFound` **throw**, as the real ones do).
+  `next/navigation` (`redirect`/`notFound`/`forbidden`/`unauthorized` **throw**, as the real
+  ones do; the last two carry the real `NEXT_HTTP_ERROR_FALLBACK;403` / `;401` digests).
 - A global `beforeEach` that resets every module-level cache: `resetServerStore()`,
   `resetUserStore()`, `resetAuditLogs()`, `resetRateLimitStore()`, `resetIdempotencyStore()`,
   `resetDonationLedger()`.
