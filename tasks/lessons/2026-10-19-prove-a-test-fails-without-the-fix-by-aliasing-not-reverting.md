@@ -21,5 +21,11 @@ fails on its first bare import; and a copy's relative imports (`./supporterTier`
 the copy, so rewrite them to absolute paths into the real tree before writing it — every case
 "failed" with "Cannot find module" until that was done, which a count alone would have passed.
 
+The probe also caught a vacuous test. A logout test spied on `Storage.prototype.removeItem` to make
+storage throw, and passed against the code it was written to catch: the component tier replaces
+jsdom's `localStorage` with a Map-backed object when Node's own is unusable
+(`tests/setup/componentSetup.ts`), so the prototype spy intercepted nothing. Spying on
+`localStorage.removeItem` itself made it fail for the right reason.
+
 **Rule:** to show a test discriminates, alias the changed modules to their base-branch copies under
 `node_modules/.probe/` and run the unchanged test; read the failure message, not just the count.
