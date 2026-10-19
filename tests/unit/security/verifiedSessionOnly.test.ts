@@ -33,11 +33,10 @@ const RAW_READER = /\b(getCurrentSession|unsealSession)\b/;
  */
 const ALLOWED: Record<string, { references: Record<"getCurrentSession" | "unsealSession", number>; reason: string }> = {
   "src/actions/auth.ts": {
-    // One import and two calls.
-    references: { getCurrentSession: 3, unsealSession: 0 },
-    reason:
-      "logoutAction names the actor in its audit row before clearing the cookie; " +
-      "getCurrentUserAction reports the caller's own cookie back. Neither grants anything.",
+    // One import and one call. getCurrentUserAction read the cookie too until 2026-10-19,
+    // and the admin layout drew its tabs from that answer.
+    references: { getCurrentSession: 2, unsealSession: 0 },
+    reason: "logoutAction names the actor in its audit row before clearing the cookie, and grants nothing.",
   },
   "src/proxy.ts": {
     // One import and one call.

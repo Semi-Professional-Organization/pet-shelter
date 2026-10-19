@@ -1,18 +1,45 @@
-import { PetDataTable } from "@/components/admin/PetDataTable";
+import { redirect } from "next/navigation";
+import { ShieldAlert } from "lucide-react";
+import { getVerifiedSession } from "@/lib/security/dal";
+import { adminHomeFor } from "@/lib/security/adminSections";
 
-export default function AdminIndexPage() {
+// The destination depends on the member's live role, so it must never come from
+// the full route cache.
+export const dynamic = "force-dynamic";
+
+/**
+ * The console's front door, and the one place that decides where a member lands.
+ *
+ * Sign-in, registration and every "Back to Admin" link point here rather than at a
+ * section, because no single section opens for every role: this page used to render
+ * the pet inventory itself, and sign-in pushed everyone to `/admin/pets`, so a STAFF
+ * or Content Editor account's first screen was a page it cannot open.
+ *
+ * The role is read through the DAL, not from the cookie. The cookie is sealed at
+ * sign-in and outlives a role change or a suspension made since, while every
+ * section's page gate reads the live row; choosing the landing from the cookie would
+ * send a demoted member into a section that then refuses them.
+ */
+export default async function AdminIndexPage() {
+  const session = await getVerifiedSession();
+
+  // Signed out, suspended, or no longer a member. Signing in again either works or
+  // says why it cannot.
+  if (!session) redirect("/admin/login");
+
+  const home = adminHomeFor(session.role);
+  if (home) redirect(home);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-          Pet Management (CRUD)
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
-          Add new rescue animals, update medical clearances, edit stories, and change adoption statuses.
-        </p>
-      </div>
-
-      <PetDataTable />
+    <div className="max-w-xl border border-border bg-background p-8 space-y-3">
+      <ShieldAlert className="size-7 text-destructive" />
+      <h1 className="font-heading text-xl font-bold text-foreground">
+        Your account has no admin sections yet
+      </h1>
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        You are signed in, but your role does not open any part of the staff portal. Ask a
+        Super Admin to assign you a role under Staff &amp; Permissions.
+      </p>
     </div>
   );
 }

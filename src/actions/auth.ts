@@ -9,6 +9,7 @@ import {
   getCurrentSession,
   SessionUser,
 } from "@/lib/security/session";
+import { getVerifiedSession } from "@/lib/security/dal";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { findUserByEmail, createUser, UserRecord } from "@/lib/server/userStore";
 import { Role, ROLES, normalizeRole } from "@/lib/security/rbac";
@@ -316,9 +317,14 @@ export async function logoutAction(): Promise<{ success: boolean }> {
 }
 
 /**
- * Retrieves the currently authenticated session user.
+ * The signed-in member as every guard sees them: the live role, and only while ACTIVE.
+ *
+ * Read through the DAL rather than from the cookie. The admin layout decides from this
+ * answer whether anyone is signed in and which tabs to draw, and every page and action
+ * behind those tabs re-reads the member row. Answered from the cookie, it showed a
+ * suspended member the console, a demoted one the tabs of a role they no longer hold,
+ * and a VOLUNTEER the STAFF role its sign-in was sealed with, until the cookie expired.
  */
 export async function getCurrentUserAction(): Promise<{ user: SessionUser | null }> {
-  const user = await getCurrentSession();
-  return { user };
+  return { user: await getVerifiedSession() };
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { loginAction, registerAction, logoutAction, getCurrentUserAction } from "@/actions/auth";
-import { normalizeRole, type CanonicalRole, type Role } from "@/lib/security/permissions";
+import type { Role } from "@/lib/security/permissions";
 
 const AUTH_STORAGE_KEY = "hope_for_strays_admin_session";
 
@@ -12,6 +12,23 @@ export interface AdminUser {
   name: string;
   /** May be a deprecated alias when read from a cached localStorage session. */
   role: Role | string;
+}
+
+/**
+ * Opens the console after a session was created outside the admin layout's own
+ * hook: sign-in, registration, invitation acceptance.
+ *
+ * A full document load, never `router.push`. `src/app/admin/layout.tsx` also wraps
+ * /admin/login and /admin/invite, mounts there while signed out, and an App Router
+ * layout persists across client-side navigation, so its `useAdminAuth` instance kept
+ * the signed-out verdict: it blanked the next page and pushed straight back to
+ * /admin/login. A new document mounts the layout with the new cookie. /admin then
+ * redirects to the first section the member's live role opens.
+ */
+export function enterAdminConsole(): void {
+  // The rule's advice, useRouter().push(), is exactly the navigation the layout bounced.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign("/admin");
 }
 
 export function useAdminAuth() {
@@ -42,10 +59,11 @@ export function useAdminAuth() {
             setUser(res.user);
             localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(res.user));
           } else {
-            const saved = localStorage.getItem(AUTH_STORAGE_KEY);
-            if (saved) {
-              setUser(JSON.parse(saved));
-            }
+            // The server's "nobody" is final: an expired cookie, a suspension, a deleted
+            // account. This used to fall back to the cached user, which kept the console
+            // and its tabs on screen over sections that all refused the visitor.
+            setUser(null);
+            localStorage.removeItem(AUTH_STORAGE_KEY);
           }
         }
       } catch (e) {
@@ -131,14 +149,12 @@ export function useAdminAuth() {
     }
   }, []);
 
-  // Cached localStorage sessions predate the RBAC migration and may hold a
-  // deprecated alias (or an old lowercase value), so the role is folded into
-  // the canonical set before any UI gating reads it.
-  const role: CanonicalRole | null = user ? normalizeRole(user.role) : null;
-
+  // No normalised `role` is offered here. It existed to fold a deprecated alias
+  // before UI gating read it, and that fold is what gated a VOLUNTEER as STAFF:
+  // gate on `user.role` through `roleHasPermission`, which resolves the aliases
+  // (and an old lowercase value) itself and fails closed on VOLUNTEER.
   return {
     user,
-    role,
     isAuthenticated: !!user,
     isLoading,
     login,

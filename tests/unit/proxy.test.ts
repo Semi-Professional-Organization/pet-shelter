@@ -98,6 +98,23 @@ describe("Proxy route guard", () => {
       expect(res.headers.get("x-robots-tag")).toBe("noindex");
     });
 
+    it("send a refused member to /admin, which lands each role on a section it opens", async () => {
+      // Was /admin/pets, which refuses every role this response is shown to except an
+      // Animal Manager, so "Back to Admin" led to a second refusal.
+      const body = await proxy(request("/admin/members", sessionFor(ROLES.STAFF))).text();
+
+      expect(body).toContain('href="/admin"');
+      expect(body).not.toContain("/admin/pets");
+    });
+
+    it("send a signed-out visitor to sign in, not to a Super Admin about their role", async () => {
+      const body = await proxy(request("/admin/members")).text();
+
+      expect(body).toContain('href="/admin/login"');
+      expect(body).toContain("Go to Sign In");
+      expect(body).not.toMatch(/review your role/);
+    });
+
     it("leak nothing about the protected resource", async () => {
       const res = proxy(request("/admin/members", sessionFor(ROLES.STAFF)));
       const body = await res.text();

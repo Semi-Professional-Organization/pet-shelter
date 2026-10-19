@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   PawPrint,
@@ -17,13 +16,12 @@ import {
   EyeOff,
   Clock,
 } from "lucide-react";
-import { useAdminAuth } from "@/lib/client/adminAuth";
+import { enterAdminConsole, useAdminAuth } from "@/lib/client/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const { login, register } = useAdminAuth();
 
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
@@ -66,7 +64,7 @@ export default function AdminLoginPage() {
 
     const result = await login(loginData.email, loginData.password);
     if (result.success) {
-      router.push("/admin/pets");
+      enterAdminConsole();
     } else {
       if (result.retryAfterSeconds) {
         setCountdown(result.retryAfterSeconds);
@@ -100,7 +98,7 @@ export default function AdminLoginPage() {
 
     if (result.success) {
       setSuccess("Account created successfully! Redirecting...");
-      router.push("/admin/pets");
+      enterAdminConsole();
     } else {
       if (result.retryAfterSeconds) {
         setCountdown(result.retryAfterSeconds);
@@ -116,7 +114,7 @@ export default function AdminLoginPage() {
     setIsSubmitting(true);
     const result = await login(email, pass);
     if (result.success) {
-      router.push("/admin/pets");
+      enterAdminConsole();
     } else {
       setError(result.error || "Quick demo login failed.");
       setIsSubmitting(false);

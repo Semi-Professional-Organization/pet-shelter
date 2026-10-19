@@ -29,8 +29,10 @@ export default function Forbidden() {
       </div>
 
       <div className="flex items-center gap-2.5 pt-1">
+        {/* /admin, not a section: it sends each role to the first section it can
+            open, where a fixed section would refuse most of the people sent here. */}
         <Link
-          href="/admin/pets"
+          href="/admin"
           className="inline-flex items-center text-xs font-semibold uppercase tracking-wider border border-border bg-background px-3 py-2 hover:bg-muted"
         >
           Back to Admin

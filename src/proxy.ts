@@ -53,13 +53,29 @@ const GUARDED_ROUTES: { prefix: string; permission: Permission }[] = [
  *   next/dist/server/lib/router-utils/resolve-routes.js returns no statusCode,
  *   so the status is silently dropped and you are back to a 200.
  *
- * The residual gap — a client-side navigation receiving HTML — is not reachable
- * in practice: the admin nav only renders a tab to a role that holds its
- * permission, so a user this function would deny has no link to click and no
- * prefetch is issued for one. Reaching a denied route means typing the URL,
- * which is a document request, which is exactly the case this handles.
+ * The residual gap — a client-side navigation receiving HTML — is reachable
+ * where the nav and the cookie disagree. The admin nav draws its tabs from the
+ * member's live role when the console loads, and this function reads the role
+ * sealed into the cookie at sign-in, so a member promoted since signing in is
+ * offered the tab and refused here; and a cookie that expires while the console
+ * is open is refused here on the next click. The texts below say what ends each:
+ * signing in again.
  */
+const NEXT_STEP: Record<401 | 403, { hint: string; href: string; label: string }> = {
+  // A signed-out visitor needs the sign-in page, not advice about their role.
+  401: { hint: "Sign in again to continue to the shelter staff portal.", href: "/admin/login", label: "Go to Sign In" },
+  // /admin, not a section: it sends each role to the first section it can open.
+  403: {
+    hint:
+      "Ask a Super Admin to review your role under Staff &amp; Permissions. If your role was " +
+      "changed since you signed in, sign out and sign in again.",
+    href: "/admin",
+    label: "Back to Admin",
+  },
+};
+
 function denialResponse(status: 401 | 403, title: string, message: string): NextResponse {
+  const next = NEXT_STEP[status];
   // Deliberately minimal: this is a network-boundary rejection, and the styled
   // in-app equivalents are src/app/forbidden.tsx and src/app/unauthorized.tsx.
   //
@@ -80,8 +96,8 @@ function denialResponse(status: 401 | 403, title: string, message: string): Next
 <main style="max-width:32rem;padding:2rem;text-align:center">
 <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${EMAIL_TONE.danger.text};margin:0 0 .5rem">${status} — ${title}</p>
 <h1 style="font-size:1.5rem;margin:0 0 .75rem">${message}</h1>
-<p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">Ask a Super Admin to review your role under Staff &amp; Permissions.</p>
-<a href="/admin/pets" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">Back to Admin</a>
+<p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">${next.hint}</p>
+<a href="${next.href}" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">${next.label}</a>
 </main>
 </body>
 </html>`;
