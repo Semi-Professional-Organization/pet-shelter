@@ -7,6 +7,7 @@ vi.mock("@/actions/sponsorships", () => ({
 }));
 
 import { submitDonationPledgeAction } from "@/actions/donations";
+import { STORAGE_RECEIPTS_KEY } from "@/lib/client/sponsorshipStore";
 import { createPetSponsorshipAction } from "@/actions/sponsorships";
 import { SponsorshipModal } from "@/components/features/pets/SponsorshipModal";
 import { makePet, renderWithLanguage, setupUser } from "./support/render";
@@ -349,6 +350,10 @@ describe("SponsorshipModal checkout contract", () => {
       }),
     );
     expect(mockedCreateSponsorship).not.toHaveBeenCalled();
+    // The client receipt store holds receipts. A claim reference is not one, and
+    // writing it there would rebuild the confusion this boundary removed. Checked on
+    // the store's own storage key, so it holds however the store is reached.
+    expect(localStorage.getItem(STORAGE_RECEIPTS_KEY)).toBeNull();
   });
 
   it("blocks RM 5, then sends the exact RM 10 target-pet boundary", async () => {
@@ -441,6 +446,7 @@ describe("SponsorshipModal checkout contract", () => {
     expect(
       screen.queryByRole("button", { name: /print|save receipt/i }),
     ).not.toBeInTheDocument();
+    expect(localStorage.getItem(STORAGE_RECEIPTS_KEY)).toBeNull();
   });
 
   it("does not claim an acknowledgement email was delivered from ledger success alone", async () => {

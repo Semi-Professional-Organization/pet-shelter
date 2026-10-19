@@ -20,7 +20,7 @@ function freshRehabNeeds(): RehabNeed[] {
 
 let serverRehabNeeds: RehabNeed[] = freshRehabNeeds();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness, and also reset by `resetServerStore()` in `./fallbackState`. */
 export function resetRehabNeeds(): void {
   serverRehabNeeds = freshRehabNeeds();
 }

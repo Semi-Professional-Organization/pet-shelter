@@ -1,5 +1,6 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { isClientCurrent } from "../../scripts/prisma-generate-if-stale.mjs";
+import { generatedSchemaPath, isClientCurrent } from "../../scripts/prisma-generate-if-stale.mjs";
 
 /**
  * `npm test` regenerates the Prisma client only when the schema changed
@@ -29,7 +30,20 @@ describe("isClientCurrent", () => {
     expect(isClientCurrent(changed, SCHEMA)).toBe(false);
   });
 
+  it("is stale when a field moved into a comment by joining two lines", () => {
+    const withComment = SCHEMA.replace("  name   String", "  // legacy\n  name   String");
+    const commentedOut = SCHEMA.replace("  name   String", "  // legacy name String");
+    expect(isClientCurrent(commentedOut, withComment)).toBe(false);
+  });
+
   it("is stale when no client has been generated yet", () => {
     expect(isClientCurrent(SCHEMA, null)).toBe(false);
+  });
+
+  it("finds the schema copy beside the client Node actually loads", () => {
+    // A worktree that borrows its parent's node_modules must compare against that client,
+    // not against a node_modules folder of its own that does not exist.
+    expect(generatedSchemaPath().replace(/\\/g, "/")).toMatch(/node_modules\/\.prisma\/client\/schema\.prisma$/);
+    expect(existsSync(generatedSchemaPath())).toBe(true);
   });
 });

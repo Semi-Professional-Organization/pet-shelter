@@ -1,28 +1,31 @@
 ---
 name: test-harness
-description: Read before writing or modifying any Vitest test in this repo - the tests/setup/hermeticEnv.ts and tests/setup/nextMocks.ts global harness, what it already mocks and resets for you, what a test may not reach (database, network, your shell's env), and how a store registers its reset.
+description: Read before writing or modifying any Vitest test in this repo - the global harness in tests/setup (hermeticEnv, hermeticRuntime, nextMocks), what it already mocks and resets for you, what a test may not reach (database, network, your shell's env), and how a store registers its reset.
 ---
 
 # Test harness (`tests/setup/`)
 
-Three setup files, in this order (`vitest.config.mts`):
+Four setup files, in this order (`vitest.config.mts`):
 
 1. **`hermeticEnv.ts`** — unit, integration and components only (not `integration-db`).
    - Deletes every environment variable the code reads that a shell might set (`DATABASE_URL`,
-     `RESEND_API_KEY`, storage, secrets, `ROS_REGISTRATION_NO`, …) and pins `TZ=UTC`. A test that
-     needs one uses `vi.stubEnv`; the config's `unstubEnvs`/`unstubGlobals` undo stubs between tests
-     (Vitest 4 restores them as each test starts, so a stub made at module scope or in
-     `vi.hoisted` is gone by the first test), so never assign `process.env.X =` by hand.
-   - Replaces `fetch` with a guard: any real network call fails the test that made it, with the
-     URL, even if the code under test swallows the error. Stub it with
-     `vi.spyOn(globalThis, "fetch")`.
-2. **`nextMocks.ts`** — every project.
+     `RESEND_API_KEY`, storage, secrets, `ROS_REGISTRATION_NO`, …). A test that needs one uses
+     `vi.stubEnv`; the config's `unstubEnvs`/`unstubGlobals` undo stubs between tests (Vitest 4
+     restores them as each test starts, so a stub made at module scope or in `vi.hoisted` is gone
+     by the first test), so never assign `process.env.X =` by hand.
+   - `STRICT_PERSISTENCE` is pinned off for unit and components in the config instead, because the
+     integration project sets it on purpose.
+2. **`hermeticRuntime.ts`** — every project, `integration-db` included. Pins `TZ=UTC` and replaces
+   `fetch` with a guard: any real network call fails the test, naming the URL and the test that was
+   running when it was made, even if the code under test swallows the error. Stub it with
+   `vi.spyOn(globalThis, "fetch")`.
+3. **`nextMocks.ts`** — every project.
    - Overload-aware `next/headers` (`cookies()` accepts both `set(name, value, opts)` and
      `set({ name, value, ...opts })`; `maxAge: 0` expires rather than writes), `next/cache`
      (`revalidatePath`/`revalidateTag`/`updateTag` spies plus `getRevalidatedPaths()`), and
      `next/navigation` (`redirect`/`notFound` **throw**, as the real ones do).
    - A global `beforeEach` that runs every reset registered with `@/lib/stateResets`.
-3. **`componentSetup.ts`** — components only: jest-dom, RTL `cleanup()`, jsdom gaps, `next/image`.
+4. **`componentSetup.ts`** — components only: jest-dom, RTL `cleanup()`, jsdom gaps, `next/image`.
 
 ## No database, unless the tier is `integration-db`
 

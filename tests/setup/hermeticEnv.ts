@@ -1,25 +1,20 @@
-import { afterEach } from "vitest";
-
 /**
- * Makes the unit, integration and components tiers independent of the machine
- * they run on. Registered first in `setupFiles`, ahead of `nextMocks.ts`, so it
- * runs before any module under test is loaded. The `integration-db` tier does
- * not use it: that tier exists to reach a real database.
+ * Makes the unit, integration and components tiers independent of the shell
+ * they are started from. Registered first in `setupFiles`, so it runs before any
+ * module under test is loaded. The `integration-db` tier does not use it: that
+ * tier exists to reach the database its `DATABASE_URL` names.
  *
- * Three things leaked in before, and each made a local run differ from CI:
+ * A developer's shell leaked in before, and made a local run differ from CI: a
+ * `RESEND_API_KEY` exported in a terminal turned simulated email into real
+ * sends, `DATABASE_URL` flipped the repositories into database mode, and storage
+ * and registration variables changed asserted URLs and certificate text. CI sets
+ * none of these, so neither does a test run: a test that needs one stubs it with
+ * `vi.stubEnv`, which the config undoes between tests (`unstubEnvs`).
  *
- *  1. The developer's shell. A `RESEND_API_KEY` exported in a terminal turned
- *     simulated email into real sends; `DATABASE_URL` flipped the repositories
- *     into database mode; storage and registration variables changed asserted
- *     URLs and certificate text. CI sets none of these, so neither does a test
- *     run: a test that needs one stubs it with `vi.stubEnv`, which the config
- *     undoes between tests (`unstubEnvs`).
- *  2. The time zone. CI and Vercel run in UTC; this machine runs UTC+8, so date
- *     arithmetic near midnight could pass in one and fail in the other.
- *  3. The network. Nothing here may reach a real host. A call that is not
- *     stubbed fails the test that made it, with the URL — even when the code
- *     under test catches the error and carries on, which is exactly the case a
- *     plain rejection would hide.
+ * `STRICT_PERSISTENCE` is not here, because the integration project sets it on
+ * purpose; the other projects pin it off in `vitest.config.mts` instead.
+ * `hermeticRuntime.ts` holds the parts every tier shares: the time zone and the
+ * network guard.
  */
 
 /** Every variable the code under test reads that a developer's shell might set. */
@@ -53,28 +48,3 @@ const AMBIENT_VARIABLES = [
 for (const name of AMBIENT_VARIABLES) {
   delete process.env[name];
 }
-
-process.env.TZ = "UTC";
-
-const unexpectedRequests: string[] = [];
-
-function describeRequest(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (input instanceof URL) return input.href;
-  return input.url;
-}
-
-globalThis.fetch = (async (input: RequestInfo | URL) => {
-  const url = describeRequest(input);
-  unexpectedRequests.push(url);
-  throw new TypeError(`Network access is disabled in tests; stub fetch for ${url}`);
-}) as typeof fetch;
-
-afterEach(() => {
-  if (unexpectedRequests.length === 0) return;
-  const urls = unexpectedRequests.splice(0);
-  throw new Error(
-    `This test tried to reach the network: ${urls.join(", ")}. ` +
-      "Stub fetch for it (vi.spyOn(globalThis, \"fetch\")) or stop the code from calling out."
-  );
-});

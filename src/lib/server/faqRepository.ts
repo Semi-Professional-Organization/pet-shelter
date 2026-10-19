@@ -62,7 +62,7 @@ function freshFaqs(): FaqRecord[] {
 
 let serverFaqs: FaqRecord[] = freshFaqs();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness, and also reset by `resetServerStore()` in `./fallbackState`. */
 export function resetFaqs(): void {
   serverFaqs = freshFaqs();
 }

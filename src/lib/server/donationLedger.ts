@@ -134,9 +134,9 @@ let memoryDonations: DonationRecord[] = [];
 let memorySeq = 0;
 
 /**
- * Clears the in-memory ledger. Test-only, and wired into the global `beforeEach`
- * in `tests/setup/nextMocks.ts` alongside `resetServerStore()` so receipt serials
- * do not leak between suites and make assertions order-dependent.
+ * Clears the in-memory ledger. Test-only, and registered below so the global
+ * `beforeEach` in `tests/setup/nextMocks.ts` runs it: receipt serials must not
+ * leak between tests and make assertions order-dependent.
  */
 export function resetDonationLedger(): void {
   memoryCounters.clear();

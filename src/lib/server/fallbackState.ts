@@ -17,10 +17,10 @@ import { resetSettings } from "./settingsRepository";
 /**
  * Restores in-memory collections to the committed JSON fixtures and initial settings.
  *
- * Test-only, mirroring `resetUserStore()`. Wired into the global `beforeEach`
- * in `tests/setup/nextMocks.ts` so a mutation made by one test — an inserted
- * pet, an approved application, an archived record, a settings edit — cannot leak into the next
- * and make the suite order-dependent.
+ * Test-only. The global `beforeEach` in `tests/setup/nextMocks.ts` no longer
+ * calls this: each of the six stores registers its own reset with
+ * `@/lib/stateResets`, so a test file resets only the stores it loaded. This
+ * stays for suites that restore all six by hand in the middle of a test.
  */
 export function resetServerStore(): void {
   resetPets();

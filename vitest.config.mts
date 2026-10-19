@@ -12,13 +12,14 @@ const alias = {
  * Shared by every project below. Kept as one object so a project cannot quietly
  * drift onto a different alias table or skip the global mock harness.
  *
- * `hermeticEnv.ts` runs first: it scrubs the developer's shell environment,
- * pins the time zone and blocks the network before anything under test loads.
- * `integration-db` replaces this list, because that tier needs its database.
+ * `hermeticEnv.ts` runs first and scrubs the developer's shell environment;
+ * `hermeticRuntime.ts` pins the time zone and blocks the network. Both run
+ * before anything under test loads. `integration-db` replaces this list
+ * without the scrub, because that tier needs its database.
  */
 const shared = {
   globals: true,
-  setupFiles: ["./tests/setup/hermeticEnv.ts", "./tests/setup/nextMocks.ts"],
+  setupFiles: ["./tests/setup/hermeticEnv.ts", "./tests/setup/hermeticRuntime.ts", "./tests/setup/nextMocks.ts"],
   // Every tier has files now, so an empty run means a moved folder or a broken
   // glob, and must fail rather than report green. A command that may select
   // nothing on purpose (`vitest related`) passes `--passWithNoTests` itself.
@@ -64,6 +65,10 @@ export default defineConfig({
           // (5507ms), clinical5NF. Raised rather than worked around — trimming
           // a guard to fit the clock would mean scanning less.
           testTimeout: 20_000,
+
+          // Off, whatever the shell says: a `STRICT_PERSISTENCE=true` copied from the
+          // integration tier would make every fallback here rethrow.
+          env: { STRICT_PERSISTENCE: "false" },
         },
       },
       {
@@ -110,7 +115,7 @@ export default defineConfig({
           // hand Prisma no database at all, and every assertion below would
           // then fail for a missing connection instead of the real schema —
           // which is indistinguishable from a genuine schema failure.
-          setupFiles: ["./tests/setup/integrationEnv.ts", "./tests/setup/nextMocks.ts"],
+          setupFiles: ["./tests/setup/integrationEnv.ts", "./tests/setup/hermeticRuntime.ts", "./tests/setup/nextMocks.ts"],
 
           // Tier 3b: the only suites that talk to a real PostgreSQL server.
           //
@@ -154,6 +159,9 @@ export default defineConfig({
           // `cleanup()`, and the browser APIs jsdom omits — and must not reach
           // the node lanes, where `document` does not exist.
           setupFiles: [...shared.setupFiles, "./tests/setup/componentSetup.ts"],
+
+          // Off, whatever the shell says; see the unit project.
+          env: { STRICT_PERSISTENCE: "false" },
         },
       },
     ],

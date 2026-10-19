@@ -52,6 +52,15 @@ describe("the Prisma client with no DATABASE_URL", () => {
     }
   });
 
+  it("hands out a client and model delegates that are not thenables, as the real ones are not", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+
+    // Awaiting a thenable that never settles would hang the caller for good.
+    expect((prisma as unknown as { then?: unknown }).then).toBeUndefined();
+    expect((prisma.pet as unknown as { then?: unknown }).then).toBeUndefined();
+    await expect(Promise.resolve(prisma.pet)).resolves.toBe(prisma.pet);
+  });
+
   it("disconnects cleanly, so teardown that always disconnects still works", async () => {
     const { disconnectPrisma } = await import("@/lib/server/prisma");
 

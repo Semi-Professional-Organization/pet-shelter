@@ -48,7 +48,7 @@ function freshSettings(): ShelterSettingsOutput {
 
 let serverSettings: ShelterSettingsOutput = freshSettings();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness, and also reset by `resetServerStore()` in `./fallbackState`. */
 export function resetSettings(): void {
   serverSettings = freshSettings();
 }

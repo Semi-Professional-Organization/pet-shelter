@@ -52,14 +52,17 @@ function createOfflineClient(): PrismaClient {
       finally: (onFinally?: () => void) =>
         Promise.reject(new DatabaseNotConfiguredError()).finally(onFinally),
     }) as unknown as Promise<never>;
-  const model = new Proxy({}, { get: () => refuse });
+  // Neither the client nor a model delegate is a thenable, as the real ones are
+  // not: answering `then` would make `await prisma.pet` wait forever. Symbol
+  // probes such as `util.inspect` get no answer either.
+  const isQuery = (key: string | symbol): key is string => typeof key === "string" && key !== "then";
+  const model = new Proxy({}, { get: (_target, key) => (isQuery(key) ? refuse : undefined) });
   return new Proxy(
     {},
     {
       get(_target, key) {
         if (key === "$disconnect") return async () => undefined;
-        // Not a thenable, and no answer to symbol probes such as util.inspect.
-        if (typeof key !== "string" || key === "then") return undefined;
+        if (!isQuery(key)) return undefined;
         return key.startsWith("$") ? refuse : model;
       },
     }
