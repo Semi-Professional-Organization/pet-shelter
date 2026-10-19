@@ -11,7 +11,7 @@ is claimed. The kill conditions below are immutable; a later edit to them is an 
 ## Baseline
 
 Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 15,485 model
+transcript Claude Code still held for this repo: 17 sessions and their subagents, 16,097 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
@@ -19,19 +19,19 @@ later change of model cannot pose as a saving. Dollars are API list-price equiva
 |---|---:|
 | Mean cost per main-session request | $0.143 |
 | Mean cost per subagent request | $0.056 |
-| Cost split: cache reads / cache writes / output | 57.2% / 30.4% / 12.3% |
+| Cost split: cache reads / cache writes / output | 57.7% / 29.9% / 12.4% |
 | Share of cost from requests made above 400K context | 56.3% |
-| Cold resumes (whole context re-written after over an hour idle) | 54, 12.6% of cost |
-| Carrying old tool output (estimated) | 13.0% of cost |
-| Workflow families, saving at one command call per burst | 5.9% of cost combined |
+| Cold resumes (whole context re-written after over an hour idle) | 54, 12.1% of cost |
+| Carrying old tool output (estimated) | 13.1% of cost |
+| Workflow families, saving at one command call per burst | 5.7% of cost combined |
 
 The families' combined saving is the sum of the eight families in the catalog's section 4 (gates
-0.9%, targeted tests 0.6%, orient 0.9%, ledger 0.4%, merge 0.2%, drift 0.1%, pr 2.5%, ports 0.4%);
+0.9%, targeted tests 0.7%, orient 0.8%, ledger 0.4%, merge 0.2%, drift 0.1%, pr 2.4%, ports 0.2%);
 a call can belong to two families, so the sum is an upper bound. The catalog estimated about 9%
 from a different weighting; this is the priced figure.
 
 Two corrections to the catalog's own method, found while building `usage`: the prototype took a
-request's first streamed transcript line, which undercounts output (its 10% output share is 12.3%
+request's first streamed transcript line, which undercounts output (its 10% output share is 12.4%
 measured), and `node:readline` cut 78 transcript records in half at a raw U+2028.
 
 ## Success

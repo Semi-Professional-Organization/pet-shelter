@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync, statSync } from "fs";
-import { join, relative, resolve } from "path";
+import { execFileSync } from "child_process";
+import { readFileSync } from "fs";
+import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 import { COMMANDS } from "../../scripts/agent.mjs";
@@ -13,34 +14,32 @@ import { COMMANDS } from "../../scripts/agent.mjs";
  */
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
-const SKIP = new Set(["node_modules", ".git", ".next", "worktrees"]);
+const NAMED = /node scripts\/agent\.mjs\s+([a-z][\w-]*)/g;
 
-function markdown(dir: string, acc: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    if (SKIP.has(name)) continue;
-    const p = join(dir, name);
-    if (statSync(p).isDirectory()) markdown(p, acc);
-    else if (name.endsWith(".md")) acc.push(p);
-  }
-  return acc;
-}
+/** Commands a text names, as `node scripts/agent.mjs <command>`. */
+const commandsNamed = (text: string) => [...text.matchAll(NAMED)].map((m) => m[1]);
 
 describe("agent scripts entry point", () => {
-  const docs = [join(ROOT, "AGENTS.md"), join(ROOT, "CLAUDE.md"), ...["docs", "tasks", ".claude"].flatMap((d) => markdown(join(ROOT, d)))];
-  const named = docs.flatMap((file) =>
-    [...readFileSync(file, "utf8").matchAll(/node scripts\/agent\.mjs\s+([a-z][\w-]*)/g)].map((m) => ({ file: relative(ROOT, file), command: m[1] })),
-  );
+  // Tracked markdown only, as `docs:check` reads it, so an untracked local note cannot make this
+  // pass or fail differently from CI.
+  const docs = execFileSync("git", ["ls-files", "-z", "--", "*.md"], { cwd: ROOT, encoding: "utf8" }).split("\0").filter(Boolean);
 
   it("is pointed at from AGENTS.md", () => {
     expect(readFileSync(join(ROOT, "AGENTS.md"), "utf8")).toContain("node scripts/agent.mjs --help");
   });
 
-  it("has every command a doc names", () => {
-    const missing = named.filter((n) => !Object.hasOwn(COMMANDS, n.command));
+  it("has every command a tracked doc names", () => {
+    const missing = docs.flatMap((file) =>
+      commandsNamed(readFileSync(join(ROOT, file), "utf8"))
+        .filter((command) => !Object.hasOwn(COMMANDS, command))
+        .map((command) => ({ file, command })),
+    );
     expect(missing).toEqual([]);
   });
 
-  it("finds the names it checks, so an empty scan cannot pass as a clean one", () => {
-    expect(named.map((n) => n.command)).toContain("usage");
+  it("reads a command name the way a doc writes it, and not the --help pointer", () => {
+    // Pins the pattern itself, so the scan above cannot go quietly blind.
+    expect(commandsNamed("run `node scripts/agent.mjs usage --json`, then node scripts/agent.mjs --help")).toEqual(["usage"]);
+    expect(docs).toContain("AGENTS.md");
   });
 });

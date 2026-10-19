@@ -65,10 +65,10 @@ export class UnpriceableError extends Error {}
  * @param {{ model: string, prompt: number, speed?: string | null, geo?: string | null }} request
  */
 export function ratesFor({ model, prompt, speed, geo }) {
-  const table = PRICES[model];
+  const table = Object.hasOwn(PRICES, model) ? PRICES[model] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
   if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
-  const multiplier = geo == null ? 1 : GEO_MULTIPLIER[geo];
+  const multiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
   if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
   const base = table.over && prompt > table.over.prompt ? table.over : table;
   return {
@@ -92,7 +92,7 @@ export const FAMILIES = {
   gates: (tool, cmd) =>
     SHELLS.has(tool) &&
     /npm run (-s )?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build/.test(cmd) &&
-    !/vitest run[^;&|]*tests\/[^ ]+\.test\.tsx?/.test(cmd),
+    !FAMILIES["targeted tests"](tool, cmd),
   "targeted tests": (tool, cmd) =>
     SHELLS.has(tool) && /vitest run[^;&|]*tests\/[^ ]+\.test\.tsx?|npm run test[^;&|]* -- [^;&|]*tests\//.test(cmd),
   orient: (tool, cmd) =>
@@ -107,7 +107,9 @@ export const FAMILIES = {
   pr: (tool, cmd) =>
     SHELLS.has(tool) && /gh pr (checks|view)|gh run (view|watch|list)|commits\/[^ ]+\/status|gh api [^ ]*deployments/.test(cmd),
   ports: (tool, cmd) =>
-    SHELLS.has(tool) && /5432|Get-NetTCPConnection|netstat|Stop-Process|taskkill|Get-CimInstance Win32_Process/.test(cmd),
+    // Port checks and process kills, not every command that carries a `:5432` database URL.
+    SHELLS.has(tool) &&
+    /Get-NetTCPConnection|Test-NetConnection|netstat|lsof -i|net\.connect|Stop-Process|taskkill|Get-CimInstance Win32_Process/.test(cmd),
 };
 
 /** Families a call belongs to. A call can count toward more than one, as in the catalog. */
@@ -115,13 +117,17 @@ export function familiesOf(tool, cmd) {
   return Object.keys(FAMILIES).filter((name) => FAMILIES[name](tool, cmd));
 }
 
-const SAFE_WORD = /^[A-Za-z0-9_.:\/-]+$/;
+/** A command word: starts with a letter; no path separator, flag, quote or substitution. */
+const VERB = /^[A-Za-z][A-Za-z0-9_.-]{0,39}$/;
+/** An npm script name may also carry colons (`test:components`). */
+const SCRIPT = /^[A-Za-z][A-Za-z0-9_.:-]{0,39}$/;
 const SUBCOMMAND = new Set(["git", "gh", "npx"]);
 
 /**
  * A coarse, content-free label for what a tool call was: the tool name, or for a shell the leading
- * verb (`git diff`, `npm run test`, `cat`). Leading `cd ... &&` and `VAR=x` are skipped. Anything
- * that is not a plain word becomes `other`, so no argument text reaches the report.
+ * verb (`git diff`, `npm run test`, `cat`). Leading `cd ... &&` and `VAR=x` are skipped. A word
+ * that could be argument text (a path, a flag, a quoted or substituted value) turns the whole label
+ * into `<tool> other`, so no argument text reaches the report.
  */
 export function commandClass(tool, cmd) {
   if (tool.startsWith("mcp__")) return tool.split("__").slice(0, 2).join("__");
@@ -129,7 +135,7 @@ export function commandClass(tool, cmd) {
   let rest = String(cmd).trim();
   for (;;) {
     const cd = /^(cd|Set-Location|pushd)\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*/.exec(rest);
-    const env = /^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|\S*)\s+/.exec(rest);
+    const env = /^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|[^\s"';&|]*)\s+/.exec(rest);
     const match = cd || env;
     if (!match) break;
     rest = rest.slice(match[0].length);
@@ -137,7 +143,8 @@ export function commandClass(tool, cmd) {
   const words = rest.split(/\s+/);
   const take = words[0] === "npm" && words[1] === "run" ? 3 : SUBCOMMAND.has(words[0]) || words[0] === "npm" ? 2 : 1;
   const label = words.slice(0, take).filter(Boolean);
-  if (!label.length || !label.every((w) => SAFE_WORD.test(w) && w.length <= 40)) return `${tool} other`;
+  const plain = label.length > 0 && label.every((w, i) => (i === 2 ? SCRIPT : VERB).test(w));
+  if (!plain) return `${tool} other`;
   return label.join(" ");
 }
 
@@ -170,6 +177,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
   let synthetic = 0;
   let duplicates = 0;
   const dupKeys = new Set();
+  let lastTs;
 
   return {
     add(record) {
@@ -187,6 +195,10 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           return;
         }
         const key = record.requestId || message.id || record.uuid;
+        // The previous assistant line's time, copied history included, so the first new request
+        // of a forked or relocated transcript still knows how long the session sat idle.
+        const prevTs = lastTs;
+        lastTs = record.timestamp;
         if (dupKeys.has(key)) return;
         let request = byKey.get(key);
         if (!request) {
@@ -199,6 +211,7 @@ export function createExtractor({ session, sub }, seen = new Set()) {
           request = {
             index: requests.length,
             ts: record.timestamp,
+            prevTs,
             model: message.model,
             speed: undefined,
             geo: undefined,
@@ -343,9 +356,9 @@ export const COLD_IDLE_MINUTES = 60;
 export function coldResumes(file) {
   if (file.sub) return [];
   const out = [];
-  for (let i = 1; i < file.requests.length; i++) {
-    const r = file.requests[i];
-    const idle = (Date.parse(r.ts) - Date.parse(file.requests[i - 1].ts)) / 60_000;
+  for (const r of file.requests) {
+    if (!r.prevTs) continue;
+    const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
     if (!(idle > COLD_IDLE_MINUTES)) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
     out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write });
@@ -569,7 +582,11 @@ export function defaultDirs(projectsDir, root) {
   if (!existsSync(projectsDir)) return [];
   const name = projectFolderName(root);
   return readdirSync(projectsDir)
-    .filter((d) => d === name || d.startsWith(`${name}--claude-worktrees-`))
+    // Claude Code keeps the drive letter's case as typed, so `d:` and `D:` give two folders.
+    .filter((d) => {
+      const lower = d.toLowerCase();
+      return lower === name.toLowerCase() || lower.startsWith(`${name}--claude-worktrees-`.toLowerCase());
+    })
     .map((d) => join(projectsDir, d));
 }
 

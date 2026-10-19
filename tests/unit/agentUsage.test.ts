@@ -12,6 +12,8 @@ import {
   coldResumes,
   commandClass,
   createExtractor,
+  defaultDirs,
+  familiesOf,
   familyUsage,
   formatReport,
   jsonlLines,
@@ -90,6 +92,9 @@ describe("agent usage: prices", () => {
 
   it("refuses a model, a speed or a region it has no price for, rather than guessing", () => {
     expect(() => ratesFor({ model: "claude-opus-9", prompt: 1 })).toThrow(UnpriceableError);
+    // Names an object inherits are not prices; they would price at NaN and exit 0.
+    expect(() => ratesFor({ model: "toString", prompt: 1 })).toThrow(UnpriceableError);
+    expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "constructor" })).toThrow(UnpriceableError);
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast" })).toThrow(/speed fast/);
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "eu" })).toThrow(/inference_geo eu/);
   });
@@ -170,6 +175,28 @@ describe("agent usage: command classes", () => {
     expect(commandClass("Bash", `'${SECRET} with spaces' arg`)).toBe("Bash other");
     expect(commandClass("Bash", "$(whoami)")).toBe("Bash other");
   });
+
+  it("never turns argument text into a label: paths, flags, or a half-stripped assignment", () => {
+    // Each of these leaked a path or a flag into the report before review round 1.
+    expect(commandClass("Bash", 'C2="src/lib/a.ts src/app/admin/pets/page.tsx"; git diff $C2')).toBe("Bash other");
+    expect(commandClass("PowerShell", "pid=$(netstat -ano | grep 5432)")).toBe("PowerShell other");
+    expect(commandClass("Bash", "./scripts/deploy-prod.sh --token=abc")).toBe("Bash other");
+    expect(commandClass("Bash", "C:/Users/User/secret-notes.txt")).toBe("Bash other");
+    expect(commandClass("Bash", "git --no-pager log")).toBe("Bash other");
+  });
+});
+
+describe("agent usage: workflow families", () => {
+  it("files a targeted test run under targeted tests only, whichever way it is invoked", () => {
+    expect(familiesOf("Bash", "npm run test -- tests/unit/x.test.ts")).toEqual(["targeted tests"]);
+    expect(familiesOf("Bash", "npx vitest run tests/unit/x.test.ts")).toEqual(["targeted tests"]);
+    expect(familiesOf("Bash", "npm run test")).toEqual(["gates"]);
+  });
+
+  it("counts port checks as ports, not every command carrying a database URL", () => {
+    expect(familiesOf("Bash", "DATABASE_URL=postgresql://u:p@localhost:5432/db npm run db:push:local")).toEqual([]);
+    expect(familiesOf("PowerShell", "Get-NetTCPConnection -LocalPort 5432")).toEqual(["ports"]);
+  });
 });
 
 describe("agent usage: the analyses", () => {
@@ -191,6 +218,17 @@ describe("agent usage: the analyses", () => {
     expect(cold).toHaveLength(1);
     expect(cold[0].cost).toBeCloseTo(3.2); // 400K at the $8 one-hour write rate
     expect(coldResumes(priceFile(extract(records, { session: "s1", sub: true })))).toHaveLength(0);
+  });
+
+  it("still sees a cold resume as the first new request of a forked transcript", () => {
+    const seen = new Set<string>();
+    const history = [assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" })];
+    extract(history, { session: "s1", sub: false }, seen);
+    const fork = priceFile(
+      extract([...history, assistant("r2", { w1h: 400_000, out: 1 }, { ts: "2026-10-01T12:00:00.000Z" })], { session: "s2", sub: false }, seen),
+    );
+    expect(fork.requests).toHaveLength(1);
+    expect(coldResumes(fork)).toHaveLength(1);
   });
 
   it("charges a tool result one cache write and one read per later request, until a compaction", () => {
@@ -293,6 +331,17 @@ describe("agent usage: the command", () => {
       return { code: e.status, out: e.stdout };
     }
   };
+
+  it("finds this repo's transcript folders whatever case the drive letter was stored in, and no neighbour's", () => {
+    // The folder keeps the case of the cwd that first created it (`d:` typed gives `d--`). One
+    // case per name, because Windows folders are case-insensitive and the second mkdir would fail.
+    const projects = mkdtempSync(join(tmpdir(), "agent-usage-projects-"));
+    for (const d of ["d--Dev-Repos-pet-shelter", "D--Dev-Repos-pet-shelter--claude-worktrees-x", "D--Dev-Repos-pet-shelter2"]) {
+      mkdirSync(join(projects, d));
+    }
+    const found = defaultDirs(projects, "D:\\Dev\\Repos\\pet-shelter").map((d: string) => d.slice(projects.length + 1)).sort();
+    expect(found).toEqual(["D--Dev-Repos-pet-shelter--claude-worktrees-x", "d--Dev-Repos-pet-shelter"]);
+  });
 
   it("lists usage in --help with its side-effect class", () => {
     expect(cli(["--help"])).toMatchObject({ code: 0, out: expect.stringMatching(/usage\s+\[read-only\]/) });
