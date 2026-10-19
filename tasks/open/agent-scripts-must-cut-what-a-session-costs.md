@@ -20,7 +20,7 @@ edit to them is an automatic DIED.
 ## Baseline
 
 Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 17,173 model
+transcript Claude Code still held for this repo: 17 sessions and their subagents, 17,238 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
@@ -28,8 +28,8 @@ later change of model cannot pose as a saving. Dollars are API list-price equiva
 |---|---:|
 | Mean cost per main-session request | $0.144 |
 | Mean cost per subagent request | $0.056 |
-| Cost split: cache reads / cache writes / output | 58.4% / 29.2% / 12.4% |
-| Share of cost from requests made above 400K context | 56.1% |
+| Cost split: cache reads / cache writes / output | 58.3% / 29.2% / 12.5% |
+| Share of cost from requests made above 400K context | 55.9% |
 | Cold resumes: whole context re-written on a person's message after the cache expired | 43, 9.5% of cost |
 | The same re-write after a long tool or a background notice | 11, 1.6% of cost |
 | Carrying old tool output (estimated) | 13.4% of cost |

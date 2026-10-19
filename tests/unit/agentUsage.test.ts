@@ -119,6 +119,15 @@ describe("agent usage: prices", () => {
     expect(ratesFor({ model: "claude-opus-4-6", prompt: 1, geo: "us" }).input).toBeCloseTo(5.5);
   });
 
+  it("keeps the cache-read discounts the pricing page gives by footnote", () => {
+    // Footnotes 1 and 2 on the page as checked: 0.025x input for Fable 5.1, 0.05x for Opus 5.5 and
+    // Sonnet 5.5, 0.1x for every other model. Easy to "correct" back to 0.1x by memory.
+    expect(PRICES["claude-fable-5-1"].cacheRead).toBe(0.25);
+    expect(PRICES["claude-opus-5-5"].cacheRead).toBe(0.2);
+    expect(PRICES["claude-sonnet-5-5"].cacheRead).toBe(0.1);
+    expect(PRICES["claude-sonnet-5"].cacheRead).toBe(0.2);
+  });
+
   it("prices a dated snapshot id as its model", () => {
     expect(ratesFor({ model: "claude-haiku-4-5-20251001", prompt: 1 })).toEqual(PRICES["claude-haiku-4-5"]);
   });
@@ -246,6 +255,10 @@ describe("agent usage: workflow families", () => {
     expect(familiesOf("Bash", "npm run test -- tests/unit")).toEqual(["gates"]);
     expect(familiesOf("Bash", "npx vitest run --project unit")).toEqual(["gates"]);
     expect(familiesOf("PowerShell", "npx vitest run .\\tests\\unit")).toEqual(["gates"]);
+    expect(familiesOf("PowerShell", 'npx vitest run "tests/unit"')).toEqual(["gates"]);
+    expect(familiesOf("Bash", "npx vitest run tests/unit --bail 1 --retry 2")).toEqual(["gates"]);
+    expect(familiesOf("Bash", "npx vitest run --exclude e2e --hookTimeout 20000")).toEqual(["gates"]);
+    expect(familiesOf("PowerShell", "npm.cmd run lint")).toEqual(["gates"]);
   });
 
   it("files a run narrowed by a name filter or a test pattern as targeted", () => {
@@ -254,6 +267,7 @@ describe("agent usage: workflow families", () => {
       "npm run test:components -- AdminInvitePage",
       'npx vitest run -t "prices"',
       "npx vitest run --testNamePattern=prices",
+      "npm test tests/unit/foo.test.ts",
       "npx vitest run --project unit tests/unit/a.test.ts",
     ]) {
       expect(isTargetedRun(cmd), cmd).toBe(true);
@@ -347,6 +361,7 @@ describe("agent usage: the analyses", () => {
     expect(triggerOf(queued("human"))).toBe("person");
     expect(triggerOf(queued("peer"))).toBe("event");
     expect(triggerOf(queued(undefined, "task-notification"))).toBe("event");
+    expect(triggerOf(queued(undefined, "prompt"))).toBe("person");
     expect(triggerOf({ type: "attachment", attachment: { type: "date" } })).toBeUndefined();
     const file = priceFile(
       extract([

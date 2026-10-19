@@ -138,18 +138,30 @@ export const FAMILIES = {
 };
 
 /** Vitest options that take a value as the next word, which is therefore not a file filter. */
-const VITEST_VALUE_FLAGS = new Set(["--project", "--reporter", "--config", "-c", "--pool", "--root", "-r", "--dir", "--environment", "--maxWorkers", "--minWorkers", "--shard", "--outputFile"]);
+const VITEST_VALUE_FLAGS = new Set([
+  "--project", "--reporter", "--config", "-c", "--pool", "--root", "-r", "--dir", "--environment",
+  "--maxWorkers", "--minWorkers", "--shard", "--outputFile", "--bail", "--retry", "--testTimeout",
+  "--hookTimeout", "--teardownTimeout", "--exclude", "--mode", "--maxConcurrency",
+]);
 /** Filters that name a whole test tier, which is the gate, not a targeted run. */
 const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/integration"]);
 
 /**
  * A vitest run narrowed to some tests: a file or name filter, or `-t <pattern>`. Reads the words
- * after `vitest run`, or after `--` in `npm test`/`npm run test[:tier]`.
+ * after `vitest run`, or after `npm test`/`npm run test[:tier]` (with or without `--`, since npm
+ * passes either on).
+ *
+ * ceiling: a vitest option missing from VITEST_VALUE_FLAGS makes its value read as a filter. The
+ * exact parse would use vitest's own CLI definition, which is not available without the package.
  */
 export function isTargetedRun(cmd) {
-  const match = /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$|(?:^|\s)npm\s+(?:run\s+)?test(?::[\w-]+)?\s+--(?:\s(.*))?$/.exec(String(cmd).trim());
+  const match = /(?:^|\s)(?:npx\s+)?vitest\s+run\b(.*)$|(?:^|\s)npm\s+(?:run\s+)?test(?::[\w-]+)?(?:\s+(.*))?$/.exec(String(cmd).trim());
   if (!match) return false;
-  const words = (match[1] ?? match[2] ?? "").trim().split(/\s+/).filter(Boolean);
+  const words = (match[1] ?? match[2] ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w && w !== "--")
+    .map((w) => w.replace(/^(["'])(.*)\1$/, "$2"));
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
     // `-t <pattern>` needs no case: its pattern reads as a filter below.
@@ -169,11 +181,14 @@ export function isTargetedRun(cmd) {
   return false;
 }
 
-/** Families a call belongs to. A call can count toward more than one, as in the catalog. */
+/** `npm.cmd run lint` is `npm run lint`: PowerShell on Windows often names the shim. */
+const withoutExeSuffix = (cmd) => cmd.replace(/\b(npm|npx|node|git|gh)\.(cmd|exe)\b/gi, "$1");
+
+/** Families a call belongs to. A call can count toward more than one. */
 export function familiesOf(tool, cmd) {
   // Each command of a chain is classed on its own, so `vitest run <file> && npm run lint` is both
   // a targeted run and a gate.
-  const parts = SHELLS.has(tool) ? String(cmd).split(/&&|\|\||[;|]/) : [cmd];
+  const parts = SHELLS.has(tool) ? withoutExeSuffix(String(cmd)).split(/&&|\|\||[;|]/) : [cmd];
   return Object.keys(FAMILIES).filter((name) => parts.some((part) => FAMILIES[name](tool, part)));
 }
 
@@ -196,7 +211,7 @@ const SUBCOMMAND = new Set(["git", "gh", "npx"]);
 export function commandClass(tool, cmd) {
   if (tool.startsWith("mcp__")) return tool.split("__").slice(0, 2).join("__");
   if (!SHELLS.has(tool)) return tool;
-  let rest = String(cmd).trim();
+  let rest = withoutExeSuffix(String(cmd).trim());
   for (;;) {
     const cd = /^(cd|Set-Location|pushd)\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*/.exec(rest);
     const env = /^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|[^\s"';&|]*)\s+/.exec(rest);
@@ -243,12 +258,13 @@ export function triggerOf(record) {
   if (record.type === "attachment") {
     // Anything that arrives while a turn runs (a person's message, a background notice, another
     // session's message) is queued and written as a `queued_command` attachment. Older ones carry
-    // no origin; their `commandMode` is "task-notification", so only "human" is a person here.
+    // no origin, and then `commandMode` "prompt" is someone typing; anything else is a notice.
     const queued = record.attachment;
     if (queued?.type !== "queued_command") return undefined;
     const kind = queued.origin?.kind;
     if (kind) return kind === "human" ? "person" : "event";
-    return queued.isMeta ? undefined : "event";
+    if (queued.isMeta) return undefined;
+    return queued.commandMode === "prompt" ? "person" : "event";
   }
   const kind = record.origin?.kind;
   if (kind) return kind === "human" ? "person" : "event";
@@ -472,23 +488,16 @@ const COMPACTION_DROP = 0.6;
 
 /** Indexes of the requests that start a new context, after a compaction. */
 function segmentBreaks(file) {
-  const cached = breaksOf.get(file);
-  if (cached) return cached;
   const breaks = new Set(file.compactions);
   for (let i = 1; i < file.requests.length; i++) {
     if (promptOf(file.requests[i]) < COMPACTION_DROP * promptOf(file.requests[i - 1])) breaks.add(i);
   }
-  breaksOf.set(file, breaks);
   return breaks;
 }
 
-/** Breaks depend only on token counts and compaction records, so one pass per file serves all. */
-const breaksOf = new WeakMap();
-
 /** Index of the last request each request's context survives to. */
-function segmentEnds(file) {
+function segmentEnds(file, breaks) {
   const n = file.requests.length;
-  const breaks = segmentBreaks(file);
   const ends = new Array(n);
   let end = n - 1;
   for (let i = n - 1; i >= 0; i--) {
@@ -509,9 +518,9 @@ function segmentEnds(file) {
  * ceiling: chars/4 over-counts dense code and under-counts non-Latin text; the exact figure is
  * the cache-write delta of the next request, which mixes in everything else that turn added.
  */
-export function carriedOutput(file) {
+export function carriedOutput(file, breaks = segmentBreaks(file)) {
   const reqs = file.requests;
-  const ends = segmentEnds(file);
+  const ends = segmentEnds(file, breaks);
   const readPrefix = [0];
   for (const r of reqs) readPrefix.push(readPrefix[readPrefix.length - 1] + (r.rates?.cacheRead ?? 0));
   const byClass = {};
@@ -549,9 +558,8 @@ export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
  * for "the cache had expired"; the exact test needs the cache's own expiry, which transcripts
  * do not record.
  */
-export function coldResumes(file) {
+export function coldResumes(file, breaks = segmentBreaks(file)) {
   if (file.sub) return [];
-  const breaks = segmentBreaks(file);
   const out = [];
   // The lifetime the context was last written with is the one that expires.
   let lifetime;
@@ -692,13 +700,14 @@ export function summarize(files, { since, priceAs } = {}) {
       if (!last || r.ts > last) last = r.ts;
     }
     if (!f.requests.length) continue;
-    const c = carriedOutput(f);
+    const breaks = segmentBreaks(f);
+    const c = carriedOutput(f, breaks);
     carried.cost += c.total;
     for (const [k, v] of Object.entries(c.byClass)) {
       carried.byClass[k] = (carried.byClass[k] || 0) + v;
       (classSessions[k] ||= new Set()).add(f.session);
     }
-    cold.push(...coldResumes(f));
+    cold.push(...coldResumes(f, breaks));
     windowed.push({ ...f, calls: f.calls.filter((call) => f.requests[call.request].usd) });
   }
 
@@ -807,7 +816,13 @@ function mainCheckoutRoot(cwd) {
   }
 }
 
-/** This repo's transcript folders: the main checkout's and every `.claude/worktrees/*` one. */
+/**
+ * This repo's transcript folders: the main checkout's and every `.claude/worktrees/*` one.
+ *
+ * ceiling: a session started in a subdirectory, or in a worktree elsewhere, has its own folder,
+ * and the folder name cannot tell `pet-shelter-src` (a subdirectory) from `pet-shelter-src` (a
+ * sibling repo), so those are left out; `--dir` adds them by hand.
+ */
 export function defaultDirs(projectsDir, root) {
   if (!existsSync(projectsDir)) return [];
   const name = projectFolderName(root);
