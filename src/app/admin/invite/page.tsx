@@ -47,8 +47,9 @@ function AcceptInvitationForm() {
     if (result.success) {
       setDone(true);
       // acceptInvitation signs the new member in, so land them in the console:
-      // whichever section the invited role opens, by a fresh document load.
-      enterAdminConsole();
+      // whichever section the invited role opens, by a fresh document load. It
+      // returns no role to cache, so whoever this browser cached before is forgotten.
+      enterAdminConsole({ forgetCachedUser: true });
       return;
     }
 

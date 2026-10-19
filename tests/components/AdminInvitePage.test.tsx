@@ -43,7 +43,9 @@ describe("/admin/invite", () => {
 
     await activate();
 
-    expect(mocks.enterAdminConsole).toHaveBeenCalledTimes(1);
+    // It learns no role to cache, so it must not leave the previous person as the
+    // console's fallback on a shared browser.
+    expect(mocks.enterAdminConsole).toHaveBeenCalledExactlyOnceWith({ forgetCachedUser: true });
     expect(routerMock.push).not.toHaveBeenCalled();
   });
 

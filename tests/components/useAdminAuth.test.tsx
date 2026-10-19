@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 
-const actions = vi.hoisted(() => ({ getCurrentUserAction: vi.fn() }));
+const actions = vi.hoisted(() => ({ getCurrentUserAction: vi.fn(), loginAction: vi.fn() }));
 
 vi.mock("@/actions/auth", () => ({
   getCurrentUserAction: actions.getCurrentUserAction,
-  loginAction: vi.fn(),
+  loginAction: actions.loginAction,
   registerAction: vi.fn(),
   logoutAction: vi.fn(),
 }));
@@ -25,6 +25,7 @@ const CACHED = { id: "usr-staff-01", email: "staff@hopeforstrays.org", name: "Ca
 describe("useAdminAuth", () => {
   beforeEach(() => {
     actions.getCurrentUserAction.mockReset();
+    actions.loginAction.mockReset();
     localStorage.clear();
   });
 
@@ -68,14 +69,38 @@ describe("useAdminAuth", () => {
     expect(result.current.user).toEqual(CACHED);
   });
 
-  it("forgets the cached user when a new session enters the console", () => {
-    // The cache describes whoever was signed in before, on a shared browser another
-    // person; the new document must ask the server, not start from that copy.
+  it("caches the member a sign-in returns, as the console's fallback", async () => {
+    // If the console's first session check fails, this copy is what it shows; it must be
+    // the person who just signed in, not whoever this browser held before.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHED));
+    actions.getCurrentUserAction.mockResolvedValue({ user: null });
+    const newMember = { ...CACHED, id: "usr-new", name: "New Member", email: "new@hopeforstrays.org" };
+    actions.loginAction.mockResolvedValue({ success: true, user: newMember });
+    const { result } = renderHook(() => useAdminAuth());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    await result.current.login(newMember.email, "a-long-enough-password");
+
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(newMember);
+  });
+
+  it("keeps that copy when entering the console", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHED));
     // jsdom implements no navigation and reports the attempt on console.error.
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     enterAdminConsole();
+
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(CACHED);
+  });
+
+  it("forgets the cached user when the caller cannot say who signed in", () => {
+    // Invitation acceptance learns no role, so the previous person on a shared browser
+    // would otherwise be the fallback.
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHED));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    enterAdminConsole({ forgetCachedUser: true });
 
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });

@@ -25,19 +25,31 @@ export interface AdminUser {
  * /admin/login. A new document mounts the layout with the new cookie. /admin then
  * redirects to the first section the member's live role opens.
  *
- * The cached user is dropped first. It describes whoever was signed in before this
- * change of session, on a shared browser another person, and the new document must
- * learn who is signed in from the server rather than start from that copy.
+ * The browser's cached user is what the console falls back on if its first session
+ * check fails, so it must describe the new session. `login` and `register` have just
+ * written it; a caller that cannot (invitation acceptance learns no role) passes
+ * `forgetCachedUser`, or the previous person on a shared browser would be the
+ * fallback.
  */
-export function enterAdminConsole(): void {
-  try {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  } catch {
-    // Storage blocked (private mode): there is no cached copy to mislead anyone.
+export function enterAdminConsole({ forgetCachedUser = false }: { forgetCachedUser?: boolean } = {}): void {
+  if (forgetCachedUser) {
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch {
+      // Storage blocked (private mode): there is no cached copy to mislead anyone.
+    }
   }
   // The rule's advice, useRouter().push(), is exactly the navigation the layout bounced.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign("/admin");
+}
+
+function cacheUser(user: AdminUser): void {
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // Storage blocked (private mode): the console simply has no fallback.
+  }
 }
 
 export function useAdminAuth() {
@@ -105,9 +117,10 @@ export function useAdminAuth() {
       try {
         const result = await loginAction({ email, password: pass });
         if (result.success && result.user) {
-          // Not cached here: the caller enters the console with `enterAdminConsole`,
-          // whose new document asks the server who is signed in.
-          setUser(result.user);
+          // The console's fallback if its first session check fails, so it must be
+          // this member. Not set as this instance's state: every caller leaves through
+          // `enterAdminConsole`, which unloads it.
+          cacheUser(result.user);
           return { success: true };
         }
         return {
@@ -134,8 +147,8 @@ export function useAdminAuth() {
       try {
         const result = await registerAction(data);
         if (result.success && result.user) {
-          // Not cached, for the same reason as `login`.
-          setUser(result.user);
+          // As in `login`.
+          cacheUser(result.user);
           return { success: true };
         }
         return {
