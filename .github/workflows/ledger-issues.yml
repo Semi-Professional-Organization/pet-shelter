@@ -30,10 +30,13 @@ permissions:
 jobs:
   sync:
     name: Mirror tasks/open into issues
-    runs-on: ubuntu-latest
+    # Pinned image and pinned actions, for the reasons in ci.yml above its `jobs:`. The checkout
+    # keeps its default credentials, unlike ci.yml's: the script runs `git fetch`, which would need
+    # them if the repository were private, and this job installs no third-party code to read them.
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
       # No `npm ci`: the script is dependency-free and needs only git and gh, both on the runner.
