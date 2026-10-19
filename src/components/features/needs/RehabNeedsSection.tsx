@@ -1,5 +1,6 @@
 "use client";
 
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect, useTransition, useRef } from "react";
 import { RehabNeed } from "@/types/rehab";
 import { getRehabNeedsAction } from "@/actions/rehabNeeds";
@@ -273,7 +274,7 @@ export function RehabNeedsSection({
             </h3>
           </div>
           <a
-            href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20would%20like%20to%20arrange%20a%20wishlist%20item%20drop-off."
+            href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20I%20would%20like%20to%20arrange%20a%20wishlist%20item%20drop-off.`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-foreground text-background px-5 py-2.5 text-xs font-bold uppercase tracking-wider hover:bg-foreground/85 transition-colors rounded-xl shrink-0"

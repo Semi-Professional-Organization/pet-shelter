@@ -10,7 +10,7 @@ import {
   EMAIL_RECEIPT,
 } from "@/lib/presentation/emailTokens";
 import { getApplicationStatusPresentation } from "@/lib/presentation/applicationStatusPresentation";
-import { isTaxClaimable } from "@/lib/domain/shelterIdentity";
+import { isTaxClaimable, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 
 export interface EmailResult {
   success: boolean;
@@ -32,7 +32,7 @@ const SHELTER_NAME = "Hope for Strays Animal Shelter";
 const SHELTER_EMAIL = process.env.SHELTER_NOTIFICATION_EMAIL || "applications@hopeforstrays.org";
 const FROM_EMAIL = process.env.EMAIL_FROM || "Hope for Strays <onboarding@resend.dev>";
 const SHELTER_ADDRESS = "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia";
-const SHELTER_PHONE = "03-7876 5432";
+const SHELTER_PHONE = SHELTER_PHONE_DISPLAY;
 const APP_BASE_URL = SHARED_APP_BASE_URL;
 
 function getTrackingUrl(appId: string, email: string): string {

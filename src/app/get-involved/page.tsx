@@ -1,4 +1,4 @@
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
+import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 // Read through the repository, not @/actions/settings: importing a "use server"
 // export here would register it as a POST-reachable endpoint on this public route.
 import { getServerSettingsAsync } from "@/lib/server/settingsRepository";
@@ -145,7 +145,7 @@ export default async function GetInvolvedPage() {
               )}
 
               <a
-                href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20would%20like%20to%20register%20as%20a%20volunteer%20for%20weekend%20shifts!"
+                href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20I%20would%20like%20to%20register%20as%20a%20volunteer%20for%20weekend%20shifts!`}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="volunteer-whatsapp-cta"
@@ -207,7 +207,7 @@ export default async function GetInvolvedPage() {
 
             <div className="pt-2">
               <a
-                href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20am%20interested%20in%20becoming%20a%20temporary%20foster%20parent."
+                href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20I%20am%20interested%20in%20becoming%20a%20temporary%20foster%20parent.`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({
@@ -273,7 +273,7 @@ export default async function GetInvolvedPage() {
 
           <div className="pt-2">
             <a
-              href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20our%20organization%20would%20like%20to%20collaborate%20on%20a%20CSR%20event."
+              href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20our%20organization%20would%20like%20to%20collaborate%20on%20a%20CSR%20event.`}
               target="_blank"
               rel="noopener noreferrer"
               className={buttonVariants({
@@ -325,7 +325,7 @@ export default async function GetInvolvedPage() {
 
             <div className="pt-2">
               <a
-                href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20we%20would%20like%20to%20discuss%20a%20clinical%20or%20academic%20partnership."
+                href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20we%20would%20like%20to%20discuss%20a%20clinical%20or%20academic%20partnership.`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={buttonVariants({
