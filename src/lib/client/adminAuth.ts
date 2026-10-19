@@ -14,6 +14,26 @@ export interface AdminUser {
   role: Role | string;
 }
 
+type AuthResult = { success: boolean; error?: string; retryAfterSeconds?: number };
+
+// The browser's copy of the last session the server confirmed. Guarded, because storage
+// access throws where site data is blocked, and losing the copy costs only a fallback.
+function cacheUser(user: AdminUser): void {
+  try {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // Storage blocked: the console simply has no fallback.
+  }
+}
+
+function forgetCachedUser(): void {
+  try {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  } catch {
+    // Storage blocked: there is no cached copy to mislead anyone.
+  }
+}
+
 /**
  * Opens the console after a session was created outside the admin layout's own
  * hook: sign-in, registration, invitation acceptance.
@@ -26,29 +46,64 @@ export interface AdminUser {
  * redirects to the first section the member's live role opens.
  *
  * The browser's cached user is what the console falls back on if its first session
- * check fails, so it must describe the new session. `login` and `register` have just
- * written it; a caller that cannot (invitation acceptance learns no role) passes
- * `forgetCachedUser`, or the previous person on a shared browser would be the
+ * check fails, so it must describe the new session. `signInStaff` and `registerStaff`
+ * have just written it; a caller that cannot (invitation acceptance learns no role)
+ * passes `forgetCachedUser`, or the previous person on a shared browser would be the
  * fallback.
  */
-export function enterAdminConsole({ forgetCachedUser = false }: { forgetCachedUser?: boolean } = {}): void {
-  if (forgetCachedUser) {
-    try {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch {
-      // Storage blocked (private mode): there is no cached copy to mislead anyone.
-    }
-  }
+export function enterAdminConsole({ forgetCachedUser: forget = false }: { forgetCachedUser?: boolean } = {}): void {
+  if (forget) forgetCachedUser();
   // The rule's advice, useRouter().push(), is exactly the navigation the layout bounced.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign("/admin");
 }
 
-function cacheUser(user: AdminUser): void {
+/**
+ * Signs a staff member in and caches who they are, as the console's fallback if its
+ * first session check fails. Not part of `useAdminAuth`: it needs none of the hook's
+ * state, and every caller leaves through `enterAdminConsole`, so a hook instance on the
+ * sign-in page would only spend a session read nobody uses.
+ */
+export async function signInStaff(email: string, password: string): Promise<AuthResult> {
   try {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-  } catch {
-    // Storage blocked (private mode): the console simply has no fallback.
+    const result = await loginAction({ email, password });
+    if (result.success && result.user) {
+      cacheUser(result.user);
+      return { success: true };
+    }
+    return {
+      success: false,
+      error: result.error || "Invalid credentials",
+      retryAfterSeconds: result.retryAfterSeconds,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Authentication failed";
+    return { success: false, error: msg };
+  }
+}
+
+/** Registers a staff account (always STAFF) and caches it, as `signInStaff` does. */
+export async function registerStaff(data: {
+  name: string;
+  email: string;
+  password: string;
+  role?: Role;
+  staffInviteCode?: string;
+}): Promise<AuthResult> {
+  try {
+    const result = await registerAction(data);
+    if (result.success && result.user) {
+      cacheUser(result.user);
+      return { success: true };
+    }
+    return {
+      success: false,
+      error: result.error || "Registration failed",
+      retryAfterSeconds: result.retryAfterSeconds,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Registration failed";
+    return { success: false, error: msg };
   }
 }
 
@@ -78,13 +133,13 @@ export function useAdminAuth() {
         if (mounted) {
           if (res.user) {
             setUser(res.user);
-            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(res.user));
+            cacheUser(res.user);
           } else {
             // The server's "nobody" is final: an expired cookie, a suspension, a deleted
             // account. This used to fall back to the cached user, which kept the console
             // and its tabs on screen over sections that all refused the visitor.
             setUser(null);
-            localStorage.removeItem(AUTH_STORAGE_KEY);
+            forgetCachedUser();
           }
         }
       } catch (e) {
@@ -109,61 +164,6 @@ export function useAdminAuth() {
     };
   }, []);
 
-  const login = useCallback(
-    async (
-      email: string,
-      pass: string
-    ): Promise<{ success: boolean; error?: string; retryAfterSeconds?: number }> => {
-      try {
-        const result = await loginAction({ email, password: pass });
-        if (result.success && result.user) {
-          // The console's fallback if its first session check fails, so it must be
-          // this member. Not set as this instance's state: every caller leaves through
-          // `enterAdminConsole`, which unloads it.
-          cacheUser(result.user);
-          return { success: true };
-        }
-        return {
-          success: false,
-          error: result.error || "Invalid credentials",
-          retryAfterSeconds: result.retryAfterSeconds,
-        };
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Authentication failed";
-        return { success: false, error: msg };
-      }
-    },
-    []
-  );
-
-  const register = useCallback(
-    async (data: {
-      name: string;
-      email: string;
-      password: string;
-      role?: Role;
-      staffInviteCode?: string;
-    }): Promise<{ success: boolean; error?: string; retryAfterSeconds?: number }> => {
-      try {
-        const result = await registerAction(data);
-        if (result.success && result.user) {
-          // As in `login`.
-          cacheUser(result.user);
-          return { success: true };
-        }
-        return {
-          success: false,
-          error: result.error || "Registration failed",
-          retryAfterSeconds: result.retryAfterSeconds,
-        };
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Registration failed";
-        return { success: false, error: msg };
-      }
-    },
-    []
-  );
-
   const logout = useCallback(async () => {
     try {
       await logoutAction();
@@ -171,8 +171,8 @@ export function useAdminAuth() {
       console.error("Logout error", e);
     }
     setUser(null);
+    forgetCachedUser();
     if (typeof window !== "undefined") {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
       document.cookie = `hope_admin_token=; path=/; max-age=0; SameSite=Lax`;
     }
   }, []);
@@ -185,8 +185,6 @@ export function useAdminAuth() {
     user,
     isAuthenticated: !!user,
     isLoading,
-    login,
-    register,
     logout,
   };
 }

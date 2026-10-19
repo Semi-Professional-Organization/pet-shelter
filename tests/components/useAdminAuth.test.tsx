@@ -10,7 +10,7 @@ vi.mock("@/actions/auth", () => ({
   logoutAction: vi.fn(),
 }));
 
-import { enterAdminConsole, useAdminAuth } from "@/lib/client/adminAuth";
+import { enterAdminConsole, signInStaff, useAdminAuth } from "@/lib/client/adminAuth";
 
 const STORAGE_KEY = "hope_for_strays_admin_session";
 const CACHED = { id: "usr-staff-01", email: "staff@hopeforstrays.org", name: "Cached Staff", role: "STAFF" };
@@ -73,15 +73,14 @@ describe("useAdminAuth", () => {
     // If the console's first session check fails, this copy is what it shows; it must be
     // the person who just signed in, not whoever this browser held before.
     localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHED));
-    actions.getCurrentUserAction.mockResolvedValue({ user: null });
     const newMember = { ...CACHED, id: "usr-new", name: "New Member", email: "new@hopeforstrays.org" };
     actions.loginAction.mockResolvedValue({ success: true, user: newMember });
-    const { result } = renderHook(() => useAdminAuth());
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-    await result.current.login(newMember.email, "a-long-enough-password");
+    await signInStaff(newMember.email, "a-long-enough-password");
 
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(newMember);
+    // A plain function, not the hook: no session read is spent on the sign-in page.
+    expect(actions.getCurrentUserAction).not.toHaveBeenCalled();
   });
 
   it("keeps that copy when entering the console", () => {
@@ -103,5 +102,20 @@ describe("useAdminAuth", () => {
     enterAdminConsole({ forgetCachedUser: true });
 
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it("signs out cleanly where the browser blocks storage", async () => {
+    // A throwing removeItem used to reject logout before it cleared the legacy token
+    // cookie, and the layout calls it without awaiting.
+    actions.getCurrentUserAction.mockResolvedValue({ user: null });
+    const { result } = renderHook(() => useAdminAuth());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    document.cookie = "hope_admin_token=legacy; path=/";
+    vi.spyOn(localStorage, "removeItem").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
+
+    await expect(result.current.logout()).resolves.toBeUndefined();
+    expect(document.cookie).not.toContain("hope_admin_token=legacy");
   });
 });

@@ -6,7 +6,11 @@ import { setupUser } from "./support/render";
 const auth = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), enterAdminConsole: vi.fn() }));
 
 vi.mock("@/lib/client/adminAuth", () => ({
+  // Both shapes, so this file can be run against the page before and after sign-in moved
+  // out of the hook: `useAdminAuth().login` then, `signInStaff` now.
   useAdminAuth: () => auth,
+  signInStaff: auth.login,
+  registerStaff: auth.register,
   enterAdminConsole: auth.enterAdminConsole,
 }));
 

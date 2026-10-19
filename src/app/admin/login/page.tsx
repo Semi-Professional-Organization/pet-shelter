@@ -16,14 +16,12 @@ import {
   EyeOff,
   Clock,
 } from "lucide-react";
-import { enterAdminConsole, useAdminAuth } from "@/lib/client/adminAuth";
+import { enterAdminConsole, registerStaff, signInStaff } from "@/lib/client/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function AdminLoginPage() {
-  const { login, register } = useAdminAuth();
-
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -62,7 +60,7 @@ export default function AdminLoginPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const result = await login(loginData.email, loginData.password);
+    const result = await signInStaff(loginData.email, loginData.password);
     if (result.success) {
       enterAdminConsole();
     } else {
@@ -89,7 +87,7 @@ export default function AdminLoginPage() {
     }
 
     setIsSubmitting(true);
-    const result = await register({
+    const result = await registerStaff({
       name: regData.name,
       email: regData.email,
       password: regData.password,
@@ -112,7 +110,7 @@ export default function AdminLoginPage() {
     setLoginData({ email, password: pass });
     setError(null);
     setIsSubmitting(true);
-    const result = await login(email, pass);
+    const result = await signInStaff(email, pass);
     if (result.success) {
       enterAdminConsole();
     } else {
