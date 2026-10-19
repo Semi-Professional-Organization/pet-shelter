@@ -30,7 +30,7 @@ import { fileURLToPath } from "url";
  * does that job now and the harness enforces it. What remains here is the two
  * agent rules, the drift log, and — in the wiring block — assertions about the
  * permission rules themselves plus a ledger of the thirteen shapes prefix matching
- * cannot reach, and four PowerShell path spellings. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
+ * cannot reach, and six PowerShell shapes. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
  *
  * What this file does NOT establish: that Claude Code runs the hook. Frontmatter
  * hooks load from the definition as it stood at SESSION START, so a hook wired
@@ -475,14 +475,19 @@ describe("agent guard", () => {
       }
     });
 
-    it("does not catch a PowerShell path spelled any other way than the rule spells it", () => {
+    it("does not catch, by prefix, a PowerShell path spelled another way or a leading statement", () => {
       // The rules name `scripts/x` with forward slashes and no `./`. PowerShell accepts every
-      // spelling below, and each one reaches the same script unprompted.
+      // path spelling below, and each one reaches the same script.
       const UNCOVERED_POWERSHELL = [
         "npx tsx .\\scripts\\migrate-bulletins.ts",
         "npx tsx ./scripts/migrate-bulletins.ts",
         "node .\\scripts\\secrets.mjs decrypt-to-local",
         "node scripts\\secrets.mjs run -- npm start",
+        // The commonest PowerShell shape in this repo's transcripts: a leading statement. The
+        // reference says PowerShell rules are checked per subcommand of the parsed command, which
+        // would catch these; this prefix model cannot, and nobody here has observed either.
+        "Set-Location D:\\Dev\\Repos\\pet-shelter; npm run secrets:run -- npm start",
+        "$env:FOO='1'; npm run db:migrate:bulletins",
       ];
       for (const command of UNCOVERED_POWERSHELL) {
         expect(covered(command, "PowerShell"), `newly covered, move it: ${command}`).toBe(false);

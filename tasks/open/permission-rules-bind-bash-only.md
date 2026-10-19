@@ -11,13 +11,20 @@ PowerShell tool. This machine runs Windows, PowerShell is the primary shell, and
 both tools.
 
 The rules added on 2026-10-20 (`db:migrate:bulletins`, `secrets:decrypt:local`, `secrets:run`,
-`secrets:edit`, `ledger:issues -- --apply`) are written for both tools. The older ones were left alone to keep that
-change to the gaps it was asked to close.
+`secrets:edit`, `ledger:issues -- --apply`) are written for both tools. The older ones were left
+alone to keep that change to the gaps it was asked to close.
+
+A second unobserved question rides on the same test. Agents here usually start a PowerShell
+command with `Set-Location <dir>;`, and the reference says PowerShell rules are checked against
+each subcommand of the parsed command, which would catch a denied command after that prefix.
+`tests/unit/agentGuard.test.ts` models rules as prefixes, so it records those shapes as uncovered.
 
 This is reasoned from the documentation, not observed: nobody has run a denied command through the
 PowerShell tool and watched whether it was refused.
 
-**Settles when:** a session runs a denied but harmless command (`npx prisma migrate --help`, which
-`Bash(npx prisma migrate*)` covers and which touches no database) through the PowerShell tool and
-records whether it was refused. Never test with a command that writes: if it was not, every
-older rule gains its `PowerShell(...)` twin and `tests/unit/agentGuard.test.ts` pins both.
+**Settles when:** a session records two observations, each made only with a harmless command that
+touches no database or secret. First, `npx prisma migrate --help`, which `Bash(npx prisma
+migrate*)` covers, run through the PowerShell tool: refused or not. Second, a temporary
+`PowerShell(...)` deny rule for a harmless command, run behind `Set-Location .;`: refused or not.
+If the first was not refused, every older rule gains its `PowerShell(...)` twin; either way
+`tests/unit/agentGuard.test.ts` is updated to say what was seen.
