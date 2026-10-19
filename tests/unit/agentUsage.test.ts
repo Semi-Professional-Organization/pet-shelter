@@ -309,6 +309,32 @@ describe("agent usage: workflow families", () => {
     expect(families("Bash", "npm run test:components -- tests/components/F.test.tsx tests/components")).toEqual(["gates"]);
   });
 
+  it("takes a heredoc's body and a here-string for text, not commands", () => {
+    const commit = "git commit -F - <<'EOF'\nfix: x\n\nnpm run lint passes now\ngh pr checks were green\nEOF";
+    expect(families("Bash", commit)).toEqual([]);
+    expect(families("Bash", "cat > m.txt <<'EOF'\nfix: don't break\nEOF\nnpm run typecheck")).toEqual(["gates"]);
+    expect(families("PowerShell", "$m = @'\nnpm run lint, don't\n'@\nnpm run typecheck")).toEqual(["gates"]);
+  });
+
+  it("reads a PowerShell path ending in a backslash as a path, not an escape", () => {
+    expect(families("PowerShell", 'Set-Location "D:\\Dev\\Repos\\pet-shelter\\"; npm run lint')).toEqual(["gates"]);
+  });
+
+  it("looks past wrappers and npx's flags to the program", () => {
+    expect(families("Bash", "npx -y tsc --noEmit")).toEqual(["gates"]);
+    expect(families("Bash", "npx --yes vitest run tests/unit/a.test.ts")).toEqual(["targeted tests"]);
+    expect(families("Bash", "timeout 600 npm run build")).toEqual(["gates"]);
+    expect(families("Bash", "time npm run lint")).toEqual(["gates"]);
+    expect(families("Bash", "LC_ALL=C cat tasks/todo.md")).toEqual(["ledger"]);
+    expect(families("Bash", "node -e \"require('net').connect(5432)\"")).toEqual(["ports"]);
+  });
+
+  it("reads vitest's subcommands and an absolute tier path for what they run", () => {
+    expect(families("Bash", "npx vitest watch")).toEqual([]);
+    expect(families("Bash", "npx vitest related src/lib/x.ts")).toEqual(["targeted tests"]);
+    expect(families("Bash", "npx vitest run D:/Dev/Repos/pet-shelter/tests/unit")).toEqual(["gates"]);
+  });
+
   it("matches every family's command where it runs, not where a search mentions it", () => {
     expect(families("Bash", 'grep -n "next build" CLAUDE.md')).toEqual([]);
     expect(families("Bash", 'git log --grep "npx tsc --noEmit"')).toEqual([]);

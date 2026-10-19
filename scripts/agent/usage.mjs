@@ -142,21 +142,48 @@ const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
 /**
  * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`, `&`, a newline),
  * leaving any of those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
+ * A heredoc's body (`<<'EOF'` … `EOF`) and a PowerShell here-string (`@'` … `'@`) are text, not
+ * commands, and are dropped. Only Bash takes a backslash inside double quotes as an escape;
+ * PowerShell's escape is the backtick, and `"D:\x\"` is a path there.
  */
-export function splitChain(cmd) {
+export function splitChain(cmd, tool = "Bash") {
   const parts = [];
   let current = "";
   let quote = null;
+  let heredoc = null;
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i];
+    if (!quote && ch === "@" && (cmd[i + 1] === "'" || cmd[i + 1] === '"') && tool === "PowerShell") {
+      const close = cmd.indexOf(`\n${cmd[i + 1]}@`, i + 2);
+      i = close === -1 ? cmd.length : close + 2;
+      current += "@string";
+      continue;
+    }
+    if (!quote && ch === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
+      const m = /^<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(cmd.slice(i));
+      if (m) {
+        heredoc = m[2];
+        current += m[0];
+        i += m[0].length - 1;
+        continue;
+      }
+    }
     if (quote) {
       // Inside double quotes a backslash escapes the next character, `\"` included.
-      if (quote === '"' && ch === "\\" && i + 1 < cmd.length) {
+      if (quote === '"' && ch === "\\" && tool === "Bash" && i + 1 < cmd.length) {
         current += ch + cmd[++i];
         continue;
       }
       if (ch === quote) quote = null;
       current += ch;
+    } else if (ch === "\n" && heredoc) {
+      // The command line ends here; its body runs to the line that is only the delimiter.
+      parts.push(current);
+      current = "";
+      const lines = cmd.slice(i + 1).split("\n");
+      const end = lines.findIndex((line) => line.trim() === heredoc);
+      i += end === -1 ? cmd.length : lines.slice(0, end + 1).join("\n").length + 1;
+      heredoc = null;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
       current += ch;
@@ -195,21 +222,18 @@ export const FAMILIES = {
   "targeted tests": (tool, cmd, vitest) => SHELLS.has(tool) && isTargetedRun(cmd, vitest),
   // Listing and reading verbs lead the command (familiesOf hands over one command of a chain at a
   // time), so `mkdir tasks/lessons` is not a listing; and a redirect into a ledger path is a write.
-  orient: (tool, cmd) =>
-    SHELLS.has(tool) &&
-    (RUNS.orient.test(cmd) || /^\s*(ls|dir|Get-ChildItem)\s+tasks[\\/](open|lessons|decisions)/.test(cmd)),
+  orient: (tool, cmd) => SHELLS.has(tool) && RUNS.orient.test(cmd),
   ledger: (tool, cmd) =>
-    (SHELLS.has(tool) &&
-      /^\s*(ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](todo\.md|open|lessons|decisions)/.test(cmd) &&
-      !/>\s*\S*tasks[\\/]/.test(cmd)) ||
+    (SHELLS.has(tool) && RUNS.ledger.test(cmd) && !/>\s*\S*tasks[\\/]/.test(cmd)) ||
     (FILE_TOOLS.has(tool) && /tasks[\\/](todo\.md|(open|lessons|decisions)\b)/.test(cmd)),
   merge: (tool, cmd) => SHELLS.has(tool) && RUNS.merge.test(cmd),
   // Reading the drift log is the workflow, whatever command reads it.
   drift: (tool, cmd) => SHELLS.has(tool) && /agent-drift\.log/.test(cmd),
   pr: (tool, cmd) => SHELLS.has(tool) && RUNS.pr.test(cmd),
   // Port checks and process kills, not every command that carries a `:5432` database URL. A
-  // `net.connect` probe sits inside `node -e`, so it is matched where it appears.
-  ports: (tool, cmd) => SHELLS.has(tool) && (RUNS.ports.test(cmd) || /net\.connect\(/.test(cmd)),
+  // socket probe sits inside `node -e` (`net.connect(`, `require('net').connect(`), so it is
+  // matched where it appears.
+  ports: (tool, cmd) => SHELLS.has(tool) && (RUNS.ports.test(cmd) || /\bnet\b['")\]]*\.connect\(/.test(cmd)),
 };
 
 /** Vitest options that take a value as the next word, which is therefore not a file filter. */
@@ -225,13 +249,20 @@ const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/i
  * The start of one command, past `VAR=value` assignments and `cross-env`, so a program name is
  * matched where it runs and not where it is merely mentioned (`grep vitest notes.md`).
  */
-const COMMAND_START = String.raw`^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:cross-env\s+(?:[A-Za-z_]\w*=\S*\s+)*)?`;
+const COMMAND_START = String.raw`^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:(?:cross-env|time)\s+(?:[A-Za-z_]\w*=\S*\s+)*|timeout\s+(?:-\S+\s+)*\S+\s+)*`;
+/** `npx` with any of its own flags (`npx -y`, `npx --yes`). */
+const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
 
-/** The family commands, each matched only where a command starts. */
+/**
+ * The family commands, each matched only where a command starts. The `git log …
+ * HEAD..origin/master` check belongs to merge only; the orient listing of master's new commits
+ * is `git log --oneline master..origin/master`.
+ */
 const RUNS = Object.fromEntries(
   Object.entries({
-    gates: String.raw`(?:npx\s+tsc\b.*--noEmit|(?:npx\s+)?next\s+build\b)`,
-    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (?:master|HEAD)\.\.origin\/master|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock)`,
+    gates: String.raw`(?:${NPX}tsc\b.*--noEmit|(?:${NPX})?next\s+build\b)`,
+    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline master\.\.origin\/master|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+tasks[\\/](?:open|lessons|decisions))`,
+    ledger: String.raw`(?:ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](?:todo\.md|open|lessons|decisions)`,
     merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/master|log\b.*HEAD\.\.origin\/master)`,
     pr: String.raw`gh\s+(?:pr\s+(?:checks|view)|run\s+(?:view|watch|list)|api\s+\S*(?:commits\/\S+\/status|deployments))`,
     ports: String.raw`(?:Get-NetTCPConnection|Test-NetConnection|netstat|lsof\s+-i|Stop-Process|taskkill|Get-CimInstance\s+Win32_Process)`,
@@ -274,8 +305,9 @@ const NPM_VALUE_FLAGS = new Set(["--prefix", "-w", "--workspace", "--userconfig"
  * terminal, as an agent's is: the words after it. `vitest.config.ts` is not `vitest`.
  */
 const VITEST_RUN = new RegExp(
-  // Bare `vitest`, but not its subcommands that run no tests (`list`, `bench`, `init`).
-  `${COMMAND_START}(?:npx\\s+)?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$)(?!\\s+(?:list|bench|init)\\b))(.*)$`,
+  // Bare `vitest` too, but not its subcommands that run no tests or never finish (`list`, `bench`,
+  // `init`, `watch`, `dev`). `vitest related <files>` reads as a filtered, so targeted, run.
+  `${COMMAND_START}(?:${NPX})?vitest(?:\\s+(?:run|--run)\\b|(?=\\s|$)(?!\\s+(?:list|bench|init|watch|dev)\\b))(.*)$`,
 );
 
 /**
@@ -339,7 +371,9 @@ export function vitestScripts(scripts = {}) {
 const narrows = (filters) => {
   if (filters.includes("-t")) return true;
   const paths = filters.filter((f) => f !== "-t");
-  return paths.length > 0 && !paths.some((f) => WHOLE_SUITE.has(f));
+  // A tier given as an absolute path (`D:/…/tests/unit`) is the tier too.
+  const wholeTier = (f) => [...WHOLE_SUITE].some((tier) => f === tier || f.endsWith(`/${tier}`));
+  return paths.length > 0 && !paths.some(wholeTier);
 };
 
 /**
@@ -368,7 +402,7 @@ const withoutExeSuffix = (cmd) =>
 export function familiesOf(tool, cmd, vitest = new Map()) {
   // Each command of a chain is classed on its own, so `vitest run <file> && npm run lint` is both
   // a targeted run and a gate.
-  const parts = SHELLS.has(tool) ? splitChain(withoutExeSuffix(String(cmd))) : [cmd];
+  const parts = SHELLS.has(tool) ? splitChain(withoutExeSuffix(String(cmd)), tool) : [cmd];
   return Object.keys(FAMILIES).filter((name) => parts.some((part) => FAMILIES[name](tool, part, vitest)));
 }
 
@@ -401,7 +435,7 @@ export function commandClass(tool, cmd) {
     rest = rest.slice(match[0].length);
   }
   // Only the first command of a chain, and no npm flag between `run` and the script.
-  const words = splitChain(rest)[0].split(/\s+/).filter(Boolean);
+  const words = splitChain(rest, tool)[0].split(/\s+/).filter(Boolean);
   if (words[0] === "npm" && words[1] === "run") while (/^-/.test(words[2] ?? "")) words.splice(2, 1);
   const take = words[0] === "npm" && words[1] === "run" ? 3 : SUBCOMMAND.has(words[0]) || words[0] === "npm" ? 2 : 1;
   const label = words.slice(0, take).filter(Boolean);
