@@ -195,14 +195,14 @@ export function Navbar() {
             </Link>
 
             <Link
-              href="/impact"
+              href="/transparency"
               className={`text-sm font-semibold transition-colors hover:text-foreground focus-visible:ring-2 ${
-                pathname === "/impact"
+                pathname === "/transparency"
                   ? "text-foreground border-b-2 border-foreground pb-0.5"
                   : "text-muted-foreground"
               }`}
             >
-              {isMs ? "Impak" : "Impact"}
+              {t("nav.transparency")}
             </Link>
 
             {/* Top Level: FAQ */}
