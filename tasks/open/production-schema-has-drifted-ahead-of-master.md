@@ -24,6 +24,11 @@
 > index, alongside the sponsor and donation tables. Raw output, now kept rather than paraphrased:
 > `tasks/decisions/2026-09-16-sponsor-portal-activation-applies-nothing-to-production.md`.
 
+> **2026-10-19: the `pets` half is applied, both halves, and the catalogue reads the database
+> again.** The owner ran expand on 2026-10-16 and contract on 2026-10-19, and a live probe
+> confirmed `/pets` serving real rows. Details and what is still open are in the last section,
+> "Applied: the `pets` conversion". The 2026-09-22 note below is history.
+
 > **2026-09-22: the remaining pet drift is losing reads, not just blocking a push.** The deployed
 > client asks for `pets.birthDate` on every catalogue read, production has no such column, and the
 > failure is swallowed — so the public pet list is being served from `src/data/pets.json`, not from
@@ -354,3 +359,41 @@ not declared in `prisma/schema.prisma`, so `db:check-drift` will offer
 `DROP TABLE "pets_age_archive_20260922"`. That is the price of a rollback that can restore the
 original prose. `cleanup.sql` drops it and takes drift to zero — and is the point at which the
 conversion stops being reversible, so it goes last and only after the archive has been read.
+
+## Applied: the `pets` conversion (2026-10-16 and 2026-10-19)
+
+The owner ran steps 1 and 3 above in the Neon SQL editor, against the production branch, using
+the files as merged on master (expand as of #113, `1b6dbbc`).
+
+1. **Expand, 2026-10-16.** The header pre-check came first, and every row read `ok`. The file
+   committed with its `backfilled N pets from "age"` NOTICE. It prints that only after checking
+   that every row was updated, and otherwise aborts.
+2. **The `/pets` probe, 2026-10-19 — the outage this entry ASSERTED is now measured as over.**
+   The public list cannot tell the database from the fixture: production holds the seeded demo
+   animals, and Tuah and Comel are "In Rehabilitation", so both paths show the same 8 names. So
+   the owner renamed `pet-001` to `Bella (db check)` in Neon, and the live `/pets` page (which is
+   `force-dynamic`) showed it on the next request. The name was then reverted, and the page showed
+   `Bella` again. The catalogue reads the database.
+3. **Contract, 2026-10-19.** The owner ran it after a three-day soak, by choice. Neon printed
+   `BEGIN`, `SELECT 1`, `DO`, `COMMIT`. `SELECT count(*) FROM pets_age_archive_20260922` returned
+   8. Afterwards `/`, `/pets`, `/pets?species=dog` and `/sponsors` all returned 200. The deployed
+   `Pet` model on master declares no `age` or `ageCategory`, so nothing reads the dropped columns.
+4. **`cleanup.sql`** was handed to the owner the same day, with the warning that it makes the
+   conversion irreversible. Whether it ran is not recorded here. If it has, `rollback.sql` can no
+   longer restore the age prose.
+
+**Not to be confused with this:** on 2026-10-19 `/pets` and `/sponsors` returned 500 for a few
+minutes. The Vercel log showed `SecretConfigurationError`: the build before #128 refused a
+`STAFF_INVITE_SECRET` shorter than 16 characters. It cleared when the #128 build took the
+production domain. Pages that were pre-built kept returning 200 throughout. It was not this
+migration.
+
+**Still open, so this entry stays open:**
+
+- **`db:check-drift` has not been re-run since.** This section is a record of what the owner
+  ran, not a drift measurement. Expect the `pets` statement to be gone, and expect one
+  `DROP TABLE "pets_age_archive_20260922"` until cleanup runs.
+- **Step 4, `20260922_settings_and_defaults/migration.sql`, has no record of being applied.** The
+  `shelter_settings` columns and the `notification_preferences.updatedAt` default may still drift.
+- **`npm run db:push` is still unguarded against production.** Treat it as destructive until
+  drift reads zero.
