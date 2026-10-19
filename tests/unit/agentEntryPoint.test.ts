@@ -52,6 +52,8 @@ describe("agent scripts entry point", () => {
       process.argv[1] = "D:\\Dev\\Repos\\pet-shelter\\scripts\\agent.mjs";
       expect(invokedAs("scripts/agent.mjs")).toBe(true);
       expect(invokedAs("scripts/commit-msg.mjs")).toBe(false);
+      process.argv[1] = "D:/tools/myscripts/agent.mjs";
+      expect(invokedAs("scripts/agent.mjs")).toBe(false);
       process.argv[1] = "D:/Dev/Repos/pet-shelter/Scripts/Agent.mjs";
       expect(invokedAs("scripts/agent.mjs")).toBe(process.platform === "win32");
     } finally {

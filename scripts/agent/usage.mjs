@@ -160,9 +160,10 @@ export function splitChain(cmd, tool = "Bash") {
       continue;
     }
     if (!quote && ch === "<" && cmd[i + 1] === "<" && cmd[i + 2] !== "<") {
-      const m = /^<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/.exec(cmd.slice(i));
+      // `<<EOF`, `<< 'EOF'`, `<<"EOF"`, `<<\EOF`, and `<<-EOF`, whose closing line may be tabbed.
+      const m = /^<<(-?)\s*\\?(['"]?)([A-Za-z_][\w-]*)\2/.exec(cmd.slice(i));
       if (m) {
-        heredoc = m[2];
+        heredoc = { word: m[3], tabs: m[1] === "-" };
         current += m[0];
         i += m[0].length - 1;
         continue;
@@ -177,13 +178,21 @@ export function splitChain(cmd, tool = "Bash") {
       if (ch === quote) quote = null;
       current += ch;
     } else if (ch === "\n" && heredoc) {
-      // The command line ends here; its body runs to the line that is only the delimiter.
+      // The command line ends here; its body runs to the line that is only the delimiter (after
+      // leading tabs, for `<<-`).
       parts.push(current);
       current = "";
       const lines = cmd.slice(i + 1).split("\n");
-      const end = lines.findIndex((line) => line.trim() === heredoc);
+      const end = lines.findIndex((line) => (heredoc.tabs ? line.replace(/^\t+/, "") : line).replace(/\r$/, "") === heredoc.word);
       i += end === -1 ? cmd.length : lines.slice(0, end + 1).join("\n").length + 1;
       heredoc = null;
+    } else if (tool === "Bash" && ch === "\\" && i + 1 < cmd.length) {
+      // Outside quotes Bash escapes the next character, an apostrophe included.
+      current += ch + cmd[++i];
+    } else if (tool === "Bash" && ch === "#" && /(^|\s)$/.test(current)) {
+      // A comment runs to the end of the line; an apostrophe in it opens no quote.
+      const eol = cmd.indexOf("\n", i);
+      i = (eol === -1 ? cmd.length : eol) - 1;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
       current += ch;
@@ -249,7 +258,8 @@ const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/i
  * The start of one command, past `VAR=value` assignments and `cross-env`, so a program name is
  * matched where it runs and not where it is merely mentioned (`grep vitest notes.md`).
  */
-const COMMAND_START = String.raw`^\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:(?:cross-env|time)\s+(?:[A-Za-z_]\w*=\S*\s+)*|timeout\s+(?:-\S+\s+)*\S+\s+)*`;
+const ASSIGNMENT = String.raw`[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)\s+`;
+const COMMAND_START = String.raw`^\s*(?:${ASSIGNMENT})*(?:(?:cross-env|time)\s+(?:${ASSIGNMENT})*|timeout\s+(?:-\S+\s+)*\S+\s+)*`;
 /** `npx` with any of its own flags (`npx -y`, `npx --yes`). */
 const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
 
@@ -260,8 +270,8 @@ const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
  */
 const RUNS = Object.fromEntries(
   Object.entries({
-    gates: String.raw`(?:${NPX}tsc\b.*--noEmit|(?:${NPX})?next\s+build\b)`,
-    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline master\.\.origin\/master|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+tasks[\\/](?:open|lessons|decisions))`,
+    gates: String.raw`(?:(?:${NPX})?tsc\b.*--noEmit|(?:${NPX})?next\s+build\b)`,
+    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline master\.\.origin\/master|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+(?:-\S+\s+)*tasks[\\/](?:open|lessons|decisions))`,
     ledger: String.raw`(?:ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](?:todo\.md|open|lessons|decisions)`,
     merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/master|log\b.*HEAD\.\.origin\/master)`,
     pr: String.raw`gh\s+(?:pr\s+(?:checks|view)|run\s+(?:view|watch|list)|api\s+\S*(?:commits\/\S+\/status|deployments))`,
@@ -326,8 +336,9 @@ function filtersIn(args) {
   const filters = [];
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
-    if (word.startsWith("--testNamePattern") || word === "-t") {
-      // Its pattern, read on as a filter too, changes nothing: the run is narrowed either way.
+    // A name filter, or `--changed` (only the tests uncommitted changes touch), narrows any run.
+    // A name filter's pattern, read on as a path filter too, changes nothing.
+    if (word.startsWith("--testNamePattern") || word === "-t" || word.startsWith("--changed")) {
       filters.push("-t");
       continue;
     }

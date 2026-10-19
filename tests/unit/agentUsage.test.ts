@@ -309,6 +309,24 @@ describe("agent usage: workflow families", () => {
     expect(families("Bash", "npm run test:components -- tests/components/F.test.tsx tests/components")).toEqual(["gates"]);
   });
 
+  it("reads Bash comments, escapes and quoted assignments the way Bash does", () => {
+    expect(families("Bash", "# what's changed\nls tasks/open\nnpm run lint")).toEqual(["gates", "orient", "ledger"]);
+    expect(families("Bash", "echo it\\'s && npm run lint")).toEqual(["gates"]);
+    expect(families("Bash", 'VAR="a b" npm run lint')).toEqual(["gates"]);
+    expect(families("Bash", "tsc --noEmit")).toEqual(["gates"]);
+  });
+
+  it("ends a heredoc only at its exact closing line, and knows the \\EOF spelling", () => {
+    expect(families("Bash", "cat << EOF\nhi\n  EOF\nnpm run lint\nEOF")).toEqual([]);
+    expect(families("Bash", "cat <<\\EOF\nnpm run lint\nEOF")).toEqual([]);
+    expect(families("Bash", "cat <<-EOF\nnpm run lint\n\tEOF\nnpm run typecheck")).toEqual(["gates"]);
+  });
+
+  it("counts a listing with flags as orient, and --changed as a narrowed run", () => {
+    expect(families("Bash", "ls -1 tasks/open")).toEqual(["orient", "ledger"]);
+    expect(families("Bash", "npx vitest run --changed")).toEqual(["targeted tests"]);
+  });
+
   it("takes a heredoc's body and a here-string for text, not commands", () => {
     const commit = "git commit -F - <<'EOF'\nfix: x\n\nnpm run lint passes now\ngh pr checks were green\nEOF";
     expect(families("Bash", commit)).toEqual([]);
