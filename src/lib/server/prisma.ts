@@ -8,29 +8,74 @@ const globalForPrisma = globalThis as unknown as {
   pgPool: Pool | undefined;
 };
 
+/**
+ * What every query rejects with when no `DATABASE_URL` is configured.
+ *
+ * It carries Prisma's P1001, "can't reach database server", so the code that
+ * tells an outage from a rejected write (`isDatabaseUnavailable`, the
+ * repositories' fallbacks) treats "no database configured" exactly as it
+ * treats "database down": serve the in-memory store.
+ */
+export class DatabaseNotConfiguredError extends Error {
+  readonly code = "P1001";
+
+  constructor() {
+    super("No DATABASE_URL is configured, so there is no database to reach.");
+    this.name = "DatabaseNotConfiguredError";
+  }
+}
+
+/**
+ * The client for a process with no `DATABASE_URL`: every query rejects at
+ * once, and no socket is ever opened.
+ *
+ * This used to connect to a hardcoded `localhost:5432` instead, so "no database
+ * configured" really meant "whatever happens to listen on that port". Tests
+ * then wrote fixture rows into another session's Postgres, and authorization
+ * results flipped with what was running on the machine
+ * (`tasks/decisions/2026-10-20-no-database-url-means-no-database.md`). Offline
+ * behaviour is otherwise unchanged: the repositories already serve their
+ * in-memory stores whenever a query fails. A local database is still one
+ * `DATABASE_URL` away, and the `:local` npm scripts set it explicitly.
+ */
+function createOfflineClient(): PrismaClient {
+  // Lazy, like Prisma's own query promises: nothing rejects until something
+  // awaits it. A query built only to be handed to `$transaction([...])` is never
+  // awaited on its own, and an eager rejection would surface there as an
+  // unhandled rejection the real client never produces.
+  const refuse = () =>
+    ({
+      then: (onFulfilled?: (value: never) => unknown, onRejected?: (reason: unknown) => unknown) =>
+        Promise.reject(new DatabaseNotConfiguredError()).then(onFulfilled, onRejected),
+      catch: (onRejected?: (reason: unknown) => unknown) =>
+        Promise.reject(new DatabaseNotConfiguredError()).catch(onRejected),
+      finally: (onFinally?: () => void) =>
+        Promise.reject(new DatabaseNotConfiguredError()).finally(onFinally),
+    }) as unknown as Promise<never>;
+  const model = new Proxy({}, { get: () => refuse });
+  return new Proxy(
+    {},
+    {
+      get(_target, key) {
+        if (key === "$disconnect") return async () => undefined;
+        // Not a thenable, and no answer to symbol probes such as util.inspect.
+        if (typeof key !== "string" || key === "then") return undefined;
+        return key.startsWith("$") ? refuse : model;
+      },
+    }
+  ) as unknown as PrismaClient;
+}
+
 function createPrismaClient(): PrismaClient {
-  const connectionString =
-    process.env.DATABASE_URL ||
-    "postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public";
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return createOfflineClient();
 
   try {
     const sslPolicy = resolveDatabaseSsl(connectionString);
 
-    // A test run against an unreachable host would otherwise sit on the
-    // production 10s connect timeout for *every* query before the dual-layer
-    // store gives up and serves fixtures, turning a 7-second suite into a
-    // multi-minute one. Refused connections fail instantly either way; this
-    // only bounds the filtered/blackholed case.
-    //
-    // Narrowed to the *deliberately offline* case: a configured DATABASE_URL
-    // means someone intends to reach a real database, and a managed Postgres
-    // like Neon can take several seconds to wake from idle. Capping that at 2s
-    // would turn a cold start into a spurious failure — and under
-    // STRICT_PERSISTENCE, into a red integration suite rather than a fallback.
-    const isOfflineTestRun = process.env.NODE_ENV === "test" && !process.env.DATABASE_URL;
-    const connectionTimeoutMillis = Number(
-      process.env.DB_CONNECT_TIMEOUT_MS ?? (isOfflineTestRun ? 2000 : 10000)
-    );
+    // A managed Postgres like Neon can take several seconds to wake from idle,
+    // so the connect timeout is generous; `DB_CONNECT_TIMEOUT_MS` overrides it.
+    const connectionTimeoutMillis = Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10000);
 
     // Reuse connection pool across Turbopack hot reloads in dev mode
     const pool =
