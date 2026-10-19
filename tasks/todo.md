@@ -15,6 +15,43 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Measure what agent sessions cost: the `usage` command
+
+**Branch:** `claude/project-thread-facxqz` · opened 2026-10-20 · base `f1f448a`
+
+The first pull request of the agent-scripts plan: one entry point, `node scripts/agent.mjs`, and
+its first command, `usage`, which prices this repo's Claude Code transcripts so every later
+command can prove what it saved. Plus three permission gaps the plan named.
+
+- [x] `scripts/agent.mjs` with `--help`; `scripts/agent/usage.mjs` as a pure core and an I/O
+      shell, no dependencies, exit 0 or 2 (a measurement has no finding).
+- [x] Each request priced at the model that served it, from the pricing page as checked on
+      2026-10-20; Haiku 5.5's 100K step; anything unpriceable (unknown model, fast mode, a region,
+      a pre-4.6 model over 200K, a cache write without its 5m/1h split) exits 2, never guesses.
+- [x] Reports cost split, cost by context size, cold resumes (on a person's message, apart from
+      long tools and background notices), carried tool output, and eight workflow families.
+      Aggregates only; command labels seen in one session only are pooled.
+- [x] Baseline, success measure and kill conditions:
+      `tasks/open/agent-scripts-must-cut-what-a-session-costs.md`.
+- [x] AGENTS.md: the pointer to `--help`, and no sleep-polling CI in the desktop app.
+- [x] Permission gaps closed in Bash and PowerShell, wider than asked:
+      `tasks/decisions/2026-10-20-agents-are-denied-every-way-into-the-production-secrets.md`.
+- [x] Eight `/code-review high` rounds so far, 78 findings, all fixed except one premise that
+      did not hold (a person's message stored beside a tool result: the only such records are a
+      fork's boilerplate). Every fix verified by a mutant that fails a test.
+
+## Review
+
+**Deliberately not done:**
+
+- The older permission rules stay Bash-only; whether that matters is unobserved
+  (`tasks/open/permission-rules-bind-bash-only.md`).
+- No hand-off simulation in `usage`: the plan's numbers for the meter come from a prototype, and
+  the meter's own pull request measures it.
+- `usage` reads every transcript even under `--since` (about 20 s here), because skipping old
+  files changed which file owned a copied request.
+- The baseline is the record: transcripts expire after 30 days, so it cannot be recomputed.
+
 # A short staff invite code no longer takes the site down
 
 **Branch:** `fix/invite-code-any-length` · opened 2026-10-17 · base `d6dd030`
