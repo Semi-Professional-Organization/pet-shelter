@@ -97,9 +97,11 @@ const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
  * snapshot id (`claude-haiku-4-5-20251001`) prices as its model, as the pricing page lists it.
  * `served`, when it differs (under --price-as), is the model whose transcript fields are checked.
  *
- * @param {{ model: string, served?: string, prompt: number, speed?: string | null, geo?: string | null }} request
+ * @param {{ model: string, served?: string, prompt: number, speed?: string | null, geo?: string | null, tier?: string | null }} request
  */
-export function ratesFor({ model, served = model, prompt, speed, geo }) {
+export function ratesFor({ model, served = model, prompt, speed, geo, tier: serviceTier }) {
+  // The table is the standard tier's; batch and priority are priced differently.
+  if (serviceTier != null && serviceTier !== "standard") throw new UnpriceableError(`no price for service tier ${serviceTier}`);
   const base = priceKey(model);
   const table = Object.hasOwn(PRICES, base) ? PRICES[base] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
@@ -172,7 +174,7 @@ export function splitChain(cmd, tool = "Bash") {
       continue;
     }
     // A PowerShell here-string opens with `@'` or `@"` at the end of a line, nowhere else.
-    if (!quote && ch === "@" && (cmd[i + 1] === "'" || cmd[i + 1] === '"') && /^\r?\n/.test(cmd.slice(i + 2)) && tool === "PowerShell") {
+    if (tool === "PowerShell" && !quote && ch === "@" && (cmd[i + 1] === "'" || cmd[i + 1] === '"') && /^\r?\n/.test(cmd.slice(i + 2, i + 4))) {
       const close = cmd.indexOf(`\n${cmd[i + 1]}@`, i + 2);
       i = close === -1 ? cmd.length : close + 2;
       current += "@string";
@@ -452,7 +454,11 @@ export function isTargetedRun(cmd, vitest = new Map()) {
  * Windows shim), and `git -C <dir> fetch` is `git fetch` (subagents with a reset cwd use `-C`).
  */
 const withoutExeSuffix = (cmd) =>
-  cmd.replace(/\b(npm|npx|node|git|gh)\.(cmd|exe)\b/gi, "$1").replace(/\bgit\s+(?:-[Cc]\s+("[^"]*"|'[^']*'|\S+)\s+)+/g, "git ");
+  cmd
+    .replace(/\b(npm|npx|node|git|gh)\.(cmd|exe)\b/gi, "$1")
+    // git's global options before the subcommand: `-C <dir>`, `-c k=v`, `--no-pager`, `-P`,
+    // `--git-dir=…`, `--work-tree=…`.
+    .replace(/\bgit\s+(?:(?:-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--no-pager|-P|--(?:git-dir|work-tree)=\S+)\s+)+/g, "git ");
 
 /** Families a call belongs to. A call can count toward more than one. */
 export function familiesOf(tool, cmd, vitest = new Map()) {
@@ -543,6 +549,8 @@ export function triggerOf(record) {
   if (kind) return kind === "human" ? "person" : "event";
   // A compaction's summary is written as a user record too; no one sent it.
   if (record.isMeta || record.isCompactSummary) return undefined;
+  // In a subagent's transcript, a message with no origin is its parent agent's prompt.
+  if (record.isSidechain) return "event";
   return "person";
 }
 
@@ -643,6 +651,7 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
             model: message.model,
             speed: undefined,
             geo: undefined,
+            tier: undefined,
             webSearch: 0,
             w5: 0,
             w1h: 0,
@@ -659,6 +668,7 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
         request.w1h = Math.max(request.w1h, Number(creation.ephemeral_1h_input_tokens) || 0);
         if (usage.speed != null) request.speed = usage.speed;
         if (usage.inference_geo != null) request.geo = usage.inference_geo;
+        if (usage.service_tier != null) request.tier = usage.service_tier;
         request.webSearch = Math.max(request.webSearch, Number(usage.server_tool_use?.web_search_requests) || 0);
         for (const block of Array.isArray(message.content) ? message.content : []) {
           if (block?.type !== "tool_use" || calls.has(block.id)) continue;
@@ -743,7 +753,7 @@ export function priceFiles(files, { priceAs, inWindow = () => true } = {}) {
  */
 function priceRequest(r, priceAs) {
   r.ctx = promptOf(r);
-  const p = ratesFor({ model: priceAs ?? r.model, served: r.model, prompt: r.ctx, speed: r.speed, geo: r.geo });
+  const p = ratesFor({ model: priceAs ?? r.model, served: r.model, prompt: r.ctx, speed: r.speed, geo: r.geo, tier: r.tier });
   // The two cache lifetimes are priced differently, so a write the split does not account for
   // has no known price. Every line in this repo's transcripts carries a split that sums to the
   // total (36,459 of 36,459 on 2026-10-20); one that does not is refused, never guessed.
@@ -842,8 +852,8 @@ export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
  * and not the first request after a compaction, which re-writes a new, smaller context anyway.
  * `trigger` says what the session waited on: "person" when the request answered someone's message
  * (they were away, which a hand-off could avoid), otherwise a long tool or a background notice
- * (which it could not). `cost` is what the re-write cost beyond the cache read a warm request
- * would have paid for the same tokens.
+ * (which it could not). `cost` is what the expiry cost: the re-write of everything that was not
+ * new since the previous request, less the cache read a warm request would have paid for it.
  *
  * ceiling: "whole" is a write of at least half the context and at least 50K tokens, a heuristic
  * for "the cache had expired"; the exact test needs the cache's own expiry, which transcripts
@@ -855,20 +865,28 @@ export function coldResumes(file, breaks = segmentBreaks(file)) {
   // The lifetime that holds most of the context, counted since the last compaction, is the one
   // whose expiry forces the re-write; one small write in the other lifetime does not change it.
   let held = { "5m": 0, "1h": 0 };
+  let previous;
   for (const r of file.requests) {
     if (breaks.has(r.index)) held = { "5m": 0, "1h": 0 };
     const total = held["5m"] + held["1h"];
     const ttl = CACHE_TTL_MINUTES[total ? (held["5m"] > held["1h"] ? "5m" : "1h") : r.w5 > r.w1h ? "5m" : "1h"];
     held["5m"] += r.w5;
     held["1h"] += r.w1h;
+    const before = previous;
+    previous = r;
     if (!r.prevTs || !r.usd || breaks.has(r.index)) continue;
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
     if (!(idle > ttl)) continue;
-    if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
-    const warm = (r.cache_creation_input_tokens * r.rates.cacheRead) / 1e6;
+    const written = r.cache_creation_input_tokens;
+    if (written < Math.max(50_000, 0.5 * r.ctx)) continue;
+    // A warm request would still have written what is new since the previous one (the person's
+    // message, a pasted block) and read the rest; only that rest is what the expiry cost.
+    const fresh = before ? Math.max(0, r.ctx - promptOf(before) - before.output_tokens) : 0;
+    const rewritten = Math.max(0, written - fresh);
+    const cost = rewritten * (r.usd.write / written - r.rates.cacheRead / 1e6);
     // A session a tool kept busy was not waiting on its person, even if they also typed meanwhile.
     const trigger = r.afterTool && r.trigger === "person" ? "tool" : (r.trigger ?? "unknown");
-    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger });
+    out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost, trigger });
   }
   return out;
 }
@@ -1084,7 +1102,7 @@ export function formatReport(report, { logPath } = {}) {
   // What was read but not counted, so a short total says why it is short.
   const skipped = report.skipped;
   const malformed = report.input?.malformedLines ?? 0;
-  lines.push(`not counted: ${malformed} unreadable lines, ${skipped.duplicates} copied requests, ${skipped.synthetic} synthetic messages`);
+  lines.push(`not counted, across all transcripts read: ${malformed} unreadable lines, ${skipped.duplicates} copied requests, ${skipped.synthetic} synthetic messages`);
   if (logPath) lines.push(`log: ${logPath}`);
   return lines.join("\n");
 }

@@ -522,9 +522,11 @@ async function main(argv) {
   process.exitCode = 0;
 }
 
-// Only run the CLI when executed directly, so the module stays importable by tests.
+// Only run the CLI when executed directly, so the module stays importable by tests. The same check
+// as scripts/lib/invokedAs.mjs, which says why this script keeps its own copy.
+const foldCase = (path) => (process.platform === "win32" || process.platform === "darwin" ? path.toLowerCase() : path);
 const invokedDirectly =
-  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("/scripts/commit-msg.mjs");
+  Boolean(process.argv[1]) && foldCase(process.argv[1].replace(/\\/g, "/")).endsWith(foldCase("/scripts/commit-msg.mjs"));
 if (invokedDirectly) {
   main(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`commit-msg: ${error.message}\n`);

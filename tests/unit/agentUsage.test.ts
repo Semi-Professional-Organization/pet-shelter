@@ -114,6 +114,13 @@ describe("agent usage: prices", () => {
     expect(ratesFor({ model: "claude-opus-5", prompt: 10 }).cacheRead).toBe(0.5);
   });
 
+  it("refuses a service tier other than standard, which the table does not price", () => {
+    expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, tier: "priority" })).toThrow(/service tier priority/);
+    const record = assistant("r1", { out: 1 });
+    (record.message.usage as Record<string, unknown>).service_tier = "batch";
+    expect(() => summarize([extract([record])])).toThrow(/service tier batch/);
+  });
+
   it("refuses a model, a speed or a region it has no price for, rather than guessing", () => {
     expect(() => ratesFor({ model: "claude-opus-9", prompt: 1 })).toThrow(UnpriceableError);
     // Names an object inherits are not prices; they would price at NaN and exit 0.
@@ -245,7 +252,9 @@ describe("agent usage: command classes", () => {
     expect(commandClass("PowerShell", "pid=$(netstat -ano | grep 5432)")).toBe("PowerShell other");
     expect(commandClass("Bash", "./scripts/deploy-prod.sh --token=abc")).toBe("Bash other");
     expect(commandClass("Bash", "C:/Users/User/secret-notes.txt")).toBe("Bash other");
-    expect(commandClass("Bash", "git --no-pager log")).toBe("Bash other");
+    // git's global options are skipped, so the subcommand still names the call.
+    expect(commandClass("Bash", "git --no-pager log")).toBe("git log");
+    expect(families("Bash", "git --no-pager log HEAD..origin/master")).toEqual(["merge"]);
     // Separators and npm flags do not hide the verb.
     expect(commandClass("Bash", "npm run typecheck; echo done")).toBe("npm run typecheck");
     expect(commandClass("Bash", "npm run -s test")).toBe("npm run test");
@@ -576,6 +585,23 @@ describe("agent usage: the analyses", () => {
       ]),
     );
     expect(coldResumes(file)[0].trigger).toBe("event");
+  });
+
+  it("takes a subagent's prompt from its parent for an event, not a person", () => {
+    expect(triggerOf({ type: "user", isSidechain: true, message: { content: "do x" } })).toBe("event");
+  });
+
+  it("charges a cold resume only for what was not new since the previous request", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 500_000, out: 0 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        PERSON,
+        // 540K now: 40K is the person's pasted block, which a warm request would have written too.
+        assistant("r2", { w1h: 540_000, out: 0 }, { ts: "2026-10-01T12:00:00.000Z" }),
+      ]),
+    );
+    // 500K re-written at $8 instead of read at $0.20.
+    expect(coldResumes(file)[0].cost).toBeCloseTo(3.9);
   });
 
   it("takes a queued message from a person for a person, whatever record comes after it", () => {
@@ -1013,7 +1039,7 @@ describe("agent usage: the analyses", () => {
     expect(lines[0]).toMatch(/^usage: PASS \$\d/);
     expect(lines.length).toBeLessThanOrEqual(30);
     expect(lines.at(-1)).toBe("log: /tmp/log.json");
-    expect(lines.at(-2)).toBe("not counted: 0 unreadable lines, 0 copied requests, 0 synthetic messages");
+    expect(lines.at(-2)).toBe("not counted, across all transcripts read: 0 unreadable lines, 0 copied requests, 0 synthetic messages");
     expect(text).not.toContain(SECRET);
   });
 });
