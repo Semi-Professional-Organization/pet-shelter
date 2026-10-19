@@ -11,8 +11,6 @@ import {
   sendTestEmailAction,
   loadShelterSettings,
 } from "@/actions/settings";
-import { useAdminAuth } from "@/lib/client/adminAuth";
-import { roleCanEditGlobalQr } from "@/lib/security/qrAccess";
 import { DonationQrSettings } from "@/components/admin/DonationQrSettings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +36,8 @@ import {
 } from "lucide-react";
 
 /**
- * The settings screen. `canManageSettings` comes from the page's verified session.
+ * The settings screen. Both capabilities come from the page's verified session,
+ * not the browser's copy of it, which can hold a role the server no longer gives.
  *
  * The section opens for MANAGE_SETTINGS or SEND_SHELTER_EMAIL, because a Volunteer
  * Coordinator legitimately sends test emails here. Everything else on the screen
@@ -47,12 +46,15 @@ import {
  * render for them, filled from this browser's copy or the built-in defaults
  * because the read was refused, with a "Save All Settings" that was refused too.
  */
-export function ShelterSettingsForm({ canManageSettings }: { canManageSettings: boolean }) {
+export function ShelterSettingsForm({
+  canManageSettings,
+  canEditQr,
+}: {
+  canManageSettings: boolean;
+  /** Display-only. `updateShelterSettings` re-checks server-side. */
+  canEditQr: boolean;
+}) {
   const { settings, saveSettings, resetToDefaultSettings } = useSettingsStore();
-  const { user } = useAdminAuth();
-  // Display-only gate. `updateShelterSettings` re-checks the role server-side,
-  // so a tampered client cannot write these fields.
-  const canEditQr = roleCanEditGlobalQr(user?.role);
   const [activeTab, setActiveTab] = useState<
     "general" | "email" | "storage" | "donation"
   >("general");

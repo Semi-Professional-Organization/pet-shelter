@@ -262,7 +262,6 @@ export async function submitApplication(
       const newApp = await insertWithUniqueReferenceCode(draft);
       try {
         revalidatePath("/admin/applications");
-        revalidatePath("/admin");
       } catch {
         // Safe outside Next.js runtime
       }
@@ -419,7 +418,6 @@ export async function scheduleApplicationInterview(
 
     try {
       revalidatePath("/admin/applications");
-      revalidatePath("/admin");
     } catch {
       // Safe outside Next.js runtime
     }
@@ -482,7 +480,6 @@ export async function recordApplicationHomeVisit(
 
     try {
       revalidatePath("/admin/applications");
-      revalidatePath("/admin");
     } catch {
       // Safe outside Next.js runtime
     }

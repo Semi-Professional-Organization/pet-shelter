@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { setupUser } from "./support/render";
 import type { ReactElement } from "react";
 import { signInAs } from "../setup/authSession";
 import { ROLES, type Role } from "@/lib/security/permissions";
@@ -11,7 +12,19 @@ const settingsActions = vi.hoisted(() => ({
   getVolunteerFormLinks: vi.fn(),
 }));
 
+// The role in the browser's copy of the session, which the form used to read for the QR
+// codes. The form no longer asks it; the mock lets the last case hold it to that.
+const browserSession = vi.hoisted(() => ({ role: null as string | null }));
+
 vi.mock("@/actions/settings", () => settingsActions);
+vi.mock("@/lib/client/adminAuth", () => ({
+  useAdminAuth: () => ({
+    user: browserSession.role
+      ? { id: "usr-member", email: "member@hopeforstrays.org", name: "Test Member", role: browserSession.role }
+      : null,
+    isLoading: false,
+  }),
+}));
 vi.mock("@/lib/server/memberStore", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/server/memberStore")>()),
   findMemberAuthStateById: vi.fn(),
@@ -65,5 +78,19 @@ describe("/admin/settings", () => {
 
     expect(await screen.findByRole("button", { name: /Save All Settings/i })).toBeInTheDocument();
     expect(settingsActions.loadShelterSettings).toHaveBeenCalled();
+  });
+
+  it("lets a Super Admin edit the QR codes, whatever the browser's cached role says", async () => {
+    // The QR controls were gated on the browser's copy of the session, so a stale one
+    // locked a Super Admin out of them. Fails against the form that read it.
+    browserSession.role = ROLES.STAFF;
+    try {
+      await renderSettingsAs(ROLES.SUPER_ADMIN);
+      await setupUser().click(screen.getByRole("button", { name: /Donation & QR Codes/i }));
+
+      expect(screen.queryByText(/can view these settings but not change them/)).toBeNull();
+    } finally {
+      browserSession.role = null;
+    }
   });
 });

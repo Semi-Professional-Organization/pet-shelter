@@ -216,20 +216,24 @@ export function MemberDataTable({
             <div className="flex items-center gap-1.5">
               {isBusy && <Loader2 className="size-3.5 animate-spin text-muted-foreground" />}
 
-              <Button
-                variant="outline"
-                size="xs"
-                // Only a Super Admin reaches this table, and on their own row the server
-                // refuses every role but Super Admin, which they already hold. The dialog
-                // offered all five.
-                disabled={isBusy || isSelf}
-                onClick={() => handleOpenRoleEdit(member)}
-                className="text-xs gap-1 disabled:opacity-40"
-                title={isSelf ? "You cannot change your own role" : "Change this member's access level"}
-              >
-                <UserCog className="size-3" />
-                Edit Role
-              </Button>
+              {/* A disabled button takes no pointer events, so its title would never
+                  show; the reason it is disabled sits on this wrapper instead. */}
+              <span className="inline-flex" title={isSelf ? "You cannot change your own role" : undefined}>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  // Only a Super Admin reaches this table, and on their own row the server
+                  // refuses every role but Super Admin, which they already hold. The dialog
+                  // offered all five.
+                  disabled={isBusy || isSelf}
+                  onClick={() => handleOpenRoleEdit(member)}
+                  className="text-xs gap-1 disabled:opacity-40"
+                  title="Change this member's access level"
+                >
+                  <UserCog className="size-3" />
+                  Edit Role
+                </Button>
+              </span>
 
               {member.status === USER_STATUSES.INVITED && (
                 <Button
@@ -257,19 +261,21 @@ export function MemberDataTable({
                   Reactivate
                 </Button>
               ) : (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  // Self-suspension would lock the operator out of the console
-                  // they are standing in; the server refuses it too.
-                  disabled={isBusy || isSelf}
-                  onClick={() => setSuspendTarget(member)}
-                  className="text-xs gap-1 text-destructive hover:text-destructive disabled:opacity-40"
-                  title={isSelf ? "You cannot suspend your own account" : "Suspend this account"}
-                >
-                  <ShieldOff className="size-3" />
-                  Suspend
-                </Button>
+                <span className="inline-flex" title={isSelf ? "You cannot suspend your own account" : undefined}>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    // Self-suspension would lock the operator out of the console
+                    // they are standing in; the server refuses it too.
+                    disabled={isBusy || isSelf}
+                    onClick={() => setSuspendTarget(member)}
+                    className="text-xs gap-1 text-destructive hover:text-destructive disabled:opacity-40"
+                    title="Suspend this account"
+                  >
+                    <ShieldOff className="size-3" />
+                    Suspend
+                  </Button>
+                </span>
               )}
             </div>
           );

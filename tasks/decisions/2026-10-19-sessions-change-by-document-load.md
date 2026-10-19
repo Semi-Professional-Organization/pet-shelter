@@ -26,7 +26,8 @@ Two separate things were wrong with signing in:
   the new cookie.
 - `/admin` (`src/app/admin/page.tsx`) is a Server Component that reads the verified session and
   redirects to the first section, in nav order, that the live role opens; a role that opens none
-  (legacy VOLUNTEER) is told so; a signed-out or suspended visitor goes to `/admin/login`.
+  (legacy VOLUNTEER) is told so; a signed-out or suspended visitor gets the 401 page, as on every
+  section, rather than a silent redirect to the sign-in form.
 - "Back to Admin" on the 403 page and in the proxy's 403 document points at `/admin` too.
 
 Observed (K2, K2b in the session's build gate): signed out in the app, then the demo Staff button —

@@ -31,17 +31,24 @@ function activeRow(role: string): LiveRow {
   return { role, status: "ACTIVE", name: "Test Member", email: "member@hopeforstrays.org" };
 }
 
-/** Renders `/admin` and returns where it redirected, or the markup it rendered instead. */
-async function enterConsole(): Promise<{ redirectedTo: string | null; html: string | null }> {
+/**
+ * Renders `/admin` and returns where it redirected, the interrupt it threw (the 401 page),
+ * or the markup it rendered instead.
+ */
+async function enterConsole(): Promise<{ redirectedTo: string | null; interrupt: string | null; html: string | null }> {
   const { default: AdminIndexPage } = await import("@/app/admin/page");
   try {
     const element = (await AdminIndexPage()) as ReactElement;
-    return { redirectedTo: null, html: renderToStaticMarkup(element) };
+    return { redirectedTo: null, interrupt: null, html: renderToStaticMarkup(element) };
   } catch (error) {
-    if (error instanceof MockNavigationError) return { redirectedTo: getLastRedirect(), html: null };
+    if (error instanceof MockNavigationError) {
+      return { redirectedTo: getLastRedirect(), interrupt: error.digest, html: null };
+    }
     throw error;
   }
 }
+
+const UNAUTHORIZED = "NEXT_HTTP_ERROR_FALLBACK;401";
 
 describe("/admin sends each member to the first section their role opens", () => {
   beforeEach(async () => {
@@ -92,14 +99,24 @@ describe("/admin sends each member to the first section their role opens", () =>
     expect(html).toContain("Your account has no admin sections yet");
   });
 
-  it("sends a signed-out visitor to sign in", async () => {
-    expect((await enterConsole()).redirectedTo).toBe("/admin/login");
+  // The 401 page, as on every section, rather than a silent redirect to the sign-in form:
+  // a sign-in can succeed for an account the DAL then refuses (one held only in the
+  // in-memory store), and the form would come straight back with no reason given.
+  it("answers a signed-out visitor with the 401 page", async () => {
+    expect(await enterConsole()).toMatchObject({ interrupt: UNAUTHORIZED, redirectedTo: null });
   });
 
-  it("sends a suspended member to sign in, where the refusal says why", async () => {
+  it("answers a suspended member with the 401 page", async () => {
     await signInAs(ROLES.SUPER_ADMIN);
     await liveRowIs({ ...activeRow(ROLES.SUPER_ADMIN), status: "SUSPENDED" });
 
-    expect((await enterConsole()).redirectedTo).toBe("/admin/login");
+    expect(await enterConsole()).toMatchObject({ interrupt: UNAUTHORIZED, redirectedTo: null });
+  });
+
+  it("answers a signed-in member the database does not hold with the 401 page", async () => {
+    // A valid cookie for an id no store vouches for.
+    await signInAs(ROLES.STAFF);
+
+    expect(await enterConsole()).toMatchObject({ interrupt: UNAUTHORIZED, redirectedTo: null });
   });
 });

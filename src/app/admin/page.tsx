@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { redirect, unauthorized } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { getVerifiedSession } from "@/lib/security/dal";
 import { adminHomeFor } from "@/lib/security/adminSections";
@@ -23,9 +23,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminIndexPage() {
   const session = await getVerifiedSession();
 
-  // Signed out, suspended, or no longer a member. Signing in again either works or
-  // says why it cannot.
-  if (!session) redirect("/admin/login");
+  // Signed out, suspended, or no longer a member: the 401 page, as on every section.
+  // Not a silent redirect to the sign-in form. A sign-in can succeed for an account
+  // the DAL then refuses (one held only in the in-memory store), and the form would
+  // come straight back with no word of why.
+  if (!session) unauthorized();
 
   const home = adminHomeFor(session.role);
   if (home) redirect(home);

@@ -42,10 +42,15 @@ function editRoleButtonInRowOf(name: string): HTMLElement {
 }
 
 describe("Staff & Permissions own row", () => {
-  it("offers no role change on your own row", () => {
+  it("offers no role change on your own row, and says why", () => {
     render(<MemberDataTable members={[member("me", "Operator"), member("other", "Colleague")]} currentUserId="me" />);
 
-    expect(editRoleButtonInRowOf("Operator")).toBeDisabled();
+    const button = editRoleButtonInRowOf("Operator");
+    expect(button).toBeDisabled();
+    // A disabled button takes no pointer events, so its own title never shows; the
+    // reason has to sit on an element that does.
+    expect(button.closest('[title="You cannot change your own role"]')).not.toBe(button);
+    expect(button.closest('[title="You cannot change your own role"]')).not.toBeNull();
   });
 
   it("still offers it on everyone else's", () => {

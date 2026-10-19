@@ -17,8 +17,6 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAdminAuth } from "@/lib/client/adminAuth";
-import { PERMISSIONS, roleHasPermission } from "@/lib/security/rbac";
 import {
   EXPENSE_CATEGORIES,
   ExpenseItemRecord,
@@ -45,22 +43,12 @@ import {
 /**
  * Admin editor for the public transparency page.
  *
- * Role gating is enforced server-side in every action; this component mirrors
- * the same rule so an unauthorised staff member sees an explanation instead of
- * a form that will only fail on submit.
+ * Role gating is enforced server-side in every action, and the page renders this
+ * editor only for a member its gate admitted (`requireAdminSection`). It used to
+ * repeat the check here from the browser's copy of the session, which could only
+ * disagree: a cached role, or a promotion the cookie had not seen, showed
+ * "Insufficient permissions" on a page the server had opened.
  */
-
-/**
- * Mirrors the server guard exactly, by asking the same question of the same
- * table: does this role hold `MANAGE_CONTENT`?
- *
- * `roleHasPermission` normalises legacy aliases, so a session still carrying
- * "ADMIN" resolves to SUPER_ADMIN and is admitted, while a hand-kept role list
- * would have drifted from the server's the first time a role was added.
- */
-function canEditTransparency(role: string | undefined): boolean {
-  return !!role && roleHasPermission(role, PERMISSIONS.MANAGE_CONTENT);
-}
 
 const fieldClass =
   "w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -132,14 +120,11 @@ function makeEmptyReport() {
 }
 
 export function TransparencyEditor({ canUploadFiles }: { canUploadFiles: boolean }) {
-  const { user, isLoading: authLoading } = useAdminAuth();
   const [tab, setTab] = useState<Tab>("expenses");
   const [snapshot, setSnapshot] = useState<TransparencySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [banner, setBanner] = useState<Banner | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const canEdit = canEditTransparency(user?.role);
 
   const refresh = useCallback(async () => {
     const res = await getAdminTransparencySnapshotAction();
@@ -151,8 +136,6 @@ export function TransparencyEditor({ canUploadFiles }: { canUploadFiles: boolean
   }, []);
 
   useEffect(() => {
-    if (!canEdit) return;
-
     let active = true;
     // State is set only after the await, never synchronously in the effect body.
     void (async () => {
@@ -163,7 +146,7 @@ export function TransparencyEditor({ canUploadFiles }: { canUploadFiles: boolean
     return () => {
       active = false;
     };
-  }, [canEdit, refresh]);
+  }, [refresh]);
 
   /** Applies one mutation, then re-reads so the list always matches the server. */
   const run = useCallback(
@@ -213,37 +196,6 @@ export function TransparencyEditor({ canUploadFiles }: { canUploadFiles: boolean
     },
     [refresh]
   );
-
-  if (authLoading) {
-    return (
-      <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" />
-        Verifying staff session...
-      </div>
-    );
-  }
-
-  if (!canEdit) {
-    return (
-      <div className="max-w-2xl rounded-2xl border border-destructive/40 bg-destructive/5 p-6">
-        <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
-          <div className="space-y-1.5">
-            <h2 className="font-heading text-base font-bold text-foreground">
-              Insufficient permissions
-            </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Editing published financial figures needs the{" "}
-              <strong className="text-foreground">Manage content</strong>{" "}
-              permission, held by Super Admin and Content Editor. Your account is
-              signed in as{" "}
-              <strong className="text-foreground">{user?.role ?? "unknown"}</strong>.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return (

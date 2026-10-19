@@ -31,7 +31,7 @@ export default async function AdminApplicationsPage() {
 
       {/* Reading applications and deciding them are separate permissions: STAFF and
           Animal Managers may read but not decide, and only a Super Admin may delete.
-          The board shows each member only the controls their actions will accept. */}
+          The board offers each member only the review controls the server will accept. */}
       <ApplicationDataTable
         initialApplications={applications}
         canReview={hasPermission(session, PERMISSIONS.REVIEW_APPLICATIONS)}

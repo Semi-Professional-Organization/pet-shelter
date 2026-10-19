@@ -17,9 +17,13 @@ const SNAPSHOT = vi.hoisted(
   })
 );
 
+// What the browser's copy of the session says. The editor no longer asks it; the mock
+// stays so the last case can hold it to that against the version that did.
+const browserSession = vi.hoisted(() => ({ role: "CONTENT_EDITOR" }));
+
 vi.mock("@/lib/client/adminAuth", () => ({
   useAdminAuth: () => ({
-    user: { id: "usr-editor", email: "editor@hopeforstrays.org", name: "Editor", role: "CONTENT_EDITOR" },
+    user: { id: "usr-editor", email: "editor@hopeforstrays.org", name: "Editor", role: browserSession.role },
     isLoading: false,
   }),
 }));
@@ -56,5 +60,20 @@ describe("transparency Audit Reports tab", () => {
 
     expect(screen.getByRole("button", { name: /Upload PDF/i })).toBeInTheDocument();
     expect(screen.queryByText(/Your role cannot upload files/)).toBeNull();
+  });
+
+  it("opens for a member the page admitted, whatever the browser's cached role says", async () => {
+    // The page renders this editor only after its server gate admitted the member. The editor
+    // used to check again from the browser's copy, and a stale one showed "Insufficient
+    // permissions" on a page the server had opened. Fails against that version.
+    browserSession.role = "STAFF";
+    try {
+      render(<TransparencyEditor canUploadFiles={false} />);
+
+      expect(await screen.findByRole("button", { name: /Expense Ledger/i })).toBeInTheDocument();
+      expect(screen.queryByText(/Insufficient permissions/)).toBeNull();
+    } finally {
+      browserSession.role = "CONTENT_EDITOR";
+    }
   });
 });

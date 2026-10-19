@@ -1,5 +1,6 @@
 import { requireAdminSection } from "@/lib/security/adminSectionGate";
 import { hasPermission, PERMISSIONS } from "@/lib/security/rbac";
+import { roleCanEditGlobalQr } from "@/lib/security/qrAccess";
 import { ShelterSettingsForm } from "./ShelterSettingsForm";
 
 export default async function AdminSettingsPage() {
@@ -8,6 +9,9 @@ export default async function AdminSettingsPage() {
   const session = await requireAdminSection("/admin/settings");
 
   return (
-    <ShelterSettingsForm canManageSettings={hasPermission(session, PERMISSIONS.MANAGE_SETTINGS)} />
+    <ShelterSettingsForm
+      canManageSettings={hasPermission(session, PERMISSIONS.MANAGE_SETTINGS)}
+      canEditQr={roleCanEditGlobalQr(session.role)}
+    />
   );
 }
