@@ -1,5 +1,6 @@
 "use client";
 
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -475,7 +476,7 @@ function ApplicationTrackerContent() {
 
               <div className="flex flex-wrap gap-2 shrink-0">
                 <a
-                  href="https://wa.me/60123456789"
+                  href={SHELTER_WHATSAPP_URL}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 bg-success-solid text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-success-solid transition"
