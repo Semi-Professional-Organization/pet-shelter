@@ -47,12 +47,15 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAdminAuth();
-  const [volunteerResponsesUrl, setVolunteerResponsesUrl] = useState("");
 
   // /admin/invite is reached from an emailed link by someone who has no
   // session yet, so it must not be forced through the sign-in redirect.
   const isPublicAdminRoute = pathname === "/admin/login" || pathname === "/admin/invite";
+
+  // No session check on those two pages: they render as they are, so the answer
+  // would be a member-row read nobody uses.
+  const { user, isAuthenticated, isLoading, logout } = useAdminAuth({ syncWithServer: !isPublicAdminRoute });
+  const [volunteerResponsesUrl, setVolunteerResponsesUrl] = useState("");
 
   // Volunteer intake lives in an external Google Form; whoever reviews
   // applications gets a direct shortcut to its responses sheet. Expressed as the

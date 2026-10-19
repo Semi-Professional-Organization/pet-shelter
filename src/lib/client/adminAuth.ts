@@ -107,7 +107,15 @@ export async function registerStaff(data: {
   }
 }
 
-export function useAdminAuth() {
+/**
+ * The signed-in member, as the server last confirmed it.
+ *
+ * `syncWithServer: false` skips the session check, for a caller that has no use for the
+ * answer: the admin layout on /admin/login and /admin/invite, which renders those pages
+ * as they are. The check is a member-row read through the DAL, and a "nobody" from it
+ * would also wipe the cached copy a sign-in is about to rely on.
+ */
+export function useAdminAuth({ syncWithServer = true }: { syncWithServer?: boolean } = {}) {
   const [user, setUser] = useState<AdminUser | null>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -126,6 +134,7 @@ export function useAdminAuth() {
 
   // Synchronize with server session on mount
   useEffect(() => {
+    if (!syncWithServer) return;
     let mounted = true;
     async function syncSession() {
       try {
@@ -162,7 +171,7 @@ export function useAdminAuth() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [syncWithServer]);
 
   const logout = useCallback(async () => {
     try {
