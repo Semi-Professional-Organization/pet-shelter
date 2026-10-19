@@ -48,10 +48,10 @@ developer shell leaking in.
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
 secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
 skipped the regeneration). Unit, integration and component suites together, after merging
-master at `474abbe`: 138 files, 2,302 tests, 40 to 51 s (master: 192 to 216 s). Shuffled test
+master at `474abbe`: 138 files, 2,306 tests, 40 to 51 s (master: 192 to 216 s). Shuffled test
 order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** ten `/code-review` rounds over the whole diff raised 84 findings; each was fixed, or
+**Review:** eleven `/code-review` rounds over the whole diff raised 92 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -74,7 +74,10 @@ sponsor seeds as well, and pinned the `forks` pool the per-project time zone dep
 kept an explicit `DB_CONNECT_TIMEOUT_MS=0`, made `petHistory`'s transaction double run callbacks as
 the shared one does, recorded the pet form's lock and its contract with parents
 (`tasks/decisions/2026-10-20-the-pet-form-locks-save-until-it-opens-again.md`), and filed the
-machine-locale gap (`tasks/open/default-locale-formatting-differs-between-machines.md`).
+machine-locale gap (`tasks/open/default-locale-formatting-differs-between-machines.md`). Round 11
+made the offline client plain objects (spies and stubs on it now work, as on the real client),
+stopped caching it across dev reloads, kept a save that settles after a reopen from closing the
+new opening, and took the staff plaintext passwords out of the exported seed table.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as

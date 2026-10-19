@@ -91,7 +91,6 @@ describe("the Prisma client with no DATABASE_URL", () => {
 
   it("says once, outside tests, that there is no database, since the CLI still defaults to localhost", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    vi.stubGlobal("prisma", undefined); // the client cached by an earlier test
     vi.resetModules();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
@@ -102,13 +101,31 @@ describe("the Prisma client with no DATABASE_URL", () => {
   });
 
   it("stays quiet about it under test", async () => {
-    vi.stubGlobal("prisma", undefined);
     vi.resetModules();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     await import("@/lib/server/prisma");
 
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("lets a spy or an assigned stub on a delegate method answer, as the real client does", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+
+    const findMany = vi.spyOn(prisma.pet, "findMany").mockResolvedValue([]);
+    await expect(prisma.pet.findMany()).resolves.toEqual([]);
+    expect(findMany).toHaveBeenCalledTimes(1);
+
+    findMany.mockRestore();
+    await expect(prisma.pet.findMany()).rejects.toMatchObject({ code: "P1001" });
+  });
+
+  it("is not kept across dev-server reloads, so a DATABASE_URL added later is used", async () => {
+    vi.resetModules();
+    await import("@/lib/server/prisma");
+
+    // Only a client with a database behind it is cached on globalThis.
+    expect((globalThis as { prisma?: unknown }).prisma).toBeUndefined();
   });
 
   it("disconnects cleanly, so teardown that always disconnects still works", async () => {

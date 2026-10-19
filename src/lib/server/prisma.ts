@@ -65,27 +65,19 @@ function createOfflineClient(): PrismaClient {
       finally: (onFinally?: () => void) =>
         Promise.reject(new DatabaseNotConfiguredError()).finally(onFinally),
     }) as unknown as Promise<never>;
-  // Only the names the real client answers: its model delegates, their query
-  // methods and its `$` methods. Anything else falls through to a plain object,
-  // as on the real client: `then` and `asymmetricMatch` are undefined (answering
-  // `then` would make `await prisma.pet` wait forever), and `toString` or
-  // `JSON.stringify` behave. One object per delegate, as on the real client, so
-  // `prisma.pet` is not `prisma.user`.
-  const delegates = new Map<string | symbol, object>();
-  const delegate = (name: string | symbol) => {
-    let found = delegates.get(name);
-    if (!found) {
-      found = new Proxy({}, {
-        get: (target, key) => (MODEL_METHODS.has(key) ? refuse : Reflect.get(target, key)),
-      });
-      delegates.set(name, found);
-    }
-    return found;
-  };
+  // Plain objects holding only the names the real client answers: one delegate
+  // per model (so `prisma.pet` is not `prisma.user`), its query methods, and the
+  // client's `$` methods. Anything else is undefined, as on the real client:
+  // `then` and `asymmetricMatch` above all (answering `then` would make
+  // `await prisma.pet` wait forever), and `toString` or `JSON.stringify` behave.
+  // Own properties, so `vi.spyOn(prisma.pet, "findMany")` or an assigned stub is
+  // what the code under test calls, as it would be on the real client.
+  const delegate = () => Object.fromEntries(MODEL_METHODS.map((method) => [method, refuse]));
+  const client: Record<string, unknown> = Object.fromEntries(MODEL_DELEGATES.map((name) => [name, delegate()]));
   // Every `$` method the generated client declares; the `satisfies` makes
   // `typecheck` fail when a Prisma upgrade adds one. A listener or an extension
   // has nothing to attach to offline, so those hand back the client unchanged.
-  const clientMethods = {
+  Object.assign(client, {
     $connect: refuse,
     $disconnect: async () => undefined,
     $transaction: refuse,
@@ -98,19 +90,8 @@ function createOfflineClient(): PrismaClient {
     // undefined offline. Nothing in src/ extends the client; apply its `model`
     // methods here if something ever does.
     $extends: () => client,
-  } satisfies Record<ClientMethod, unknown>;
-  const client = new Proxy(
-    {},
-    {
-      get(target, key) {
-        if (typeof key === "string" && Object.hasOwn(clientMethods, key)) {
-          return clientMethods[key as ClientMethod];
-        }
-        return MODEL_DELEGATES.has(key) ? delegate(key) : Reflect.get(target, key);
-      },
-    }
-  ) as unknown as PrismaClient;
-  return client;
+  } satisfies Record<ClientMethod, unknown>);
+  return client as unknown as PrismaClient;
 }
 
 /** A query method on a model delegate, as the generated client declares them. */
@@ -125,31 +106,29 @@ type ClientMethod = Extract<keyof PrismaClient, `$${string}`>;
  * offline client would answer a new method with `undefined`, and the call would
  * throw a TypeError the fallbacks cannot read as "database down".
  */
-const MODEL_METHODS = new Set<string | symbol>(
-  Object.keys({
-    findUnique: true,
-    findUniqueOrThrow: true,
-    findFirst: true,
-    findFirstOrThrow: true,
-    findMany: true,
-    create: true,
-    createMany: true,
-    createManyAndReturn: true,
-    update: true,
-    updateMany: true,
-    updateManyAndReturn: true,
-    upsert: true,
-    delete: true,
-    deleteMany: true,
-    count: true,
-    aggregate: true,
-    groupBy: true,
-  } satisfies Record<ModelMethod, true>)
-);
+const MODEL_METHODS: string[] = Object.keys({
+  findUnique: true,
+  findUniqueOrThrow: true,
+  findFirst: true,
+  findFirstOrThrow: true,
+  findMany: true,
+  create: true,
+  createMany: true,
+  createManyAndReturn: true,
+  update: true,
+  updateMany: true,
+  updateManyAndReturn: true,
+  upsert: true,
+  delete: true,
+  deleteMany: true,
+  count: true,
+  aggregate: true,
+  groupBy: true,
+} satisfies Record<ModelMethod, true>);
 
 /** One delegate per model in the schema, named as the client names them: `Pet` is `prisma.pet`. */
-const MODEL_DELEGATES = new Set<string | symbol>(
-  Object.values(Prisma.ModelName).map((name) => name.charAt(0).toLowerCase() + name.slice(1))
+const MODEL_DELEGATES: string[] = Object.values(Prisma.ModelName).map(
+  (name) => name.charAt(0).toLowerCase() + name.slice(1)
 );
 
 function createPrismaClient(): PrismaClient {
@@ -196,7 +175,10 @@ function createPrismaClient(): PrismaClient {
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") {
+// Kept across dev-server reloads, but only a client with a database behind it.
+// An offline one kept here would outlive a `DATABASE_URL` added later, while the
+// repositories, which read `DATABASE_URL` live, switched to the database.
+if (process.env.NODE_ENV !== "production" && process.env.DATABASE_URL) {
   globalForPrisma.prisma = prisma;
 }
 

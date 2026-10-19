@@ -217,6 +217,29 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
+   * A slow save that settles after the operator closed the dialog and opened it again belongs to
+   * the earlier opening: it must not close the new one, which would throw away what was typed.
+   */
+  it("does not let a save that settles after a reopen close the new opening", async () => {
+    const { onSave, onOpenChange, user, rerender } = renderDialog();
+    let settle = () => {};
+    onSave.mockImplementationOnce(() => new Promise<void>((resolve) => (settle = resolve)));
+
+    await fillRequiredFields(user, "2023-04-15");
+    await user.click(screen.getByRole("button", { name: /create pet record/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    const dialog = (open: boolean) => (
+      <PetFormDialog open={open} onOpenChange={onOpenChange} editingPet={null} onSave={onSave} />
+    );
+    rerender(dialog(false));
+    rerender(dialog(true));
+    await act(async () => settle());
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  /**
    * Two submits dispatched before the dialog re-renders both run against the same render, so a
    * guard kept only in state would let both through to onSave.
    */

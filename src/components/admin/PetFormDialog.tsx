@@ -117,10 +117,16 @@ export function PetFormDialog({
   // pass; the state is what locks the button.
   const submittedRef = useRef(false);
   const [submitted, setSubmitted] = useState(false);
+  // Which opening this is, so a save that settles after the dialog was closed and
+  // opened again cannot close or unlock the new opening.
+  const openingRef = useRef(0);
   useEffect(() => {
     // Here rather than beside `setSubmitted(false)` below: a ref must not be
     // written during render.
-    if (currentKey !== null) submittedRef.current = false;
+    if (currentKey !== null) {
+      submittedRef.current = false;
+      openingRef.current += 1;
+    }
   }, [currentKey]);
 
   if (currentKey !== prevKey) {
@@ -307,6 +313,7 @@ export function PetFormDialog({
     if (submittedRef.current) return;
     submittedRef.current = true;
     setSubmitted(true);
+    const opening = openingRef.current;
     // Update with current image selections
     const finalData = {
       ...data,
@@ -324,13 +331,18 @@ export function PetFormDialog({
           : undefined
       );
     } catch (error) {
-      // The dialog stays open: unlock it so the operator can try again, and report the error
-      // rather than leave it unhandled.
-      submittedRef.current = false;
-      setSubmitted(false);
+      // Reported rather than left unhandled. If this is still the opening that saved, the
+      // dialog stays open: unlock it so the operator can try again.
       console.error("[PetFormDialog] onSave failed before taking the form:", error);
+      if (openingRef.current === opening) {
+        submittedRef.current = false;
+        setSubmitted(false);
+      }
       return;
     }
+    // A save that settles after the dialog was closed and opened again belongs to the earlier
+    // opening: closing now would throw the new one away.
+    if (openingRef.current !== opening) return;
     // The form closes itself, so the lock set above lasts only while it animates out.
     onOpenChange(false);
   };
