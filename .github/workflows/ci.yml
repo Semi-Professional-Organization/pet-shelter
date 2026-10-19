@@ -178,8 +178,11 @@ jobs:
         run: npx playwright install --with-deps --only-shell chromium
       - name: Run the golden paths
         run: npm run test:e2e
-      - name: Upload the report on failure
-        if: failure()
+      # Every run, not only a red one. CI retries a failed spec once (`retries` in
+      # playwright.config.ts), so a flaky spec leaves the job green, and a report kept only on
+      # failure would never show it.
+      - name: Upload the report
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
