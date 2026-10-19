@@ -9,7 +9,8 @@
  * command classes such as `git diff` or `npm run test`.
  *
  * The core (everything exported) is pure and takes parsed records; `main` is the I/O shell.
- * Spec: the agent-scripts catalog, sections 1a, 3, 4 (`usage`) and 7.
+ * What it is the measuring stick for, and the baseline it recorded:
+ * `tasks/open/agent-scripts-must-cut-what-a-session-costs.md`.
  *
  * Exit codes, as the rest of the repo: 0 the report was produced, 2 it could not be. There is no
  * exit 1, because a measurement has no failing state. An unpriceable request (unknown model, fast
@@ -67,10 +68,11 @@ const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
  * The rates one request pays, or a throw. `model` is the model that served the request
  * (`message.model`), not the one asked for: a fallback bills at the model that answered. A dated
  * snapshot id (`claude-haiku-4-5-20251001`) prices as its model, as the pricing page lists it.
+ * `served`, when it differs (under --price-as), is the model whose transcript fields are checked.
  *
- * @param {{ model: string, prompt: number, speed?: string | null, geo?: string | null }} request
+ * @param {{ model: string, served?: string, prompt: number, speed?: string | null, geo?: string | null }} request
  */
-export function ratesFor({ model, prompt, speed, geo }) {
+export function ratesFor({ model, served = model, prompt, speed, geo }) {
   const base = priceKey(model);
   const table = Object.hasOwn(PRICES, base) ? PRICES[base] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
@@ -79,7 +81,9 @@ export function ratesFor({ model, prompt, speed, geo }) {
   if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
   // "For Claude 4.6 and later models"; earlier ones refuse the parameter, so a US-only request
   // on one is a transcript this table does not understand.
-  if (geo === "us" && NO_INFERENCE_GEO.has(base)) throw new UnpriceableError(`no price for ${base} with inference_geo us`);
+  if (geo === "us" && NO_INFERENCE_GEO.has(priceKey(served))) {
+    throw new UnpriceableError(`no price for ${priceKey(served)} with inference_geo us`);
+  }
   const tier = table.over && prompt > table.over.prompt ? table.over : table;
   return {
     input: tier.input * multiplier,
@@ -95,8 +99,11 @@ export function ratesFor({ model, prompt, speed, geo }) {
 const SHELLS = new Set(["Bash", "PowerShell"]);
 
 /**
- * The workflow families of catalog section 4: the runs of calls one proposed command would
- * replace. Matched against the command string at extraction time; only the family name is kept.
+ * The workflow families: the runs of calls each proposed agent command would replace (gates,
+ * orient, ledger, merge, drift, pr; plus targeted test runs and port checks, which stay manual).
+ * Matched against the command string at extraction time; only the family name is kept. Paths
+ * match with either separator and listing or reading verbs in either shell, because PowerShell
+ * is this machine's primary shell.
  */
 export const FAMILIES = {
   gates: (tool, cmd) =>
@@ -104,15 +111,14 @@ export const FAMILIES = {
     /npm (run (-s )?)?(typecheck|lint|docs:check|build|check|test:all|test:components|test:integration|test:db|test)(\s|$|;|&|\|)|npx tsc --noEmit|next build|npx vitest run/.test(cmd) &&
     !FAMILIES["targeted tests"](tool, cmd),
   "targeted tests": (tool, cmd) =>
-    // Either separator: PowerShell spells the path `tests\unit\x.test.ts`.
-    SHELLS.has(tool) && /vitest run[^;&|]*tests[\\/][^ ]+\.test\.tsx?|npm (run )?test[^;&|]* -- [^;&|]*tests[\\/]/.test(cmd),
+    SHELLS.has(tool) && /(vitest run|npm (run )?test[^;&|]* --)[^;&|]*tests[\\/][^ ]+\.test\.tsx?/.test(cmd),
   orient: (tool, cmd) =>
     SHELLS.has(tool) &&
-    /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|ls tasks\/(open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
+    /git (worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (master|HEAD)\.\.origin\/master|fetch)|gh pr list|(ls|dir|Get-ChildItem) tasks[\\/](open|lessons|decisions)|ls -la \.git\/[^ ]*lock/.test(cmd),
   ledger: (tool, cmd) =>
     (SHELLS.has(tool) &&
-      /ls tasks\/(lessons|open|decisions)|grep [^|;&]*tasks\/(lessons|open|decisions)|(cat|head|sed -n|tail|grep|awk)[^|;&]*tasks\/todo\.md/.test(cmd)) ||
-    (tool === "Read" && /todo\.md$/.test(cmd)),
+      /(ls|dir|Get-ChildItem) tasks[\\/](lessons|open|decisions)|(grep|Select-String) [^|;&]*tasks[\\/](lessons|open|decisions)|(cat|head|sed -n|tail|grep|awk|Get-Content|Select-String)[^|;&]*tasks[\\/]todo\.md/.test(cmd)) ||
+    (tool === "Read" && /tasks[\\/]((open|lessons|decisions)[\\/][^\\/]+|todo\.md)$/.test(cmd)),
   merge: (tool, cmd) => SHELLS.has(tool) && /git merge-tree|HEAD\.\.origin\/master|merge-base HEAD origin\/master/.test(cmd),
   drift: (tool, cmd) => SHELLS.has(tool) && /agent-drift\.log/.test(cmd),
   pr: (tool, cmd) =>
@@ -344,7 +350,7 @@ export const priceFile = (file, opts) => priceFiles([file], opts)[0];
  */
 function priceRequest(r, priceAs) {
   r.ctx = promptOf(r);
-  const p = ratesFor({ model: priceAs ?? r.model, prompt: r.ctx, speed: r.speed, geo: r.geo });
+  const p = ratesFor({ model: priceAs ?? r.model, served: r.model, prompt: r.ctx, speed: r.speed, geo: r.geo });
   // The two cache lifetimes are priced differently, so a write the split does not account for
   // has no known price. Every line in this repo's transcripts carries a split that sums to the
   // total (36,459 of 36,459 on 2026-10-20); one that does not is refused, never guessed.
@@ -378,11 +384,19 @@ export const CONTEXT_BUCKETS = [
  */
 const COMPACTION_DROP = 0.6;
 
+/** Indexes of the requests that start a new context, after a compaction. */
+function segmentBreaks(file) {
+  const breaks = new Set(file.compactions);
+  for (let i = 1; i < file.requests.length; i++) {
+    if (promptOf(file.requests[i]) < COMPACTION_DROP * promptOf(file.requests[i - 1])) breaks.add(i);
+  }
+  return breaks;
+}
+
 /** Index of the last request each request's context survives to. */
 function segmentEnds(file) {
   const n = file.requests.length;
-  const breaks = new Set(file.compactions);
-  for (let i = 1; i < n; i++) if (promptOf(file.requests[i]) < COMPACTION_DROP * promptOf(file.requests[i - 1])) breaks.add(i);
+  const breaks = segmentBreaks(file);
   const ends = new Array(n);
   let end = n - 1;
   for (let i = n - 1; i >= 0; i--) {
@@ -424,14 +438,17 @@ export function carriedOutput(file) {
   return { total, byClass };
 }
 
-export const COLD_IDLE_MINUTES = 60;
+/** How long each cache lifetime keeps an entry, in minutes. */
+export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 
 /**
- * Main-session requests that came after the 1-hour cache expired and re-wrote the whole context.
+ * Main-session requests that came after the cache expired and re-wrote the whole context: idle
+ * longer than the lifetime the request writes with (1 hour, or 5 minutes for 5-minute writes),
+ * and not the first request after a compaction, which re-writes a new, smaller context anyway.
  * `trigger` says what the session waited on: "person" when the request answered someone's message
- * (they were away, which a hand-off could avoid), otherwise a tool that ran over an hour or a
- * background notice (which it could not). `cost` is what the re-write cost beyond the cache read a
- * warm request would have paid for the same tokens.
+ * (they were away, which a hand-off could avoid), otherwise a long tool or a background notice
+ * (which it could not). `cost` is what the re-write cost beyond the cache read a warm request
+ * would have paid for the same tokens.
  *
  * ceiling: "whole" is a write of at least half the context and at least 50K tokens, a heuristic
  * for "the cache had expired"; the exact test needs the cache's own expiry, which transcripts
@@ -439,11 +456,12 @@ export const COLD_IDLE_MINUTES = 60;
  */
 export function coldResumes(file) {
   if (file.sub) return [];
+  const breaks = segmentBreaks(file);
   const out = [];
   for (const r of file.requests) {
-    if (!r.prevTs || !r.usd) continue;
+    if (!r.prevTs || !r.usd || breaks.has(r.index)) continue;
     const idle = (Date.parse(r.ts) - Date.parse(r.prevTs)) / 60_000;
-    if (!(idle > COLD_IDLE_MINUTES)) continue;
+    if (!(idle > CACHE_TTL_MINUTES[r.w5 > r.w1h ? "5m" : "1h"])) continue;
     if (r.cache_creation_input_tokens < Math.max(50_000, 0.5 * r.ctx)) continue;
     const warm = (r.cache_creation_input_tokens * r.rates.cacheRead) / 1e6;
     out.push({ session: file.session, ts: r.ts, idleMinutes: idle, ctx: r.ctx, cost: r.usd.write - warm, trigger: r.trigger ?? "person" });
@@ -621,7 +639,8 @@ export function formatReport(report, { logPath } = {}) {
   const lines = [
     `usage: PASS ${usd(t.cost)} across ${sessionCount} sessions, ${t.requests.toLocaleString("en-US")} requests (${day(report.window.first)} to ${day(report.window.last)})`,
     `prices: per request at ${report.prices.priceAs ? `${report.prices.priceAs} rates for every model` : "the serving model's rates"}, ${report.prices.source} checked ${report.prices.checked}`,
-    `split: cache reads ${pct(t.read, t.cost)} | cache writes ${pct(t.write, t.cost)} | output ${pct(t.output, t.cost)} | fresh input ${pct(t.input + t.search, t.cost)}`,
+    `split: cache reads ${pct(t.read, t.cost)} | cache writes ${pct(t.write, t.cost)} | output ${pct(t.output, t.cost)} | fresh input ${pct(t.input, t.cost)}` +
+      (t.search ? ` | web search ${pct(t.search, t.cost)}` : ""),
     `models${report.prices.priceAs ? ` (all at ${report.prices.priceAs} rates)` : ""}: ${top(report.models, 6, (m) => m.cost)
       .map(([name, m]) => `${name} ${usd(m.cost)} (${m.requests})`)
       .join(" | ")}`,
@@ -631,7 +650,7 @@ export function formatReport(report, { logPath } = {}) {
   ];
   const c = report.coldResumes;
   lines.push(
-    `cold resumes: ${c.count} whole-context re-writes on a message after >1h idle, ${usd(c.cost)} = ${pct(c.cost, t.cost)}` +
+    `cold resumes: ${c.count} whole-context re-writes on a person's message after the cache expired, ${usd(c.cost)} = ${pct(c.cost, t.cost)}` +
       (c.count ? `; median context ${kTok(c.medianContext)}, median idle ${c.medianIdleHours.toFixed(1)}h` : "") +
       `; ${report.coldOnToolOrEvent.count} more on a long tool or a background notice, ${pct(report.coldOnToolOrEvent.cost, t.cost)}`,
   );
@@ -794,15 +813,16 @@ async function readFile(file, seen) {
  * ceiling: creation time stands in for "written first"; a copied file whose creation time was
  * preserved would sort wrongly, and the exact order needs each file's first timestamp.
  */
-function byCreation(files, sinceMs) {
-  // A transcript last written before the window holds no request in it, and any copy of its
-  // requests in a later file is before the window too, so it is skipped unread.
+function byCreation(files) {
+  // Every file is read even under --since: skipping the ones written before the window would
+  // change which file owns a copied request, and with it the numbers inside the window.
+  // ceiling: about 20 s for 300 transcripts here; an index of each file's request ids would let
+  // old files be skipped without changing ownership.
   return files
     .map((path) => {
       const s = statSync(path);
-      return { path, born: s.birthtimeMs || s.mtimeMs, written: s.mtimeMs };
+      return { path, born: s.birthtimeMs || s.mtimeMs };
     })
-    .filter((f) => !(f.written < sinceMs))
     .sort((a, b) => a.born - b.born || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
     .map((f) => f.path);
 }
@@ -841,8 +861,8 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
     if (!root) return fail(`git could not name this repo's main checkout from ${cwd}\nnext: pass --dir <transcript folder>`);
     dirs = defaultDirs(projectsDir, root);
   }
-  const sinceMs = opts.since ? Date.parse(opts.since) : -Infinity;
-  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)), sinceMs);
+  dirs = dirs.map((d) => resolve(cwd, d));
+  const files = byCreation(dirs.filter((d) => existsSync(d)).flatMap((d) => walk(d)));
   if (!files.length) return fail(`no transcripts found in ${dirs.length ? dirs.join(", ") : projectsDir}`);
 
   const seen = new Set();

@@ -3,8 +3,8 @@
  * One entry point for the agent scripts: `node scripts/agent.mjs <command> [args]`.
  *
  * Each command lives in `scripts/agent/<command>.mjs` as a pure core plus a `main(argv)` shell
- * that returns its exit code. Conventions every command follows (the agent-scripts catalog,
- * section 3): line 1 of output is `<command>: PASS|FAIL|ERROR <summary>`, at most 30 lines, a
+ * that returns its exit code. Conventions every command follows: line 1 of output is
+ * `<command>: PASS|FAIL|ERROR <summary>`, at most 30 lines, a
  * `next:` line when there is a single next action, a `log:` line with the full log, `--json` for
  * machine output. Exit codes as the rest of the repo: 0 pass, 1 finding, 2 could not run.
  *

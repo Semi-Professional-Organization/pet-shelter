@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { execFileSync } from "child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
-import { join, resolve } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 import {
@@ -21,6 +21,7 @@ import {
   familyUsage,
   formatReport,
   jsonlLines,
+  main,
   priceFile,
   ratesFor,
   summarize,
@@ -208,6 +209,17 @@ describe("agent usage: workflow families", () => {
     expect(familiesOf("PowerShell", "npx vitest run tests\\unit\\x.test.ts")).toEqual(["targeted tests"]);
   });
 
+  it("counts ledger and orient reads in PowerShell spellings and through the Read tool", () => {
+    expect(familiesOf("PowerShell", "Get-ChildItem tasks\\lessons")).toEqual(["orient", "ledger"]);
+    expect(familiesOf("PowerShell", "Get-Content tasks\\todo.md")).toEqual(["ledger"]);
+    expect(familiesOf("Read", "D:\\x\\tasks\\open\\a.md")).toEqual(["ledger"]);
+    expect(familiesOf("Read", "D:/x/src/tasks.ts")).toEqual([]);
+  });
+
+  it("files a run over a whole test directory as a gate, not a targeted run", () => {
+    expect(familiesOf("Bash", "npm run test -- tests/unit")).toEqual(["gates"]);
+  });
+
   it("classes each command of a chain on its own", () => {
     expect(familiesOf("Bash", "npx vitest run tests/unit/a.test.ts && npm run lint")).toEqual(["gates", "targeted tests"]);
     expect(familiesOf("Bash", "npm test -- tests/unit/a.test.ts")).toEqual(["targeted tests"]);
@@ -304,6 +316,32 @@ describe("agent usage: the analyses", () => {
     ];
     // Written before the window, read once inside it at $0.20 per million.
     expect(summarize([extract(records)], { since: "2026-10-02" }).carried.cost).toBeCloseTo(0.2);
+  });
+
+  it("does not count the first request after a compaction, which re-writes a new context anyway", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 800_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        { type: "system", subtype: "compact_boundary" },
+        assistant("r2", { w1h: 100_000, out: 1 }, { ts: "2026-10-01T12:00:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)).toHaveLength(0);
+  });
+
+  it("takes a 5-minute cache as expired after 5 minutes, not an hour", () => {
+    const file = priceFile(
+      extract([
+        assistant("r1", { read: 400_000, out: 1 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("r2", { w5: 400_000, out: 1 }, { ts: "2026-10-01T10:30:00.000Z" }),
+      ]),
+    );
+    expect(coldResumes(file)).toHaveLength(1);
+  });
+
+  it("checks a US-only request against the model that served it, not the --price-as model", () => {
+    const record = assistant("r1", { out: 1, geo: "us" }, { model: "claude-opus-5-5" });
+    expect(() => summarize([extract([record])], { priceAs: "claude-opus-4-5" })).not.toThrow();
   });
 
   it("still sees a cold resume as the first new request of a forked transcript", () => {
@@ -539,6 +577,14 @@ describe("agent usage: the command", () => {
     expect(cli(["usage", "--frobnicate"]).code).toBe(2);
     expect(cli(["nonesuch"]).code).toBe(2);
     expect(cli([])).toMatchObject({ code: 2, out: expect.stringMatching(/^agent: ERROR no command/) });
+  });
+
+  it("resolves --dir against the working directory it was given", async () => {
+    const dir = fixtureDir([assistant("r1", { out: 1 })]);
+    let out = "";
+    const code = await main(["--dir", basename(dir), "--json"], { cwd: dirname(dir), out: { write: (s: string) => (out += s) } });
+    expect(code).toBe(0);
+    expect(JSON.parse(out).totals.requests).toBe(2);
   });
 
   it("will not take the next flag as an option's value, and takes a dated id for --price-as", () => {
