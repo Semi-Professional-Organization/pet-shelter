@@ -165,7 +165,7 @@ Zod 4. The rule (Blueprint Tenet 3): **every value crossing into a Server Action
 - **RBAC** — `ADMIN | COORDINATOR | STAFF | VOLUNTEER`; `assertAuthorized(user, roles)` throws `UnauthorizedError` / `ForbiddenError`. `verifyAdminSession()` additionally accepts a legacy `admin_session` cookie matching `ADMIN_SECRET_KEY`.
 - **Rate limiting / idempotency** — in-memory `Map`, sliding window (login 5/min). Per-process only: does not survive a restart and does not scale horizontally. Externalize before any multi-instance deployment.
 
-⚠️ **There is no `middleware.ts`.** `src/app/admin/layout.tsx` guards routes **client-side only**. Every admin Server Action must re-check authorization itself. Never rely on the layout.
+⚠️ **Admin pages gate on the server; actions still gate themselves.** Every admin section's page calls `requireAdminSection(href)` (`src/lib/security/adminSectionGate.ts`) before rendering, which reads the same table (`src/lib/security/adminSections.ts`) as the nav in `src/app/admin/layout.tsx` and the `/admin` landing, so a new section needs a table entry and that call. `src/proxy.ts` answers `/admin/members` with a real HTTP 403 from the same table, on the cookie's role. The layout's client redirect is a convenience. None of these is the boundary: every admin Server Action must re-check authorization itself.
 
 ### L-B6 — Services & integrations
 
@@ -371,7 +371,7 @@ The script and the test duplicate a little resolver logic on purpose: the script
 1. **Prisma imports live in exactly three files.** A fourth is a design decision, not a detail.
 2. **No backend module imports a `"use client"` module.** Enforced in CI (§8) — if you need a value on both sides, put it in a directive-free module.
 3. **Parse at the edge.** External input hits a Zod schema in L-B4 before any other layer sees it.
-4. **Authorize in the action, not the layout.** There is no middleware.
+4. **Authorize in the action, not the layout.** A section page's `requireAdminSection` decides what renders; the action decides what happens.
 5. **Every privileged mutation calls `recordAuditLog`.**
 6. **Optional fields on `Pet` are a silent contract.** Adding one to `src/types/pet.ts` without the matching column and mapper produces zero errors and zero data — see §6.
 7. **Don't trust the barrels yet.** They have no importers and `security/index.ts` is loaded (§5.2).
