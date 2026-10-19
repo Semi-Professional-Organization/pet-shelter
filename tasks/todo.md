@@ -46,17 +46,21 @@ developer shell leaking in.
 **Verified on this branch:** `tsc --noEmit` exit 0. `npm run lint` 0 errors (13 warnings, all in
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
 secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
-skipped the regeneration). Unit, integration and component suites together: 137 files, 2,281
-tests, 42 s (master: 192 to 216 s).
+skipped the regeneration). Unit, integration and component suites together, after merging
+master at `474abbe`: 138 files, 2,291 tests, 40 s (master: 192 to 216 s).
 
-**Review:** five `/code-review` rounds over the whole diff raised 47 findings; each was fixed, or
+**Review:** six `/code-review` rounds over the whole diff raised 54 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
 env guard fail on any `process.env` read it cannot name. Round 5 retired `resetServerStore()`
 (the registry already resets those six stores), made the app warn at start when it has no
 database while the CLI still defaults to localhost, and guarded the pet form with a ref so two
-submits before a re-render save once.
+submits before a re-render save once. Round 6 moved the components tier to `Asia/Kuala_Lumpur`
+(it stands in for the users' browsers; server tiers stay UTC), gave the offline client one
+delegate per model, and split the stale-client checks into `scripts/lib/prismaClientState.mjs`
+so the script needs no run-directly test. It also surfaced a product bug, filed rather than fixed
+here: `tasks/open/admin-date-defaults-use-the-utc-day.md`.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as

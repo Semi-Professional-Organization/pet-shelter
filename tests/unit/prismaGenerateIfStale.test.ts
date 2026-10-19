@@ -6,11 +6,12 @@ import {
   generatedSchemaPath,
   isClientComplete,
   isClientCurrent,
-} from "../../scripts/prisma-generate-if-stale.mjs";
+} from "../../scripts/lib/prismaClientState.mjs";
 
 /**
  * `npm test` regenerates the Prisma client only when the schema changed
- * (`scripts/prisma-generate-if-stale.mjs`). A wrong "current" leaves a stale
+ * (`scripts/prisma-generate-if-stale.mjs`, with its checks in
+ * `scripts/lib/prismaClientState.mjs`). A wrong "current" leaves a stale
  * client, which fails in files nobody touched; a wrong "stale" brings back the
  * regeneration that broke concurrent runs. Both directions are pinned here.
  */

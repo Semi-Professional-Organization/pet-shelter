@@ -38,8 +38,11 @@ production-mode test the session secret a production process always has.
 `tests/setup/hermeticEnv.ts` runs first in the unit, integration and components projects and
 deletes every environment variable the code reads that a developer's shell might set; the config
 pins `STRICT_PERSISTENCE` off for unit and components. `tests/setup/hermeticRuntime.ts`, in every
-project including `integration-db`, pins `TZ=UTC` (CI's and Vercel's zone) and replaces `fetch`
-with a guard that fails any test making a real network call, naming the test that made it. The config adds `unstubEnvs`, `unstubGlobals` and `expect.requireAssertions`,
+project including `integration-db`, pins the time zone and replaces `fetch` with a guard that
+fails any test making a real network call, naming the test that made it. The zone is UTC for
+server code, as on CI and Vercel, and `Asia/Kuala_Lumpur` in the components tier, which stands in
+for the browsers of the shelter's staff and supporters; either way it is the same on every
+machine. The config adds `unstubEnvs`, `unstubGlobals` and `expect.requireAssertions`,
 and `passWithNoTests: false` now that every tier has files. With the offline Prisma client
 (`2026-10-20-no-database-url-means-no-database.md`), a unit, integration or component run reads
 nothing from the machine it runs on.

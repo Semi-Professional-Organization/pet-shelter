@@ -41,6 +41,10 @@ interface PetFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingPet?: Pet | null;
+  /**
+   * Takes the form once per opening. The dialog then asks to close and keeps Save locked until
+   * it opens again, so a parent that keeps it open after a save must close and reopen it.
+   */
   onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void;
 }
 

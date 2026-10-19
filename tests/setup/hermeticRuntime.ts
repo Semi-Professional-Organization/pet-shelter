@@ -8,8 +8,10 @@ import { afterAll, afterEach, expect } from "vitest";
  *     `production` failed whole files at import (the session secret becomes
  *     mandatory), and `development` switched on dev-only paths. A test that needs
  *     another mode stubs it with `vi.stubEnv`.
- *  2. The time zone. CI and Vercel run in UTC; this machine runs UTC+8, so date
- *     arithmetic near midnight could pass in one and fail in the other.
+ *  2. The time zone, the same on every machine: this one runs UTC+8, so date
+ *     arithmetic near midnight could pass here and fail on CI, or the reverse.
+ *     UTC for server code, as on Vercel; `Asia/Kuala_Lumpur` for the components
+ *     tier, which stands in for the browser.
  *  3. The network, through `fetch`, which is the only HTTP client the code under
  *     test has (email; the storage providers only build URLs). The database is
  *     covered separately: with no `DATABASE_URL` the Prisma client opens no
@@ -26,8 +28,12 @@ import { afterAll, afterEach, expect } from "vitest";
  * but nothing is left running to report it.
  */
 
+// The browser runs where the shelter's staff and supporters are, so a client-side date bug
+// (a UTC day shown as today before 08:00 there) can show up in the components tier.
+const TIME_ZONE = typeof window === "undefined" ? "UTC" : "Asia/Kuala_Lumpur";
+
 // Object.assign because Next types NODE_ENV as read-only, which it is not at runtime.
-Object.assign(process.env, { NODE_ENV: "test", TZ: "UTC" });
+Object.assign(process.env, { NODE_ENV: "test", TZ: TIME_ZONE });
 
 interface UnexpectedRequest {
   url: string;
@@ -53,7 +59,8 @@ function failOnUnexpectedRequests(): void {
   const calls = unexpectedRequests.splice(0).map(({ url, during }) => `${url} (made during "${during}")`);
   throw new Error(
     `A test tried to reach the network: ${calls.join(", ")}. ` +
-      'Stub fetch for it (vi.spyOn(globalThis, "fetch")) or stop the code from calling out.'
+      'Stub fetch for it with vi.stubGlobal("fetch", ...), which is undone before the next test, ' +
+      "or stop the code from calling out."
   );
 }
 

@@ -239,6 +239,13 @@ describe("next/navigation mock", () => {
 });
 
 // ===========================================================================
+describe("hermetic runtime", () => {
+  it("runs server code in UTC, as on Vercel, whatever zone the machine is in", () => {
+    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe("UTC");
+    expect(new Date("2026-10-20T00:30:00Z").getHours()).toBe(0);
+  });
+});
+
 describe("hermetic state isolation", () => {
   const FIXTURE_COUNT = (petsFixture as Pet[]).length;
 

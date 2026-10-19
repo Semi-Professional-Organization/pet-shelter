@@ -74,6 +74,13 @@ describe("the Prisma client with no DATABASE_URL", () => {
     expect(JSON.stringify(prisma.pet)).toBe("{}");
   });
 
+  it("hands out one delegate per model, as the real client does", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+
+    expect(prisma.pet).toBe(prisma.pet);
+    expect(prisma.pet).not.toBe(prisma.user);
+  });
+
   it("hands back the client from a listener or an extension, so module-scope setup still loads", async () => {
     const { prisma } = await import("@/lib/server/prisma");
     const on = prisma.$on as unknown as (event: string, listener: () => void) => unknown;

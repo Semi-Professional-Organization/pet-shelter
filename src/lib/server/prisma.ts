@@ -46,7 +46,8 @@ function createOfflineClient(): PrismaClient {
   if (process.env.NODE_ENV !== "test") {
     console.warn(
       "[Prisma] No DATABASE_URL is set: the app serves its in-memory fixtures and keeps writes in memory. " +
-        "Set DATABASE_URL to use a database (the Prisma CLI and seed script default to localhost:5432 without it)."
+        "Set DATABASE_URL and restart to use a database (the Prisma CLI and seed script default to " +
+        "localhost:5432 without it)."
     );
   }
 
@@ -67,10 +68,19 @@ function createOfflineClient(): PrismaClient {
   // methods and its `$` methods. Anything else falls through to a plain object,
   // as on the real client: `then` and `asymmetricMatch` are undefined (answering
   // `then` would make `await prisma.pet` wait forever), and `toString` or
-  // `JSON.stringify` behave.
-  const model = new Proxy({}, {
-    get: (target, key) => (MODEL_METHODS.has(key) ? refuse : Reflect.get(target, key)),
-  });
+  // `JSON.stringify` behave. One object per delegate, as on the real client, so
+  // `prisma.pet` is not `prisma.user`.
+  const delegates = new Map<string | symbol, object>();
+  const delegate = (name: string | symbol) => {
+    let found = delegates.get(name);
+    if (!found) {
+      found = new Proxy({}, {
+        get: (target, key) => (MODEL_METHODS.has(key) ? refuse : Reflect.get(target, key)),
+      });
+      delegates.set(name, found);
+    }
+    return found;
+  };
   // Every `$` method the generated client declares; the `satisfies` makes
   // `typecheck` fail when a Prisma upgrade adds one. A listener or an extension
   // has nothing to attach to offline, so those hand back the client unchanged.
@@ -92,7 +102,7 @@ function createOfflineClient(): PrismaClient {
         if (typeof key === "string" && Object.hasOwn(clientMethods, key)) {
           return clientMethods[key as ClientMethod];
         }
-        return MODEL_DELEGATES.has(key) ? model : Reflect.get(target, key);
+        return MODEL_DELEGATES.has(key) ? delegate(key) : Reflect.get(target, key);
       },
     }
   ) as unknown as PrismaClient;
