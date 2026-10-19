@@ -6,9 +6,9 @@
   separate clone; the main checkout is untouched)
 - **phase:** 3 — build gate emitted; building
 - **paths:** `.github/workflows/**`, `.github/dependabot.yml`, `.github/CONTRIBUTING.md`,
+  `src/lib/server/sponsorRepository.ts`, `tests/unit/sponsorSeedHashes.test.ts`,
   `docs/reference/COMMIT_MESSAGES.md`, `tasks/**` entries this session writes. Outside the tree:
-  the repository ruleset "Basic" (id 20886052) and the Dependabot alert settings. The sponsor
-  repository and its test were released on 2026-10-20; see "Scope change" at the end.
+  the repository ruleset "Basic" (id 20886052) and the Dependabot alert settings.
 
 ## Phase 0 — frame
 
@@ -164,13 +164,14 @@ claimed, see A2).
 
 ## Scope change — 2026-10-20, after the gate
 
-**The sponsor seed hash cache leaves this branch.** The "Test suite redesign plan" thread is
-replacing it with precomputed seed hashes on `claude/project-thread-jdktt3`. That touches the same
+**The sponsor seed hash cache stays on this branch.** The "Test suite redesign plan" thread plans
+to replace it with precomputed seed hashes on `claude/project-thread-jdktt3`. That touches the same
 lines and measured faster on its machine: 85 s for the full suite, against 104 s with the cache.
-The coordinator asked for the cache to be dropped here so that the two branches do not collide,
-and it was, before this branch had a pull request. A2 and A3 go with that work. This branch's own
-measurement of the cache, the unit project at 130.4 s before and 54.4 s after on one machine and
-tree, was passed to that thread.
+The coordinator asked for the cache to be dropped here, so that the two branches do not collide.
+Rewriting this branch to drop it was declined when attempted, so it stays, and that thread
+replaces it on top of this branch instead, the alternative the coordinator offered. This branch's
+measurement of the cache goes to that thread either way: the unit project at 130.4 s before and
+54.4 s after, on one machine and tree.
 
 **One item joins, from the same thread's plan:** the Playwright report uploads on every run, not
 only on failure. With `retries: 1` in CI, a test that fails once and then passes leaves the job
