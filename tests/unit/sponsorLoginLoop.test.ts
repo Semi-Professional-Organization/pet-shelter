@@ -1,6 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { getLastRedirect, MockNavigationError } from "../setup/nextMocks";
 import { setSponsorSessionCookie } from "@/lib/security/sponsorSession";
+
+vi.mock("@/lib/server/sponsorRepository", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server/sponsorRepository")>();
+  return { ...actual, findSponsorById: vi.fn(actual.findSponsorById) };
+});
+vi.mock("@/lib/server/sponsorshipLedger", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/server/sponsorshipLedger")>();
+  return { ...actual, listSponsorshipsByUserId: vi.fn(actual.listSponsorshipsByUserId) };
+});
 
 /**
  * /sponsor/login and /sponsor/dashboard agree on who is signed in.
@@ -40,5 +49,24 @@ describe("sponsor sign-in", () => {
 
   it("shows the sign-in form when signed out", async () => {
     expect(await open("login")).toBeNull();
+  });
+
+  it("still shows the sign-in form when the database cannot say who the cookie names", async () => {
+    // So a sponsor can start over during an outage instead of meeting a 500.
+    const { findSponsorById } = await import("@/lib/server/sponsorRepository");
+    vi.mocked(findSponsorById).mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    await setSponsorSessionCookie({ sponsorId: "spn-bronze-01", email: "bronze@example.com", name: "Nurul Aisyah" });
+
+    expect(await open("login")).toBeNull();
+  });
+
+  it("decides without reading the sponsor's sponsorships", async () => {
+    const { listSponsorshipsByUserId } = await import("@/lib/server/sponsorshipLedger");
+    vi.mocked(listSponsorshipsByUserId).mockClear();
+    await setSponsorSessionCookie({ sponsorId: "spn-bronze-01", email: "bronze@example.com", name: "Nurul Aisyah" });
+
+    await open("login");
+
+    expect(listSponsorshipsByUserId).not.toHaveBeenCalled();
   });
 });

@@ -88,6 +88,24 @@ export const getSponsorContext = cache(async (): Promise<SponsorContext | null> 
   };
 });
 
+/**
+ * Whether the sponsor session still names a sponsor, without reading their standing.
+ *
+ * For /sponsor/login, which only decides whether to send a visitor on to the dashboard:
+ * the dashboard's own test (a session, and a sponsor record behind it), minus the ledger
+ * read `getSponsorContext` adds. A database that cannot answer counts as "no", so the
+ * sign-in form still renders and the sponsor can start over rather than meeting a 500.
+ */
+export async function sponsorSessionNamesASponsor(): Promise<boolean> {
+  const session = await getCurrentSponsorSession();
+  if (!session) return false;
+  try {
+    return (await findSponsorById(session.sponsorId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
 /** The current standing, or `null` for signed-out visitors and sub-Bronze sponsors. */
 export async function getCurrentSupporterTier(): Promise<SupporterTier | null> {
   const context = await getSponsorContext();
