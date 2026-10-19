@@ -99,12 +99,16 @@ describe("/admin sends each member to the first section their role opens", () =>
     expect(html).toContain("Your account has no admin sections yet");
   });
 
-  // The 401 page, as on every section, rather than a silent redirect to the sign-in form:
-  // a sign-in can succeed for an account the DAL then refuses (one held only in the
-  // in-memory store), and the form would come straight back with no reason given.
-  it("answers a signed-out visitor with the 401 page", async () => {
-    expect(await enterConsole()).toMatchObject({ interrupt: UNAUTHORIZED, redirectedTo: null });
+  it("sends a visitor with no session to the sign-in form", async () => {
+    // The front door's answer to nobody, not a "your session has ended" page for a
+    // session that never existed.
+    expect((await enterConsole()).redirectedTo).toBe("/admin/login");
   });
+
+  // A session the DAL will not honour gets the 401 page, as on every section, rather than
+  // a silent redirect to the sign-in form: a sign-in can succeed for an account the DAL
+  // then refuses (one held only in the in-memory store), and the form would come straight
+  // back with no reason given.
 
   it("answers a suspended member with the 401 page", async () => {
     await signInAs(ROLES.SUPER_ADMIN);
