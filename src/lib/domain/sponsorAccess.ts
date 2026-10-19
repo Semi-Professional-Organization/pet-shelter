@@ -101,7 +101,10 @@ export async function sponsorSessionNamesASponsor(): Promise<boolean> {
   if (!session) return false;
   try {
     return (await findSponsorById(session.sponsorId)) !== null;
-  } catch {
+  } catch (error) {
+    // Answered "no" so the page still renders, but logged: otherwise an outage here
+    // looks exactly like a signed-out visitor.
+    console.error("[Sponsor Sign-In] Could not check the session's sponsor:", error);
     return false;
   }
 }

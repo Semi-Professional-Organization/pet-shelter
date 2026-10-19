@@ -55,9 +55,13 @@ describe("sponsor sign-in", () => {
     // So a sponsor can start over during an outage instead of meeting a 500.
     const { findSponsorById } = await import("@/lib/server/sponsorRepository");
     vi.mocked(findSponsorById).mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     await setSponsorSessionCookie({ sponsorId: "spn-bronze-01", email: "bronze@example.com", name: "Nurul Aisyah" });
 
     expect(await open("login")).toBeNull();
+    // ...and says so, or the outage looks exactly like a signed-out visitor.
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining("[Sponsor Sign-In]"), expect.any(Error));
+    logged.mockRestore();
   });
 
   it("decides without reading the sponsor's sponsorships", async () => {
