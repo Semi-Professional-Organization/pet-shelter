@@ -8,13 +8,15 @@
  * output: the report holds counts, token totals, dollars, session ids, tool names and coarse
  * command classes such as `git diff` or `npm run test`.
  *
- * The core (everything exported) is pure and takes parsed records; `main` is the I/O shell.
+ * The core (everything exported) does no I/O and takes parsed records; `main` is the I/O shell.
+ * `priceFiles` and `summarize` write each in-window request's price onto it, clearing any earlier
+ * one first, and the analyses read "has a price" as "inside the window".
  * What it is the measuring stick for, and the baseline it recorded:
  * `tasks/open/agent-scripts-must-cut-what-a-session-costs.md`.
  *
  * Exit codes, as the rest of the repo: 0 the report was produced, 2 it could not be. There is no
- * exit 1, because a measurement has no failing state. An unpriceable request (unknown model, fast
- * mode, an unknown inference region) is a 2, never a guess.
+ * exit 1, because a measurement has no failing state. An unpriceable request (unknown model, a
+ * speed or region with no published price) is a 2, never a guess.
  */
 
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
@@ -49,7 +51,21 @@ export const PRICES = {
   // on its own." Every rate moves, output included.
   "claude-haiku-5-5": { ...rates(0.1, 0.125, 0.2, 0.01, 0.5), over: { prompt: 100_000, ...rates(0.5, 0.625, 1, 0.05, 2.5) } },
   "claude-haiku-4-5": rates(1, 1.25, 2, 0.1, 5),
+  // Still listed with prices, though retired outside some clouds or in limited availability.
+  "claude-mythos-5-1": rates(10, 12.5, 20, 0.25, 50),
+  "claude-mythos-5": rates(10, 12.5, 20, 1, 50),
+  "claude-opus-4-1": rates(15, 18.75, 30, 1.5, 75),
+  "claude-opus-4": rates(15, 18.75, 30, 1.5, 75),
+  "claude-sonnet-4": rates(3, 3.75, 6, 0.3, 15),
+  "claude-3-5-haiku": rates(0.8, 1, 1.6, 0.08, 4),
 };
+
+/**
+ * "Fast mode pricing": Opus 5.5 at $8/$40, Opus 5 and Opus 4.8 at $10/$50, which is twice the
+ * standard input and output rates, and "prompt caching multipliers apply on top", so every
+ * category doubles. No other model has a fast price.
+ */
+const FAST_MULTIPLIER = { "claude-opus-5-5": 2, "claude-opus-5": 2, "claude-opus-4-8": 2 };
 
 /** "Web search is $10 per 1,000 searches"; web fetch costs only its tokens. */
 const WEB_SEARCH_USD = 0.01;
@@ -57,7 +73,10 @@ const WEB_SEARCH_USD = 0.01;
 /** `inference_geo` values priced at standard rates. "us" is 1.1x on every category. */
 const GEO_MULTIPLIER = { global: 1, not_available: 1, us: 1.1 };
 /** Models before Claude 4.6, which do not take `inference_geo` and have no flat 1M pricing. */
-const BEFORE_4_6 = new Set(["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]);
+const BEFORE_4_6 = new Set([
+  "claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5",
+  "claude-opus-4-1", "claude-opus-4", "claude-sonnet-4", "claude-3-5-haiku",
+]);
 /**
  * The pricing page promises the 1M context at standard rates for "Claude 4.6 and later models"
  * only, and publishes no long-context rates for the earlier ones, so a prompt over 200K on one of
@@ -82,9 +101,12 @@ export function ratesFor({ model, served = model, prompt, speed, geo }) {
   const base = priceKey(model);
   const table = Object.hasOwn(PRICES, base) ? PRICES[base] : undefined;
   if (!table) throw new UnpriceableError(`no price for model ${model}`);
-  if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
-  const multiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
-  if (multiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
+  let speedMultiplier = 1;
+  if (speed === "fast" && Object.hasOwn(FAST_MULTIPLIER, base)) speedMultiplier = FAST_MULTIPLIER[base];
+  else if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
+  const geoMultiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
+  if (geoMultiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
+  const multiplier = speedMultiplier * geoMultiplier;
   // "For Claude 4.6 and later models"; earlier ones refuse the parameter, so a US-only request
   // on one is a transcript this table does not understand.
   // Neither the model that served a US-only request nor the model it is priced at may be one
@@ -114,8 +136,8 @@ const PERSON_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
 const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
 
 /**
- * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`), leaving any of
- * those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
+ * A shell command split into the commands of its chain (`&&`, `||`, `;`, `|`, a newline), leaving
+ * any of those inside quotes alone, so `grep "a|b" tasks/open/x.md` stays one command.
  */
 export function splitChain(cmd) {
   const parts = [];
@@ -124,12 +146,17 @@ export function splitChain(cmd) {
   for (let i = 0; i < cmd.length; i++) {
     const ch = cmd[i];
     if (quote) {
+      // Inside double quotes a backslash escapes the next character, `\"` included.
+      if (quote === '"' && ch === "\\" && i + 1 < cmd.length) {
+        current += ch + cmd[++i];
+        continue;
+      }
       if (ch === quote) quote = null;
       current += ch;
     } else if (ch === '"' || ch === "'") {
       quote = ch;
       current += ch;
-    } else if (ch === ";" || ch === "|" || (ch === "&" && cmd[i + 1] === "&")) {
+    } else if (ch === ";" || ch === "|" || ch === "\n" || (ch === "&" && cmd[i + 1] === "&")) {
       parts.push(current);
       current = "";
       if ((ch === "|" || ch === "&") && cmd[i + 1] === ch) i++;
@@ -218,8 +245,8 @@ const npmScript = (cmd) => npmCall(cmd)?.script;
 const VITEST_RUN = /(?:^|\s)(?:npx\s+)?vitest\s+(?:run|--run)\b(.*)$/;
 
 /**
- * The test filters in the words after `vitest run`: each positional word, normalised, and `-t`'s
- * pattern. `--testNamePattern=x` reads as the filter "-t".
+ * The test filters in the words after `vitest run`: each positional word, normalised, and "-t"
+ * for a name filter (`-t x`, `--testNamePattern x`, `--testNamePattern=x`).
  *
  * ceiling: a vitest option missing from VITEST_VALUE_FLAGS makes its value read as a filter. The
  * exact parse would use vitest's own CLI definition, which is not available without the package.
@@ -233,7 +260,8 @@ function filtersIn(args) {
   const filters = [];
   for (let i = 0; i < words.length; i++) {
     const word = words[i];
-    if (word.startsWith("--testNamePattern")) {
+    if (word.startsWith("--testNamePattern") || word === "-t") {
+      // Its pattern, read on as a filter too, changes nothing: the run is narrowed either way.
       filters.push("-t");
       continue;
     }
@@ -276,8 +304,12 @@ export function isTargetedRun(cmd, vitest = new Map()) {
   if (direct) return filtersIn(direct[1]).some((f) => !WHOLE_SUITE.has(f));
   const npm = npmCall(text);
   const script = npm && vitest.get(npm.script);
-  if (!script || script.filtered) return false;
-  return filtersIn(npm.args).some((f) => !WHOLE_SUITE.has(f));
+  if (!script) return false;
+  const filters = filtersIn(npm.args);
+  // A name filter narrows any run (vitest ANDs it with the paths); a path only narrows a script
+  // that passes none of its own (vitest ORs paths).
+  if (filters.includes("-t")) return true;
+  return !script.filtered && filters.some((f) => !WHOLE_SUITE.has(f));
 }
 
 /**
@@ -436,6 +468,9 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
         // When the previous request started, copied history included, so the first new request of
         // a forked or relocated transcript still knows how long the session sat idle. The start,
         // not the last streamed line: the cache's clock restarts when a request reads it.
+        // ceiling: "start" is the request's first written line, which lands after its first block
+        // has streamed; transcripts do not record when a request was sent, so near a lifetime's
+        // edge a long first block can move a resume across it.
         let trigger;
         if (!started.has(key)) {
           started.add(key);
@@ -1111,6 +1146,8 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
 
   // The test scripts as this checkout defines them, from its top level whatever the cwd; without a
   // package.json, npm test runs are not told apart from other npm scripts.
+  // ceiling: every transcript is read against today's scripts here, though a worktree or an old
+  // session may have run different ones; the exact answer needs package.json as of each call.
   const packageJson = join(git(cwd, ["rev-parse", "--show-toplevel"]) ?? cwd, "package.json");
   const vitest = vitestScripts(existsSync(packageJson) ? JSON.parse(readFileSync(packageJson, "utf8")).scripts : {});
 

@@ -118,7 +118,8 @@ describe("agent usage: prices", () => {
     // Names an object inherits are not prices; they would price at NaN and exit 0.
     expect(() => ratesFor({ model: "toString", prompt: 1 })).toThrow(UnpriceableError);
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "constructor" })).toThrow(UnpriceableError);
-    expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast" })).toThrow(/speed fast/);
+    expect(() => ratesFor({ model: "claude-sonnet-5-5", prompt: 1, speed: "fast" })).toThrow(/speed fast/);
+    expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "turbo" })).toThrow(/speed turbo/);
     expect(() => ratesFor({ model: "claude-opus-5-5", prompt: 1, geo: "eu" })).toThrow(/inference_geo eu/);
   });
 
@@ -144,6 +145,18 @@ describe("agent usage: prices", () => {
 
   it("prices a dated snapshot id as its model", () => {
     expect(ratesFor({ model: "claude-haiku-4-5-20251001", prompt: 1 })).toEqual(PRICES["claude-haiku-4-5"]);
+  });
+
+  it("charges fast mode at the published fast rates, with the cache multipliers on top", () => {
+    // Opus 5.5 fast: $8 in, $40 out; caching keeps its multipliers of input.
+    expect(ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast" })).toMatchObject({ input: 8, output: 40, cacheRead: 0.4, write1h: 16 });
+    expect(ratesFor({ model: "claude-opus-5", prompt: 1, speed: "fast" })).toMatchObject({ input: 10, output: 50 });
+    expect(ratesFor({ model: "claude-opus-5-5", prompt: 1, speed: "fast", geo: "us" }).output).toBeCloseTo(44);
+  });
+
+  it("prices the older models the page still lists, by their dated ids", () => {
+    expect(ratesFor({ model: "claude-opus-4-1-20250805", prompt: 1 }).output).toBe(75);
+    expect(ratesFor({ model: "claude-3-5-haiku-20241022", prompt: 1 }).input).toBe(0.8);
   });
 
   it("charges US-only inference 1.1x on every category", () => {
@@ -286,6 +299,16 @@ describe("agent usage: workflow families", () => {
     expect(families("Bash", "npm -s run test:components -- tests/components/A.test.tsx")).toEqual(["targeted tests"]);
     expect(families("Bash", "git -C /d/x worktree list")).toEqual(["orient"]);
     expect(families("Bash", 'git -C "D:/a b" merge-tree --write-tree HEAD origin/master')).toEqual(["merge"]);
+  });
+
+  it("splits a chain at a newline, and keeps an escaped quote inside its string", () => {
+    expect(families("Bash", "npx vitest run tests/unit/a.test.ts\nnpm run lint")).toEqual(["gates", "targeted tests"]);
+    expect(families("Bash", 'echo "a\\"b" && cat tasks/todo.md')).toEqual(["ledger"]);
+  });
+
+  it("takes a name filter as narrowing even a script that already passes a path", () => {
+    expect(families("Bash", 'npm test -- -t "prices"')).toEqual(["targeted tests"]);
+    expect(families("Bash", "npm run test -- --testNamePattern=prices")).toEqual(["targeted tests"]);
   });
 
   it("does not take a write into the ledger, or making a folder there, for a read", () => {
