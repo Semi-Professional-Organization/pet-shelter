@@ -89,8 +89,11 @@ export function UpgradeNudge({
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
+            {/* To the rescues, where a sponsorship starts. A standing is derived from pet
+                sponsorships alone (`getSponsorContext`), so this used to send a sponsor to
+                the general-gift form, which can never raise one. */}
             <Link
-              href="/donate"
+              href="/pets"
               className={buttonVariants({ size: "sm", className: "gap-2" })}
             >
               {isMs ? `Naik taraf ke ${required}` : `Become a ${required} sponsor`}

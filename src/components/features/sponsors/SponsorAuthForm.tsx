@@ -82,8 +82,8 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
         <p className="text-sm text-muted-foreground">
           {isRegister
             ? isMs
-              ? "Sudah menderma? Gunakan nombor resit daripada e-Resit anda untuk menuntut sejarah penajaan anda."
-              : "Already donated? Use the receipt number from your e-Receipt to claim your sponsorship history."
+              ? "Sudah menaja haiwan rescue? Gunakan nombor resit daripada e-Resit penajaan itu untuk menuntut sejarah penajaan anda."
+              : "Sponsored a rescue? Use the receipt number from that sponsorship's e-Receipt to claim your sponsorship history."
             : isMs
               ? "Akses rescue anda, taraf penajaan dan kandungan eksklusif."
               : "Access your rescues, sponsorship standing and exclusive content."}
@@ -212,9 +212,11 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
           ? isMs
             ? "Sudah mempunyai akaun?"
             : "Already have an account?"
-          : isMs
-            ? "Menderma tetapi belum mempunyai akaun?"
-            : "Donated but have no account yet?"}{" "}
+          : // A sponsorship receipt, not any donation: registration only accepts a receipt
+            // that matches a pet sponsorship, so a general gift's receipt is always refused.
+            isMs
+            ? "Menaja haiwan rescue tetapi belum mempunyai akaun?"
+            : "Sponsored a rescue but have no account yet?"}{" "}
         <button
           type="button"
           onClick={() => {

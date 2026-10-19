@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getCurrentSponsorSession } from "@/lib/security/sponsorSession";
+import { getSponsorContext } from "@/lib/domain/sponsorAccess";
 import { SponsorAuthForm } from "@/components/features/sponsors";
 
 export const metadata: Metadata = {
@@ -11,7 +11,11 @@ export const metadata: Metadata = {
 };
 
 export default async function SponsorLoginPage() {
-  if (await getCurrentSponsorSession()) {
+  // Only a session that still names a sponsor goes on to the dashboard, which is
+  // the test the dashboard applies. On the cookie alone, a sponsor whose record is
+  // gone (deleted, or an offline-mode registration lost to a restart) was sent to
+  // the dashboard, sent back here, and round again, with no page ever rendering.
+  if (await getSponsorContext()) {
     redirect("/sponsor/dashboard");
   }
 
