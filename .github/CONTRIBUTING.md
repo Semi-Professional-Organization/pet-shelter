@@ -246,6 +246,23 @@ Before hitting "Create Pull Request", verify:
 - Request re-review after addressing feedback
 - Polite disagreement is okay—explain your reasoning clearly
 
+### Merging into `master`
+
+`master` takes changes only through a pull request, squash-merged, once six checks pass:
+`Static & architecture analysis`, `Unit, integration & component tests`,
+`Strict persistence against Postgres`, `Playwright golden paths`, `Commit messages`, and `Vercel`
+(the preview build). No approval is required. Nobody can push, force-push or delete `master`
+directly, maintainers included. The rule is the repository ruleset "Basic" (Settings → Rules →
+Rulesets), and the reasons are in
+[`tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md`](../tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md).
+
+- **Renaming a CI job renames its check.** The rename cannot merge until the ruleset requires the
+  new name, so update the ruleset just before merging it, then merge `master` into any other open
+  pull request so that it reports the new name too.
+- **When a check is down rather than red** (a GitHub or Vercel outage), a maintainer can set the
+  ruleset's enforcement to Disabled, merge, and set it back to Active. Merging a red pull request
+  is not that case: it is how `master` broke twice in September 2026.
+
 ---
 
 ## Common Patterns & Anti-Patterns
