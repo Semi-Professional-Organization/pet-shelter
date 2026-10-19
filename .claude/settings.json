@@ -29,6 +29,12 @@
       "Bash(npm run db:push:unsafe*)",
       "Bash(npm run db:seed)",
       "Bash(npm run db:migrate:faqs*)",
+      "Bash(npm run db:migrate:bulletins)",
+      "Bash(npm run db:migrate:bulletins *)",
+      "Bash(npx tsx scripts/migrate-bulletins.ts*)",
+      "Bash(tsx scripts/migrate-bulletins.ts*)",
+      "Bash(npm run secrets:decrypt:local*)",
+      "Bash(node scripts/secrets.mjs decrypt-to-local*)",
       "Bash(npx prisma db push*)",
       "Bash(npx prisma db execute*)",
       "Bash(npx prisma migrate*)"
@@ -42,7 +48,9 @@
       "Bash(git commit --amend*)",
       "Bash(git rebase *)",
       "Bash(git branch -D*)",
-      "Bash(rm -rf *)"
+      "Bash(rm -rf *)",
+      "Bash(npm run ledger:issues -- --apply*)",
+      "Bash(node scripts/ledger-issues.mjs --apply*)"
     ]
   },
   "hooks": {

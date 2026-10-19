@@ -29,7 +29,7 @@ import { fileURLToPath } from "url";
  * defects and the rate never fell. `permissions.deny` in `.claude/settings.json`
  * does that job now and the harness enforces it. What remains here is the two
  * agent rules, the drift log, and — in the wiring block — assertions about the
- * permission rules themselves plus a ledger of the twelve shapes prefix matching
+ * permission rules themselves plus a ledger of the thirteen shapes prefix matching
  * cannot reach. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
  *
  * What this file does NOT establish: that Claude Code runs the hook. Frontmatter
@@ -392,6 +392,31 @@ describe("agent guard", () => {
         .filter(r => r.startsWith("Bash("))
         .some(r => matchesRule(r, command));
 
+    it("denies the two scripts that touch production through .env.local, and not their local variant", () => {
+      // In the main checkout `.env.local` is production: db:migrate:bulletins reads it, and
+      // secrets:decrypt:local overwrites it. db:migrate:bulletins:local is the rehearsal and must
+      // stay open, which is why the bulletins rule is exact plus word-bounded, not a bare `*`.
+      for (const command of [
+        "npm run db:migrate:bulletins",
+        "npm run db:migrate:bulletins -- --dry-run",
+        "npx tsx scripts/migrate-bulletins.ts",
+        "npm run secrets:decrypt:local",
+        "node scripts/secrets.mjs decrypt-to-local .env.production.enc .env.local",
+      ]) {
+        expect(covered(command), `expected covered: ${command}`).toBe(true);
+      }
+      expect(covered("npm run db:migrate:bulletins:local")).toBe(false);
+      expect(settings.permissions.deny).not.toContain("Bash(npm run db:migrate:bulletins*)");
+    });
+
+    it("asks before the ledger mirror publishes issues, and not for its dry run", () => {
+      const ask = settings.permissions.ask.join("\n");
+      expect(ask).toContain("npm run ledger:issues -- --apply");
+      expect(covered("npm run ledger:issues -- --apply")).toBe(true);
+      expect(covered("node scripts/ledger-issues.mjs --apply")).toBe(true);
+      expect(covered("npm run ledger:issues")).toBe(false);
+    });
+
     it("catches the destructive commands only when they lead the string", () => {
       // The rules work. This is the control for the test below it.
       for (const command of [
@@ -424,6 +449,8 @@ describe("agent guard", () => {
         // Quoted command word, and a leading git option before the subcommand.
         "'rm' -rf build",
         "git -c core.pager=cat reset --hard",
+        // A flag before the one the rule names. The ledger mirror reads --apply anywhere.
+        "npm run ledger:issues -- --branch master --apply",
       ];
       for (const command of UNCOVERED) {
         expect(covered(command), `newly covered, move it: ${command}`).toBe(false);
