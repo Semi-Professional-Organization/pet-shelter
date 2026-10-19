@@ -49,10 +49,13 @@ import {
 export function ShelterSettingsForm({
   canManageSettings,
   canEditQr,
+  ownEmail,
 }: {
   canManageSettings: boolean;
   /** Display-only. `updateShelterSettings` re-checks server-side. */
   canEditQr: boolean;
+  /** The signed-in member's address, the test email's default for one who cannot read the settings. */
+  ownEmail: string;
 }) {
   const { settings, saveSettings, resetToDefaultSettings } = useSettingsStore();
   const [activeTab, setActiveTab] = useState<
@@ -62,8 +65,12 @@ export function ShelterSettingsForm({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
 
-  // Test Email State
-  const [testRecipient, setTestRecipient] = useState(settings.shelterNotificationEmail || "fergeley@gmail.com");
+  // Test Email State. A member without MANAGE_SETTINGS never loads the shelter's
+  // notification address, so their default is their own inbox, where they can watch
+  // the test arrive, rather than this browser's copy or the hard-coded fallback.
+  const [testRecipient, setTestRecipient] = useState(
+    canManageSettings ? settings.shelterNotificationEmail || "fergeley@gmail.com" : ownEmail
+  );
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -124,10 +131,10 @@ export function ShelterSettingsForm({
 
   useEffect(() => {
     reset(settings);
-    if (settings.shelterNotificationEmail) {
+    if (canManageSettings && settings.shelterNotificationEmail) {
       setTestRecipient(settings.shelterNotificationEmail);
     }
-  }, [settings, reset]);
+  }, [settings, reset, canManageSettings]);
 
   const currentStorageProvider = watch("storageProvider");
   const watchedVolunteerFormUrl = watch("volunteerFormUrl");
@@ -257,7 +264,7 @@ export function ShelterSettingsForm({
           </h1>
           <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
             The shelter&apos;s configuration is changed by a Super Admin. From here you can
-            check that the shelter&apos;s email is being delivered.
+            send a test email to check that the shelter&apos;s email service is working.
           </p>
         </div>
 

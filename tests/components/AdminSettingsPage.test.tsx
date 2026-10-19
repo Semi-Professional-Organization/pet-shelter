@@ -73,6 +73,14 @@ describe("/admin/settings", () => {
     expect(settingsActions.loadShelterSettings).not.toHaveBeenCalled();
   });
 
+  it("addresses a coordinator's test email to the coordinator, not to a hard-coded inbox", async () => {
+    // The coordinator cannot read the shelter's notification address, so the default fell
+    // through to a fixed personal Gmail address, and one click sent shelter mail there.
+    await renderSettingsAs(ROLES.VOLUNTEER_COORDINATOR);
+
+    expect(screen.getByPlaceholderText(/Enter test recipient email/i)).toHaveValue("member@hopeforstrays.org");
+  });
+
   it("shows a Super Admin the whole form", async () => {
     await renderSettingsAs(ROLES.SUPER_ADMIN);
 

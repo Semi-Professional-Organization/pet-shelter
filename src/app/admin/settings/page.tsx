@@ -17,6 +17,7 @@ export default async function AdminSettingsPage() {
     <ShelterSettingsForm
       canManageSettings={hasPermission(session, PERMISSIONS.MANAGE_SETTINGS)}
       canEditQr={roleCanEditGlobalQr(session.role)}
+      ownEmail={session.email}
     />
   );
 }
