@@ -39,6 +39,17 @@ export class DatabaseNotConfiguredError extends Error {
  * `DATABASE_URL` away, and the `:local` npm scripts set it explicitly.
  */
 function createOfflineClient(): PrismaClient {
+  // Said once per process, outside tests (a build prints it from each worker).
+  // The Prisma CLI and the seed script still fall back to localhost
+  // (`prisma/env.ts`), so `db:push` and `db:seed` without a `DATABASE_URL` fill
+  // a database this app will not read, and nothing else would tell the developer.
+  if (process.env.NODE_ENV !== "test") {
+    console.warn(
+      "[Prisma] No DATABASE_URL is set: the app serves its in-memory fixtures and keeps writes in memory. " +
+        "Set DATABASE_URL to use a database (the Prisma CLI and seed script default to localhost:5432 without it)."
+    );
+  }
+
   // Lazy, like Prisma's own query promises: nothing rejects until something
   // awaits it. A query built only to be handed to `$transaction([...])` is never
   // awaited on its own, and an eager rejection would surface there as an
@@ -53,27 +64,46 @@ function createOfflineClient(): PrismaClient {
         Promise.reject(new DatabaseNotConfiguredError()).finally(onFinally),
     }) as unknown as Promise<never>;
   // Only the names the real client answers: its model delegates, their query
-  // methods and the client methods that reach the database. Anything else falls
-  // through to a plain object, as on the real client: `then` and
-  // `asymmetricMatch` are undefined (answering `then` would make
-  // `await prisma.pet` wait forever), and `toString` or `JSON.stringify` behave.
+  // methods and its `$` methods. Anything else falls through to a plain object,
+  // as on the real client: `then` and `asymmetricMatch` are undefined (answering
+  // `then` would make `await prisma.pet` wait forever), and `toString` or
+  // `JSON.stringify` behave.
   const model = new Proxy({}, {
     get: (target, key) => (MODEL_METHODS.has(key) ? refuse : Reflect.get(target, key)),
   });
-  return new Proxy(
+  // Every `$` method the generated client declares; the `satisfies` makes
+  // `typecheck` fail when a Prisma upgrade adds one. A listener or an extension
+  // has nothing to attach to offline, so those hand back the client unchanged.
+  const clientMethods = {
+    $connect: refuse,
+    $disconnect: async () => undefined,
+    $transaction: refuse,
+    $queryRaw: refuse,
+    $queryRawUnsafe: refuse,
+    $executeRaw: refuse,
+    $executeRawUnsafe: refuse,
+    $on: () => client,
+    $extends: () => client,
+  } satisfies Record<ClientMethod, unknown>;
+  const client = new Proxy(
     {},
     {
-      get(_target, key) {
-        if (key === "$disconnect") return async () => undefined;
-        if (CLIENT_METHODS.has(key)) return refuse;
-        return MODEL_DELEGATES.has(key) ? model : Reflect.get(_target, key);
+      get(target, key) {
+        if (typeof key === "string" && Object.hasOwn(clientMethods, key)) {
+          return clientMethods[key as ClientMethod];
+        }
+        return MODEL_DELEGATES.has(key) ? model : Reflect.get(target, key);
       },
     }
   ) as unknown as PrismaClient;
+  return client;
 }
 
 /** A query method on a model delegate, as the generated client declares them. */
 type ModelMethod = Exclude<keyof PrismaClient["pet"], symbol | "fields">;
+
+/** A method on the client itself, as `prisma.$transaction`. */
+type ClientMethod = Extract<keyof PrismaClient, `$${string}`>;
 
 /**
  * The query methods on a model delegate, as `prisma.pet.findMany`. The `satisfies`
@@ -102,16 +132,6 @@ const MODEL_METHODS = new Set<string | symbol>(
     groupBy: true,
   } satisfies Record<ModelMethod, true>)
 );
-
-/** The client methods that would reach the database. */
-const CLIENT_METHODS = new Set<string | symbol>([
-  "$connect",
-  "$transaction",
-  "$queryRaw",
-  "$queryRawUnsafe",
-  "$executeRaw",
-  "$executeRawUnsafe",
-]);
 
 /** One delegate per model in the schema, named as the client names them: `Pet` is `prisma.pet`. */
 const MODEL_DELEGATES = new Set<string | symbol>(

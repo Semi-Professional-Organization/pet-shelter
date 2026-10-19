@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pet, PetStatus } from "@/types/pet";
@@ -103,8 +103,16 @@ export function PetFormDialog({
   // dialog stays mounted while it animates closed, and a click in that window
   // must not hand the same form to `onSave` twice: that is two pet records.
   // (A fast double-click is already stopped by `isSubmitting`, which
-  // react-hook-form sets on the first click.)
+  // react-hook-form sets on the first click.) The ref is the guard, read
+  // synchronously, so two submits dispatched before a re-render cannot both
+  // pass; the state is what locks the button.
+  const submittedRef = useRef(false);
   const [submitted, setSubmitted] = useState(false);
+  useEffect(() => {
+    // Here rather than beside `setSubmitted(false)` below: a ref must not be
+    // written during render.
+    if (currentKey !== null) submittedRef.current = false;
+  }, [currentKey]);
 
   if (currentKey !== prevKey) {
     setPrevKey(currentKey);
@@ -287,7 +295,8 @@ export function PetFormDialog({
   const canNotifySponsors = Boolean(editingPet) && newlyAddedPhotos.length > 0;
 
   const onSubmit = (data: PetFormInput) => {
-    if (submitted) return;
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setSubmitted(true);
     // Update with current image selections
     const finalData = {

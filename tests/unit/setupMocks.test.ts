@@ -17,7 +17,7 @@ import {
   getServerPetsAsync,
   insertServerPet,
 } from "@/lib/server/petRepository";
-import { resetServerStore } from "@/lib/server/fallbackState";
+import { resetRegisteredState } from "@/lib/stateResets";
 import { findUserByEmail, createUser, listUsers } from "@/lib/server/userStore";
 import {
   recordAuditLog,
@@ -254,17 +254,17 @@ describe("hermetic state isolation", () => {
     expect(getServerPets()).toHaveLength(FIXTURE_COUNT);
   });
 
-  it("resetServerStore restores an inserted pet away", async () => {
+  it("the registered resets restore an inserted pet away", async () => {
     await insertServerPet(makePet("pet-reset-probe"), actor);
     expect(getServerPets()).toHaveLength(FIXTURE_COUNT + 1);
 
-    resetServerStore();
+    await resetRegisteredState();
 
     expect(getServerPets()).toHaveLength(FIXTURE_COUNT);
     expect(getServerPets().some((p) => p.id === "pet-reset-probe")).toBe(false);
   });
 
-  it("resetServerStore restores a record mutated in place", () => {
+  it("the registered resets restore a record mutated in place", async () => {
     // Guards the `structuredClone` seeding. Under the previous shallow spread
     // the store shared element identity with the imported JSON module, so this
     // assignment corrupted the fixture for the rest of the process and no
@@ -272,7 +272,7 @@ describe("hermetic state isolation", () => {
     const original = getServerPets()[0].name;
     getServerPets()[0].name = "MUTATED IN PLACE";
 
-    resetServerStore();
+    await resetRegisteredState();
 
     expect(getServerPets()[0].name).toBe(original);
     expect((petsFixture as Pet[])[0].name).toBe(original);

@@ -31,7 +31,9 @@ a refused connection gave them, minus the network round trip. Production and pre
 npm scripts (`db:push:local`, `db:seed:local`, `test:db`) set it explicitly.
 
 The one behaviour that did change: running `next dev` with no `DATABASE_URL` and a docker-compose
-Postgres up no longer finds that database by accident. Set `DATABASE_URL` to it instead.
+Postgres up no longer finds that database by accident. Set `DATABASE_URL` to it instead. The
+Prisma CLI and the seed script still default to localhost (below), so `db:push` and `db:seed`
+without it fill a database the app will not read; the app says so once at start, outside tests.
 
 ## Details worth keeping
 

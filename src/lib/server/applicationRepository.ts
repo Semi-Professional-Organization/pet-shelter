@@ -68,7 +68,7 @@ function freshApplications(): AdoptionApplicationRecord[] {
 
 let serverApplications: AdoptionApplicationRecord[] = freshApplications();
 
-/** Test-only. Registered below for the test harness, and also reset by `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetApplications(): void {
   serverApplications = freshApplications();
 }

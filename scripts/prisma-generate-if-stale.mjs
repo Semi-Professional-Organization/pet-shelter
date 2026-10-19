@@ -20,6 +20,11 @@
  * field into a `//` comment. A client with a file missing (a generation that was
  * interrupted) or built by another Prisma version is stale whatever its schema.
  *
+ * Only the schema can change between installs. `postinstall` runs `prisma
+ * generate`, so a Prisma upgrade regenerates the client as it installs, and
+ * `prisma.config.ts` holds the schema path and the datasource URL, neither of
+ * which reaches the generated client.
+ *
  * ceiling: a generation interrupted after every checked file was written but
  * before the rest still reads as current; `npm run db:generate` repairs it.
  */

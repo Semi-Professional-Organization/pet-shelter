@@ -139,7 +139,7 @@ In your deployment dashboard (e.g. **Vercel Project Settings $\rightarrow$ Envir
 
 ### Procedure D: Verify Connection Pool Configuration
 
-Check [`src/lib/prisma.ts`](file:///c:/Users/User/pet-shelter/src/lib/prisma.ts#L10-L46):
+Check `src/lib/server/prisma.ts`:
 
 ```typescript
 function createPrismaClient(): PrismaClient {
@@ -148,31 +148,28 @@ function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) return createOfflineClient();
 
-  try {
-    const sslPolicy = resolveDatabaseSsl(connectionString);
-    
-    const pool =
-      globalForPrisma.pgPool ??
-      new Pool({
-        connectionString: sslPolicy.connectionString,
-        ssl: sslPolicy.ssl,
-        max: 10,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
+  // No catch: a configured database whose client cannot be built fails the import.
+  const sslPolicy = resolveDatabaseSsl(connectionString);
 
-    if (process.env.NODE_ENV !== "production") {
-      globalForPrisma.pgPool = pool;
-    }
-
-    const adapter = new PrismaPg(pool);
-    return new PrismaClient({
-      adapter,
-      log: process.env.PRISMA_LOG === "true" ? ["error", "warn"] : [],
+  const pool =
+    globalForPrisma.pgPool ??
+    new Pool({
+      connectionString: sslPolicy.connectionString,
+      ssl: sslPolicy.ssl,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis, // DB_CONNECT_TIMEOUT_MS, 10000 by default
     });
-  } catch (err) {
-    ...
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.pgPool = pool;
   }
+
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({
+    adapter,
+    log: process.env.PRISMA_LOG === "true" ? ["error", "warn"] : [],
+  });
 }
 ```
 

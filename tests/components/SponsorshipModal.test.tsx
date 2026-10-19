@@ -356,9 +356,11 @@ describe("SponsorshipModal checkout contract", () => {
     );
     expect(mockedCreateSponsorship).not.toHaveBeenCalled();
     // The client receipt store holds receipts. A claim reference is not one, and
-    // writing it there would rebuild the confusion this boundary removed. Checked on
-    // the store's own storage key, so it holds however the store is reached, and on
-    // its entries, because merely mounting the store writes an empty list there.
+    // writing it there would rebuild the confusion this boundary removed. The modal
+    // does not use the store today; this keeps it that way. It reads the store's own
+    // storage key, so it fails whether the modal saves through `useSponsorshipStore`
+    // or writes the key itself, and checks entries, because merely mounting the store
+    // writes an empty list there.
     expect(storedReceipts()).toEqual([]);
   });
 

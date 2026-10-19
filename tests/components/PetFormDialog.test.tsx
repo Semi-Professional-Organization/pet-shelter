@@ -188,6 +188,23 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
+   * Two submits dispatched before the dialog re-renders both run against the same render, so a
+   * guard kept only in state would let both through to onSave.
+   */
+  it("saves once when two submits arrive before it re-renders", async () => {
+    const { onSave, user } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    const form = screen.getByRole("button", { name: /create pet record/i }).closest("form") as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
    * The guard holds while the dialog closes (it stays mounted while it animates out, which jsdom
    * cannot show) and is cleared only when the dialog opens again, so the next save goes through.
    */

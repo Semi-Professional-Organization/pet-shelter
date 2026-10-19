@@ -74,6 +74,36 @@ describe("the Prisma client with no DATABASE_URL", () => {
     expect(JSON.stringify(prisma.pet)).toBe("{}");
   });
 
+  it("hands back the client from a listener or an extension, so module-scope setup still loads", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+    const on = prisma.$on as unknown as (event: string, listener: () => void) => unknown;
+
+    expect(on("query", () => undefined)).toBe(prisma);
+    expect(prisma.$extends({})).toBe(prisma);
+  });
+
+  it("says once, outside tests, that there is no database, since the CLI still defaults to localhost", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubGlobal("prisma", undefined); // the client cached by an earlier test
+    vi.resetModules();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await import("@/lib/server/prisma");
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain("No DATABASE_URL is set");
+  });
+
+  it("stays quiet about it under test", async () => {
+    vi.stubGlobal("prisma", undefined);
+    vi.resetModules();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await import("@/lib/server/prisma");
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("disconnects cleanly, so teardown that always disconnects still works", async () => {
     const { disconnectPrisma } = await import("@/lib/server/prisma");
 
