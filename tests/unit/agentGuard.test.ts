@@ -29,8 +29,8 @@ import { fileURLToPath } from "url";
  * defects and the rate never fell. `permissions.deny` in `.claude/settings.json`
  * does that job now and the harness enforces it. What remains here is the two
  * agent rules, the drift log, and — in the wiring block — assertions about the
- * permission rules themselves plus a ledger of the thirteen shapes prefix matching
- * cannot reach, and six PowerShell shapes. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
+ * permission rules themselves plus a ledger of the shapes prefix matching cannot
+ * reach, in Bash and in PowerShell. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
  *
  * What this file does NOT establish: that Claude Code runs the hook. Frontmatter
  * hooks load from the definition as it stood at SESSION START, so a hook wired
@@ -342,6 +342,11 @@ describe("agent guard", () => {
       expect(deny).not.toContain("npm run db:push:local");
       expect(deny).not.toContain("npm run db:seed:local");
       expect(deny).not.toContain("Bash(npm run db:push*)");
+      // The FAQ and bulletin migrations are the same shape of script, so both deny the direct
+      // invocation as well as the npm one.
+      for (const script of ["migrate-faqs", "migrate-bulletins"]) {
+        expect(covered(`npx tsx scripts/${script}.ts`), script).toBe(true);
+      }
     });
 
     it("asks rather than denies for the judgment calls, so the override is in band", () => {
@@ -469,6 +474,9 @@ describe("agent guard", () => {
         "git -c core.pager=cat reset --hard",
         // A flag before the one the rule names. The ledger mirror reads --apply anywhere.
         "npm run ledger:issues -- --branch master --apply",
+        // Under the npm scripts: the sops binary they call, and another way to load tsx.
+        "sops --decrypt --input-type dotenv --output-type dotenv .env.production.enc",
+        "node --import tsx scripts/migrate-bulletins.ts",
       ];
       for (const command of UNCOVERED) {
         expect(covered(command), `newly covered, move it: ${command}`).toBe(false);
