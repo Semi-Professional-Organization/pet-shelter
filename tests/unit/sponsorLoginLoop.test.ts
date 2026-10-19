@@ -20,9 +20,14 @@ vi.mock("@/lib/server/sponsorshipLedger", async (importOriginal) => {
  * the dashboard back again, and no page ever rendered. The first case fails against the
  * sign-in page before 2026-10-19.
  */
-async function open(path: "login" | "dashboard"): Promise<string | null> {
-  const { default: Page } =
-    path === "login" ? await import("@/app/sponsor/login/page") : await import("@/app/sponsor/dashboard/page");
+const PAGES = {
+  login: () => import("@/app/sponsor/login/page"),
+  dashboard: () => import("@/app/sponsor/dashboard/page"),
+  certificate: () => import("@/app/sponsor/certificate/page"),
+};
+
+async function open(path: keyof typeof PAGES): Promise<string | null> {
+  const { default: Page } = await PAGES[path]();
   try {
     await Page();
     return null;
@@ -37,8 +42,10 @@ describe("sponsor sign-in", () => {
     await setSponsorSessionCookie({ sponsorId: "spn-gone-01", email: "gone@example.com", name: "Gone Sponsor" });
 
     expect(await open("login")).toBeNull();
-    // ...which the dashboard sends here, so the two now end in a page rather than a loop.
+    // ...which the dashboard sends here, so the two now end in a page rather than a loop,
+    // and so does the certificate page, which used to render for the cookie alone.
     expect(await open("dashboard")).toBe("/sponsor/login");
+    expect(await open("certificate")).toBe("/sponsor/login");
   });
 
   it("sends a sponsor who still exists on to the dashboard", async () => {

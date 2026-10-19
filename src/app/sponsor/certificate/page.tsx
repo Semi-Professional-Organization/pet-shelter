@@ -5,8 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import {
   getSponsorCertificate,
   getCurrentSupporterTier,
+  sponsorSessionNamesASponsor,
 } from "@/lib/domain/sponsorAccess";
-import { getCurrentSponsorSession } from "@/lib/security/sponsorSession";
 import { buttonVariants } from "@/components/ui/button";
 import { SponsorCertificate, UpgradeNudge } from "@/components/features/sponsors";
 
@@ -24,7 +24,10 @@ export const metadata: Metadata = {
  * hidden element.
  */
 export default async function SponsorCertificatePage() {
-  if (!(await getCurrentSponsorSession())) {
+  // The same test as the dashboard and the sign-in page. On the cookie alone, a sponsor
+  // whose record is gone was shown this page, empty, while the other two sent them to
+  // sign in.
+  if (!(await sponsorSessionNamesASponsor())) {
     redirect("/sponsor/login");
   }
 
