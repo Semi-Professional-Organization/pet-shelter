@@ -28,7 +28,7 @@ import {
 } from "@/lib/validations/pet";
 import { createPet, updatePet, getPetById } from "@/actions/pets";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
-import { signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
+import { memberRowForId, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { Pet, MedicalTimelineEvent, PetUpdate } from "@/types/pet";
 import petsData from "@/data/pets.json";
 
@@ -76,6 +76,15 @@ const prismaSpies = vi.hoisted(() => {
     applicationDelete: op("adoptionApplication.delete"),
     auditCreate: op("auditLog.create"),
     auditFindMany: vi.fn(async () => [] as unknown[]),
+    // The member lookup `getVerifiedSession` makes on every guarded call. This
+    // double had no `user` delegate, so the lookup threw a TypeError, the DAL's
+    // outage fall-back handed back the cookie's own claims, and the admin
+    // mutations below were authorized by a database "outage" — a session for a
+    // member no store knows passed them all. Answered with the row a signed-in
+    // test identity has, so the session is refreshed from it as in production.
+    userFindUnique: vi.fn(async (args?: { where?: { id?: string } }) =>
+      memberRowForId(args?.where?.id)
+    ),
     transaction: vi.fn(async (arg: unknown) => {
       if (Array.isArray(arg)) return Promise.all(arg);
       return undefined;
@@ -110,6 +119,7 @@ vi.mock("@/lib/server/prisma", () => {
       create: prismaSpies.auditCreate,
       findMany: prismaSpies.auditFindMany,
     },
+    user: { findUnique: prismaSpies.userFindUnique },
     $transaction: prismaSpies.transaction,
   };
   return { prisma: client, default: client };
@@ -849,6 +859,9 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
         medicalTimeline: [timelineIntake, { ...timelineSurgery, id: timelineIntake.id }],
       });
       expect(result.success).toBe(false);
+      // Named, because every refusal returns `success: false` — an
+      // authorization refusal included — and the line above alone passes on one.
+      expect(result.error).toMatch(/Duplicate 'medicalTimeline' id 'tl-hist-1'/);
     });
   });
 

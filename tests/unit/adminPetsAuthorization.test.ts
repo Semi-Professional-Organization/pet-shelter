@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { getAdminPets, getPublicPets } from "@/actions/pets";
 import { ROLES } from "@/lib/security/permissions";
+import { memberRowForId, signInAs } from "../setup/authSession";
 
 /**
  * Regression guard for a real data exposure.
@@ -13,29 +14,38 @@ import { ROLES } from "@/lib/security/permissions";
  * including archived animals and per-pet application counts.
  */
 
-const currentRole = { value: null as string | null };
+/**
+ * The member lookup `getVerifiedSession` makes on every guarded call — the one
+ * database read this path needs answered; with no database configured, the
+ * catalogue and the application counts come from the in-memory stores.
+ *
+ * This file used to mock `getCurrentSession` with a session for `actor-1`, an id
+ * no store vouches for, and left Prisma real. The member lookup then failed for
+ * want of a database, the DAL's outage fall-back handed back the mocked
+ * session's own claims, and that fall-back is the only reason the admissions
+ * below passed: against a reachable database with no `actor-1` row, all three
+ * were refused as "Authentication required", and the role refusals failed the
+ * same way instead of on MANAGE_PETS. `signInAs` seals a real cookie for an
+ * identity `memberRowForId` answers for, so every case reaches the permission
+ * check with the role the database holds.
+ */
+const prismaDouble = vi.hoisted(() => ({
+  user: {
+    findUnique: vi.fn(async (args?: { where?: { id?: string } }) => memberRowForId(args?.where?.id)),
+  },
+}));
 
-vi.mock("@/lib/security/session", () => ({
-  getCurrentSession: vi.fn(async () =>
-    currentRole.value === null
-      ? null
-      : {
-          id: "actor-1",
-          email: "actor@hopeforstrays.org",
-          name: "Test Actor",
-          role: currentRole.value,
-          expiresAt: Date.now() + 3_600_000,
-        }
-  ),
+vi.mock("@/lib/server/prisma", () => ({
+  prisma: prismaDouble,
+  default: prismaDouble,
+  disconnectPrisma: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 describe("getAdminPets authorization", () => {
-  beforeEach(() => {
-    currentRole.value = null;
-  });
-
+  // Signed out unless a case signs in: the harness empties the cookie jar
+  // before every test.
   it("refuses an anonymous caller", async () => {
     await expect(getAdminPets()).rejects.toThrow(/Authentication required/i);
   });
@@ -43,15 +53,15 @@ describe("getAdminPets authorization", () => {
   it.each([ROLES.CONTENT_EDITOR, ROLES.VOLUNTEER_COORDINATOR, ROLES.STAFF])(
     "refuses a %s",
     async (role) => {
-      currentRole.value = role;
+      await signInAs(role);
       await expect(getAdminPets()).rejects.toThrow(/MANAGE_PETS/);
     }
   );
 
-  it.each([ROLES.SUPER_ADMIN, ROLES.ANIMAL_MANAGER, "ADMIN"])(
+  it.each([ROLES.SUPER_ADMIN, ROLES.ANIMAL_MANAGER, ROLES.ADMIN])(
     "admits a %s and returns the admin projection",
     async (role) => {
-      currentRole.value = role;
+      await signInAs(role);
 
       const pets = await getAdminPets();
       expect(Array.isArray(pets)).toBe(true);
