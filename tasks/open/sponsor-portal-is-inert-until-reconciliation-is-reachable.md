@@ -90,7 +90,7 @@ authoritative rather than falling back (`isLedgerPersistent()`), so this is a **
 `/sponsors` and `/sponsor/login`**, not a graceful degradation.
 
 Do not reach for `db:push` — see
-[`production-schema-has-drifted-ahead-of-master.md`](production-schema-has-drifted-ahead-of-master.md).
+[`2026-09-03-schema-changes-ship-as-additive-sql-here-never-as-db-push.md`](../lessons/2026-09-03-schema-changes-ship-as-additive-sql-here-never-as-db-push.md).
 
 ## 3. Exclusive media is gated but not secret
 
