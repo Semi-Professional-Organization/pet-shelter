@@ -61,6 +61,8 @@ export class UnpriceableError extends Error {}
 /**
  * The rates one request pays, or a throw. `model` is the model that served the request
  * (`message.model`), not the one asked for: a fallback bills at the model that answered.
+ *
+ * @param {{ model: string, prompt: number, speed?: string | null, geo?: string | null }} request
  */
 export function ratesFor({ model, prompt, speed, geo }) {
   const table = PRICES[model];

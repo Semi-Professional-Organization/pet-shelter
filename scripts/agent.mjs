@@ -43,8 +43,8 @@ async function run(argv) {
     process.stdout.write(`agent: ERROR unknown command ${name}\nnext: node scripts/agent.mjs --help\n`);
     return 2;
   }
-  const module = await command.load();
-  return module.main(rest);
+  const loaded = await command.load();
+  return loaded.main(rest);
 }
 
 const invokedDirectly = process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/agent.mjs");
