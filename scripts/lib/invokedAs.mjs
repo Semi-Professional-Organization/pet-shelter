@@ -5,7 +5,8 @@
  * separators in argv are normalised first, and on Windows and macOS, where paths are
  * case-insensitive, so is the comparison (`node Scripts/agent.mjs` runs).
  *
- * Two scripts keep their own copy of the original, case-sensitive check on purpose:
+ * Two scripts keep their own one-line copy of the check on purpose, matching whole segments too
+ * but not folding case:
  * - `scripts/ledger-issues.mjs`: its workflow runs only when that file changes (`paths` in
  *   `.github/workflows/ledger-issues.yml`), so a dependency here would let an edit to this file
  *   silence the issue mirror without the workflow ever running on it.

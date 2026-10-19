@@ -169,14 +169,21 @@ export function splitChain(cmd, tool = "Bash") {
       heredoc = null;
       continue;
     }
-    if (!quote && ch === "@" && (cmd[i + 1] === "'" || cmd[i + 1] === '"') && tool === "PowerShell") {
+    // A PowerShell here-string opens with `@'` or `@"` at the end of a line, nowhere else.
+    if (!quote && ch === "@" && (cmd[i + 1] === "'" || cmd[i + 1] === '"') && /^\r?\n/.test(cmd.slice(i + 2)) && tool === "PowerShell") {
       const close = cmd.indexOf(`\n${cmd[i + 1]}@`, i + 2);
       i = close === -1 ? cmd.length : close + 2;
       current += "@string";
       continue;
     }
+    // A PowerShell block comment, `<# … #>`.
+    if (!quote && tool === "PowerShell" && ch === "<" && cmd[i + 1] === "#") {
+      const close = cmd.indexOf("#>", i + 2);
+      i = close === -1 ? cmd.length : close + 1;
+      continue;
+    }
     // `<<EOF`, `<< 'EOF'`, `<<"EOF"`, `<<\EOF`, and `<<-EOF`, whose closing line may be tabbed;
-    // not a shift inside `$(( ))` or `[[ ]]`.
+    // not a shift inside `$(( ))`, `(( ))`, `let` or `[[ ]]`.
     // Inside double quotes only a command substitution (`"$(cat <<'EOF'`) can hold one, and `<<<`
     // is a here-string, at either of its first two `<`.
     const heredocCanStart =
@@ -187,7 +194,7 @@ export function splitChain(cmd, tool = "Bash") {
       cmd[i + 1] === "<" &&
       cmd[i + 2] !== "<" &&
       cmd[i - 1] !== "<" &&
-      !/\$\(\([^)]*$|\[\[[^\]]*$/.test(current)
+      !/\(\([^)]*$|\[\[[^\]]*$|(^|\s)let\s[^;]*$/.test(current)
     ) {
       const m = /^<<(-?)\s*\\?(['"]?)([A-Za-z_][\w-]*)\2/.exec(cmd.slice(i));
       if (m) {
@@ -201,6 +208,17 @@ export function splitChain(cmd, tool = "Bash") {
       // Neither shell escapes inside single quotes.
       if (ch === "'") quote = null;
       current += ch;
+    } else if (quote === "$'") {
+      // Bash's ANSI-C quoting, `$'it\'s'`, where a backslash does escape.
+      if (ch === "\\" && i + 1 < cmd.length) current += ch + cmd[++i];
+      else {
+        if (ch === "'") quote = null;
+        current += ch;
+      }
+    } else if (!quote && tool === "Bash" && ch === "$" && cmd[i + 1] === "'") {
+      quote = "$'";
+      current += "$'";
+      i++;
     } else if (ch === escape && i + 1 < cmd.length) {
       current += ch + cmd[++i];
     } else if (quote === '"') {
@@ -250,7 +268,9 @@ export const FAMILIES = {
   // time), so `mkdir tasks/lessons` is not a listing; and a redirect into a ledger path is a write.
   orient: (tool, cmd) => SHELLS.has(tool) && RUNS.orient.test(cmd),
   ledger: (tool, cmd) =>
-    (SHELLS.has(tool) && RUNS.ledger.test(cmd) && !/>\s*\S*tasks[\\/]/.test(cmd)) ||
+    // Only what comes before a redirect is read: `cat > tasks/open/x.md` writes, while
+    // `cat tasks/open/x.md > copy.md` reads, as `Get-Content … | Out-File` does.
+    (SHELLS.has(tool) && RUNS.ledger.test(cmd.split(/\s\d?>/)[0])) ||
     (FILE_TOOLS.has(tool) && /tasks[\\/](todo\.md|(open|lessons|decisions)\b)/.test(cmd)),
   merge: (tool, cmd) => SHELLS.has(tool) && RUNS.merge.test(cmd),
   // Reading the drift log is the workflow, whatever command reads it.
@@ -269,7 +289,7 @@ const VITEST_VALUE_FLAGS = new Set([
   "--hookTimeout", "--teardownTimeout", "--exclude", "--mode", "--maxConcurrency",
 ]);
 /** Filters that name a whole test tier, which is the gate, not a targeted run. */
-const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/integration"]);
+const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/integration", "tests/integration/db"]);
 
 /**
  * The start of one command, past `VAR=value` assignments and `cross-env`, so a program name is
@@ -915,12 +935,13 @@ const median = (xs) => {
 /**
  * The whole report, from extracted files. Prices the window first (see `priceFiles`), so a run
  * never reports a partial total. Segments and idle gaps are still measured against the requests
- * before the window.
+ * outside the window. The window is `since <= time < until`, either end open.
  */
-export function summarize(files, { since, priceAs } = {}) {
+export function summarize(files, { since, until, priceAs } = {}) {
   const sinceMs = since ? Date.parse(since) : -Infinity;
+  const untilMs = until ? Date.parse(until) : Infinity;
   // Without a window everything is in; with one, a request with no readable time is out.
-  const inWindow = (ts) => !since || Date.parse(ts) >= sinceMs;
+  const inWindow = (ts) => (!since && !until) || (Date.parse(ts) >= sinceMs && Date.parse(ts) < untilMs);
   priceFiles(files, { priceAs, inWindow });
 
   const totals = { cost: 0, read: 0, write: 0, output: 0, input: 0, search: 0, requests: 0 };
@@ -975,7 +996,7 @@ export function summarize(files, { since, priceAs } = {}) {
 
   return {
     prices: { source: PRICE_SOURCE, checked: PRICES_CHECKED, priceAs: priceAs ?? null },
-    window: { since: since ?? null, first, last },
+    window: { since: since ?? null, until: until ?? null, first, last },
     totals,
     models,
     who,
@@ -1052,11 +1073,12 @@ export function formatReport(report, { logPath } = {}) {
 
 // ================================ shell ================================
 
-const HELP = `usage: node scripts/agent.mjs usage [--since <date>] [--price-as <model>] [--dir <path>]... [--json]
+const HELP = `usage: node scripts/agent.mjs usage [--since <date>] [--until <date>] [--price-as <model>] [--dir <path>]... [--json]
 
 What agent sessions in this repo cost, at official per-model API rates. Read-only.
 
   --since <date>  only requests at or after YYYY-MM-DD (UTC midnight) or an ISO time with a zone
+  --until <date>  only requests before that date or time, in the same forms
   --price-as <model>  price every request at this model's rates, so a before/after comparison
                   is not moved by a change of model (e.g. claude-opus-5-5)
   --dir <path>    a transcript directory to read instead of the default (repeatable);
@@ -1090,15 +1112,14 @@ function git(cwd, args) {
  * and the folder name cannot tell `pet-shelter-src` (a subdirectory) from `pet-shelter-src` (a
  * sibling repo), so those are left out; `--dir` adds them by hand.
  */
-export function defaultDirs(projectsDir, root) {
+export function defaultDirs(projectsDir, root, platform = process.platform) {
   if (!existsSync(projectsDir)) return [];
-  const name = projectFolderName(root);
+  // Claude Code keeps the case of the path as typed (`d:` gives `d--`), so where the file system
+  // ignores case, so does this; on Linux `Repo` and `repo` are two checkouts.
+  const fold = platform === "win32" || platform === "darwin" ? (s) => s.toLowerCase() : (s) => s;
+  const name = fold(projectFolderName(root));
   return readdirSync(projectsDir)
-    // Claude Code keeps the drive letter's case as typed, so `d:` and `D:` give two folders.
-    .filter((d) => {
-      const lower = d.toLowerCase();
-      return lower === name.toLowerCase() || lower.startsWith(`${name}--claude-worktrees-`.toLowerCase());
-    })
+    .filter((d) => fold(d) === name || fold(d).startsWith(`${name}--claude-worktrees-`))
     .map((d) => join(projectsDir, d));
 }
 
@@ -1131,12 +1152,12 @@ const realDate = (v) => {
 };
 
 export function parseArgs(argv) {
-  const opts = { dirs: [], json: false, since: undefined, priceAs: undefined, help: false };
+  const opts = { dirs: [], json: false, since: undefined, until: undefined, priceAs: undefined, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--json") opts.json = true;
     else if (a === "--help" || a === "-h") opts.help = true;
-    else if (a === "--since" || a === "--dir" || a === "--price-as") {
+    else if (a === "--since" || a === "--until" || a === "--dir" || a === "--price-as") {
       const v = argv[++i];
       if (v === undefined || v.startsWith("--")) throw new Error(`${a} needs a value`);
       if (a === "--dir") opts.dirs.push(v);
@@ -1145,8 +1166,8 @@ export function parseArgs(argv) {
         opts.priceAs = v;
       }
       else if (!SINCE.test(v) || !realDate(v) || Number.isNaN(Date.parse(v))) {
-        throw new Error(`--since takes YYYY-MM-DD (UTC midnight) or an ISO time with a zone, not ${v}`);
-      } else opts.since = v;
+        throw new Error(`${a} takes YYYY-MM-DD (UTC midnight) or an ISO time with a zone, not ${v}`);
+      } else opts[a.slice(2)] = v;
     } else throw new Error(`unknown argument: ${a}`);
   }
   return opts;
@@ -1235,7 +1256,7 @@ export async function main(argv, io = {}) {
   }
 }
 
-async function run(argv, { env = process.env, cwd = process.cwd(), out = process.stdout, err = process.stderr } = {}) {
+async function run(argv, { env = process.env, cwd = process.cwd(), out = process.stdout, err = process.stderr, tmp = tmpdir() } = {}) {
   const fail = (message) => {
     out.write(`usage: ERROR ${message}\n`);
     return 2;
@@ -1277,16 +1298,16 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
 
   let report;
   try {
-    report = summarize(extracted, { since: opts.since, priceAs: opts.priceAs });
+    report = summarize(extracted, { since: opts.since, until: opts.until, priceAs: opts.priceAs });
   } catch (error) {
     if (!(error instanceof UnpriceableError)) throw error;
     return fail(`${error.message}\nnext: price what is named above in scripts/agent/usage.mjs from ${PRICE_SOURCE}`);
   }
-  if (!report.totals.requests) return fail(`no priced requests in ${files.length} transcripts${opts.since ? ` since ${opts.since}` : ""}`);
+  if (!report.totals.requests) return fail(`no priced requests in ${files.length} transcripts in the window`);
   report.input = { files: files.length, dirs, malformedLines: extracted.reduce((a, f) => a + f.malformed, 0) };
 
   const key = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 8);
-  const logPath = join(tmpdir(), `agent-usage-${env.CLAUDE_CODE_SESSION_ID || "nosession"}-${key}.json`);
+  const logPath = join(tmp, `agent-usage-${env.CLAUDE_CODE_SESSION_ID || "nosession"}-${key}.json`);
   try {
     writeFileSync(logPath, JSON.stringify(report, null, 2));
   } catch (error) {

@@ -524,7 +524,7 @@ async function main(argv) {
 
 // Only run the CLI when executed directly, so the module stays importable by tests.
 const invokedDirectly =
-  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/commit-msg.mjs");
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("/scripts/commit-msg.mjs");
 if (invokedDirectly) {
   main(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`commit-msg: ${error.message}\n`);

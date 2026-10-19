@@ -324,7 +324,7 @@ async function main(argv) {
 
 // Only run the CLI when executed directly, so the module stays importable by tests.
 const invokedDirectly =
-  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/ledger-issues.mjs");
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("/scripts/ledger-issues.mjs");
 if (invokedDirectly) {
   main(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`ledger-issues: ${error.message}\n`);

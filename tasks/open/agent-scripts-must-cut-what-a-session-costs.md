@@ -19,35 +19,37 @@ edit to them is an automatic DIED.
 
 ## Baseline
 
-Measured 2026-10-20 with `node scripts/agent.mjs usage --price-as claude-opus-5-5` over every
-transcript Claude Code still held for this repo: 17 sessions and their subagents, 18,116 model
+Measured 2026-10-20 with
+`node scripts/agent.mjs usage --price-as claude-opus-5-5 --until 2026-10-19T16:45:00Z` over every
+transcript Claude Code still held for this repo, up to the moment work on `usage` began, so this
+build session does not count toward its own baseline: 16 sessions and their subagents, 15,241 model
 requests, 2026-09-09 to 2026-10-19. Every request is priced at Claude Opus 5.5 list rates, so a
 later change of model cannot pose as a saving. Dollars are API list-price equivalents.
 
 | Measure | Baseline |
 |---|---:|
-| Mean cost per main-session request | $0.144 |
+| Mean cost per main-session request | $0.143 |
 | Mean cost per subagent request | $0.056 |
-| Cost split: cache reads / cache writes / output | 58.6% / 28.9% / 12.5% |
-| Share of cost from requests made above 400K context | 55.9% |
-| Cold resumes: whole context re-written on a person's message after the cache expired | 43, 9.1% of cost |
-| The same re-write woken by anything else (a long tool, a notice) | 11, 1.5% of cost |
-| Carrying old tool output (estimated) | 13.6% of cost |
-| Workflow families, saving at one command call per burst | 5.2% of cost combined |
+| Cost split: cache reads / cache writes / output | 57.1% / 30.6% / 12.3% |
+| Share of cost from requests made above 400K context | 56.4% |
+| Cold resumes: whole context re-written on a person's message after the cache expired | 43, 10.7% of cost |
+| The same re-write woken by anything else (a long tool, a notice) | 11, 1.8% of cost |
+| Carrying old tool output (estimated) | 12.9% of cost |
+| Workflow families, saving at one command call per burst | 5.4% of cost combined |
 
 A cold resume's cost is the re-write beyond the cache read a warm request would have paid for the
 same tokens, which is what a hand-off could save.
 
 A workflow family is the set of calls one command would replace. The eight measured, with the
-saving each would make at one call per burst: gates 1.3%, targeted test runs 0.8%, orient 0.3%,
-ledger reads 1.6%, merge checks 0.1%, drift-log reads 0.1%, pull-request checks 1.0%, port checks
+saving each would make at one call per burst: gates 1.3%, targeted test runs 0.7%, orient 0.3%,
+ledger reads 1.6%, merge checks 0.2%, drift-log reads 0.1%, pull-request checks 1.1%, port checks
 0.1%. A call can belong to two families, so the sum is an upper bound. A burst is a run of
 requests that each call the family, and it ends at the end of a turn; calls issued in parallel
 from one request save nothing, since one command would remove no request. The plan estimated
 about 9% from a cruder weighting; this is the priced figure.
 
 Two corrections to the plan's own method, found while building `usage`: its prototype took a
-request's first streamed transcript line, which undercounts output (its 10% output share is 12.5%
+request's first streamed transcript line, which undercounts output (its 10% output share is 12.3%
 measured), and `node:readline` cut 78 transcript records in half at a raw U+2028.
 
 ## Success
@@ -55,7 +57,7 @@ measured), and `node:readline` cut 78 transcript records in half at a raw U+2028
 Measured with `usage --price-as claude-opus-5-5 --since <merge date>` once five main sessions have
 run after the context meter (item 2 above) merges:
 
-- mean cost per main-session request at least 20% below $0.144, the floor of the plan's 20% to
+- mean cost per main-session request at least 20% below $0.143, the floor of the plan's 20% to
   31% hand-off estimate; and
 - cold resumes on a person's message below 5% of cost.
 
@@ -66,7 +68,7 @@ five sessions, go through the command.
 
 1. If, once items 2 to 4 above (the context meter, `pr` and `gates`) have merged and five main
    sessions have run since the last of them, mean cost per main-session request at Opus 5.5 rates
-   is not at least 10% below $0.144, building further commands stops and the plan is re-measured
+   is not at least 10% below $0.143, building further commands stops and the plan is re-measured
    before anything else is built.
 2. A command whose family's calls go through it less than half the time over five sessions after
    it lands is deleted.

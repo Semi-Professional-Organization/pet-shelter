@@ -42,7 +42,7 @@ describe("agent scripts entry point", () => {
     // scripts/lib/invokedAs.mjs says why these two keep their own, original copy.
     for (const script of ["scripts/commit-msg.mjs", "scripts/ledger-issues.mjs"]) {
       const source = readFileSync(join(ROOT, script), "utf8");
-      expect(source, script).toContain(`process.argv[1] && process.argv[1].replace(/\\\\/g, "/").endsWith("${script}")`);
+      expect(source, script).toContain(`process.argv[1] && process.argv[1].replace(/\\\\/g, "/").endsWith("/${script}")`);
     }
   });
 

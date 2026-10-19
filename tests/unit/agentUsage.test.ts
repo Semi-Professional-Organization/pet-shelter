@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { basename, dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
@@ -324,6 +324,28 @@ describe("agent usage: workflow families", () => {
   it("does not take a here-string or a quoted `<<` for a heredoc", () => {
     expect(families("Bash", "tr a-z A-Z <<< hello\nnpm run lint")).toEqual(["gates"]);
     expect(families("Bash", 'echo "a << b"\nnpm run lint')).toEqual(["gates"]);
+    expect(families("Bash", "(( x = a << b ))\ncat tasks/todo.md")).toEqual(["ledger"]);
+    expect(families("Bash", "let x=a<<b\ncat tasks/todo.md")).toEqual(["ledger"]);
+  });
+
+  it("reads PowerShell's here-strings and block comments only where they can be", () => {
+    expect(families("PowerShell", "git log --format=%an@'x' ; npm test")).toEqual(["gates"]);
+    expect(families("PowerShell", "<# it's #> npm run lint; npm test")).toEqual(["gates"]);
+  });
+
+  it("reads Bash's ANSI-C quoting, where a backslash escapes", () => {
+    expect(families("Bash", "echo $'it\\'s' ; npm run lint")).toEqual(["gates"]);
+  });
+
+  it("knows the integration-db folder as a whole tier", () => {
+    expect(families("Bash", "npx vitest run tests/integration/db")).toEqual(["gates"]);
+  });
+
+  it("counts a ledger file read into a copy as a read, as PowerShell's pipe to a file is", () => {
+    expect(families("Bash", "cat tasks/open/x.md > copy.md")).toEqual(["ledger"]);
+    expect(families("Bash", "cat tasks/open/x.md > tasks/open/y.md")).toEqual(["ledger"]);
+    expect(families("PowerShell", "Get-Content tasks/todo.md | Out-File copy.md")).toEqual(["ledger"]);
+    expect(families("Bash", "cat > tasks/open/x.md")).toEqual([]);
   });
 
   it("labels past PowerShell's call operator and npx's flags", () => {
@@ -913,6 +935,19 @@ describe("agent usage: the analyses", () => {
     expect(summarize(files(), { priceAs: "claude-opus-5-5" }).totals.read).toBeCloseTo(0.2);
   });
 
+  it("ends the window before --until, so a baseline can stop where the work it measures began", () => {
+    const files = () => [
+      extract([
+        assistant("r1", { out: 1_000_000 }, { ts: "2026-10-01T10:00:00.000Z" }),
+        assistant("r2", { out: 1_000_000 }, { ts: "2026-10-02T10:00:00.000Z" }),
+      ]),
+    ];
+    expect(summarize(files(), { until: "2026-10-02T10:00:00Z" }).totals.requests).toBe(1);
+    expect(summarize(files(), { since: "2026-10-01T12:00:00Z", until: "2026-10-03" }).totals.requests).toBe(1);
+    expect(parseArgs(["--until", "2026-10-02"]).until).toBe("2026-10-02");
+    expect(() => parseArgs(["--until", "2026-10-02T09:00"])).toThrow(/--until takes/);
+  });
+
   it("windows the totals with --since without losing the earlier gap that makes a resume cold", () => {
     const files = [
       extract([
@@ -945,8 +980,13 @@ describe("agent usage: the analyses", () => {
 });
 
 describe("agent usage: the command", () => {
+  // Every folder and log these tests make goes here, and goes away after them, so no fixture's
+  // log lands in the real temp folder under a live session's id.
+  const SCRATCH = mkdtempSync(join(tmpdir(), "agent-usage-suite-"));
+  afterAll(() => rmSync(SCRATCH, { recursive: true, force: true }));
+
   const fixtureDir = (records: unknown[]) => {
-    const dir = mkdtempSync(join(tmpdir(), "agent-usage-"));
+    const dir = mkdtempSync(join(SCRATCH, "fixture-"));
     mkdirSync(join(dir, "s1", "subagents"), { recursive: true });
     writeFileSync(join(dir, "s1.jsonl"), records.map((r) => JSON.stringify(r)).join("\n") + "\n");
     writeFileSync(join(dir, "s1", "subagents", "agent-a1.jsonl"), JSON.stringify(assistant("sub1", { out: 1000 })) + "\n");
@@ -954,12 +994,23 @@ describe("agent usage: the command", () => {
   };
   const cli = (args: string[], cwd = ROOT) => {
     try {
-      return { code: 0, out: execFileSync("node", [join(ROOT, "scripts", "agent.mjs"), ...args], { cwd, encoding: "utf8", env: { ...process.env, CLAUDE_CODE_SESSION_ID: "test" } }) };
+      const env = { ...process.env, CLAUDE_CODE_SESSION_ID: "test", TEMP: SCRATCH, TMP: SCRATCH, TMPDIR: SCRATCH };
+      return { code: 0, out: execFileSync("node", [join(ROOT, "scripts", "agent.mjs"), ...args], { cwd, encoding: "utf8", env }) };
     } catch (error) {
       const e = error as { status: number; stdout: string };
       return { code: e.status, out: e.stdout };
     }
   };
+
+  // Only where the folder name starts with a drive letter can its case differ.
+  it.runIf(process.platform === "win32")("does not fold case where the file system keeps it apart", () => {
+    const projects = mkdtempSync(join(SCRATCH, "projects-linux-"));
+    const name = projectFolderName(ROOT);
+    const flipped = name[0] === name[0].toLowerCase() ? name[0].toUpperCase() + name.slice(1) : name[0].toLowerCase() + name.slice(1);
+    mkdirSync(join(projects, flipped));
+    expect(defaultDirs(projects, ROOT, "linux")).toEqual([]);
+    expect(defaultDirs(projects, ROOT, "win32")).toHaveLength(1);
+  });
 
   it("reads a parent before its subagents even where the filesystem records no creation time", () => {
     const parent = { path: "s1.jsonl", born: 0, written: 300, sub: false };
@@ -974,7 +1025,7 @@ describe("agent usage: the command", () => {
     // case per name, because Windows folders are case-insensitive and the second mkdir would fail.
     // The checkout path is this platform's own, so the folder name comes out as Claude Code would
     // write it here; the stored copy differs from it only in case.
-    const projects = mkdtempSync(join(tmpdir(), "agent-usage-projects-"));
+    const projects = mkdtempSync(join(SCRATCH, "projects-"));
     const name = projectFolderName(ROOT);
     const flipped = name[0] === name[0].toLowerCase() ? name[0].toUpperCase() + name.slice(1) : name[0].toLowerCase() + name.slice(1);
     for (const d of [flipped, `${name}--claude-worktrees-x`, `${name}2`]) {
@@ -1003,7 +1054,7 @@ describe("agent usage: the command", () => {
       code: 2,
       out: expect.stringMatching(/^usage: ERROR no price for model claude-x-1/),
     });
-    expect(cli(["usage", "--dir", mkdtempSync(join(tmpdir(), "agent-usage-empty-"))]).code).toBe(2);
+    expect(cli(["usage", "--dir", mkdtempSync(join(SCRATCH, "empty-"))]).code).toBe(2);
     // One folder that does not exist fails the run, rather than leaving its sessions out.
     const real = fixtureDir([assistant("r1", { out: 1 })]);
     expect(cli(["usage", "--dir", real, "--dir", join(real, "typo")])).toMatchObject({ code: 2, out: expect.stringMatching(/no such transcript folder/) });
@@ -1015,7 +1066,7 @@ describe("agent usage: the command", () => {
   it("reads the test scripts from the checkout's top level when run from a subdirectory", async () => {
     const dir = fixtureDir([assistant("r1", { out: 1 }, { tools: [{ id: "t", name: "Bash", command: "npm test" }] })]);
     let out = "";
-    const code = await main(["--dir", dir, "--json"], { cwd: join(ROOT, "src"), out: { write: (s: string) => (out += s) } });
+    const code = await main(["--dir", dir, "--json"], { cwd: join(ROOT, "src"), env: {}, tmp: SCRATCH, out: { write: (s: string) => (out += s) } });
     expect(code).toBe(0);
     expect(JSON.parse(out).families.gates.calls).toBe(1);
   });
@@ -1023,7 +1074,7 @@ describe("agent usage: the command", () => {
   it("resolves --dir against the working directory it was given", async () => {
     const dir = fixtureDir([assistant("r1", { out: 1 })]);
     let out = "";
-    const code = await main(["--dir", basename(dir), "--json"], { cwd: dirname(dir), out: { write: (s: string) => (out += s) } });
+    const code = await main(["--dir", basename(dir), "--json"], { cwd: dirname(dir), env: {}, tmp: SCRATCH, out: { write: (s: string) => (out += s) } });
     expect(code).toBe(0);
     expect(JSON.parse(out).totals.requests).toBe(2);
   });
@@ -1044,7 +1095,7 @@ describe("agent usage: the command", () => {
   it("answers any failure in its own line-1 contract, and refuses to guess the repo without git", () => {
     const notADir = join(fixtureDir([]), "s1.jsonl");
     expect(cli(["usage", "--dir", notADir])).toMatchObject({ code: 2, out: expect.stringMatching(/^usage: ERROR /) });
-    const outside = mkdtempSync(join(tmpdir(), "agent-usage-nogit-"));
+    const outside = mkdtempSync(join(SCRATCH, "nogit-"));
     expect(cli(["usage"], outside)).toMatchObject({ code: 2, out: expect.stringMatching(/^usage: ERROR git could not name/) });
   });
 });
