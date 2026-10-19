@@ -275,8 +275,7 @@ export function resetNextMocks(): void {
  *
  * Each `src/lib` module that keeps module-level state registers its own reset
  * with `@/lib/stateResets` when it loads, so this resets exactly the stores the
- * file has loaded. The relative order they run in — the ledgers before the
- * demo-seed flag, so the next test re-seeds — is declared where each registers.
+ * file has loaded, in the order they loaded: no reset reads another store.
  *
  * This hook used to import all eleven store owners itself, dynamically, before
  * every test. That pulled Prisma, `pg` and every repository into files that

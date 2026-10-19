@@ -61,6 +61,19 @@ describe("the Prisma client with no DATABASE_URL", () => {
     await expect(Promise.resolve(prisma.pet)).resolves.toBe(prisma.pet);
   });
 
+  it("answers only the names the real client has, and behaves as a plain object otherwise", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+    const client = prisma as unknown as Record<string, unknown>;
+    const pet = prisma.pet as unknown as Record<string, unknown>;
+
+    expect(client.notAModel).toBeUndefined();
+    expect(pet.notAQuery).toBeUndefined();
+    // A test matcher treats any object with a function `asymmetricMatch` as a matcher.
+    expect(pet.asymmetricMatch).toBeUndefined();
+    expect(String(prisma.pet)).toBe("[object Object]");
+    expect(JSON.stringify(prisma.pet)).toBe("{}");
+  });
+
   it("disconnects cleanly, so teardown that always disconnects still works", async () => {
     const { disconnectPrisma } = await import("@/lib/server/prisma");
 

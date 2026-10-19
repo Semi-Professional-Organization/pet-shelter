@@ -53,17 +53,6 @@ describe("module state resets", () => {
     expect(registeredStateResets()).toEqual(expect.arrayContaining(EXPECTED));
   });
 
-  it("clears the demo-seed flag only after every ledger, so the next test re-seeds", async () => {
-    await Promise.all(STORE_OWNERS.map((path) => import(path)));
-    const order = registeredStateResets();
-    const seedFlag = order.indexOf("sponsorDemoSeed");
-
-    for (const ledger of ["donationLedger", "donationPledgeLedger", "sponsorshipLedger"]) {
-      expect(order.indexOf(ledger)).toBeLessThan(seedFlag);
-    }
-    expect(order.indexOf("sponsorRepository")).toBeGreaterThan(seedFlag);
-  });
-
   it("keeps one entry per name, so a module re-evaluated by vi.resetModules replaces its own", () => {
     registerStateReset("re-registered", () => undefined);
     registerStateReset("re-registered", () => undefined);

@@ -24,9 +24,10 @@ The global `beforeEach` used to import eleven store owners and call their resets
 Now each owner registers its reset with `@/lib/stateResets` when it loads, and the hook runs what
 is registered. A file that tests pure functions loads no store, so it no longer loads Prisma, `pg`
 and every repository before its first test. Measured on the 55 unit files that use no store:
-compile CPU 46 s to 6 s, all 895 tests passing. The relative order the old hook documented (the
-ledgers before the demo-seed flag) is declared at each registration and pinned by
-`tests/unit/stateResets.test.ts`.
+compile CPU 46 s to 6 s, all 895 tests passing. The resets run in load order. The old hook said
+"order matters" for the sponsor demo-seed flag, but what mattered was that it is cleared at all:
+no reset reads another store, and the demo seeds lazily inside the next test, after every reset.
+`tests/unit/stateResets.test.ts` pins that every store the old hook reset still registers.
 
 What it exposed: `transparency.test.ts` passed only because the old hook had loaded `crypto.ts`
 in test mode before the file switched `NODE_ENV` to production. Fixed in the test by giving the

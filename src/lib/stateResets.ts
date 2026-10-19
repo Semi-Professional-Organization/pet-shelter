@@ -21,31 +21,10 @@
 
 type Reset = () => void | Promise<void>;
 
-/**
- * When a reset runs relative to the others. Almost all module state is
- * independent and resets in the default phase. The two later phases exist for
- * the one real dependency, in the sponsor demo: its seed flag must be cleared
- * only once every ledger is empty, or the next test starts with stale standings.
- */
-export const RESET_PHASE = {
-  /** No dependency on another store's state. */
-  default: 0,
-  /** After every ledger is empty: the sponsor demo-seed flag, so the next test re-seeds. */
-  afterLedgers: 1,
-  /** After the demo-seed flag: the seeded sponsor accounts the demo commitments name. */
-  afterDemoSeed: 2,
-} as const;
-
-interface RegisteredReset {
-  /** A `RESET_PHASE`; lower runs first, and resets in one phase run in load order. */
-  order: number;
-  reset: Reset;
-}
-
 const REGISTRY_KEY = Symbol.for("pet-shelter.stateResets");
 
-function registry(): Map<string, RegisteredReset> {
-  const holder = globalThis as unknown as Record<symbol, Map<string, RegisteredReset> | undefined>;
+function registry(): Map<string, Reset> {
+  const holder = globalThis as unknown as Record<symbol, Map<string, Reset> | undefined>;
   let resets = holder[REGISTRY_KEY];
   if (!resets) {
     resets = new Map();
@@ -55,21 +34,25 @@ function registry(): Map<string, RegisteredReset> {
 }
 
 /** Called once at module scope by each owner of module-level state. */
-export function registerStateReset(name: string, reset: Reset, order: number = RESET_PHASE.default): void {
-  registry().set(name, { order, reset });
+export function registerStateReset(name: string, reset: Reset): void {
+  registry().set(name, reset);
 }
 
-/** The names registered so far, in run order. For the harness's own tests. */
+/** The names registered so far, in load order. For the harness's own tests. */
 export function registeredStateResets(): string[] {
-  return [...registry().entries()]
-    .sort(([, a], [, b]) => a.order - b.order)
-    .map(([name]) => name);
+  return [...registry().keys()];
 }
 
-/** Runs every registered reset, in order, awaiting the asynchronous ones. */
+/**
+ * Runs every registered reset, awaiting the asynchronous ones.
+ *
+ * In load order, because no reset depends on another: each one only empties or
+ * refills its own store, and none starts work that reads a different store. (The
+ * sponsor demo, the one place that looks like a dependency, seeds the ledgers
+ * lazily inside the next test, after every reset has finished.)
+ */
 export async function resetRegisteredState(): Promise<void> {
-  const resets = [...registry().values()].sort((a, b) => a.order - b.order);
-  for (const { reset } of resets) {
+  for (const reset of registry().values()) {
     await reset();
   }
 }

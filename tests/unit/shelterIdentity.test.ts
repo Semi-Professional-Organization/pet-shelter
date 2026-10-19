@@ -10,12 +10,9 @@ import {
   currentIssuerIdentity,
 } from "@/lib/domain/shelterIdentity";
 
-// The module reads ROS_REGISTRATION_NO once, when the import above loads it. Vitest hoists this
-// above the imports, so that load sees the variable unset and the default the tests below pin.
-// Unset rather than "": the module reads it with `??`, under which "" is a configured value.
-vi.hoisted(() => {
-  vi.stubEnv("ROS_REGISTRATION_NO", undefined);
-});
+// The module reads ROS_REGISTRATION_NO once, when the import above loads it. That load sees the
+// variable unset, and so the default the tests below pin, because tests/setup/hermeticEnv.ts
+// deletes it before any test file loads, whatever the shell exports.
 
 describe("statutory identifiers", () => {
   it("exposes the LHDN Subsection 44(6) approval reference", () => {

@@ -50,14 +50,38 @@ const CLIENT_FILES = ["default.js", "index.js", "package.json", "schema.prisma"]
 /** True when every file the runtime loads is there, from the installed Prisma version. */
 export function isClientComplete(clientDir, expectedVersion) {
   if (!CLIENT_FILES.every((file) => existsSync(join(clientDir, file)))) return false;
-  const { version } = JSON.parse(readFileSync(join(clientDir, "package.json"), "utf8"));
-  return version === expectedVersion;
+  try {
+    const { version } = JSON.parse(readFileSync(join(clientDir, "package.json"), "utf8"));
+    return version === expectedVersion;
+  } catch {
+    // A package.json cut off mid-write is an incomplete client, not a reason to crash.
+    return false;
+  }
 }
 
-/** True when the generated client was built from this schema, spacing within lines aside. */
+/** One line with runs of spaces and tabs collapsed, except inside double-quoted strings. */
+function normalizeLine(line) {
+  let out = "";
+  let inString = false;
+  let pendingSpace = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (!inString && (ch === " " || ch === "\t")) {
+      pendingSpace = true;
+      continue;
+    }
+    if (pendingSpace && out !== "") out += " ";
+    pendingSpace = false;
+    if (ch === '"' && line[i - 1] !== "\\") inString = !inString;
+    out += ch;
+  }
+  return out;
+}
+
+/** True when the generated client was built from this schema, alignment aside. */
 export function isClientCurrent(schemaText, generatedSchemaText) {
   if (generatedSchemaText === null || generatedSchemaText === undefined) return false;
-  const lines = (text) => text.split(/\r?\n/).map((line) => line.replace(/[ \t]+/g, " ").trim());
+  const lines = (text) => text.split(/\r?\n/).map(normalizeLine);
   return lines(schemaText).join("\n") === lines(generatedSchemaText).join("\n");
 }
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { resolveDatabaseSsl } from "./databaseSsl";
@@ -52,22 +52,61 @@ function createOfflineClient(): PrismaClient {
       finally: (onFinally?: () => void) =>
         Promise.reject(new DatabaseNotConfiguredError()).finally(onFinally),
     }) as unknown as Promise<never>;
-  // Neither the client nor a model delegate is a thenable, as the real ones are
-  // not: answering `then` would make `await prisma.pet` wait forever. Symbol
-  // probes such as `util.inspect` get no answer either.
-  const isQuery = (key: string | symbol): key is string => typeof key === "string" && key !== "then";
-  const model = new Proxy({}, { get: (_target, key) => (isQuery(key) ? refuse : undefined) });
+  // Only the names the real client answers: its model delegates, their query
+  // methods and the client methods that reach the database. Anything else falls
+  // through to a plain object, as on the real client: `then` and
+  // `asymmetricMatch` are undefined (answering `then` would make
+  // `await prisma.pet` wait forever), and `toString` or `JSON.stringify` behave.
+  const model = new Proxy({}, {
+    get: (target, key) => (MODEL_METHODS.has(key) ? refuse : Reflect.get(target, key)),
+  });
   return new Proxy(
     {},
     {
       get(_target, key) {
         if (key === "$disconnect") return async () => undefined;
-        if (!isQuery(key)) return undefined;
-        return key.startsWith("$") ? refuse : model;
+        if (CLIENT_METHODS.has(key)) return refuse;
+        return MODEL_DELEGATES.has(key) ? model : Reflect.get(_target, key);
       },
     }
   ) as unknown as PrismaClient;
 }
+
+/** The query methods on a model delegate, as `prisma.pet.findMany`. */
+const MODEL_METHODS = new Set<string | symbol>([
+  "findUnique",
+  "findUniqueOrThrow",
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "create",
+  "createMany",
+  "createManyAndReturn",
+  "update",
+  "updateMany",
+  "updateManyAndReturn",
+  "upsert",
+  "delete",
+  "deleteMany",
+  "count",
+  "aggregate",
+  "groupBy",
+]);
+
+/** The client methods that would reach the database. */
+const CLIENT_METHODS = new Set<string | symbol>([
+  "$connect",
+  "$transaction",
+  "$queryRaw",
+  "$queryRawUnsafe",
+  "$executeRaw",
+  "$executeRawUnsafe",
+]);
+
+/** One delegate per model in the schema, named as the client names them: `Pet` is `prisma.pet`. */
+const MODEL_DELEGATES = new Set<string | symbol>(
+  Object.values(Prisma.ModelName).map((name) => name.charAt(0).toLowerCase() + name.slice(1))
+);
 
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;

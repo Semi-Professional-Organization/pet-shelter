@@ -5,7 +5,7 @@ import { listSponsorshipsByUserId } from "./sponsorshipLedger";
 import { isLedgerPersistent } from "./donationLedger";
 import type { SponsorshipRecord } from "./sponsorshipLedger";
 import type { SponsorRecord, WallSponsor } from "@/types/supporter";
-import { RESET_PHASE, registerStateReset } from "@/lib/stateResets";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Supporter accounts for the sponsor portal.
@@ -272,4 +272,4 @@ export async function resetSponsorRepository(): Promise<void> {
   await ensureInitialised();
 }
 
-registerStateReset("sponsorRepository", resetSponsorRepository, RESET_PHASE.afterDemoSeed);
+registerStateReset("sponsorRepository", resetSponsorRepository);

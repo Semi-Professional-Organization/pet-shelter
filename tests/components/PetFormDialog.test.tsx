@@ -152,23 +152,41 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
-   * The parent owns `open`, so the dialog stays mounted after the first submit until the parent
-   * closes it, and longer while it animates out. `onOpenChange` here is a spy that closes nothing,
-   * which holds that window open: a second click in it must not save the same animal twice.
+   * Two clicks back to back must save one pet record, not two. react-hook-form disables the
+   * button from the first click (`isSubmitting`); this pins the outcome, whichever guard holds.
    */
-  it("hands the form to onSave once when the submit button is clicked twice", async () => {
+  it("hands the form to onSave once on a fast double-click", async () => {
     const { onSave, user } = renderDialog();
 
     await fillRequiredFields(user, "2023-04-15");
     const submit = screen.getByRole("button", { name: /create pet record/i });
-    await user.click(submit);
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The guard holds while the dialog closes (it stays mounted while it animates out, which jsdom
+   * cannot show) and is cleared only when the dialog opens again, so the next save goes through.
+   */
+  it("accepts a new save once the dialog opens again", async () => {
+    const { onSave, onOpenChange, user, rerender } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    await user.click(screen.getByRole("button", { name: /create pet record/i }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
 
-    // The same element: its label has changed to "Saving...", but it is the button a
-    // double-click lands on twice.
-    await user.click(submit);
+    const dialog = (open: boolean) => (
+      <PetFormDialog open={open} onOpenChange={onOpenChange} editingPet={null} onSave={onSave} />
+    );
+    rerender(dialog(false));
+    rerender(dialog(true));
 
-    expect(onSave).toHaveBeenCalledTimes(1);
+    await fillRequiredFields(user, "2023-04-15");
+    await user.click(screen.getByRole("button", { name: /create pet record/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
   });
 
   /**

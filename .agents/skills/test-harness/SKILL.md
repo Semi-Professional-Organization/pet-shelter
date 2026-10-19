@@ -41,12 +41,12 @@ A module with module-level state exports a reset and registers it next to it:
 
 ```ts
 export function resetThings(): void { things.clear(); }
-registerStateReset("things", resetThings, 0);
+registerStateReset("things", resetThings);
 ```
 
-The harness resets exactly the stores a test file has loaded, before every test, in `order`
-(lowest first; the ledgers before the demo-seed flag, which is why the numbers differ). New suites
-are order-independent by default; don't re-implement this per file, and don't add store imports to
+The harness resets exactly the stores a test file has loaded, before every test, in the order they
+loaded: no reset reads another store, so order does not matter. New suites are order-independent by
+default; don't re-implement this per file, and don't add store imports to
 the harness. `tests/unit/stateResets.test.ts` pins that every store the harness used to reset by
 hand still registers.
 

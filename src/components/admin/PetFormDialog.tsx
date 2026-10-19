@@ -99,14 +99,16 @@ export function PetFormDialog({
   const [prevKey, setPrevKey] = useState<string | null>(null);
   const currentKey = open ? (editingPet ? `edit-${editingPet.id}` : "create-new") : null;
 
-  // True from the first submit until the dialog opens again. The dialog stays
-  // mounted while it animates closed, and a second click in that window must not
-  // hand the same form to `onSave` twice: that is two pet records.
+  // Set by the first submit and cleared only when the dialog opens again. The
+  // dialog stays mounted while it animates closed, and a click in that window
+  // must not hand the same form to `onSave` twice: that is two pet records.
+  // (A fast double-click is already stopped by `isSubmitting`, which
+  // react-hook-form sets on the first click.)
   const [submitted, setSubmitted] = useState(false);
 
   if (currentKey !== prevKey) {
     setPrevKey(currentKey);
-    setSubmitted(false);
+    if (currentKey !== null) setSubmitted(false);
     // Reset alongside every other per-pet field. Without this, a caregiver note
     // typed for one animal survives closing the dialog and would be emailed to a
     // different animal's supporters.

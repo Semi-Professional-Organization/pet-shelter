@@ -42,6 +42,12 @@ describe("isClientCurrent", () => {
     expect(isClientCurrent(commentedOut, withComment)).toBe(false);
   });
 
+  it("is stale when only the spacing inside a quoted value changed", () => {
+    const before = SCHEMA.replace("  name   String", '  name   String @default("Ongoing  care")');
+    const after = SCHEMA.replace("  name   String", '  name   String @default("Ongoing care")');
+    expect(isClientCurrent(after, before)).toBe(false);
+  });
+
   it("is stale when no client has been generated yet", () => {
     expect(isClientCurrent(SCHEMA, null)).toBe(false);
   });
@@ -70,6 +76,12 @@ describe("isClientCurrent", () => {
 
     it("is incomplete when another Prisma version built it", () => {
       writeClient("7.8.0");
+      expect(isClientComplete(dir, "7.9.1")).toBe(false);
+    });
+
+    it("is incomplete, not a crash, when package.json was cut off mid-write", () => {
+      writeClient();
+      writeFileSync(join(dir, "package.json"), '{"version": "7.9');
       expect(isClientComplete(dir, "7.9.1")).toBe(false);
     });
   });
