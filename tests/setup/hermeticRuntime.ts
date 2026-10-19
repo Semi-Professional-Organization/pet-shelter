@@ -1,3 +1,4 @@
+import net from "node:net";
 import { afterAll, afterEach, expect } from "vitest";
 
 /**
@@ -13,18 +14,23 @@ import { afterAll, afterEach, expect } from "vitest";
  *     UTC for server code, as on Vercel; `Asia/Kuala_Lumpur` for the components
  *     tier, which stands in for the browser.
  *  3. The network, through `fetch`, which is the only HTTP client the code under
- *     test has (email; the storage providers only build URLs). The database is
- *     covered separately: with no `DATABASE_URL` the Prisma client opens no
- *     socket. A `fetch` that is not stubbed fails the test, with the URL — even
- *     when the code under test catches the error and carries on, which is
- *     exactly the case a plain rejection would hide.
+ *     test has (email; the storage providers only build URLs). A `fetch` that is
+ *     not stubbed fails the test, with the URL — even when the code under test
+ *     catches the error and carries on, which is exactly the case a plain
+ *     rejection would hide.
+ *  4. Sockets, in every tier with no database: all but `integration-db`, whose
+ *     setup sets `DATABASE_URL` before this file runs. With no `DATABASE_URL` the
+ *     Prisma client opens none, and `pg`, `http` and `tls` all connect through
+ *     `net.Socket.prototype.connect`, so a test that stubs a `DATABASE_URL` and
+ *     forgets to mock Prisma fails here, naming the address, instead of writing
+ *     into whatever listens on it.
  *
- * The network check runs after each test and once more after the file, and names
- * the test that was running when the call was made. Background work (an email
- * sent after the response, say) can call out after its own test has finished, so
- * that name may be a later test than the one that started the work; the URL is
- * the better lead. The end-of-file check catches what the last test left behind.
- * A call made after that check, by work that outlives the file, is still refused,
+ * The check runs after each test and once more after the file, and names the test
+ * that was running when the call was made. Background work (an email sent after
+ * the response, say) can call out after its own test has finished, so that name
+ * may be a later test than the one that started the work; the address is the
+ * better lead. The end-of-file check catches what the last test left behind. A
+ * call made after that check, by work that outlives the file, is still refused,
  * but nothing is left running to report it.
  */
 
@@ -42,6 +48,10 @@ interface UnexpectedRequest {
 
 const unexpectedRequests: UnexpectedRequest[] = [];
 
+function record(url: string): void {
+  unexpectedRequests.push({ url, during: expect.getState().currentTestName ?? "file setup" });
+}
+
 function describeRequest(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.href;
@@ -50,9 +60,36 @@ function describeRequest(input: RequestInfo | URL): string {
 
 globalThis.fetch = (async (input: RequestInfo | URL) => {
   const url = describeRequest(input);
-  unexpectedRequests.push({ url, during: expect.getState().currentTestName ?? "file setup" });
+  record(url);
   throw new TypeError(`Network access is disabled in tests; stub fetch for ${url}`);
 }) as typeof fetch;
+
+/** `host:port` or a socket path, from any of the ways `connect` is called. */
+function describeConnect(args: unknown[]): string {
+  // `net.connect()` hands `connect` its arguments already normalized, as an array.
+  const [first, second] = Array.isArray(args[0]) ? (args[0] as unknown[]) : args;
+  if (typeof first === "object" && first !== null) {
+    const options = first as { host?: string; port?: number | string; path?: string };
+    return options.path ?? `${options.host ?? "localhost"}:${options.port}`;
+  }
+  if (typeof first === "number" || (typeof first === "string" && /^\d+$/.test(first))) {
+    return `${typeof second === "string" ? second : "localhost"}:${first}`;
+  }
+  return String(first);
+}
+
+if (!process.env.DATABASE_URL) {
+  net.Socket.prototype.connect = function connect(...args: unknown[]) {
+    const target = describeConnect(args);
+    record(`socket ${target}`);
+    throw new Error(`Sockets are disabled in tests with no database; mock what opened one to ${target}`);
+  } as typeof net.Socket.prototype.connect;
+}
+
+/** Takes what the guards recorded, for the harness's own tests of them. */
+export function takeUnexpectedRequests(): UnexpectedRequest[] {
+  return unexpectedRequests.splice(0);
+}
 
 function failOnUnexpectedRequests(): void {
   if (unexpectedRequests.length === 0) return;
@@ -60,7 +97,7 @@ function failOnUnexpectedRequests(): void {
   throw new Error(
     `A test tried to reach the network: ${calls.join(", ")}. ` +
       'Stub fetch for it with vi.stubGlobal("fetch", ...), which is undone before the next test, ' +
-      "or stop the code from calling out."
+      "mock the database client, or stop the code from calling out."
   );
 }
 

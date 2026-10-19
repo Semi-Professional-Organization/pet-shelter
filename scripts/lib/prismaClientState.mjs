@@ -53,8 +53,9 @@ export function isClientComplete(clientDir, expectedVersion) {
 
 /**
  * One line with runs of spaces and tabs collapsed, except inside double-quoted
- * strings. A backslash inside a string escapes the character after it, so
- * `"C:\\"` closes on its last quote and `"say \"hi\""` does not close early.
+ * strings and comments. A backslash inside a string escapes the character
+ * after it, so `"C:\\"` closes on its last quote and `"say \"hi\""` does not
+ * close early.
  */
 function normalizeLine(line) {
   let out = "";
@@ -78,6 +79,11 @@ function normalizeLine(line) {
     }
     if (pendingSpace && out !== "") out += " ";
     pendingSpace = false;
+    // A comment keeps its text as written: `///` doc comments reach the generated types.
+    if (ch === "/" && line[i + 1] === "/") {
+      out += line.slice(i);
+      break;
+    }
     if (ch === '"') inString = true;
     out += ch;
   }

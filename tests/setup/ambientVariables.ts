@@ -29,6 +29,18 @@ export const AMBIENT_VARIABLES = [
   "SESSION_SECRET",
   "ADMIN_SECRET_KEY",
   "STAFF_INVITE_SECRET",
+  // Read by `pg` itself as connection defaults (node-postgres follows libpq), so a
+  // shell exporting one would change how a pool connects, though `src/` never names it.
+  "PGHOST",
+  "PGPORT",
+  "PGDATABASE",
+  "PGUSER",
+  "PGPASSWORD",
+  "PGSSLMODE",
+  "PGAPPNAME",
+  "PGCONNECT_TIMEOUT",
+  "PGOPTIONS",
+  "PGCLIENTENCODING",
 ] as const;
 
 /**

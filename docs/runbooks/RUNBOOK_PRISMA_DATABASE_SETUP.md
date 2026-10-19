@@ -139,39 +139,18 @@ In your deployment dashboard (e.g. **Vercel Project Settings $\rightarrow$ Envir
 
 ### Procedure D: Verify Connection Pool Configuration
 
-Check `src/lib/server/prisma.ts`:
+`createPrismaClient` in `src/lib/server/prisma.ts` is the one place this is set; read it there
+rather than from a copy here. What to check against it:
 
-```typescript
-function createPrismaClient(): PrismaClient {
-  // No DATABASE_URL: an offline client, no localhost fallback (see the decision
-  // tasks/decisions/2026-10-20-no-database-url-means-no-database.md).
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) return createOfflineClient();
-
-  // No catch: a configured database whose client cannot be built fails the import.
-  const sslPolicy = resolveDatabaseSsl(connectionString);
-
-  const pool =
-    globalForPrisma.pgPool ??
-    new Pool({
-      connectionString: sslPolicy.connectionString,
-      ssl: sslPolicy.ssl,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis, // DB_CONNECT_TIMEOUT_MS, 10000 by default
-    });
-
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.pgPool = pool;
-  }
-
-  const adapter = new PrismaPg(pool);
-  return new PrismaClient({
-    adapter,
-    log: process.env.PRISMA_LOG === "true" ? ["error", "warn"] : [],
-  });
-}
-```
+- **No `DATABASE_URL`**: an offline client. Every query rejects with P1001 at once, no socket is
+  opened, and the process says so once outside tests. There is no localhost fallback
+  (`tasks/decisions/2026-10-20-no-database-url-means-no-database.md`).
+- **A `DATABASE_URL`**: a `pg` pool with at most 10 connections, idle ones closed after 30 s, and
+  TLS decided by `resolveDatabaseSsl` (below). The connect timeout is `DB_CONNECT_TIMEOUT_MS`:
+  10 s when it is unset, empty or not a number, and none at all when it is `0`.
+- **A client that cannot be built** fails the import with its own error. Nothing falls back.
+- **Outside production**, the client and the pool are kept across dev-server reloads, each only
+  for the URL it was built from, so changing `DATABASE_URL` takes effect without a stale client.
 
 > [!TIP]
 > TLS to Neon is verified, not merely enabled: `resolveDatabaseSsl` (`src/lib/server/databaseSsl.ts`) demands a trusted certificate for any public host and strips `sslmode` so `pg` cannot override it. Never set `rejectUnauthorized: false` to get past a handshake error; see `tasks/decisions/2026-09-08-database-tls-is-decided-by-host-not-url-spelling.md`.

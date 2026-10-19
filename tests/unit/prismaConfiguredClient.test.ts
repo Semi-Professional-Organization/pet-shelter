@@ -41,6 +41,45 @@ describe("a configured Prisma client", () => {
     expect(poolOptions[0]).toMatchObject({ connectionTimeoutMillis: 10000 });
   });
 
+  describe("kept across dev-server reloads", () => {
+    const URL = "postgresql://shelter@db.internal:5432/shelter";
+    const cached = { cachedClient: true };
+
+    it("is reused for the DATABASE_URL it was built from", async () => {
+      vi.stubGlobal("prisma", cached);
+      vi.stubGlobal("prismaUrl", URL);
+
+      const { prisma } = await import("@/lib/server/prisma");
+      expect(prisma).toBe(cached);
+    });
+
+    it("is rebuilt when DATABASE_URL names another database", async () => {
+      vi.stubGlobal("prisma", cached);
+      vi.stubGlobal("prismaUrl", "postgresql://shelter@old.internal:5432/shelter");
+
+      // Building a new client reaches the pool, which refuses here.
+      await expect(import("@/lib/server/prisma")).rejects.toThrow("the pool refused its configuration");
+    });
+
+    it("is dropped when DATABASE_URL goes away, so no socket can open", async () => {
+      vi.stubGlobal("prisma", cached);
+      vi.stubGlobal("prismaUrl", URL);
+      vi.stubEnv("DATABASE_URL", "");
+
+      const { prisma } = await import("@/lib/server/prisma");
+      expect(prisma).not.toBe(cached);
+      await expect(prisma.pet.findMany()).rejects.toMatchObject({ code: "P1001" });
+    });
+
+    it("builds a new pool when the connection string changed", async () => {
+      vi.stubGlobal("pgPool", { stalePool: true });
+      vi.stubGlobal("pgPoolUrl", "postgresql://shelter@old.internal:5432/shelter");
+
+      await expect(import("@/lib/server/prisma")).rejects.toThrow("the pool refused its configuration");
+      expect(poolOptions).toHaveLength(1);
+    });
+  });
+
   it.each([
     ["2500", 2500],
     ["0", 0], // pg's "no timeout", set on purpose

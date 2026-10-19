@@ -5,7 +5,13 @@ import { resolveDatabaseSsl } from "./databaseSsl";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  /** The `DATABASE_URL` the cached client was built from. */
+  prismaUrl: string | undefined;
   pgPool: Pool | undefined;
+  /** The connection string the cached pool was built from. */
+  pgPoolUrl: string | undefined;
+  /** Set once this process has said it has no database. */
+  prismaOfflineWarned: boolean | undefined;
 };
 
 /**
@@ -40,11 +46,13 @@ export class DatabaseNotConfiguredError extends Error {
  * and the app needs it in `.env.local` or the shell to read that database.
  */
 function createOfflineClient(): PrismaClient {
-  // Said once per process, outside tests (a build prints it from each worker).
-  // The Prisma CLI and the seed script still fall back to localhost
-  // (`prisma/env.ts`), so `db:push` and `db:seed` without a `DATABASE_URL` fill
-  // a database this app will not read, and nothing else would tell the developer.
-  if (process.env.NODE_ENV !== "test") {
+  // Said once per process, outside tests (a build prints it from each worker),
+  // and latched on globalThis so a dev-server reload does not repeat it. The
+  // Prisma CLI and the seed script still fall back to localhost (`prisma/env.ts`),
+  // so `db:push` and `db:seed` without a `DATABASE_URL` fill a database this app
+  // will not read, and nothing else would tell the developer.
+  if (process.env.NODE_ENV !== "test" && !globalForPrisma.prismaOfflineWarned) {
+    globalForPrisma.prismaOfflineWarned = true;
     console.warn(
       "[Prisma] No DATABASE_URL is set: the app serves its in-memory fixtures and keeps writes in memory. " +
         "Set DATABASE_URL and restart to use a database (the Prisma CLI and seed script default to " +
@@ -151,9 +159,11 @@ function createPrismaClient(): PrismaClient {
   const connectionTimeoutMillis =
     configuredTimeout && Number.isFinite(Number(configuredTimeout)) ? Number(configuredTimeout) : 10000;
 
-  // Reuse connection pool across Turbopack hot reloads in dev mode
+  // Reused across dev-server reloads, but only for the connection string it was
+  // built from. ceiling: a pool replaced because the URL changed is not ended; its
+  // idle connections close after `idleTimeoutMillis`.
   const pool =
-    globalForPrisma.pgPool ??
+    (globalForPrisma.pgPoolUrl === sslPolicy.connectionString ? globalForPrisma.pgPool : undefined) ??
     new Pool({
       connectionString: sslPolicy.connectionString,
       ssl: sslPolicy.ssl,
@@ -164,6 +174,7 @@ function createPrismaClient(): PrismaClient {
 
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.pgPool = pool;
+    globalForPrisma.pgPoolUrl = sslPolicy.connectionString;
   }
 
   const adapter = new PrismaPg(pool);
@@ -173,13 +184,20 @@ function createPrismaClient(): PrismaClient {
   });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+const databaseUrl = process.env.DATABASE_URL;
 
-// Kept across dev-server reloads, but only a client with a database behind it.
-// An offline one kept here would outlive a `DATABASE_URL` added later, while the
-// repositories, which read `DATABASE_URL` live, switched to the database.
-if (process.env.NODE_ENV !== "production" && process.env.DATABASE_URL) {
+// Kept across dev-server reloads, but only a client with a database behind it,
+// and only for the `DATABASE_URL` it was built from. The repositories read that
+// variable live, so a stale client of either kind would disagree with them: an
+// offline one would ignore a database added later, and a real one would keep
+// querying a database that was replaced or removed.
+export const prisma =
+  (databaseUrl && globalForPrisma.prismaUrl === databaseUrl ? globalForPrisma.prisma : undefined) ??
+  createPrismaClient();
+
+if (process.env.NODE_ENV !== "production" && databaseUrl) {
   globalForPrisma.prisma = prisma;
+  globalForPrisma.prismaUrl = databaseUrl;
 }
 
 /**
@@ -202,6 +220,7 @@ export async function disconnectPrisma(): Promise<void> {
   const pool = globalForPrisma.pgPool;
   if (pool) {
     globalForPrisma.pgPool = undefined;
+    globalForPrisma.pgPoolUrl = undefined;
     try {
       await pool.end();
     } catch {

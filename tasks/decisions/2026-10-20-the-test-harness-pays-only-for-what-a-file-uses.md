@@ -39,7 +39,8 @@ production-mode test the session secret a production process always has.
 deletes every environment variable the code reads that a developer's shell might set; the config
 pins `STRICT_PERSISTENCE` off for unit and components. `tests/setup/hermeticRuntime.ts`, in every
 project including `integration-db`, pins the time zone and replaces `fetch` with a guard that
-fails any test making a real network call, naming the test that made it. The zone is UTC for
+fails any test making a real network call, naming the test that made it; in every tier with no
+database it refuses sockets too, so even a test that stubs a `DATABASE_URL` cannot reach one. The zone is UTC for
 server code, as on CI and Vercel, and `Asia/Kuala_Lumpur` in the components tier, which stands in
 for the browsers of the shelter's staff and supporters; either way it is the same on every
 machine. The config adds `unstubEnvs`, `unstubGlobals` and `expect.requireAssertions`,

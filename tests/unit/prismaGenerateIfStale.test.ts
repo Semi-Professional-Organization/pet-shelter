@@ -57,6 +57,18 @@ describe("isClientCurrent", () => {
     expect(isClientCurrent(aligned, realigned)).toBe(true);
   });
 
+  it("is stale when only the spacing inside a doc comment changed, since doc comments reach the client", () => {
+    const before = SCHEMA.replace("  name   String", "  /// The pet's  name\n  name   String");
+    const after = SCHEMA.replace("  name   String", "  /// The pet's name\n  name   String");
+    expect(isClientCurrent(after, before)).toBe(false);
+  });
+
+  it("ignores realigned spacing before a trailing comment", () => {
+    const aligned = SCHEMA.replace("  name   String", "  name   String   // shown on the card");
+    const realigned = SCHEMA.replace("  name   String", "  name String // shown on the card");
+    expect(isClientCurrent(aligned, realigned)).toBe(true);
+  });
+
   it("is stale when no client has been generated yet", () => {
     expect(isClientCurrent(SCHEMA, null)).toBe(false);
   });

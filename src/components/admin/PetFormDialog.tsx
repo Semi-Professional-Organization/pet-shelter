@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pet, PetStatus } from "@/types/pet";
@@ -120,9 +120,10 @@ export function PetFormDialog({
   // Which opening this is, so a save that settles after the dialog was closed and
   // opened again cannot close or unlock the new opening.
   const openingRef = useRef(0);
-  useEffect(() => {
-    // Here rather than beside `setSubmitted(false)` below: a ref must not be
-    // written during render.
+  useLayoutEffect(() => {
+    // Here rather than beside `setSubmitted(false)` below, since a ref must not
+    // be written during render; and a layout effect, so the ref is cleared in the
+    // same commit as the button, before the reopened dialog can be used.
     if (currentKey !== null) {
       submittedRef.current = false;
       openingRef.current += 1;

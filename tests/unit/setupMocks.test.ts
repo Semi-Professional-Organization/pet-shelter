@@ -1,3 +1,4 @@
+import net from "node:net";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { cookies, headers } from "next/headers";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -11,6 +12,7 @@ import {
   mockCookieStore,
   MockNavigationError,
 } from "../setup/nextMocks";
+import { takeUnexpectedRequests } from "../setup/hermeticRuntime";
 
 import {
   getServerPets,
@@ -243,6 +245,17 @@ describe("hermetic runtime", () => {
   it("runs server code in UTC, as on Vercel, whatever zone the machine is in", () => {
     expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe("UTC");
     expect(new Date("2026-10-20T00:30:00Z").getHours()).toBe(0);
+  });
+
+  it("refuses fetch, and names the URL", async () => {
+    await expect(fetch("https://example.invalid/receipt")).rejects.toThrow(/Network access is disabled/);
+    expect(takeUnexpectedRequests()).toEqual([expect.objectContaining({ url: "https://example.invalid/receipt" })]);
+  });
+
+  it("refuses a socket while there is no database, and names the address", () => {
+    // What `pg` does when a test stubs a DATABASE_URL and leaves the client real.
+    expect(() => net.connect(5432, "127.0.0.1")).toThrow(/Sockets are disabled/);
+    expect(takeUnexpectedRequests()).toEqual([expect.objectContaining({ url: "socket 127.0.0.1:5432" })]);
   });
 });
 

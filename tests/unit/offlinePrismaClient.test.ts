@@ -91,9 +91,13 @@ describe("the Prisma client with no DATABASE_URL", () => {
 
   it("says once, outside tests, that there is no database, since the CLI still defaults to localhost", async () => {
     vi.stubEnv("NODE_ENV", "development");
-    vi.resetModules();
+    vi.stubGlobal("prismaOfflineWarned", undefined);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
+    // Twice, as a dev-server reload evaluates the module again.
+    vi.resetModules();
+    await import("@/lib/server/prisma");
+    vi.resetModules();
     await import("@/lib/server/prisma");
 
     expect(warn).toHaveBeenCalledTimes(1);

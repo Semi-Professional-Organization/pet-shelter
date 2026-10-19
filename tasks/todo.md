@@ -48,10 +48,10 @@ developer shell leaking in.
 lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
 secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
 skipped the regeneration). Unit, integration and component suites together, after merging
-master at `474abbe`: 138 files, 2,306 tests, 40 to 51 s (master: 192 to 216 s). Shuffled test
+master at `474abbe`: 138 files, 2,315 tests, 40 to 52 s (master: 192 to 216 s). Shuffled test
 order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** eleven `/code-review` rounds over the whole diff raised 92 findings; each was fixed, or
+**Review:** twelve `/code-review` rounds over the whole diff raised 100 findings; each was fixed, or
 checked by probe and answered, in the commit after it, and the loop runs until a round comes back
 clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
@@ -77,7 +77,11 @@ the shared one does, recorded the pet form's lock and its contract with parents
 machine-locale gap (`tasks/open/default-locale-formatting-differs-between-machines.md`). Round 11
 made the offline client plain objects (spies and stubs on it now work, as on the real client),
 stopped caching it across dev reloads, kept a save that settles after a reopen from closing the
-new opening, and took the staff plaintext passwords out of the exported seed table.
+new opening, and took the staff plaintext passwords out of the exported seed table. Round 12 made
+every tier without a database refuse sockets as well as `fetch`, so a test that stubs a
+`DATABASE_URL` and forgets to mock Prisma fails instead of reaching a local Postgres; keyed the
+cached client and pool to the URL they were built from; scrubbed the `PG*` variables `pg` reads;
+and replaced the runbook's and the guide's copies of `createPrismaClient` with what to check.
 
 **Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
 `npm test` runs made beside `npm run build`, and the error text was lost; filed as

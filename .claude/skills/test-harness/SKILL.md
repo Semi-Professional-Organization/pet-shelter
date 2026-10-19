@@ -23,7 +23,9 @@ Prisma loads; its suites refuse a remote database unless `ALLOW_REMOTE_DB_TESTS=
    users' browsers) and replaces `fetch` with a guard: any real network call fails the test, naming
    the URL and the test that was running when it was made, even if the code under test swallows the
    error. Stub it with `vi.stubGlobal("fetch", ...)`, which `unstubGlobals` undoes before the next
-   test; a `vi.spyOn` on it stays in place for the rest of the file unless you restore it.
+   test; a `vi.spyOn` on it stays in place for the rest of the file unless you restore it. In every
+   tier but `integration-db` it also refuses any socket (`net.Socket.prototype.connect`, which `pg`,
+   `http` and `tls` all reach), so a test that stubs a `DATABASE_URL` must mock the Prisma client.
 3. **`nextMocks.ts`** — every project.
    - Overload-aware `next/headers` (`cookies()` accepts both `set(name, value, opts)` and
      `set({ name, value, ...opts })`; `maxAge: 0` expires rather than writes), `next/cache`
