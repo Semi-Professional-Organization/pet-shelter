@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, unsealSession } from "@/lib/security/sessionToken";
-import { PERMISSIONS, roleHasPermission, type Permission } from "@/lib/security/permissions";
+import { canOpenAdminSection, type AdminSectionHref } from "@/lib/security/adminSections";
 import { EMAIL_BRAND, EMAIL_TONE } from "@/lib/presentation/emailTokens";
 
 /**
@@ -32,10 +32,12 @@ import { EMAIL_BRAND, EMAIL_TONE } from "@/lib/presentation/emailTokens";
  * permission matrix are reused here rather than reimplemented.
  */
 
-/** Routes that must answer with an accurate status before rendering. */
-const GUARDED_ROUTES: { prefix: string; permission: Permission }[] = [
-  { prefix: "/admin/members", permission: PERMISSIONS.MANAGE_MEMBERS },
-];
+/**
+ * Sections that must answer with an accurate status before rendering. Who may open
+ * one is the section table's answer (`adminSections.ts`), the one its nav tab and
+ * page gate give, so the three cannot drift; only the role read here is the cookie's.
+ */
+const GUARDED_SECTIONS: AdminSectionHref[] = ["/admin/members"];
 
 /**
  * Returns a document response, which is the documented way to produce a status
@@ -115,10 +117,10 @@ function denialResponse(status: 401 | 403, title: string, message: string): Next
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
-  const guard = GUARDED_ROUTES.find(
-    (route) => pathname === route.prefix || pathname.startsWith(`${route.prefix}/`)
+  const section = GUARDED_SECTIONS.find(
+    (href) => pathname === href || pathname.startsWith(`${href}/`)
   );
-  if (!guard) return NextResponse.next();
+  if (!section) return NextResponse.next();
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = token ? unsealSession(token) : null;
@@ -127,9 +129,9 @@ export function proxy(request: NextRequest): NextResponse {
     return denialResponse(401, "Sign in required", "Your session has ended");
   }
 
-  // roleHasPermission normalises the role, so a cookie issued before the RBAC
+  // The table resolves deprecated aliases, so a cookie issued before the RBAC
   // migration (role "ADMIN") is still recognised as a Super Admin here.
-  if (!roleHasPermission(session.role, guard.permission)) {
+  if (!canOpenAdminSection(session.role, section)) {
     return denialResponse(403, "Forbidden", "You do not have access to this area");
   }
 
