@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { donationPledgeSchema } from "@/lib/validations/donation";
 import { submitDonationPledgeAction } from "@/actions/donations";
 import { sendDonationReceiptEmail } from "@/lib/email";
@@ -155,6 +155,9 @@ describe("Donation Server Action (submitDonationPledgeAction)", () => {
 
 describe("Donation Receipt Transactional Email Dispatcher", () => {
   it("should simulate and record email dispatch for donation receipts", async () => {
+    // Simulation mode. The mailer tests the key for truthiness, so an empty string is unset.
+    vi.stubEnv("RESEND_API_KEY", "");
+
     const mockReceipt = {
       receiptNumber: "HFS-DON-202608-9999",
       date: "16 Aug 2026, 12:30 AM",

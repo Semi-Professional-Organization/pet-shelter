@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -10,9 +10,11 @@ import {
   currentIssuerIdentity,
 } from "@/lib/domain/shelterIdentity";
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.resetModules();
+// The module reads ROS_REGISTRATION_NO once, when the import above loads it. Vitest hoists this
+// above the imports, so that load sees the variable unset and the default the tests below pin.
+// Unset rather than "": the module reads it with `??`, under which "" is a configured value.
+vi.hoisted(() => {
+  vi.stubEnv("ROS_REGISTRATION_NO", undefined);
 });
 
 describe("statutory identifiers", () => {
@@ -49,6 +51,8 @@ describe("the unresolved ROS registration discrepancy (P2)", () => {
   });
 
   it("can be corrected by configuration, without a code deploy", async () => {
+    // The one test that needs a fresh module: the override is read at load, so only a re-import
+    // can see it.
     vi.resetModules();
     vi.stubEnv("ROS_REGISTRATION_NO", "PPM-012-10-18042016");
 
