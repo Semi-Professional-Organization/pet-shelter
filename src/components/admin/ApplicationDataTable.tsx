@@ -47,7 +47,7 @@ export function ApplicationDataTable({
   canReview,
   canDelete,
 }: {
-  initialApplications?: AdoptionApplicationRecord[];
+  initialApplications: AdoptionApplicationRecord[];
   /** REVIEW_APPLICATIONS: change a status, record a decision, schedule a meet and greet. */
   canReview: boolean;
   /** DELETE_APPLICATIONS: remove a record. */
@@ -75,6 +75,7 @@ export function ApplicationDataTable({
     setStatusError,
     handleQuickStatus,
     handleUpdateStatusWithNotes,
+    handleInterviewScheduled,
     confirmDelete,
     handleExportCsv,
   } = handlers;
@@ -371,6 +372,7 @@ export function ApplicationDataTable({
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         onUpdateStatus={handleUpdateStatusWithNotes}
+        onInterviewScheduled={handleInterviewScheduled}
         canReview={canReview}
       />
 

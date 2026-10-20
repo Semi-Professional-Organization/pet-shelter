@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import { SortingState } from "@tanstack/react-table";
 import { AdoptionApplicationRecord, ApplicationStatus } from "@/types/application";
-import { useApplicationStore } from "@/lib/client/applicationStore";
 import { exportApplicationsToCsv } from "@/lib/presentation/exportCsv";
 import {
   updateApplicationStatus as serverUpdateStatus,
@@ -11,19 +10,19 @@ import {
 } from "@/actions/applications";
 
 /**
- * State and handlers for the applications board.
+ * State and handlers for the applications board, over the server's applications.
  *
  * Decisions go straight to the server, which enforces the status state machine and the
  * reviewer's permission. They used to be checked against the browser's application store
  * first, which holds only the three bundled samples and what this browser created, so for
  * every real application the check answered "Application not found" and the server was
- * never asked: no role, Super Admin included, could record a decision on one.
+ * never asked: no role, Super Admin included, could record a decision on one. The board no
+ * longer reads that store at all: given no server list, it used to show the samples as
+ * though they were the shelter's applicants.
  */
-export function useApplicationTableController(initialApplications?: AdoptionApplicationRecord[]) {
-  const { applications: storeApplications } = useApplicationStore();
-
+export function useApplicationTableController(initialApplications: AdoptionApplicationRecord[]) {
   const [localApplications, setLocalApplications] = useState<AdoptionApplicationRecord[] | null>(null);
-  const applications = localApplications || initialApplications || storeApplications;
+  const applications = localApplications || initialApplications;
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -69,12 +68,17 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
       });
   };
 
-  const handleUpdateStatusWithNotes = (
+  /**
+   * The decision dialog's save. Applied on screen at once, but the answer is the
+   * server's: the dialog waits for it, so a refused transition is reported where it was
+   * made rather than after the dialog has said it worked.
+   */
+  const handleUpdateStatusWithNotes = async (
     id: string,
     status: ApplicationStatus,
     notes: string,
     notifyApplicant = true
-  ) => {
+  ): Promise<{ success: boolean; error?: string }> => {
     setStatusError(null);
     const prevApplications = applications;
     setLocalApplications((prev) =>
@@ -82,21 +86,35 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
         app.id === id ? { ...app, status, adminReviewNotes: notes } : app
       )
     );
-    serverUpdateStatus({ id, status, adminReviewNotes: notes, notifyApplicant })
-      .then((serverRes) => {
-        if (serverRes && !serverRes.success) {
-          setLocalApplications(prevApplications);
-          setStatusError(serverRes.error || "Failed to update application status.");
-        }
-      })
-      .catch((err) => {
-        console.warn("Background server update sync:", err);
+    try {
+      const serverRes = await serverUpdateStatus({ id, status, adminReviewNotes: notes, notifyApplicant });
+      if (serverRes && !serverRes.success) {
         setLocalApplications(prevApplications);
-        setStatusError(err instanceof Error ? err.message : "Failed to update application status.");
-      });
-    // Applied on screen at once and confirmed by the server afterwards; a refusal rolls
-    // the row back and shows in the board's banner.
-    return { success: true };
+        return { success: false, error: serverRes.error || "Failed to update application status." };
+      }
+      return { success: true };
+    } catch (err) {
+      console.warn("Background server update sync:", err);
+      setLocalApplications(prevApplications);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Failed to update application status.",
+      };
+    }
+  };
+
+  /**
+   * Shows on the board the status and notes `scheduleApplicationInterview` wrote. Not a
+   * write of its own: the dialog used to follow a schedule with a status save, which
+   * replaced the meeting's notes, sent a second email and reopened decided applications.
+   */
+  const handleInterviewScheduled = (
+    id: string,
+    written: { status: ApplicationStatus; adminReviewNotes: string }
+  ) => {
+    setLocalApplications((prev) =>
+      (prev || applications).map((app) => (app.id === id ? { ...app, ...written } : app))
+    );
   };
 
   const confirmDelete = async () => {
@@ -147,6 +165,7 @@ export function useApplicationTableController(initialApplications?: AdoptionAppl
       setStatusError,
       handleQuickStatus,
       handleUpdateStatusWithNotes,
+      handleInterviewScheduled,
       confirmDelete,
       handleExportCsv,
     },

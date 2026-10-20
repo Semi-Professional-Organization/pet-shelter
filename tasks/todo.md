@@ -50,9 +50,11 @@ Deliberately not done, and why:
 - The applications board never sent a decision on a real application to the server: it checked
   the browser's sample copy first and stopped at "Application not found". First filed as not a
   role dead end, then fixed in the sixth review round, because the controls this branch offers
-  reviewers could not work without it. What is left of that board — the dialog reporting success
-  before the server answers, scheduling reopening a decided application — is in
-  `tasks/open/application-review-dialog-answers-before-the-server.md`.
+  reviewers could not work without it. That made reachable two things the dialog did on its own,
+  fixed in the seventh: it said a decision was saved before the server answered, and it followed
+  every meet and greet with a status save of its own, which replaced the meeting's notes, sent a
+  second email and reopened decided applications. The scheduling action now answers with what it
+  wrote, and stops at a write the repository refused instead of sending the invitation anyway.
 - Content Editors cannot upload report PDFs; the button is hidden rather than `/api/upload`
   widened, because widening who can store files is the owner's call:
   `tasks/decisions/2026-10-19-content-editors-paste-report-links-rather-than-upload.md`.

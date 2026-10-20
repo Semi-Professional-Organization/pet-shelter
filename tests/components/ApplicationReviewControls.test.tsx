@@ -118,3 +118,83 @@ describe("applications board controls", () => {
     expect(screen.queryByText(/Application not found/)).toBeNull();
   });
 });
+
+/**
+ * The review dialog reports what the server did.
+ *
+ * Once decisions reached the server, two things the dialog did on its own became visible:
+ * it said a decision was saved before the server answered, and it followed every meet and
+ * greet with a status save of its own, which replaced the meeting's notes, sent a second
+ * email and moved decided applications back to Under Review. Each case fails against the
+ * dialog before 2026-10-20.
+ */
+describe("applications review dialog", () => {
+  beforeEach(() => {
+    actions.updateApplicationStatus.mockReset().mockResolvedValue({ success: true });
+    actions.scheduleApplicationInterview.mockReset();
+  });
+
+  // The board behind an open dialog is hidden from the accessibility tree.
+  const rowStatus = () =>
+    screen.getByRole("combobox", { name: /Change status for application/i, hidden: true });
+
+  it("keeps the dialog open with the server's refusal when a decision is refused", async () => {
+    const refusal = "Illegal status transition: Cannot change application from 'SUBMITTED' to 'APPROVED'.";
+    actions.updateApplicationStatus.mockResolvedValue({ success: false, error: refusal });
+    board(true, false);
+
+    const user = setupUser();
+    const dialog = await openDetail();
+    await user.click(within(dialog).getByRole("button", { name: "Approve" }));
+    await user.click(within(dialog).getByRole("button", { name: /Save Decision/i }));
+
+    expect(await within(dialog).findByText(refusal)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/saved successfully/i)).toBeNull();
+    expect(rowStatus()).toHaveValue("SUBMITTED");
+  });
+
+  it("schedules a meet and greet with one write, keeping a decided application's status", async () => {
+    actions.scheduleApplicationInterview.mockResolvedValue({
+      success: true,
+      status: "APPROVED",
+      adminReviewNotes: "[Meet & Greet Scheduled: 2026-11-02 at 14:00 (In-Person Visit) - Location: Shelter]",
+    });
+    render(
+      <ApplicationDataTable
+        initialApplications={[{ ...APPLICATION, status: "APPROVED" }]}
+        canReview={true}
+        canDelete={false}
+      />
+    );
+
+    const user = setupUser();
+    const dialog = await openDetail();
+    await user.click(within(dialog).getByRole("button", { name: /Schedule Meet & Greet/i }));
+    await user.click(within(dialog).getByRole("button", { name: /Confirm Meet & Greet/i }));
+
+    expect(await within(dialog).findByText(/Meet & Greet scheduled/)).toBeInTheDocument();
+    expect(actions.scheduleApplicationInterview).toHaveBeenCalledTimes(1);
+    expect(actions.updateApplicationStatus).not.toHaveBeenCalled();
+    expect(rowStatus()).toHaveValue("APPROVED");
+  });
+
+  it("says no email went out when the invitation box was unticked", async () => {
+    actions.scheduleApplicationInterview.mockResolvedValue({
+      success: true,
+      status: "UNDER_REVIEW",
+      adminReviewNotes: "[Meet & Greet Scheduled: 2026-11-02 at 14:00 (In-Person Visit) - Location: Shelter]",
+    });
+    board(true, false);
+
+    const user = setupUser();
+    const dialog = await openDetail();
+    await user.click(within(dialog).getByRole("button", { name: /Schedule Meet & Greet/i }));
+    await user.click(within(dialog).getByLabelText(/Dispatch calendar invitation email/i));
+    await user.click(within(dialog).getByRole("button", { name: /Confirm Meet & Greet/i }));
+
+    expect(await within(dialog).findByText("Meet & Greet scheduled. No email was sent.")).toBeInTheDocument();
+    expect(actions.scheduleApplicationInterview).toHaveBeenCalledWith(
+      expect.objectContaining({ notifyApplicant: false })
+    );
+  });
+});
