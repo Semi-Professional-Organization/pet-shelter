@@ -1,5 +1,6 @@
 "use client";
 
+import { SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -398,7 +399,7 @@ export function Navbar() {
                   {/* Shelter Info */}
                   <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2 text-xs text-muted-foreground">
                     <p className="font-bold text-foreground">{isMs ? "Santuari Petaling Jaya:" : "PJ Sanctuary Desk:"}</p>
-                    <p>03-7876 5432 • Tue–Sun: 10AM–5PM</p>
+                    <p>{SHELTER_PHONE_DISPLAY} • Tue–Sun: 10AM–5PM</p>
                     <Link
                       href="/pets"
                       onClick={() => setIsMobileOpen(false)}

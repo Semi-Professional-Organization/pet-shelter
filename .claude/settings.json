@@ -72,6 +72,9 @@
       "Bash(node scripts/ledger-issues.mjs *--apply*)",
       "PowerShell(npm run ledger:issues *--apply*)",
       "PowerShell(node scripts/ledger-issues.mjs *--apply*)"
+    ],
+    "allow": [
+      "gh pr merge"
     ]
   },
   "hooks": {

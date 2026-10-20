@@ -6,6 +6,7 @@ import { usePetStore } from "@/lib/client/petStore";
 import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
 import { usePetSponsorshipSummary } from "@/hooks/usePetSponsorshipSummary";
 import { shouldShowSocialProof } from "@/lib/domain/petSponsorship";
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 
 export type PetDetailTab = "about" | "status" | "updates" | "support";
 
@@ -36,7 +37,7 @@ export function usePetDetailViewController({ initialPet, initialTab = "about" }:
     : encodeURIComponent(
         `Hello Hope for Strays Selangor! I am interested in inquiring about adopting ${pet.name} (${pet.breed}, Ref: ${pet.id}). Could you let me know about visiting arrangements?`
       );
-  const waUrl = `https://wa.me/60127876543?text=${waMessage}`;
+  const waUrl = `${SHELTER_WHATSAPP_URL}?text=${waMessage}`;
 
   const handleShare = async () => {
     if (typeof window !== "undefined") {
