@@ -64,10 +64,11 @@ export interface SponsorContext {
 /**
  * A sponsor session and the sponsor record it names: who is signed in to the portal.
  *
- * The one test the dashboard (through `getSponsorContext`) and /sponsor/login (through
- * `sponsorSessionNamesASponsor`) both apply. Two copies of it disagreed once already,
- * cookie alone on one side and cookie plus record on the other, and a sponsor whose
- * record was gone went round between the two pages with none ever rendering.
+ * The one test the dashboard and the certificate page (through `getSponsorContext`) and
+ * /sponsor/login (through `sponsorSessionNamesASponsor`) all apply. Two copies of it
+ * disagreed once already, cookie alone on one side and cookie plus record on the other,
+ * and a sponsor whose record was gone went round between the two pages with none ever
+ * rendering.
  */
 async function findSignedInSponsor(): Promise<{ session: SponsorSession; sponsor: SponsorRecord } | null> {
   const session = await getCurrentSponsorSession();

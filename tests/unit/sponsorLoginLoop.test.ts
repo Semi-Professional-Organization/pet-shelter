@@ -71,6 +71,21 @@ describe("sponsor sign-in", () => {
     logged.mockRestore();
   });
 
+  it("lets an outage fail the certificate page as it fails the dashboard", async () => {
+    // Only the sign-in form answers an outage as "signed out". The certificate page did
+    // too, and sent a signed-in sponsor to sign in again while the dashboard failed.
+    // Fails against the page that asked through `sponsorSessionNamesASponsor`.
+    const { findSponsorById } = await import("@/lib/server/sponsorRepository");
+    const outage = new Error("connect ECONNREFUSED");
+    vi.mocked(findSponsorById).mockRejectedValueOnce(outage).mockRejectedValueOnce(outage);
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await setSponsorSessionCookie({ sponsorId: "spn-bronze-01", email: "bronze@example.com", name: "Nurul Aisyah" });
+
+    await expect(open("dashboard")).rejects.toBe(outage);
+    await expect(open("certificate")).rejects.toBe(outage);
+    logged.mockRestore();
+  });
+
   it("decides without reading the sponsor's sponsorships", async () => {
     const { listSponsorshipsByUserId } = await import("@/lib/server/sponsorshipLedger");
     vi.mocked(listSponsorshipsByUserId).mockClear();
