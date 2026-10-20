@@ -21,11 +21,12 @@ Suspending clears the invitation token (`updateMemberStatusRecord` in
 `ACTIVE` account holding the unusable placeholder password. "Resend" is no longer offered and the
 server would refuse it. There is no staff password reset.
 
-## 3. Member actions fail silently once the cookie expires
+## 3. Member actions show nothing when the call itself fails
 
-Server Actions post to the route they are used on. On `/admin/members` the proxy answers an
-expired cookie with its HTML 401 document instead of running the action, and the four handlers in
-`src/hooks/useMemberTableController.ts` have no `catch`, so the click shows nothing.
+An expired cookie no longer does this: the proxy lets Server Actions through, and the action's own
+refusal ("Authentication required. Please sign in.") shows in the table's banner. But the four
+handlers in `src/hooks/useMemberTableController.ts` have no `catch`, so a call that throws (the
+network, or a Server Action id gone stale after a deploy) still shows nothing.
 
 ## 4. A dead invitation link still shows the activation form
 

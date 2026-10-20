@@ -23,6 +23,18 @@ A fresh STAFF account's first screen after signing in was a refusal: every sign-
 `/admin/pets`. The brief asked for that fixed first and the same class swept across every role,
 admin page, action and the sponsor portal, with the role × page × action matrix as evidence.
 
+Scope, written at close, when the owner's scope rule arrived. Written first, it would have named
+the review dialog's server path as in scope before the sixth round woke it
+(`tasks/lessons/2026-10-20-a-fix-that-wakes-a-dead-path-owns-everything-behind-it.md`):
+
+- **Done when:** every role, the five canonical ones and the three legacy aliases, is sent to,
+  shown and offered only what it can use in the admin console and the sponsor portal; each fix has
+  a test shown failing without it; every gate is green.
+- **In scope:** landing and redirects, nav against page gates, page gates against action gates,
+  controls per permission, signed-out and suspended states, sponsor-portal session dead ends, and
+  correctness bugs this branch made reachable.
+- **Not in scope:** everything in the four `tasks/open` entries listed under Review.
+
 - [x] Audit: lessons and open entries for role, permission, redirect, nav and suspension; no open
       PR overlaps. Five read-only readers built the matrix, one per area.
 - [x] Landing: sign-in, registration, demo sign-in and invite acceptance enter the console by a
@@ -41,9 +53,21 @@ admin page, action and the sponsor portal, with the role × page × action matri
       sponsor" now leads to the rescues; "Claim your portal" offered to sponsors, not every donor.
 - [x] Tests for every fix, each shown failing against the base branch's code through an alias
       probe; local browser run for Staff, Coordinator, Content Editor and Animal Manager.
-- [ ] `/code-review high` until a clean round; draft PR; CI.
+- [x] `/code-review high`: seven rounds and one pass by another session, then stopped under the
+      owner's scope rule (round 8 needs the owner's go-ahead); draft PR; CI.
 
 ## Review
+
+**Review tally** (candidates: fixed / deferred to `tasks/open` / declined with a reason):
+round 1, 8: 6/0/2 · round 2, 8: 4/0/4 · round 3, 6: 6/0/0 · round 4, 6: 5/0/1 · round 5, 8: 8/0/0
+· round 6, 8: 6/0/2 · round 7, 8: 5/1/2 · other session's pass, 9: 5/3/1. Total 61: 45 fixed,
+4 deferred, 12 declined. In-scope correctness findings were still arriving at the last pass (the
+approval re-run, the proxy's answer to Server Actions), and the round 7 fixes have had no round of
+their own.
+
+**Verified at the branch tip,** after merging `origin/master` (`474abbe`): `npm run check`
+(0 errors, 12 warnings, none new), `npm test` 2063 passed, `npm run test:components` 274,
+`npm run test:integration` 92, `npm run build` exit 0 offline with throwaway secrets.
 
 Deliberately not done, and why:
 
@@ -64,6 +88,10 @@ Deliberately not done, and why:
   loose ends unrelated to sessions: `tasks/open/staff-account-flows-with-no-way-forward.md`,
   `tasks/open/admin-console-loose-ends-from-the-role-sweep.md`,
   `tasks/open/sponsor-portal-loose-ends.md`.
+- The applications board stops following the server after its first change, rolls back every
+  row on a refusal, and scheduling replaces the review notes. All predate this branch; the first
+  two want the server's list as the board's source of truth, a restructure rather than a fix:
+  `tasks/open/applications-board-shows-its-own-copy-after-a-change.md`.
 
 # A short staff invite code no longer takes the site down
 
