@@ -8,6 +8,7 @@ import { SponsorshipModal } from "./SponsorshipModal";
 import { MedicalTimeline } from "./MedicalTimeline";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   Heart,
@@ -229,7 +230,7 @@ export function PetDetailView(props: PetDetailViewProps) {
                   "foster". Animals under care get neither — sponsorship below. */}
               {placement.foster && (
                 <a
-                  href={`https://wa.me/60123456789?text=${encodeURIComponent(
+                  href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
                     `Hi Hope for Strays, I would like to foster ${pet.name}.`
                   )}`}
                   target="_blank"
