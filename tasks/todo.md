@@ -15,6 +15,64 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# CI speed and a protected master, not yet switched on
+
+**Branch:** `claude/project-thread-2ne14n` · opened 2026-10-20 · base `f1f448a` · PR #140, draft
+
+The owner asked for the fastest, most secure CI a two-person team should run, and for sharding,
+consensus and canary releases to be considered. A measured audit came first, delivered in the
+project thread as `ci-review-2026-10-19.md`. The owner approved it and asked for the details to
+be critiqued before building, then asked to push cleanly and stop before merging.
+
+- [x] A seed hash cache was built and measured here, then dropped when #141 precomputed the
+      hashes, which removes the same cost and its failure path.
+- [x] `Commit messages` runs in its own workflow, again whenever the title is edited. Pull
+      requests that Dependabot opens skip the commit audit but not the title check.
+- [x] Actions pinned to commits at their current majors; `ubuntu-24.04`; read-only permissions;
+      no persisted token in `ci.yml`.
+- [x] Node 24, read from `.nvmrc` by every workflow.
+- [x] A `Production build` job and a `Doc invariants` step. `master` runs are never cancelled.
+      Playwright installs only the headless shell, and its report uploads on every run.
+- [x] Dependabot: Actions weekly, grouped, a week behind each release; npm security updates only.
+- [ ] The master ruleset is decided but not switched on, because the owner asked to stop first.
+      The payload and its kill condition are in
+      `tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`.
+- [ ] Dependabot alerts and security updates are off, and switching them on is the owner's step.
+
+## Review
+
+**Verified:** PR #140's CI at `1ef6a0c`, 8 of 8 checks green, on Node 24 and `ubuntu-24.04`.
+Wall clock was 126 s, against 2.5 to 4.5 minutes before. The unit, integration and component job
+took 114 s (150–235 s before), of which its suites took 72 s (193 s). `Production build` took
+51 s. Playwright took 122 s, its Chromium step 19 s (22 s), and a 234 KB report uploaded from a
+green run. On one machine and tree, the unit project went from 130.4 s to 54.4 s. Local gates at
+the last code change: `typecheck` 0, `lint` 0 errors, `docs:check` OK, `build` exit 0, `test`
+1,935 passed, `test:components` 228, `test:integration` 92.
+
+**Kill conditions.** K-A4 did not fire. On one head commit, editing the title to a lowercase
+summary started a new `Commit messages` run that failed on rule 3, and restoring the title started
+one that passed; each event produced exactly one run. K-A1 was retired unevaluated, when review
+removed the `Vercel` requirement it guarded. Its successor, K-A1′, waits for the ruleset.
+
+**Review.** Two `/code-review high` rounds. Round 1 found seven issues. Five were fixed: the build
+check moved into CI, Node 24, `overwrite`, retry after a failed derivation in both stores, and a
+comment. The other two were already planned or accepted. Round 2 found seven. Two in-scope
+wording errors were fixed: npm security updates depend on a setting that is off, and five checks
+apply now with a sixth after merge. The rest were recorded and declined. Offline `initPromise`
+stickiness was pre-existing; #141 removed it by precomputing the hashes. Long Dependabot titles are an
+accepted edge. Precomputed hashes belong to the follow-up branch. The stale claim lines went
+with the claim file. There was no third round, per the owner's scope rule relayed on 2026-10-20.
+
+**Deliberately not done:**
+
+- The ruleset and the Dependabot settings are not switched on: the owner asked to stop before
+  merging, and both are the owner's steps.
+- No sharding, approvals, merge queue, canary or browser cache:
+  `tasks/decisions/2026-10-20-ci-skips-sharding-merge-queues-and-canary-releases.md`.
+- `engines.node` stays an open range: pinning it changes what Vercel deploys.
+- The API conformance linter (5 errors on `master`) and the always-green "Layer boundaries" step
+  were left to the scripts thread's catalogue of unwired checks.
+- The hash cache was dropped once #141 merged first, by a merge commit rather than a rewrite.
 # The test suite runs hermetic and pays only for what a test uses
 
 **Branch:** `claude/project-thread-jdktt3` · opened 2026-10-20 · base `f1f448a`

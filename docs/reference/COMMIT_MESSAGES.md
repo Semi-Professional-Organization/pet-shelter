@@ -160,6 +160,13 @@ Bypass a single commit with `git commit --no-verify`; remove it with
 `origin/<base>..HEAD`. That excludes everything already reachable from the base branch, so
 merging the base *into* a feature branch never dilutes the result.
 
+The same job lints the pull request's title, which becomes the squash-merge subject. It lives in
+`.github/workflows/commit-messages.yml` rather than `ci.yml` so that editing the title reruns it:
+`Commit messages` is a required check for merging into `master`, and a result for a title the pull
+request no longer has would either block the merge or wave the wrong subject through. Pull requests
+that Dependabot opens skip the commit audit, because their bodies quote release notes, but not the
+title check.
+
 It is not a guarantee that pre-standard history is never re-linted, and an earlier version of this
 page claimed it was. Merging some **other** unmerged branch into your feature branch adds every one
 of its commits to the range, grandfathered or not; this repo's own `78609a1` did exactly that. If
