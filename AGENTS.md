@@ -80,6 +80,13 @@ drifts. What the descriptions cannot say:
 - Write the message to a file and use `git commit -F`, never `-m`. Five commits in this history
   have a bare `@` as their subject because a PowerShell here-string handed its delimiter to `-m`.
 
+## Agent scripts
+
+- `node scripts/agent.mjs --help` lists the agent scripts and what each one touches.
+- In the Claude desktop app, never sleep-poll CI (`sleep` loops, `gh pr checks --watch`,
+  `gh run watch`): its CI monitor wakes the session when checks finish. Anywhere else, check once
+  when you need the result rather than in a loop.
+
 ## Verification
 
 - Run the relevant local verification before reporting a change complete. If a check cannot run,

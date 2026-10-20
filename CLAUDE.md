@@ -79,6 +79,15 @@ what each returned — announcing "done" without them is not a close.
    `tasks/lessons/` and not in this list. Its second review found eleven real defects, one of them
    defeating the PR's headline claim. Verify each finding by probe before accepting or dismissing
    it; a finding that changes what the PR claims stops the merge.
+
+   **Scope bounds the loop (owner's rule, 2026-10-20).** State in the PR body what done means, what
+   is in scope and what is not; a heuristic gets a `ceiling:` comment saying what it handles and how
+   its accuracy is measured. Triage every finding: fix in-scope correctness bugs; record anything
+   beyond a stated ceiling, any new behaviour and anything out of scope once per class in
+   `tasks/open/`, and decline it; fix wording or style only when trivial. Stop after two
+   consecutive rounds with no in-scope correctness finding. At round 8, or sooner if in-scope
+   findings are not falling, stop and ask the owner. Only the owner widens scope. Why: the first
+   agent-scripts PR ran 25 rounds, most of them on shell spellings a measurement did not need.
 7. **Merge-check against current `origin/master`, then commit and push.** `git fetch origin
    master`, then `git merge-tree --write-tree --name-only HEAD origin/master` — a dry run that
    touches no ref and no working tree. A conflicted PR gets no CI run at all, so resolve before
