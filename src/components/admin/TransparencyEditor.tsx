@@ -119,7 +119,7 @@ function makeEmptyReport() {
   };
 }
 
-export function TransparencyEditor({ canUploadFiles }: { canUploadFiles: boolean }) {
+export function TransparencyEditor() {
   const [tab, setTab] = useState<Tab>("expenses");
   const [snapshot, setSnapshot] = useState<TransparencySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -297,7 +297,7 @@ export function TransparencyEditor({ canUploadFiles }: { canUploadFiles: boolean
       )}
       {tab === "impact" && <ImpactTab snapshot={snapshot} busy={busy} run={run} />}
       {tab === "reports" && (
-        <ReportsTab snapshot={snapshot} busy={busy} run={run} canUploadFiles={canUploadFiles} />
+        <ReportsTab snapshot={snapshot} busy={busy} run={run} />
       )}
     </div>
   );
@@ -929,13 +929,10 @@ function ReportsTab({
   snapshot,
   busy,
   run,
-  canUploadFiles,
 }: {
   snapshot: TransparencySnapshot | null;
   busy: boolean;
   run: Runner;
-  /** Whether `/api/upload` will take a file from this member (MANAGE_PET_MEDIA). */
-  canUploadFiles: boolean;
 }) {
   const [form, setForm] = useState(makeEmptyReport);
   const [uploading, setUploading] = useState(false);
@@ -1054,41 +1051,31 @@ function ReportsTab({
                 onChange={(e) => setForm({ ...form, fileUrl: e.target.value })}
                 required
               />
-              {canUploadFiles && (
-                <>
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept="application/pdf"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void upload(file);
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="shrink-0 gap-1.5"
-                    disabled={uploading}
-                    onClick={() => fileInput.current?.click()}
-                  >
-                    {uploading ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Upload className="size-3.5" />
-                    )}
-                    Upload PDF
-                  </Button>
-                </>
-              )}
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void upload(file);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0 gap-1.5"
+                disabled={uploading}
+                onClick={() => fileInput.current?.click()}
+              >
+                {uploading ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Upload className="size-3.5" />
+                )}
+                Upload PDF
+              </Button>
             </div>
-            {!canUploadFiles && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your role cannot upload files. Paste a link to the PDF, or ask a Super Admin
-                to upload it.
-              </p>
-            )}
             {uploadError && (
               <p className="mt-1 text-xs font-semibold text-destructive">{uploadError}</p>
             )}

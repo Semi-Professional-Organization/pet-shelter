@@ -79,9 +79,9 @@ Deliberately not done, and why:
   every meet and greet with a status save of its own, which replaced the meeting's notes, sent a
   second email and reopened decided applications. The scheduling action now answers with what it
   wrote, and stops at a write the repository refused instead of sending the invitation anyway.
-- Content Editors cannot upload report PDFs; the button is hidden rather than `/api/upload`
-  widened, because widening who can store files is the owner's call:
-  `tasks/decisions/2026-10-19-content-editors-paste-report-links-rather-than-upload.md`.
+- Content Editors first could not upload report PDFs (the button was hidden); the owner then
+  chose to widen `/api/upload` to PDFs for MANAGE_CONTENT holders:
+  `tasks/decisions/2026-10-20-content-editors-upload-report-pdfs.md`.
 - The proxy still reads the cookie, so a member promoted since signing in is refused at Staff &
   Permissions until they sign in again; its 403 text now says so.
 - Sign-in has no return-to, staff account flows have further dead ends, and the sponsor portal has

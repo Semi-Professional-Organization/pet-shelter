@@ -58,8 +58,11 @@ async function validateFileSignature(file: File, expectedType: string): Promise<
 export async function POST(request: NextRequest) {
   try {
     // Authenticate against the specific capability, and capture who that is so
-    // the upload can be attributed.
-    const principal = await verifyAdminSession(PERMISSIONS.MANAGE_PET_MEDIA);
+    // the upload can be attributed. Pet media holders may store any allowed type;
+    // a content editor may store PDFs only, for the transparency page's audit
+    // reports (the owner's decision, 2026-10-20).
+    const mediaPrincipal = await verifyAdminSession(PERMISSIONS.MANAGE_PET_MEDIA);
+    const principal = mediaPrincipal ?? (await verifyAdminSession(PERMISSIONS.MANAGE_CONTENT));
     if (!principal) {
       return NextResponse.json(
         { error: "Unauthorized: Admin access required" },
@@ -79,6 +82,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid file type. Only JPEG, PNG, WebP, GIF, and PDF are allowed." },
         { status: 400 }
+      );
+    }
+
+    if (!mediaPrincipal && file.type !== "application/pdf") {
+      return NextResponse.json(
+        { error: "Your role can upload PDF reports only." },
+        { status: 403 }
       );
     }
 
