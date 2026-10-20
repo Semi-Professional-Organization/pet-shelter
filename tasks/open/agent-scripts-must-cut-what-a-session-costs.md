@@ -83,3 +83,21 @@ record; it cannot be recomputed later.
 
 **Settles when:** kill condition 1 fires, or the success measure is met and recorded as a decision
 in `tasks/decisions/`.
+
+## 2026-10-21: what the meter's pull request adds, and how its two new commands are judged
+
+Item 2 lands as hooks in `.claude/settings.json` and three commands: the `meter` hook, after tool
+calls and when a message arrives; `orient --brief`, when a session starts; `ledger handoff`, which
+writes the hand-off state as `tasks/open/HANDOFF-<slug>.md`; and `recall`, which searches the
+session that wrote it. The success measure above is the meter's. Kill condition 2 cannot judge
+`ledger handoff` or `recall`, because there is no family of manual calls for either to replace, so
+these two are registered before either is built, and are as immutable as the two above:
+
+3. Of the first five main sessions to pass 300K context after the meter merges, if fewer than
+   three write a hand-off with `ledger handoff` before they reach 500K, a line in context did not
+   change what agents do: no further command is built until the hand-off is enforced by a hook
+   rather than asked for.
+4. `recall` is deleted if it is not called once in the sessions that continue the first five
+   hand-offs.
+
+Both are counted from transcripts, by the commands' names in tool calls.

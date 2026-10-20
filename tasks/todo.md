@@ -15,6 +15,40 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# The context meter: `meter`, `ledger handoff`, `recall`, `orient --brief`
+
+**Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `9c79a8e`
+
+The second pull request of the agent-scripts plan: hooks that tell an agent its real context size
+and the state of its cache, and the three commands that make a fresh start cheap. The owner's
+hand-off rule (2026-10-19): above 250K, write the hand-off state before going quiet; on a cold
+resume above 250K, answer, then hand off; backstops at 300K and 500K; on Haiku 5.5, warn at 80K
+and hand off before 100K; never compact. Design rule carried from the planning thread: price a
+call by the context it re-reads, not by the tokens it prints.
+
+- **Done when:** the three hooks are wired in `.claude/settings.json` and observed firing in a
+  headless session started in a clean clone; `ledger handoff` writes a hand-off an agent can
+  continue from, `recall` finds detail in the session that wrote it; the meter's reading and its
+  cold-resume call are measured against `usage` on this repo's transcripts; every gate is green.
+- **In scope:** the `meter` hook (PostToolUse, UserPromptSubmit), a minimal `orient --brief`
+  (SessionStart), `ledger handoff`, `recall`, the docs that prescribed the manual steps, and
+  keeping hand-off entries out of the public issue mirror.
+- **Not in scope:** the full `orient` (PR 5) and the rest of `ledger` with the todo.md split
+  (PR 7); a Stop hook that forces the hand-off; idle-compaction settings; subagent models.
+- **Ceiling:** the meter reads the last request the transcript has finished writing, so it can be
+  a turn behind; how far, and how often its cold-resume call agrees with `usage`, is measured by
+  replay and recorded in its `ceiling:` comments.
+- The CLAUDE.md step 6 scope rule the brief assigned here is already on `master` (#143): nothing
+  to copy.
+
+- [ ] Register what success looks like for the new commands in `tasks/open/`, before building.
+- [ ] `meter`: thresholds once each, cold resumes, model-aware, silent inside subagents, never
+      blocks a prompt.
+- [ ] `ledger handoff`, `recall`, `orient --brief`.
+- [ ] Wiring, AGENTS.md, `tasks/README.md`, the mirror exclusion.
+- [ ] Accuracy replay; hooks observed firing in a headless session.
+- [ ] `/code-review` rounds under the scope rule.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`
