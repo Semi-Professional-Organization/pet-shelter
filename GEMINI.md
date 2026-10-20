@@ -6,8 +6,9 @@ This file specifies Gemini- and Antigravity-specific behaviors for this reposito
 
 ## Context & Session Hygiene
 
-**The reset rule is in `AGENTS.md` and is not restated here**: reset on task milestones, not on a
-token estimate. This file used to name a 200K–300K threshold while `AGENTS.md` said not to
+**The reset rule is in `AGENTS.md` and is not restated here.** Its context meter is a Claude Code
+hook and does not run here, so under Gemini: reset on task milestones, not on a token estimate.
+This file used to name a 200K–300K threshold while `AGENTS.md` said not to
 self-meter at all and `CLAUDE.md` named two different numbers — one rule, three answers, all three
 loaded into the same context. Only Gemini- and Antigravity-specific behaviour belongs below.
 

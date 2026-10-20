@@ -89,7 +89,7 @@ const BEFORE_4_6_STANDARD_PROMPT = 200_000;
 export class UnpriceableError extends Error {}
 
 /** The PRICES key for a model id: a dated snapshot (`claude-haiku-4-5-20251001`) prices as its model. */
-const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
+export const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
 
 /**
  * The rates one request pays, or a throw. `model` is the model that served the request
@@ -1145,7 +1145,7 @@ function mainCheckoutRoot(cwd) {
 }
 
 /** git's answer, trimmed, or null when git cannot give one. */
-function git(cwd, args) {
+export function git(cwd, args) {
   try {
     return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {

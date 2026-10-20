@@ -20,6 +20,26 @@ export const COMMANDS = {
     summary: "what agent sessions in this repo cost, at official per-model rates",
     load: () => import("./agent/usage.mjs"),
   },
+  meter: {
+    effect: "hook",
+    summary: "this session's context size, what a call costs at it, and when to hand off",
+    load: () => import("./agent/meter.mjs"),
+  },
+  orient: {
+    effect: "read-only",
+    summary: "where this session is: checkout, branch, uncommitted work, hand-offs waiting",
+    load: () => import("./agent/orient.mjs"),
+  },
+  ledger: {
+    effect: "writes tasks/",
+    summary: "handoff: write this session's hand-off state for a fresh session to continue from",
+    load: () => import("./agent/ledger.mjs"),
+  },
+  recall: {
+    effect: "read-only",
+    summary: "search the transcript of the session that wrote a hand-off",
+    load: () => import("./agent/recall.mjs"),
+  },
 };
 
 export function helpText() {
@@ -34,33 +54,49 @@ export function helpText() {
   ].join("\n");
 }
 
-async function run(argv) {
+async function run(argv, commands, out) {
   const [name, ...rest] = argv;
   if (!name) {
-    process.stdout.write(`agent: ERROR no command\nnext: node scripts/agent.mjs --help\n`);
+    out.write(`agent: ERROR no command\nnext: node scripts/agent.mjs --help\n`);
     return 2;
   }
   if (name === "--help" || name === "-h" || name === "help") {
-    process.stdout.write(`${helpText()}\n`);
+    out.write(`${helpText()}\n`);
     return 0;
   }
-  const command = Object.hasOwn(COMMANDS, name) ? COMMANDS[name] : undefined;
+  const command = Object.hasOwn(commands, name) ? commands[name] : undefined;
   if (!command) {
-    process.stdout.write(`agent: ERROR unknown command ${name}\nnext: node scripts/agent.mjs --help\n`);
+    // A hook's stdout goes into the agent's context, so a hook says nothing it was not built to.
+    if (!rest.includes("--hook")) out.write(`agent: ERROR unknown command ${name}\nnext: node scripts/agent.mjs --help\n`);
     return 2;
   }
   const loaded = await command.load();
   return loaded.main(rest);
 }
 
-if (invokedAs("scripts/agent.mjs")) {
-  run(process.argv.slice(2)).then(
-    (code) => {
-      process.exitCode = code;
-    },
-    (error) => {
-      process.stdout.write(`agent: ERROR ${error.message}\n`);
-      process.exitCode = 2;
-    },
-  );
+/**
+ * The exit code for a command line. A hook's exit 2 is not "could not run": on UserPromptSubmit
+ * it throws the person's message away. So a command run as a hook exits 0 whatever happens here,
+ * a module that will not load included, and says nothing.
+ *
+ * @param {string[]} argv
+ * @param {{ commands?: Record<string, { load: () => Promise<any> }>, out?: { write: (text: string) => unknown } }} [options]
+ */
+export async function cli(argv, options = {}) {
+  const { commands = COMMANDS, out = process.stdout } = options;
+  const hook = argv.includes("--hook");
+  try {
+    const code = await run(argv, commands, out);
+    return hook ? 0 : code;
+  } catch (error) {
+    if (!hook) out.write(`agent: ERROR ${error.message}\n`);
+    return hook ? 0 : 2;
+  }
 }
+
+if (invokedAs("scripts/agent.mjs")) {
+  cli(process.argv.slice(2)).then((code) => {
+    process.exitCode = code;
+  });
+}
+

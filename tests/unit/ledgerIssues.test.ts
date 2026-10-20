@@ -49,6 +49,12 @@ describe("which files are mirrored", () => {
     expect(isMirroredPath("tasks/open/CLAIM-home-bulletins.md")).toBe(false);
   });
 
+  it("skips hand-offs, which are one session's working state for the next", () => {
+    expect(isMirroredPath("tasks/open/HANDOFF-context-meter.md")).toBe(false);
+    // The prefix is the file name's, not a word anywhere in it.
+    expect(isMirroredPath("tasks/open/the-HANDOFF-rule.md")).toBe(true);
+  });
+
   it("mirrors any name, because the marker percent-encodes it into printable ASCII", () => {
     // Each of these broke a raw marker: `-->` ends the comment, a regex `.` stops at line breaks
     // (U+2028 and U+2029 included), and GitHub may strip control characters it is sent.

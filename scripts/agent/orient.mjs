@@ -1,0 +1,133 @@
+/**
+ * `node scripts/agent.mjs orient`: where this session is. The SessionStart hook runs it as
+ * `orient --brief`, so a fresh session starts knowing its checkout, its branch against
+ * `origin/master`, its uncommitted work and any hand-off waiting for it, without spending a call.
+ *
+ * This is the minimal orient of the agent-scripts plan's second pull request. Who else is working
+ * here, open pull requests on your paths, the ledger read from `origin/master` and ports come with
+ * the full one, in a later pull request.
+ *
+ * Read-only: it runs git, never fetches, and reads `tasks/open/HANDOFF-*.md`.
+ */
+
+import { statSync } from "node:fs";
+import { join, resolve } from "node:path";
+
+import { caseFolder } from "../lib/invokedAs.mjs";
+import { readHandoffs } from "./handoff.mjs";
+import { ago } from "./meter.mjs";
+import { git } from "./usage.mjs";
+
+/**
+ * The checkout `cwd` is in, or null outside a git repository. `stray` is set when `cwd` is a
+ * `.claude/worktrees/<name>` folder git does not know as a worktree, so it silently resolves to
+ * the checkout above it; whatever a session there edits lands in that checkout.
+ */
+export function whereAmI(cwd, { now = Date.now(), platform = process.platform } = {}) {
+  const top = git(cwd, ["rev-parse", "--show-toplevel"]);
+  if (!top) return null;
+  const gitDir = git(cwd, ["rev-parse", "--path-format=absolute", "--git-dir"]);
+  const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  const counts = git(cwd, ["rev-list", "--left-right", "--count", "origin/master...HEAD"]);
+  const [behind, ahead] = counts ? counts.split(/\s+/).map(Number) : [null, null];
+  const status = git(cwd, ["status", "--porcelain"]);
+  let fetched = null;
+  try {
+    fetched = statSync(join(common, "FETCH_HEAD")).mtimeMs;
+  } catch {
+    // never fetched
+  }
+  const fold = caseFolder(platform);
+  const slashed = (p) => fold(resolve(p).replace(/\\/g, "/"));
+  const folder = /^(.*\/\.claude\/worktrees\/[^/]+)/.exec(slashed(cwd))?.[1];
+  return {
+    top,
+    worktree: Boolean(gitDir && common && slashed(gitDir) !== slashed(common)),
+    branch: git(cwd, ["branch", "--show-current"]) || null,
+    head: git(cwd, ["rev-parse", "--short", "HEAD"]),
+    ahead,
+    behind,
+    uncommitted: status ? status.split("\n").filter(Boolean).length : 0,
+    fetchedMinutesAgo: fetched === null ? null : (now - fetched) / 60_000,
+    stray: folder && slashed(top) !== folder ? folder : null,
+  };
+}
+
+/** One sentence about the checkout, for a hand-off's header. */
+export function describeWhere(w) {
+  const against = w.ahead === null ? "no `origin/master` to compare with" : `${w.ahead} ahead and ${w.behind} behind \`origin/master\``;
+  return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.`;
+}
+
+/**
+ * The report, as lines. Pure. `session` is the current one, whose own hand-off is not news to it.
+ *
+ * @param {{ brief?: boolean, session?: string }} [options]
+ */
+export function orientLines(w, handoffs, options = {}) {
+  const { brief = false, session } = options;
+  const kind = w.worktree ? "worktree" : "main checkout";
+  const at = `${kind} ${w.top} on ${w.branch ?? "a detached HEAD"} at ${w.head ?? "no commit"}`;
+  const lines = [
+    w.stray
+      ? `orient: FAIL ${w.stray} is not a registered worktree, so git resolves it to ${w.top}: edits here land in that checkout`
+      : `orient: PASS ${at}`,
+  ];
+  if (w.stray) lines.push(`where: ${at}`);
+  const fetched = w.fetchedMinutesAgo === null ? "never fetched" : `as of the last fetch, ${ago(w.fetchedMinutesAgo)} ago`;
+  lines.push(
+    w.ahead === null
+      ? `git: no origin/master to compare with; ${w.uncommitted} uncommitted paths`
+      : `git: ${w.ahead} ahead and ${w.behind} behind origin/master ${fetched}; ${w.uncommitted} uncommitted paths`,
+  );
+  const waiting = handoffs.filter((h) => h.session !== session);
+  for (const h of waiting.slice(0, 3)) {
+    lines.push(`hand-off: ${h.file} "${h.title}", from session ${(h.session ?? "unknown").slice(0, 8)}${h.opened ? ` on ${h.opened}` : ""}`);
+  }
+  if (waiting.length > 3) lines.push(`hand-off: ${waiting.length - 3} more in tasks/open/HANDOFF-*.md`);
+  if (brief) {
+    lines.push("meter: on. It adds a line when this session should write its hand-off: node scripts/agent.mjs ledger handoff --help");
+  }
+  return lines;
+}
+
+const HELP = `usage: node scripts/agent.mjs orient [--brief]
+
+Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/master
+as of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
+tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one git does not know,
+which silently resolves to the checkout above it. Read-only.
+
+  --brief  the form the SessionStart hook in .claude/settings.json runs: it always exits 0, since
+           a hook's output reaches the session only then
+
+Exit codes: 0 pass, 1 a warning (the stray folder), 2 could not run.`;
+
+export async function main(argv, io = {}) {
+  const out = io.out ?? process.stdout;
+  const cwd = io.cwd ?? process.cwd();
+  const env = io.env ?? process.env;
+  const brief = argv.includes("--brief");
+  const unknown = argv.filter((a) => a !== "--brief" && a !== "--help" && a !== "-h");
+  if (argv.includes("--help") || argv.includes("-h")) {
+    out.write(`${HELP}\n`);
+    return 0;
+  }
+  if (unknown.length) {
+    out.write(`orient: ERROR unknown argument: ${unknown[0]}\nnext: node scripts/agent.mjs orient --help\n`);
+    return brief ? 0 : 2;
+  }
+  try {
+    const w = whereAmI(cwd, { now: io.now ?? Date.now() });
+    if (!w) {
+      out.write(`orient: ERROR ${cwd} is not in a git repository\n`);
+      return brief ? 0 : 2;
+    }
+    const lines = orientLines(w, readHandoffs(w.top), { brief, session: env.CLAUDE_CODE_SESSION_ID });
+    out.write(`${lines.join("\n")}\n`);
+    return brief || !w.stray ? 0 : 1;
+  } catch (error) {
+    out.write(`orient: ERROR ${error.message}\n`);
+    return brief ? 0 : 2;
+  }
+}
