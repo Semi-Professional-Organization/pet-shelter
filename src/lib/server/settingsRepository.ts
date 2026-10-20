@@ -6,6 +6,7 @@ import {
   DEFAULT_VOLUNTEER_FORM_URL,
   DEFAULT_VOLUNTEER_FORM_RESPONSES_URL,
 } from "@/lib/volunteerFormUrl";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Shelter Settings persistence over the repository layer.
@@ -48,10 +49,12 @@ function freshSettings(): ShelterSettingsOutput {
 
 let serverSettings: ShelterSettingsOutput = freshSettings();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetSettings(): void {
   serverSettings = freshSettings();
 }
+
+registerStateReset("settings", resetSettings);
 
 /** Synchronous cached read. */
 export function getServerSettings(): ShelterSettingsOutput {

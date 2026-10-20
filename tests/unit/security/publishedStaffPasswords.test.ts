@@ -46,11 +46,9 @@ async function databaseRow(overrides: Partial<UserRecord> & { password: string }
 
 describe("isPublishedStaffPassword", () => {
   it("covers every password a staff seed in this repository publishes", () => {
-    const published = [
-      "prisma/seed.ts",
-      "src/lib/server/userStore.ts",
-      "src/app/admin/login/page.tsx",
-    ].flatMap((file) =>
+    // `src/lib/server/userStore.ts` keeps only the hashes now; which password each of its
+    // accounts has is checked against the same list in tests/unit/demoSeedPasswordHashes.test.ts.
+    const published = ["prisma/seed.ts", "src/app/admin/login/page.tsx"].flatMap((file) =>
       [...readFileSync(join(ROOT, file), "utf8").matchAll(/\b(?:password|initialPassword|pass):\s*"([^"]+)"/g)].map(
         (match) => match[1]
       )
@@ -58,8 +56,8 @@ describe("isPublishedStaffPassword", () => {
 
     // Named, so a seed that publishes a new password fails with the password in the message.
     expect([...new Set(published)].filter((password) => !isPublishedStaffPassword(password))).toEqual([]);
-    // Five seeded accounts, each in all three files. A scan that matched nothing would pass
-    // the line above vacuously.
+    // At least five seeded passwords across the two files. A scan that matched nothing would
+    // pass the line above vacuously.
     expect(new Set(published).size).toBeGreaterThanOrEqual(5);
   });
 

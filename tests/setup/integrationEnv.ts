@@ -4,20 +4,19 @@ import { config as loadDotenv } from "dotenv";
 import { afterAll } from "vitest";
 
 /**
- * Tier-3 environment wiring, registered on the `integration` project only.
+ * Tier-3b environment wiring, registered on the `integration-db` project only.
  *
- * Two jobs, both of which have to happen before `nextMocks.ts` imports anything
- * from `src/lib`:
+ * Two jobs, both of which have to happen before anything from `src/lib` loads:
  *
  *  1. Put `DATABASE_URL` (and the auth secrets) into `process.env`.
  *  2. Close the pg pool when the run ends.
  *
- * Ordering matters. `setupFiles` are evaluated in order, and `nextMocks.ts`
- * pulls in the repositories — and through them `@/lib/server/prisma`, which
- * reads `DATABASE_URL` when it builds the pool. Registering this file second
- * would hand Prisma the hardcoded `localhost:5432` fallback and every strict
- * assertion would then fail against a refused connection instead of the real
- * schema, which is indistinguishable from a genuine failure.
+ * Ordering matters. `setupFiles` are evaluated in order, and
+ * `@/lib/server/prisma` reads `DATABASE_URL` once, when it first loads.
+ * Registering this file after anything that loads it would leave Prisma with no
+ * database at all, and every strict assertion would then fail for a missing
+ * connection instead of the real schema, which is indistinguishable from a
+ * genuine failure.
  */
 
 /**
@@ -25,8 +24,8 @@ import { afterAll } from "vitest";
  *
  * That is a Next.js behaviour, not a Vite one — Vite exposes only `VITE_`-
  * prefixed variables, and only on `import.meta.env`, never on `process.env`.
- * Nothing in `vitest.config.mts` fills the gap, so without this call the whole
- * integration lane runs against Prisma's hardcoded localhost fallback.
+ * Nothing in `vitest.config.mts` fills the gap, so without this call (or a
+ * `DATABASE_URL` exported by the npm script) this lane would have no database.
  *
  * `.env.local` first (developer machine), then `.env` (CI writes one next to
  * its service container). `override: false` is the default and is what makes an

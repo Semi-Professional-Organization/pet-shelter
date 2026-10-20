@@ -12,6 +12,7 @@ import {
   buildPetUpdatePayload,
   mapDbPetToPet,
 } from "./petMappers";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Pet reads and writes over the repository layer.
@@ -43,10 +44,12 @@ function freshPets(): Pet[] {
 
 let serverPets: Pet[] = freshPets();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetPets(): void {
   serverPets = freshPets();
 }
+
+registerStateReset("pets", resetPets);
 
 export function getServerPets(): Pet[] {
   return serverPets;

@@ -131,7 +131,7 @@ describe("Security & Route Protection (verifyAdminSession)", () => {
   });
 
   it("names the legacy token when the admin_session secret cookie matches", async () => {
-    process.env.ADMIN_SECRET_KEY = ADMIN_SECRET;
+    vi.stubEnv("ADMIN_SECRET_KEY", ADMIN_SECRET);
     mockCookieMap.set("admin_session", { value: ADMIN_SECRET });
 
     const principal = await verifyAdminSession();
@@ -143,7 +143,7 @@ describe("Security & Route Protection (verifyAdminSession)", () => {
     // The token is what authorized this, so the token is what gets named. The
     // previous implementation read the session a second time and attributed the
     // mutation to the VOLUNTEER, who was never authorized for it.
-    process.env.ADMIN_SECRET_KEY = ADMIN_SECRET;
+    vi.stubEnv("ADMIN_SECRET_KEY", ADMIN_SECRET);
     mockCookieMap.set(SESSION_COOKIE_NAME, { value: sealSession(VOLUNTEER) });
     mockCookieMap.set("admin_session", { value: ADMIN_SECRET });
 
@@ -153,6 +153,8 @@ describe("Security & Route Protection (verifyAdminSession)", () => {
   });
 
   it("returns null when no session and invalid secret cookie", async () => {
+    // A configured secret, so the cookie is wrong against a real key rather than the dev default.
+    vi.stubEnv("ADMIN_SECRET_KEY", ADMIN_SECRET);
     mockCookieMap.set("admin_session", { value: "wrong_password" });
 
     const principal = await verifyAdminSession();
@@ -163,7 +165,7 @@ describe("Security & Route Protection (verifyAdminSession)", () => {
 describe("Audit trail distinguishes the legacy token from a real administrator", () => {
   beforeEach(() => {
     mockCookieMap.clear();
-    process.env.ADMIN_SECRET_KEY = ADMIN_SECRET;
+    vi.stubEnv("ADMIN_SECRET_KEY", ADMIN_SECRET);
   });
 
   /**

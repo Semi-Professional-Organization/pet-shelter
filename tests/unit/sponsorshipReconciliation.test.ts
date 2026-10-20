@@ -7,8 +7,8 @@ import {
   roleHasPermission,
 } from "@/lib/security/permissions";
 import { senFromInteger } from "@/lib/domain/money";
-// Type-only, so it is erased before the harness's dynamic-import rule applies:
-// nothing here instantiates the repository ahead of a file's own vi.mock.
+// Type-only, so it is erased at compile time: nothing here instantiates the
+// repository ahead of a file's own vi.mock.
 import type { SponsorshipDraft } from "@/lib/server/sponsorshipLedger";
 
 /**

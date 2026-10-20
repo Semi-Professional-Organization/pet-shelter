@@ -11,7 +11,8 @@ import { SPONSORSHIP_TIERS } from "@/lib/domain/sponsorshipTiers";
  */
 export { SPONSORSHIP_TIERS };
 
-const STORAGE_RECEIPTS_KEY = "hope_for_strays_donation_receipts_v1";
+/** Exported so a test can assert that a flow wrote nothing here, however it got to the store. */
+export const STORAGE_RECEIPTS_KEY = "hope_for_strays_donation_receipts_v1";
 
 /**
  * Browser-side history of receipts this device has been shown.

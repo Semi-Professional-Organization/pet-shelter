@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { Sen, senFromInteger } from "@/lib/domain/money";
 import type { SponsorshipTierId } from "@/types/sponsorship";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Persistence for issued LHDN tax receipts.
@@ -133,15 +134,17 @@ let memoryDonations: DonationRecord[] = [];
 let memorySeq = 0;
 
 /**
- * Clears the in-memory ledger. Test-only, and wired into the global `beforeEach`
- * in `tests/setup/nextMocks.ts` alongside `resetServerStore()` so receipt serials
- * do not leak between suites and make assertions order-dependent.
+ * Clears the in-memory ledger. Test-only, and registered below so the global
+ * `beforeEach` in `tests/setup/nextMocks.ts` runs it: receipt serials must not
+ * leak between tests and make assertions order-dependent.
  */
 export function resetDonationLedger(): void {
   memoryCounters.clear();
   memoryDonations = [];
   memorySeq = 0;
 }
+
+registerStateReset("donationLedger", resetDonationLedger);
 
 /**
  * The offline branch of issuance. **Synchronous by design.**

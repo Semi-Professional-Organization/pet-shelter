@@ -135,7 +135,7 @@ describe("the repository distinguishes a missing row from an unreachable databas
 
     // Scope stated honestly, because an earlier version of this test claimed more than it
     // proves. It does **not** guard against a reader that lost its fallback: the harness's
-    // `resetServerStore()` reseeds this array from `pets.json` before every test, so the
+    // reset of the pet store reseeds this array from `pets.json` before every test, so the
     // assertion below holds even against a reader with no fallback at all. That coverage
     // comes from the outage and no-database cases above, which observe what the reader
     // *returns* rather than what the mirror contains.

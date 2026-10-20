@@ -33,6 +33,7 @@ import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Bulletin reads and writes over the repository layer.
@@ -123,11 +124,13 @@ function freshBulletins(): BulletinRecord[] {
 
 let serverBulletins: BulletinRecord[] = freshBulletins();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetBulletins(): void {
   serverBulletins = freshBulletins();
   warnedTableMissing = false;
 }
+
+registerStateReset("bulletins", resetBulletins);
 
 /**
  * `DbBulletinRow` is Prisma's generated `Bulletin` type, imported above — not a

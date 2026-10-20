@@ -9,10 +9,9 @@ import { prisma } from "@/lib/server/prisma";
  * Fails the run when no database is configured, with the command that fixes it.
  *
  * This tier must never *skip*. `src/lib/server/donationLedger.ts` chooses its
- * storage from `Boolean(process.env.DATABASE_URL)`, while
- * `src/lib/server/prisma.ts` quietly falls back to a hardcoded localhost URL. So
- * with `DATABASE_URL` unset, a probe written to exercise Postgres takes the
- * in-memory branch instead and passes — green, fast, and having verified nothing.
+ * storage from `Boolean(process.env.DATABASE_URL)`, so with `DATABASE_URL`
+ * unset, a probe written to exercise Postgres takes the in-memory branch
+ * instead and passes — green, fast, and having verified nothing.
  * That is the exact failure mode this tier exists to catch, so the absence of a
  * database is an error rather than a reason to opt out.
  */

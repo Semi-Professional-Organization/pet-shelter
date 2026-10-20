@@ -28,7 +28,9 @@ import {
 } from "@/lib/validations/pet";
 import { createPet, updatePet, getPetById } from "@/actions/pets";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
-import { signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
+import { findMemberRow, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
+import { wireTransaction } from "../integration/support/prismaDouble";
+import { prisma } from "@/lib/server/prisma";
 import { Pet, MedicalTimelineEvent, PetUpdate } from "@/types/pet";
 import petsData from "@/data/pets.json";
 
@@ -76,10 +78,15 @@ const prismaSpies = vi.hoisted(() => {
     applicationDelete: op("adoptionApplication.delete"),
     auditCreate: op("auditLog.create"),
     auditFindMany: vi.fn(async () => [] as unknown[]),
-    transaction: vi.fn(async (arg: unknown) => {
-      if (Array.isArray(arg)) return Promise.all(arg);
-      return undefined;
-    }),
+    // The member lookup `getVerifiedSession` makes on every guarded call. This
+    // double had no `user` delegate, so the lookup threw a TypeError, the DAL's
+    // outage fall-back handed back the cookie's own claims, and the admin
+    // mutations below were authorized by a database "outage" — a session for a
+    // member no store knows passed them all. Answered with the row a signed-in
+    // test identity has, so the session is refreshed from it as in production.
+    userFindUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
+    // Wired below by the shared `wireTransaction`, so both forms run as in every other double.
+    transaction: vi.fn(),
   };
 });
 
@@ -110,10 +117,15 @@ vi.mock("@/lib/server/prisma", () => {
       create: prismaSpies.auditCreate,
       findMany: prismaSpies.auditFindMany,
     },
+    user: { findUnique: prismaSpies.userFindUnique },
     $transaction: prismaSpies.transaction,
   };
   return { prisma: client, default: client };
 });
+
+// An array of queued operations, or an interactive callback run against the client: answering
+// the callback form with `undefined` would "commit" work never done.
+wireTransaction(prisma as unknown as { $transaction: typeof prismaSpies.transaction });
 
 describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () => {
   const timelineIntake: MedicalTimelineEvent = {
@@ -849,6 +861,9 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
         medicalTimeline: [timelineIntake, { ...timelineSurgery, id: timelineIntake.id }],
       });
       expect(result.success).toBe(false);
+      // Named, because every refusal returns `success: false` — an
+      // authorization refusal included — and the line above alone passes on one.
+      expect(result.error).toMatch(/Duplicate 'medicalTimeline' id 'tl-hist-1'/);
     });
   });
 
@@ -890,5 +905,15 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       expect(timelineMs[0].badge).toBe("Kemasukan Bersih");
       expect(timelineMs[0].description).toContain("Seksyen 19");
     });
+  });
+});
+
+describe("this file's Prisma double", () => {
+  it("runs an interactive transaction's callback against the client, as the shared double does", async () => {
+    const { prisma } = await import("@/lib/server/prisma");
+
+    const seen = await prisma.$transaction(async (tx) => tx);
+
+    expect(seen).toBe(prisma);
   });
 });
