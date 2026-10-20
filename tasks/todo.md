@@ -44,7 +44,7 @@ the review dialog's server path as in scope before the sixth round woke it
 - [x] One section table for the nav, the landing and a gate every section page calls; FAQ
       editing moved to `MANAGE_CONTENT`; the nav and `getCurrentUserAction` read the live role.
 - [x] Controls follow permissions: applications (decide, delete), settings (a coordinator gets
-      only the test email tool), transparency (no upload without `MANAGE_PET_MEDIA`), own-row
+      only the test email tool), transparency (PDF upload for `MANAGE_CONTENT`), own-row
       role edit.
 - [x] Signed out or suspended: nobody signed in goes to the sign-in form from every section, from
       `/admin` and from the proxy; a session the DAL will not honour gets the 401 page; the client
@@ -60,10 +60,10 @@ the review dialog's server path as in scope before the sixth round woke it
 
 **Review tally** (candidates: fixed / deferred to `tasks/open` / declined with a reason):
 round 1, 8: 6/0/2 · round 2, 8: 4/0/4 · round 3, 6: 6/0/0 · round 4, 6: 5/0/1 · round 5, 8: 8/0/0
-· round 6, 8: 6/0/2 · round 7, 8: 5/1/2 · other session's pass, 9: 5/3/1. Total 61: 45 fixed,
-4 deferred, 12 declined. In-scope correctness findings were still arriving at the last pass (the
-approval re-run, the proxy's answer to Server Actions), and the round 7 fixes have had no round of
-their own.
+· round 6, 8: 6/0/2 · round 7, 8: 5/1/2 · other session's pass, 9: 5/3/1 · round 8 (asked for by
+the owner), 6: 3/1/2. Total 67: 48 fixed, 5 deferred, 14 declined. Round 8's one in-scope
+correctness bug: a stale mirror refused a decision the database allowed. The loop stopped there
+at the owner's word, not on a clean round.
 
 **Verified at the branch tip,** after merging `origin/master` (`474abbe`): `npm run check`
 (0 errors, 12 warnings, none new), `npm test` 2063 passed, `npm run test:components` 274,

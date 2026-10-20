@@ -29,6 +29,13 @@ the screen when the first is refused.
 so whatever reviewers had written there is lost. An older comment beside it said the details were
 appended. Whether to append, and how the applicant-facing text should read, is a product choice.
 
+## 4. The browser's application store keeps a second copy of the status rules
+
+Nothing calls `updateApplicationStatus`, `deleteApplication` or `resetToDefaultApplications` in
+`src/lib/client/applicationStore.ts` any more; only the adoption form's `addApplication` is used.
+The unused code repeats the transition rules and the approval cascade, already differently from
+the server's, so a later change to approval rules finds two copies, one of which nothing runs.
+
 **Settles when:** each section is fixed or moved to `tasks/decisions/` as a deliberate non-fix.
 Sections 1 and 2 likely settle together, by letting the server's list be the board's source of
 truth after each change (React's `useOptimistic` is built for that).

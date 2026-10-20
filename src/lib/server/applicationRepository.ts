@@ -334,7 +334,10 @@ export async function atomicUpdateApplicationStatus(
     return { success: false, error: "Application not found" };
   }
 
-  if (inMemoryApp) {
+  // With a database, the transaction below validates against the row it reads. This
+  // instance's mirror may be stale (another instance moved the application on), and
+  // checking it first refused transitions the database would allow.
+  if (inMemoryApp && !isDatabasePersistent()) {
     try {
       validateApplicationTransition(inMemoryApp.status, targetStatus);
     } catch (err: unknown) {
