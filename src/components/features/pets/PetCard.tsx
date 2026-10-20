@@ -7,6 +7,7 @@ import { Pet } from "@/types/pet";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   getPetStatusPresentation,
@@ -175,7 +176,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
           </Button>
         ) : placement.foster ? (
           <a
-            href={`https://wa.me/60123456789?text=${encodeURIComponent(
+            href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
               `Hi Hope for Strays, I would like to foster ${pet.name}.`
             )}`}
             target="_blank"

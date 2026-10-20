@@ -20,6 +20,7 @@ import { PetMatchQuiz } from "./PetMatchQuiz";
 import { SponsorshipModal } from "./SponsorshipModal";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import { usePetGalleryController } from "@/hooks/usePetGalleryController";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { SectionHeader } from "@/components/layout/Section";
@@ -404,7 +405,7 @@ export function PetGallery({
             <div className="col-span-2 sm:col-span-1 flex items-end min-w-0">
               {selectedPlacement === "foster" ? (
                 <a
-                  href={`https://wa.me/60123456789?text=${encodeURIComponent(
+                  href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
                     "Hi Hope for Strays, I would like to apply to foster."
                   )}`}
                   target="_blank"
