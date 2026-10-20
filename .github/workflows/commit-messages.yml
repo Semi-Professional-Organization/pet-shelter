@@ -43,7 +43,9 @@ jobs:
         #
         # Skipped for pull requests Dependabot opens: its commit bodies quote release notes that
         # cannot meet the 72-column wrap. Its title is the same text as its commit subject, and
-        # the next step still checks that.
+        # the next step still checks that. The skip goes by who opened the pull request, so a
+        # commit a person adds to such a branch goes unaudited as well. Squash merging discards
+        # those commits too, and the subject that reaches master is the title.
         if: github.event.pull_request.user.login != 'dependabot[bot]'
         # The base branch name goes through the environment for the same reason the title does
         # below: a branch name may contain characters the shell would act on.
