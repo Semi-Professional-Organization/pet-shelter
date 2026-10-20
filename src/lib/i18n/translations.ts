@@ -1,3 +1,4 @@
+import { SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 export type Language = "en" | "ms";
 
 /** Every leaf of the dictionary as a dot path, e.g. `home.step1Title`. */
@@ -391,7 +392,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       sponsor: "Sponsor Care",
       adopt: "Adopt",
       sanctuaryLocation: "Petaling Jaya, Selangor",
-      phone: "03-7876 5432",
+      phone: SHELTER_PHONE_DISPLAY,
       visitingHours: "Tue–Sun: 10:00 AM – 5:00 PM",
       browsePets: "Browse Pets",
       transparency: "Where Your Money Goes",
@@ -658,7 +659,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       helplineTitle: "Hope for Strays Sanctuary & Helpline",
       helplineHours: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Hours: Tue – Sun 10am – 5pm",
       whatsAppBtn: "WhatsApp Coordinator",
-      callBtn: "03-7876 5432",
+      callBtn: SHELTER_PHONE_DISPLAY,
     },
     donations: {
       badge: "Direct Rescue Giving & Sponsorship",
@@ -766,7 +767,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       sponsor: "Taja Rawatan",
       adopt: "Adopsi",
       sanctuaryLocation: "Petaling Jaya, Selangor",
-      phone: "03-7876 5432",
+      phone: SHELTER_PHONE_DISPLAY,
       visitingHours: "Sel–Ahad: 10:00 PG – 5:00 PTG",
       browsePets: "Lihat Haiwan",
       transparency: "Ke Mana Wang Anda Pergi",
@@ -1031,7 +1032,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       helplineTitle: "Pusat Perlindungan & Talian Bantuan Hope for Strays",
       helplineHours: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Waktu: Sel – Ahad 10pg – 5ptg",
       whatsAppBtn: "WhatsApp Penyelaras",
-      callBtn: "03-7876 5432",
+      callBtn: SHELTER_PHONE_DISPLAY,
     },
     donations: {
       badge: "Sumbangan & Penajaan Terus",

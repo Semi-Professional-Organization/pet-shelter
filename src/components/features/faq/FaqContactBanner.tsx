@@ -1,5 +1,6 @@
 "use client";
 
+import { SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React from "react";
 import { PhoneCall } from "lucide-react";
 
@@ -8,14 +9,12 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 /**
  * The "call the shelter desk" banner shown under both FAQ surfaces.
  *
- * Shared so the phone number lives in one place: it was previously written out
+ * Shared so the phone number is written once: it was previously written out
  * twice, in the display text and the tel: href of two separate components, so
  * changing it meant four edits and any miss would silently keep dialling the
- * old number.
+ * old number. The number itself now comes from `shelterIdentity.ts`, which every
+ * other "Call" and WhatsApp link reads too.
  */
-const SHELTER_PHONE_DISPLAY = "03-7876 5432";
-const SHELTER_PHONE_TEL = "+60378765432";
-
 export function FaqContactBanner({
   title,
   titleMs,

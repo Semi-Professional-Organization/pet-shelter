@@ -1,5 +1,6 @@
 "use client";
 
+import { SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import { useState, useEffect, useCallback } from "react";
 import { ShelterSettingsInput } from "@/lib/validations/settings";
 
@@ -8,7 +9,7 @@ const STORAGE_KEY = "hope_for_strays_settings_v2";
 const defaultSettings: ShelterSettingsInput = {
   shelterName: "Hope for Strays",
   email: "info@hopeforstrays.org",
-  phone: "03-7876 5432",
+  phone: SHELTER_PHONE_DISPLAY,
   address: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia",
   operatingHours: "Tuesday – Sunday: 10:00 AM – 5:00 PM (Closed Mondays)",
   announcementBanner: "Weekend Adoption Drive & Free Microchip Clinic this Saturday 9 AM – 1 PM at Petaling Jaya sanctuary!",

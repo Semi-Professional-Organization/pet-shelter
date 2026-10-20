@@ -43,6 +43,9 @@
       "Bash(git rebase *)",
       "Bash(git branch -D*)",
       "Bash(rm -rf *)"
+    ],
+    "allow": [
+      "gh pr merge"
     ]
   },
   "hooks": {
