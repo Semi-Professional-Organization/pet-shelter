@@ -66,6 +66,30 @@ jobs:
   # The commit-message check is .github/workflows/commit-messages.yml, so that a title edit can
   # rerun it without rerunning everything here.
 
+  # The production build, which no other job runs: typecheck and lint pass code that
+  # `next build` still rejects. Vercel builds every push as well, but its status is not a
+  # required check. Vercel decides whether to deploy a commit by who wrote it, so a check that
+  # depended on it could stay pending forever on a pull request that Dependabot opens.
+  build:
+    name: Production build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `next build` runs as production, where the app refuses to start without its
+      # secrets. Random throwaway values satisfy that, and nothing built here is deployed.
+      # With no DATABASE_URL, pages that read the database render their offline fallback.
+      - name: Build
+        run: |
+          SESSION_SECRET="$(openssl rand -hex 32)" ADMIN_SECRET_KEY="$(openssl rand -hex 32)" \
+            npm run build
+
   unit-and-components:
     name: Unit, integration & component tests
     runs-on: ubuntu-24.04
