@@ -116,7 +116,11 @@ function getSeededStaff(): Promise<UserRecord[]> {
         createdAt: staff.createdAt,
         updatedAt: staff.updatedAt,
       }))
-    );
+    ).catch((error: unknown) => {
+      // A failed derivation must not be cached: the next reset derives again.
+      seededStaffPromise = null;
+      throw error;
+    });
   }
   return seededStaffPromise;
 }

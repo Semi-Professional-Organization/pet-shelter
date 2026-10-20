@@ -112,7 +112,11 @@ function getSeededSponsors(): Promise<SponsorRecord[]> {
         createdAt: seed.createdAt,
         updatedAt: seed.createdAt,
       }))
-    );
+    ).catch((error: unknown) => {
+      // A failed derivation must not be cached: the next reset derives again.
+      seededSponsorsPromise = null;
+      throw error;
+    });
   }
   return seededSponsorsPromise;
 }
