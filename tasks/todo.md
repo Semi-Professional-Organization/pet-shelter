@@ -51,9 +51,10 @@ skipped the regeneration). Unit, integration and component suites together, afte
 master at `474abbe`: 138 files, 2,321 tests, 40 to 52 s (master: 192 to 216 s). Shuffled test
 order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
 
-**Review:** seventeen `/code-review` rounds over the whole diff raised 138 findings; each was fixed, or
-checked by probe and answered, in the commit after it, and the loop runs until a round comes back
-clean (CLAUDE.md, close step 6). Round 4 made `typecheck` hold the offline client's method list to
+**Review:** eighteen `/code-review` rounds over the whole diff raised 144 findings; each through
+round 17 was fixed, or checked by probe and answered, in the commit after it. The owner stopped the
+loop after round 18 under the new scope rule; its six minor findings are listed in PR #141, not
+fixed. Why it took so long: `tasks/lessons/2026-10-20-a-dismissed-finding-comes-back-until-the-answer-is-where-the-reviewer-reads.md`. Round 4 made `typecheck` hold the offline client's method list to
 the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
 env guard fail on any `process.env` read it cannot name. Round 5 retired `resetServerStore()`
 (the registry already resets those six stores), made the app warn at start when it has no
