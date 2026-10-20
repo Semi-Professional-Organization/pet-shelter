@@ -94,6 +94,23 @@ describe("Proxy route guard", () => {
     it("guards nested paths under the prefix", () => {
       expect(proxy(request("/admin/members/usr-1", sessionFor(ROLES.STAFF))).status).toBe(403);
     });
+
+    it("lets a Server Action answer for itself, signed out or refused", () => {
+      // Each members action re-checks the live role through the DAL and returns a refusal
+      // the client can read. A redirect here had the browser re-POST to the sign-in page,
+      // which answered "Server Action not found". Fails against the proxy that redirected.
+      const action = (cookie?: string) =>
+        new NextRequest("http://localhost:3000/admin/members", {
+          method: "POST",
+          headers: {
+            "next-action": "7f3a9c",
+            ...(cookie ? { cookie: `${SESSION_COOKIE_NAME}=${cookie}` } : {}),
+          },
+        });
+
+      expect(isPassThrough(proxy(action()))).toBe(true);
+      expect(isPassThrough(proxy(action(sessionFor(ROLES.STAFF))))).toBe(true);
+    });
   });
 
   describe("denial responses", () => {

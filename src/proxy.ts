@@ -112,6 +112,12 @@ export function proxy(request: NextRequest): NextResponse {
   );
   if (!section) return NextResponse.next();
 
+  // Page requests only. A Server Function POSTs to the route it is used on and answers
+  // for itself, through the DAL, with a refusal its caller can read. A redirect in its
+  // place had the browser re-POST to the sign-in page, which answered "Server Action not
+  // found"; the 403 document is no more readable to it.
+  if (request.method !== "GET" && request.method !== "HEAD") return NextResponse.next();
+
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = token ? unsealSession(token) : null;
 
