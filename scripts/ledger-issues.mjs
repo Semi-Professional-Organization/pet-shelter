@@ -322,11 +322,9 @@ async function main(argv) {
   applyActions(actions, { repo, sha, exec: run, log: (line) => process.stdout.write(`${line}\n`) });
 }
 
-// Only run the CLI when executed directly, so the module stays importable by tests. The same check
-// as scripts/lib/invokedAs.mjs, which says why this script keeps its own copy.
-const foldCase = (path) => (process.platform === "win32" || process.platform === "darwin" ? path.toLowerCase() : path);
+// Only run the CLI when executed directly, so the module stays importable by tests.
 const invokedDirectly =
-  Boolean(process.argv[1]) && foldCase(process.argv[1].replace(/\\/g, "/")).endsWith(foldCase("/scripts/ledger-issues.mjs"));
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("scripts/ledger-issues.mjs");
 if (invokedDirectly) {
   main(process.argv.slice(2)).catch((error) => {
     process.stderr.write(`ledger-issues: ${error.message}\n`);

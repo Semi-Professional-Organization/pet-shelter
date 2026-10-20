@@ -34,8 +34,6 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-import { invokedAs } from "./lib/invokedAs.mjs";
-
 /**
  * Below these, assume the scanner broke rather than that the repo is clean.
  *
@@ -211,6 +209,6 @@ function main() {
   console.log("\nOK: every live invariant reference resolves.");
 }
 
-if (invokedAs("scripts/check-doc-invariants.mjs")) {
+if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("check-doc-invariants.mjs")) {
   main();
 }

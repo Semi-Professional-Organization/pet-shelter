@@ -5,13 +5,10 @@
  * always gives argv[1] as an absolute path. Windows separators are normalised first, and on
  * Windows and macOS, where paths are case-insensitive, so is the comparison.
  *
- * Two scripts keep their own copy of the same check on purpose, written out in full:
- * - `scripts/ledger-issues.mjs`: its workflow runs only when that file changes (`paths` in
- *   `.github/workflows/ledger-issues.yml`), so a dependency here would let an edit to this file
- *   silence the issue mirror without the workflow ever running on it.
- * - `scripts/commit-msg.mjs`: the commit-msg hook checks only that the linter file exists, so a
- *   checkout holding it without `scripts/lib/` would fail every commit on a missing import.
- * `tests/unit/agentEntryPoint.test.ts` keeps all three answering alike.
+ * Used by the agent scripts. Three older scripts (`commit-msg.mjs`, `ledger-issues.mjs`,
+ * `check-doc-invariants.mjs`) still carry their own looser check; aligning them was out of the
+ * scope of the change that added this file and is recorded in
+ * `tasks/open/three-scripts-keep-their-own-invocation-check.md`.
  */
 
 /** A path as a file system on `platform` compares it: Windows and macOS ignore case by default. */

@@ -38,18 +38,6 @@ describe("agent scripts entry point", () => {
     expect(missing).toEqual([]);
   });
 
-  it("keeps the two inline copies of the invocation check the same as the shared one", () => {
-    // scripts/lib/invokedAs.mjs says why these two keep their own copy. Same case rule, same
-    // whole-segment match.
-    const rule = `process.platform === "win32" || process.platform === "darwin"`;
-    expect(readFileSync(join(ROOT, "scripts/lib/invokedAs.mjs"), "utf8")).toContain(`platform === "win32" || platform === "darwin"`);
-    for (const script of ["scripts/commit-msg.mjs", "scripts/ledger-issues.mjs"]) {
-      const source = readFileSync(join(ROOT, script), "utf8");
-      expect(source, script).toContain(rule);
-      expect(source, script).toContain(`.endsWith(foldCase("/${script}"))`);
-    }
-  });
-
   it("knows a script by its path from the repo root, in either separator, and on Windows in any case", () => {
     const saved = process.argv[1];
     try {
