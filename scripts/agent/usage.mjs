@@ -111,7 +111,7 @@ export function ratesFor({ model, served = model, prompt, speed, geo, tier: serv
   // before/after comparison holds constant.
   const servedKey = priceKey(served);
   if (speed === "fast" && Object.hasOwn(FAST_MULTIPLIER, servedKey)) speedMultiplier = FAST_MULTIPLIER[servedKey];
-  else if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${model} at speed ${speed}`);
+  else if (speed != null && speed !== "standard") throw new UnpriceableError(`no price for ${servedKey} at speed ${speed}`);
   const geoMultiplier = geo == null ? 1 : Object.hasOwn(GEO_MULTIPLIER, geo) ? GEO_MULTIPLIER[geo] : undefined;
   if (geoMultiplier === undefined) throw new UnpriceableError(`no price for inference_geo ${geo}`);
   const multiplier = speedMultiplier * geoMultiplier;
@@ -150,6 +150,13 @@ const FILE_TOOLS = new Set(["Read", "Glob", "Grep"]);
  * commands, and are dropped. Each shell's own escape character applies (Bash's backslash,
  * PowerShell's backtick, so `"D:\x\"` is a path there), and in both a `#` that starts a word
  * comments out the rest of its line.
+ *
+ * ceiling: this is a tokenizer for classifying commands into families, not a shell parser. It
+ * handles the shapes above and nothing more: not `$( … )` nesting (a `|` inside an unquoted
+ * substitution splits there), not every quoting form. Accuracy is measured, not argued: a miss
+ * leaves a call out of its family, and `usage --json` shows each family's share, so a miss is
+ * worth fixing only when it moves a share the baseline records. Known misses are listed in
+ * `tasks/open/usage-classifier-known-misses.md`; new shapes go there, not into this function.
  */
 export function splitChain(cmd, tool = "Bash") {
   const escape = tool === "PowerShell" ? "`" : "\\";
@@ -303,7 +310,7 @@ const WHOLE_SUITE = new Set(["tests", "tests/unit", "tests/components", "tests/i
  * The start of one command, past `VAR=value` assignments and `cross-env`, so a program name is
  * matched where it runs and not where it is merely mentioned (`grep vitest notes.md`).
  */
-const ASSIGNMENT = String.raw`[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)\s+`;
+const ASSIGNMENT = String.raw`[A-Za-z_]\w*=(?:"[^"$]*"|'[^']*'|[^\s$]*)\s+`;
 const COMMAND_START = String.raw`^\s*(?:${ASSIGNMENT})*(?:(?:cross-env|time)\s+(?:${ASSIGNMENT})*|timeout\s+(?:-\S+\s+)*\S+\s+)*`;
 /** `npx` with any of its own flags (`npx -y`, `npx --yes`). */
 const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
@@ -490,7 +497,9 @@ export function commandClass(tool, cmd) {
   let rest = withoutExeSuffix(String(cmd).trim());
   for (;;) {
     const cd = /^(cd|Set-Location|pushd)\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*/.exec(rest);
-    const env = /^[A-Za-z_][A-Za-z0-9_]*=("[^"]*"|'[^']*'|[^\s"';&|]*)\s+/.exec(rest);
+    // A value with a `$(` in it is a command, not a value: stop there rather than read its
+    // arguments as the label.
+    const env = /^[A-Za-z_][A-Za-z0-9_]*=("[^"$]*"|'[^']*'|[^\s"';&|$]*)\s+/.exec(rest);
     const psEnv = /^\$env:[A-Za-z_][A-Za-z0-9_]*\s*=\s*("[^"]*"|'[^']*'|[^\s;]*)\s*;\s*/.exec(rest);
     const match = cd || env || psEnv;
     if (!match) break;
@@ -944,6 +953,9 @@ export const RARE_CLASS = "seen in one session only";
  * Command classes seen in at least two sessions, the rest pooled. A command word is a name, but a
  * secret pasted where a command goes would look like one; it would also appear in one session
  * only, so this keeps it out of the report without having to recognise it.
+ *
+ * ceiling: a letters-only token pasted as a command in two sessions would still be shown; the
+ * upgrade is an allow-list of known command names, at the cost of pooling every new tool.
  */
 export function commonClasses(byClass, classSessions) {
   const out = {};

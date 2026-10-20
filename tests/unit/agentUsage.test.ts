@@ -259,6 +259,9 @@ describe("agent usage: command classes", () => {
     expect(commandClass("Bash", "npm run typecheck; echo done")).toBe("npm run typecheck");
     expect(commandClass("Bash", "npm run -s test")).toBe("npm run test");
     expect(commandClass("PowerShell", "$env:FOO='1'; npm run lint")).toBe("npm run lint");
+    // An assignment whose value runs a command: its arguments are not a label.
+    expect(commandClass("Bash", "x=$(cat payroll notes)")).toBe("Bash other");
+    expect(commandClass("Bash", "FOO=$(op read vault) deploy")).toBe("Bash other");
     // A key pasted where a command goes: digits keep it out of the report.
     expect(commandClass("Bash", "sk-ant-api03-abcDEF")).toBe("Bash other");
   });
