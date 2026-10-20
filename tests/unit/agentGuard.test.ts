@@ -29,8 +29,8 @@ import { fileURLToPath } from "url";
  * defects and the rate never fell. `permissions.deny` in `.claude/settings.json`
  * does that job now and the harness enforces it. What remains here is the two
  * agent rules, the drift log, and — in the wiring block — assertions about the
- * permission rules themselves plus a ledger of the twelve shapes prefix matching
- * cannot reach. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
+ * permission rules themselves plus a ledger of the shapes prefix matching cannot
+ * reach, in Bash and in PowerShell. See docs/archives/tasks/TARGET_AGENT_GUARDRAILS.md.
  *
  * What this file does NOT establish: that Claude Code runs the hook. Frontmatter
  * hooks load from the definition as it stood at SESSION START, so a hook wired
@@ -342,6 +342,14 @@ describe("agent guard", () => {
       expect(deny).not.toContain("npm run db:push:local");
       expect(deny).not.toContain("npm run db:seed:local");
       expect(deny).not.toContain("Bash(npm run db:push*)");
+      // The FAQ and bulletin migrations are the same shape of script, so both deny the npm and
+      // the direct invocation, in both shells.
+      for (const [script, npm] of [["migrate-faqs", "db:migrate:faqs"], ["migrate-bulletins", "db:migrate:bulletins"]]) {
+        for (const tool of ["Bash", "PowerShell"]) {
+          expect(covered(`npx tsx scripts/${script}.ts`, tool), `${script} in ${tool}`).toBe(true);
+          expect(covered(`npm run ${npm}`, tool), `${npm} in ${tool}`).toBe(true);
+        }
+      }
     });
 
     it("asks rather than denies for the judgment calls, so the override is in band", () => {
@@ -383,14 +391,63 @@ describe("agent guard", () => {
     // This is a LEDGER, not a fence. Nothing here is enforced. If a shape becomes
     // covered, move it to COVERED and say what covers it — an entry silently changing
     // sides is the regression this exists to catch.
+    // Per the permissions reference (code.claude.com/docs/en/permissions): `*` matches anything,
+    // anywhere in the rule, and a trailing ` *` also matches the bare command (`Bash(ls *)`
+    // matches `ls`).
     const matchesRule = (rule: string, command: string): boolean => {
-      const body = rule.replace(/^Bash\(/, "").replace(/\)$/, "");
-      return body.endsWith("*") ? command.startsWith(body.slice(0, -1)) : command === body;
+      const body = rule.replace(/^\w+\(/, "").replace(/\)$/, "");
+      const pattern = (text: string) => new RegExp(`^${text.split("*").map(s => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+      return pattern(body).test(command) || (body.endsWith(" *") && command === body.slice(0, -2));
     };
-    const covered = (command: string): boolean =>
+    const covered = (command: string, tool = "Bash"): boolean =>
       [...settings.permissions.deny, ...settings.permissions.ask]
-        .filter(r => r.startsWith("Bash("))
+        .filter(r => r.startsWith(`${tool}(`))
         .some(r => matchesRule(r, command));
+
+    // Permission gaps found while planning the agent scripts, closed for both shells: this repo's
+    // agents run PowerShell as often as Bash, and the permissions reference documents PowerShell
+    // rules as their own `PowerShell(...)` shape. Whether a Bash rule also binds PowerShell is
+    // unobserved; the older rules above are Bash-only —
+    // tasks/open/permission-rules-bind-bash-only.md.
+    it.each(["Bash", "PowerShell"])("denies the scripts that reach production secrets, in %s", (tool) => {
+      // In the main checkout `.env.local` is production: db:migrate:bulletins reads it, and
+      // secrets:decrypt:local overwrites it. secrets:run decrypts the production file into any
+      // command's environment, and secrets:edit:prod decrypts it into an editor. secrets:check,
+      // which only reports whether decryption works, stays open. db:migrate:bulletins:local is
+      // the rehearsal and must stay open, which is why the bulletins rule is word-bounded, not a
+      // bare `*`.
+      for (const command of [
+        "npm run db:migrate:bulletins",
+        "npm run db:migrate:bulletins -- --dry-run",
+        "npx tsx scripts/migrate-bulletins.ts",
+        "npm run secrets:decrypt:local",
+        "node scripts/secrets.mjs decrypt-to-local .env.production.enc .env.local",
+        "npm run secrets:run -- npm run db:seed",
+        "node scripts/secrets.mjs run .env.production.enc -- npm start",
+        "npm run secrets:edit:prod",
+        "node scripts/secrets.mjs edit .env.production.enc",
+      ]) {
+        expect(covered(command, tool), `expected covered: ${command}`).toBe(true);
+      }
+      // The bare command has its own exact rule, so it is denied even if a trailing ` *` turned
+      // out not to match a command with no arguments, which the reference says but nobody here
+      // has observed.
+      expect(settings.permissions.deny).toContain(`${tool}(npm run db:migrate:bulletins)`);
+      expect(covered("npm run db:migrate:bulletins:local", tool)).toBe(false);
+      expect(covered("npm run secrets:check", tool)).toBe(false);
+      expect(settings.permissions.deny).not.toContain(`${tool}(npm run db:migrate:bulletins*)`);
+    });
+
+    it.each(["Bash", "PowerShell"])("asks before the ledger mirror publishes issues, and not for its dry run, in %s", (tool) => {
+      // The mirror reads --apply anywhere in its arguments, so the rule does too.
+      expect(settings.permissions.ask).toContain(`${tool}(npm run ledger:issues *--apply*)`);
+      expect(covered("npm run ledger:issues -- --apply", tool)).toBe(true);
+      expect(covered("npm run ledger:issues -- --branch master --apply", tool)).toBe(true);
+      expect(covered("node scripts/ledger-issues.mjs --apply", tool)).toBe(true);
+      expect(covered("node scripts/ledger-issues.mjs --branch x --apply", tool)).toBe(true);
+      expect(covered("npm run ledger:issues", tool)).toBe(false);
+      expect(covered("npm run ledger:issues -- --branch master", tool)).toBe(false);
+    });
 
     it("catches the destructive commands only when they lead the string", () => {
       // The rules work. This is the control for the test below it.
@@ -424,9 +481,37 @@ describe("agent guard", () => {
         // Quoted command word, and a leading git option before the subcommand.
         "'rm' -rf build",
         "git -c core.pager=cat reset --hard",
+        // npm's own other spellings of `npm run <script>`.
+        "npm run -s secrets:run -- npm start",
+        "npm --silent run db:migrate:bulletins",
+        "npm run-script secrets:decrypt:local",
+        // Under the npm scripts: the sops binary they call, and another way to load tsx.
+        "sops --decrypt --input-type dotenv --output-type dotenv .env.production.enc",
+        "node --import tsx scripts/migrate-bulletins.ts",
       ];
       for (const command of UNCOVERED) {
         expect(covered(command), `newly covered, move it: ${command}`).toBe(false);
+      }
+    });
+
+    it("does not catch, by prefix, a PowerShell path spelled another way or a leading statement", () => {
+      // The rules name `scripts/x` with forward slashes and no `./`. PowerShell accepts every
+      // path spelling below, and each one reaches the same script.
+      const UNCOVERED_POWERSHELL = [
+        "npx tsx .\\scripts\\migrate-bulletins.ts",
+        "npx tsx ./scripts/migrate-bulletins.ts",
+        "node .\\scripts\\secrets.mjs decrypt-to-local",
+        "node scripts\\secrets.mjs run -- npm start",
+        // The Windows shim, which PowerShell agents here often name.
+        "npm.cmd run secrets:run -- npm start",
+        // The commonest PowerShell shape in this repo's transcripts: a leading statement. The
+        // reference says PowerShell rules are checked per subcommand of the parsed command, which
+        // would catch these; this prefix model cannot, and nobody here has observed either.
+        "Set-Location D:\\Dev\\Repos\\pet-shelter; npm run secrets:run -- npm start",
+        "$env:FOO='1'; npm run db:migrate:bulletins",
+      ];
+      for (const command of UNCOVERED_POWERSHELL) {
+        expect(covered(command, "PowerShell"), `newly covered, move it: ${command}`).toBe(false);
       }
     });
 

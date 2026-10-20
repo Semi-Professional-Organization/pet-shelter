@@ -27,9 +27,9 @@
 // defence-in-depth argument. That was incoherent — the same parser, the same defect rate, applied
 // to whoever happened not to be the main conversation — and it was removed on the human's call.
 // **Do not revive it.** `permissions` rules are prefix-matched, so `cd x && git reset --hard` is
-// not caught; the twelve shapes that escape are enumerated in `tests/unit/agentGuard.test.ts` as a
-// ledger. If one of them must actually be blocked, that is a narrowly-scoped hook for one shape,
-// with a corpus replay before it is armed — not this file again.
+// not caught; the shapes that escape, Bash and PowerShell, are enumerated in
+// `tests/unit/agentGuard.test.ts` as a ledger. If one of them must actually be blocked, that is a
+// narrowly-scoped hook for one shape, with a corpus replay before it is armed — not this file again.
 //
 // **Two wirings, deliberately different.**
 //   - Agent frontmatter (`schema-auditor`, `atomic-commit`): `PreToolUse`, binds those two agents.
