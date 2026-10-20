@@ -22,10 +22,11 @@
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { caseFolder } from "../lib/invokedAs.mjs";
+import { projectsDir as transcriptsHome } from "./transcript.mjs";
 
 // ================================ prices ================================
 
@@ -564,7 +565,7 @@ export function triggerOf(record) {
 }
 
 /** Token fields a request's lines are merged on. Streamed lines repeat them; output grows. */
-const USAGE_FIELDS = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens"];
+export const USAGE_FIELDS = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens"];
 
 /**
  * One transcript file, fed record by record. Keeps numbers and labels only.
@@ -1144,10 +1145,15 @@ function mainCheckoutRoot(cwd) {
   return common ? dirname(common) : null;
 }
 
-/** git's answer, trimmed, or null when git cannot give one. */
+/**
+ * git's answer, trimmed, or null when git cannot give one. Optional locks are off, as in
+ * `agent-guard.mjs`: a `git status` here would otherwise take `index.lock` in a checkout other
+ * sessions are committing in.
+ */
 export function git(cwd, args) {
   try {
-    return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+    return execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
   }
@@ -1320,7 +1326,7 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
     return 0;
   }
 
-  const projectsDir = join(env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
+  const projectsDir = transcriptsHome(env);
   let dirs = opts.dirs;
   if (!dirs.length) {
     const root = mainCheckoutRoot(cwd);

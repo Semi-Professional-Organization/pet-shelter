@@ -26,7 +26,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CACHE_TTL_MINUTES, PRICES, priceKey, ratesFor } from "./usage.mjs";
+import { CACHE_TTL_MINUTES, PRICES, USAGE_FIELDS, priceKey, ratesFor } from "./usage.mjs";
 import { findTranscript, projectsDir, readTail } from "./transcript.mjs";
 
 // ================================ the rule ================================
@@ -76,7 +76,6 @@ const HANDOFF = "node scripts/agent.mjs ledger handoff --help";
 
 // ================================ the reading ================================
 
-const USAGE_FIELDS = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens"];
 const requestKey = (record) => record.requestId || record.message?.id || record.uuid;
 const isRequest = (record) =>
   record?.type === "assistant" && record.message?.usage && typeof record.message.usage === "object" && record.message.model !== "<synthetic>";
@@ -89,15 +88,18 @@ const isRequest = (record) =>
  * - `ctx`: what the next request carries at least, which is this request's prompt (fresh input,
  *   cache reads and cache writes) plus its output.
  * - `start`: when its first line was written, which is when it last read the cache, in ms.
- * - `ttl`: the lifetime in minutes of the last cache write, 5 or 60; 60 when none is in view.
+ * - `ttl`: in minutes, the cache lifetime that holds most of what the requests in view wrote since
+ *   the last compaction, which decides whether the whole context expires, as in `usage`'s
+ *   `coldResumes`; 60 when nothing written is in view.
  *
  * ceiling: the reading is a floor, not the size of the next request: it leaves out the tool
  * results and messages that request will add. The transcript "is written asynchronously and may
- * lag", so it can also be one request behind; and `start` is the first line of the request in the
- * records given, so a request that began before them reads as starting later. Replayed over this
- * repo's 18 main-session transcripts (10,498 requests) on 2026-10-21: this function agreed with
- * `usage`'s extraction on the last request of all 18 (size, model, start and lifetime), and the
- * next request's prompt was larger than the reading by a median of 280 tokens, 1.5K at the 90th
+ * lag", so it can also be one request behind; `start` is the first line of the request in the
+ * records given, so a request that began before them reads as starting later; and `ttl` counts
+ * only the writes in view, where `usage` counts every write since the compaction. Replayed over
+ * this repo's 18 main-session transcripts (10,562 requests) on 2026-10-21: this function agreed
+ * with `usage`'s extraction on the last request of all 18 (size, model and start), and the next
+ * request's prompt was larger than the reading by a median of 280 tokens, 1.5K at the 90th
  * percentile, 6.5K at the 99th and 90K at most (13.8K at the 99th when the reading is a request
  * behind). Against levels of 250K and up, a line can come a call late, not a level late.
  */
@@ -113,33 +115,34 @@ export function readingOf(records) {
   const key = requestKey(records[last]);
   const usage = Object.fromEntries(USAGE_FIELDS.map((field) => [field, 0]));
   let start = Date.parse(records[last].timestamp);
-  let w5 = 0;
-  let w1h = 0;
   for (const record of records) {
     if (!isRequest(record) || requestKey(record) !== key) continue;
     const u = record.message.usage;
     for (const field of USAGE_FIELDS) usage[field] = Math.max(usage[field], Number(u[field]) || 0);
-    w5 = Math.max(w5, Number(u.cache_creation?.ephemeral_5m_input_tokens) || 0);
-    w1h = Math.max(w1h, Number(u.cache_creation?.ephemeral_1h_input_tokens) || 0);
     const at = Date.parse(record.timestamp);
     if (at < start) start = at;
   }
-  // The lifetime of the newest write decides when the cache expires; one request that wrote
-  // nothing (everything it carried was already cached) keeps the one before it.
-  let ttl;
-  for (let i = last; i >= 0 && ttl === undefined; i--) {
+  // Each request's writes, merged over its lines, back to the last compaction in view.
+  const writes = new Map();
+  for (let i = last; i >= 0; i--) {
     const record = records[i];
+    if (record?.type === "system" && record.subtype === "compact_boundary") break;
     if (!isRequest(record)) continue;
-    const c = requestKey(record) === key ? { ephemeral_5m_input_tokens: w5, ephemeral_1h_input_tokens: w1h } : record.message.usage.cache_creation || {};
-    const five = Number(c.ephemeral_5m_input_tokens) || 0;
-    const hour = Number(c.ephemeral_1h_input_tokens) || 0;
-    if (five || hour) ttl = five > hour ? CACHE_TTL_MINUTES["5m"] : CACHE_TTL_MINUTES["1h"];
+    const c = record.message.usage.cache_creation || {};
+    const [five, hour] = writes.get(requestKey(record)) ?? [0, 0];
+    writes.set(requestKey(record), [Math.max(five, Number(c.ephemeral_5m_input_tokens) || 0), Math.max(hour, Number(c.ephemeral_1h_input_tokens) || 0)]);
+  }
+  let held5 = 0;
+  let held1h = 0;
+  for (const [five, hour] of writes.values()) {
+    held5 += five;
+    held1h += hour;
   }
   return {
     model: String(records[last].message.model),
     ctx: usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens,
     start,
-    ttl: ttl ?? CACHE_TTL_MINUTES["1h"],
+    ttl: held5 > held1h ? CACHE_TTL_MINUTES["5m"] : CACHE_TTL_MINUTES["1h"],
   };
 }
 
@@ -207,11 +210,12 @@ function coldLine(reading, idleMinutes, price) {
  * line and are all marked. A cold resume's line replaces a level's, since it already says to hand
  * off.
  *
- * ceiling: "cold" is idle longer than the lifetime of the last cache write; the cache's own expiry
- * is not in the transcript. Replayed on 2026-10-21 over the 153 messages from a person that
- * reached a main session of 250K or more in this repo's transcripts, it called 40 cold and 113
- * warm, and each was right by what the request then did: every one called cold re-wrote at least
- * half its context, and none called warm did.
+ * ceiling: "cold" is idle longer than the cache lifetime `readingOf` gives; the cache's own expiry
+ * is not in the transcript. Replayed on 2026-10-21 through this function and `readingOf`, over the
+ * 122 messages from a person that reached a main session of 250K or more in this repo's 18
+ * transcripts, each read as the hook reads it (the transcript's last 256 KB before the message):
+ * it called 30 cold and 92 warm, and each was right by what the answering request then did. Every
+ * one called cold re-wrote at least half its context, and none called warm did.
  */
 export function assess({ event, reading, fired = new Set(), now }) {
   const rule = ruleFor(reading.model);
@@ -233,7 +237,18 @@ export function assess({ event, reading, fired = new Set(), now }) {
 
 // ================================ the shell ================================
 
-const HELP = `usage: node scripts/agent.mjs meter [--session <id>] [--json]
+const WHAT = { quiet: "write the hand-off state before ending a turn that waits on a person", milestone: "write it at the next milestone", now: "hand off now" };
+
+/** The help, with the levels read from RULES so the two cannot disagree. */
+export function helpText() {
+  const levels = Object.entries(RULES).map(([model, rule]) =>
+    [
+      `  ${model === "default" ? "any other model" : model}:`,
+      ...rule.levels.map(([kind, at]) => `    ${tokens(at).padEnd(5)} ${WHAT[kind]}`),
+      `    ${tokens(rule.cold).padEnd(5)} and up: the cold-resume line`,
+    ].join("\n"),
+  );
+  return `usage: node scripts/agent.mjs meter [--session <id>] [--json]
        node scripts/agent.mjs meter --hook   (reads a hook event on stdin; .claude/settings.json runs it)
 
 The context meter: this session's real context size, what each call costs at that size, and
@@ -241,15 +256,16 @@ whether its cache is still warm, read from the session's transcript. Read-only, 
 hook keeps which levels it has announced in <tmp>/claude-meter/<session>/.
 
 As a hook it adds one line to the agent's context at each level of the hand-off rule, once per
-level: from 250K, write the hand-off state before ending a turn that waits on a person; at 300K, at
-the next milestone; at 500K, now (Haiku 5.5: 80K and 90K). A message that arrives after the cache
-expired, in a session at 250K or more, gets a line saying what that turn re-wrote.
+level, and a line when a message arrives after the cache expired, saying what that turn re-wrote:
+
+${levels.join("\n")}
 
   --session <id>  the session to read (default: CLAUDE_CODE_SESSION_ID); a prefix of 8 or more
                   characters will do
   --json          print the reading as JSON
 
 Exit codes: 0 reading printed (and always, as a hook), 2 could not run.`;
+}
 
 /** Grows the tail read until it holds a request, or is the whole file. */
 export function readLatest(path, first = 256 * 1024) {
@@ -362,7 +378,7 @@ export async function main(argv, io = {}) {
     return 2;
   }
   if (opts.help) {
-    out.write(`${HELP}\n`);
+    out.write(`${helpText()}\n`);
     return 0;
   }
   if (opts.hook) {

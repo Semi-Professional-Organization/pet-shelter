@@ -33,6 +33,8 @@ const textOf = (content) =>
           .join("\n")
       : "";
 
+let unnamed = 0;
+
 /**
  * The searchable pieces of one transcript's records: what a person or a parent agent wrote, what
  * the model wrote and thought, the tool calls it made and what they returned. Meta records (the
@@ -45,7 +47,8 @@ export function piecesOf(records, { sub = false } = {}) {
   for (const record of records) {
     if (!record || typeof record !== "object" || record.isMeta) continue;
     const at = record.timestamp;
-    const id = record.uuid ?? `${pieces.length}`;
+    // A record with no uuid cannot be a fork's copy of another, so it gets an id nothing shares.
+    const id = record.uuid ?? `no-uuid-${++unnamed}`;
     if (record.type === "attachment" && record.attachment?.type === "queued_command") {
       pieces.push({ at, id, kind: who("user"), text: textOf(record.attachment.prompt) });
       continue;
@@ -83,16 +86,22 @@ export function snippet(text, at, length, { before = 100, after = 160 } = {}) {
   return `${from > 0 ? "…" : ""}${middle}${to < text.length ? "…" : ""}`;
 }
 
-/** Pieces that contain `term`, ignoring case, in time order, each once. */
+const literal = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Pieces that contain `term`, ignoring case, in time order, each once. The match is found in the
+ * text as written, since lower-casing can change a string's length ("İ" becomes two characters)
+ * and move every offset after it.
+ */
 export function search(pieces, term) {
-  const needle = term.toLowerCase();
+  const pattern = new RegExp(literal(term), "iu");
   const seen = new Set();
   const hits = [];
   for (const piece of pieces) {
     if (seen.has(piece.id)) continue;
     seen.add(piece.id);
-    const at = piece.text.toLowerCase().indexOf(needle);
-    if (at >= 0) hits.push({ ...piece, match: at });
+    const found = pattern.exec(piece.text);
+    if (found) hits.push({ ...piece, match: found.index, length: found[0].length });
   }
   return hits.sort((a, b) => String(a.at).localeCompare(String(b.at)));
 }
@@ -177,7 +186,7 @@ export async function main(argv, io = {}) {
   try {
     writeFileSync(
       log,
-      hits.map((h) => `${h.at} ${h.kind}: ${snippet(h.text, h.match, term.length, { before: 400, after: 800 })}`).join("\n\n") + "\n",
+      hits.map((h) => `${h.at} ${h.kind}: ${snippet(h.text, h.match, h.length, { before: 400, after: 800 })}`).join("\n\n") + "\n",
     );
   } catch {
     logged = false;
@@ -186,7 +195,7 @@ export async function main(argv, io = {}) {
   out.write(
     [
       `recall: PASS ${hits.length} ${hits.length === 1 ? "match" : "matches"} for "${term}" in session ${short}${hits.length > SHOWN ? `, the last ${SHOWN} shown` : ""}`,
-      ...shown.map((h) => `${stamp(h.at)} ${h.kind}: ${snippet(h.text, h.match, term.length)}`),
+      ...shown.map((h) => `${stamp(h.at)} ${h.kind}: ${snippet(h.text, h.match, h.length)}`),
       ...(logged ? [`log: ${log}`] : []),
     ].join("\n") + "\n",
   );

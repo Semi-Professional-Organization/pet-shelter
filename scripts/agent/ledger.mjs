@@ -106,11 +106,21 @@ export async function main(argv, io = {}) {
     say("ERROR", "a hand-off needs a title with letters or digits", 'node scripts/agent.mjs ledger handoff "<title>" --from <file>');
     return 2;
   }
-  const session = opts.session ?? env.CLAUDE_CODE_SESSION_ID;
-  if (!session) {
+  const given = opts.session ?? env.CLAUDE_CODE_SESSION_ID;
+  if (!given) {
     say("ERROR", "no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
     return 2;
   }
+  // A prefix stands for the session it starts. The file records the full id, which is what
+  // `recall`, `orient` and a later run of this command compare against.
+  let found;
+  try {
+    found = findTranscript(projectsDir(env), given);
+  } catch (error) {
+    say("ERROR", error.message);
+    return 2;
+  }
+  const session = found?.session ?? given;
 
   let body;
   try {
@@ -150,7 +160,6 @@ export async function main(argv, io = {}) {
 
   let context = "unknown: no transcript of this session was found.";
   try {
-    const found = findTranscript(projectsDir(env), session);
     const reading = found && readLatest(found.path);
     if (reading) context = `${Math.round(reading.ctx / 1000)}K tokens on ${reading.model}.`;
   } catch (error) {

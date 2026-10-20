@@ -6,7 +6,8 @@ import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 import { COMMANDS, cli } from "../../scripts/agent.mjs";
-import { REARM, assess, main, priceOf, readLatest, readingOf, settle } from "../../scripts/agent/meter.mjs";
+import { REARM, RULES, assess, helpText, main, priceOf, readLatest, readingOf, settle } from "../../scripts/agent/meter.mjs";
+import { createExtractor } from "../../scripts/agent/usage.mjs";
 
 /**
  * The context meter tells an agent its real context size and when to hand off, from the session's
@@ -72,12 +73,31 @@ describe("the reading", () => {
     expect(readingOf([toolResult(0)])).toBeNull();
   });
 
-  it("takes the cache lifetime from the newest write, and an hour when none is in view", () => {
+  it("takes the cache lifetime that holds most of what was written since the last compaction", () => {
     expect(readingOf([line("a", 0, { w5: 10 })])?.ttl).toBe(5);
-    expect(readingOf([line("a", 0, { w5: 10 }), line("b", 1, { w1h: 10 })])?.ttl).toBe(60);
-    // A request that wrote nothing keeps the lifetime of the one before it.
     expect(readingOf([line("a", 0, { w5: 10 }), line("b", 1, { read: 10 })])?.ttl).toBe(5);
     expect(readingOf([line("a", 0, { read: 10 })])?.ttl).toBe(60);
+    // A small 5-minute write on top of a context cached for an hour does not expire the context.
+    expect(readingOf([line("a", 0, { w1h: 300_000 }), line("b", 1, { w5: 2_000 })])?.ttl).toBe(60);
+    // It is the total that counts, not the oldest write or the newest.
+    expect(readingOf([line("a", 0, { w5: 1_000 }), line("b", 1, { w1h: 900 }), line("c", 2, { w1h: 900 }), line("d", 3, { w5: 10 })])?.ttl).toBe(60);
+    // What was written before a compaction is no longer in the context.
+    const boundary = { type: "system", subtype: "compact_boundary", timestamp: at(2) };
+    expect(readingOf([line("a", 0, { w1h: 300_000 }), boundary, line("b", 3, { w5: 2_000 })])?.ttl).toBe(5);
+  });
+
+  it("reads a request as usage does: the same size, model and start", () => {
+    const records = [
+      line("r1", 0, { input: 4, read: 10_000, w1h: 500, out: 20 }),
+      toolResult(1),
+      line("r2", 2, { input: 2, read: 10_500, w5: 30, out: 5 }),
+      line("r2", 3, { input: 2, read: 10_500, w5: 30, out: 70 }),
+    ];
+    const extractor = createExtractor({ session: "s", sub: false });
+    for (const record of records) extractor.add(record);
+    const last = extractor.finish().requests.at(-1);
+    const prompt = last.input_tokens + last.cache_read_input_tokens + last.cache_creation_input_tokens;
+    expect(readingOf(records)).toMatchObject({ ctx: prompt + last.output_tokens, model: last.model, start: Date.parse(last.ts) });
   });
 
   it("finds the last request beyond a first tail read, past a tool result bigger than the read", () => {
@@ -121,6 +141,15 @@ describe("the levels", () => {
     expect(compacted.rearm).toEqual(["quiet-250000", "milestone-300000"]);
     expect(REARM * 250_000).toBeGreaterThan(100_000);
     expect(levels(reading(260_000), []).announce).toBe("quiet-250000");
+  });
+
+  it("lists in its help the levels it acts on, read from the same table", () => {
+    const help = helpText();
+    for (const [model, rule] of Object.entries(RULES)) {
+      const section = help.slice(help.indexOf(model === "default" ? "any other model:" : `${model}:`));
+      for (const [, size] of rule.levels) expect(section).toMatch(new RegExp(`^ {4}${Number(size) / 1000}K `, "m"));
+    }
+    expect(help).toContain("    250K  and up: the cold-resume line");
   });
 
   it("warns a Haiku 5.5 session at 80K and hands it off at 90K, naming the price step", () => {
@@ -253,9 +282,15 @@ describe("the hook", () => {
   it("is wired after tool calls, when a message arrives, and orient when a session starts", () => {
     const hooks = JSON.parse(readFileSync(join(ROOT, ".claude", "settings.json"), "utf8")).hooks;
     const commands = (event: string) => hooks[event].flatMap((entry: { hooks: { command: string }[] }) => entry.hooks.map((h) => h.command));
-    expect(commands("PostToolUse")).toContain('node "${CLAUDE_PROJECT_DIR}/scripts/agent.mjs" meter --hook');
-    expect(commands("UserPromptSubmit")).toEqual(['node "${CLAUDE_PROJECT_DIR}/scripts/agent.mjs" meter --hook']);
-    expect(commands("SessionStart")).toEqual(['node "${CLAUDE_PROJECT_DIR}/scripts/agent.mjs" orient --brief']);
+    const meter = 'node "${CLAUDE_PROJECT_DIR}/scripts/agent.mjs" meter --hook';
+    // After every tool, not only the shells and edits the drift log's matcher names: Read, Grep
+    // and Agent results are what grow a context fastest. An entry with no matcher was seen firing
+    // after Read, Grep and Glob on Claude Code 2.1.304.
+    const after = hooks.PostToolUse.filter((entry: { hooks: { command: string }[] }) => entry.hooks.some((h) => h.command === meter));
+    expect(after).toHaveLength(1);
+    expect(after[0].matcher).toBeUndefined();
+    expect(commands("UserPromptSubmit")).toEqual([meter]);
+    expect(commands("SessionStart")).toEqual(['node "${CLAUDE_PROJECT_DIR}/scripts/agent.mjs" orient --brief --hook']);
     // Every hook that runs the entry point names a command it has.
     for (const event of Object.keys(hooks)) {
       for (const command of commands(event)) {

@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/agent.mjs\" orient --brief",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/agent.mjs\" orient --brief --hook",
             "timeout": 15
           }
         ]
@@ -108,7 +108,11 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/agent-guard.mjs\""
-          },
+          }
+        ]
+      },
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "node \"${CLAUDE_PROJECT_DIR}/scripts/agent.mjs\" meter --hook",

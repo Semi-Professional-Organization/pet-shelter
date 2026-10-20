@@ -139,6 +139,16 @@ describe("ledger handoff", () => {
     expect(readFileSync(join(top, "tasks", "open", "HANDOFF-shared-title.md"), "utf8")).toBe(mine);
   });
 
+  it("records the full session id when given a prefix, so the session can replace its own file", async () => {
+    const top = repo();
+    const { dir } = config(SESSION, [{ type: "user", uuid: "u", timestamp: "2026-10-21T09:00:00Z", message: { content: "hi" } }]);
+    const env = { CLAUDE_CONFIG_DIR: dir };
+    expect((await run(["handoff", "Prefixed", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env })).code).toBe(0);
+    expect(sessionOf(readFileSync(join(top, "tasks", "open", "HANDOFF-prefixed.md"), "utf8"))).toBe(SESSION);
+    expect((await run(["handoff", "Prefixed"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
+    expect((await run(["handoff", "Prefixed", "--session", "short"], { cwd: top, stdin: BODY, env })).code).toBe(2);
+  });
+
   it("could not run without a session, a body, a usable title or a known subcommand", async () => {
     const top = repo();
     const env = { CLAUDE_CODE_SESSION_ID: SESSION };
@@ -176,7 +186,7 @@ describe("orient", () => {
   });
 
   it("names the hand-offs other sessions left, three at most, and the meter when run as the hook", () => {
-    const lines = orientLines(where, [handoff(1, SESSION), handoff(2, OTHER), handoff(3, OTHER), handoff(4, OTHER), handoff(5, OTHER)], { brief: true, session: SESSION });
+    const lines = orientLines(where, [handoff(1, SESSION), handoff(2, OTHER), handoff(3, OTHER), handoff(4, OTHER), handoff(5, OTHER)], { hook: true, session: SESSION });
     expect(lines.slice(2)).toEqual([
       'hand-off: tasks/open/HANDOFF-h2.md "H2", from session bbbbbbbb on 2026-10-21',
       'hand-off: tasks/open/HANDOFF-h3.md "H3", from session bbbbbbbb on 2026-10-21',
@@ -197,8 +207,17 @@ describe("orient", () => {
     expect(await orient([], plain.io)).toBe(1);
     expect(plain.sink.text).toMatch(/^orient: FAIL .*ghost is not a registered worktree, so git resolves it to .*: edits here land in that checkout\nwhere: main checkout /);
     const hook = io({ cwd: ghost, env: {} });
-    expect(await orient(["--brief"], hook.io)).toBe(0);
+    expect(await orient(["--brief", "--hook"], hook.io)).toBe(0);
     expect(hook.sink.text).toContain("orient: FAIL");
+  });
+
+  it("dates the last fetch by the newest FETCH_HEAD, since each worktree writes its own", () => {
+    const top = repo();
+    expect(whereAmI(top, { now: NOW })?.fetchedMinutesAgo).toBeNull();
+    const common = execFileSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: top, encoding: "utf8" }).trim();
+    mkdirSync(join(common, "worktrees", "wt"), { recursive: true });
+    writeFileSync(join(common, "worktrees", "wt", "FETCH_HEAD"), "");
+    expect(whereAmI(top, { now: Date.now() })?.fetchedMinutesAgo).toBeLessThan(5);
   });
 
   it("exits 0 as the hook even outside a repository, where it could not run", async () => {
@@ -206,7 +225,8 @@ describe("orient", () => {
     try {
       const plain = io({ cwd: outside, env: {} });
       expect(await orient([], plain.io)).toBe(2);
-      expect(await orient(["--brief"], io({ cwd: outside, env: {} }).io)).toBe(0);
+      expect(await orient(["--hook"], io({ cwd: outside, env: {} }).io)).toBe(0);
+      expect(await orient(["--brief"], io({ cwd: outside, env: {} }).io)).toBe(2);
     } finally {
       rmSync(outside, { recursive: true, force: true });
     }
@@ -228,6 +248,15 @@ describe("recall", () => {
     expect(search(piecesOf(records, { sub: true }), "tail read").map((h) => h.kind)).toEqual(["sub thinking"]);
     // A piece copied into a second file (a fork) is found once.
     expect(search([...piecesOf(records), ...piecesOf(records)], "please")).toHaveLength(1);
+  });
+
+  it("keeps records with no uuid apart, and finds a match where it is in the text as written", () => {
+    const bare = (text: string) => [{ type: "user", timestamp: "2026-10-21T09:00:00Z", message: { content: text } }];
+    expect(search([...piecesOf(bare("main has the meter")), ...piecesOf(bare("sub has the meter"), { sub: true })], "meter")).toHaveLength(2);
+    // Lower-casing turns each "İ" into two characters; the offset must not move with it.
+    const [hit] = search(piecesOf(bare(`${"İ".repeat(200)} needle`)), "NEEDLE");
+    expect(snippet(hit.text, hit.match, hit.length)).toMatch(/needle$/);
+    expect(search(piecesOf(bare("a.b(c) and a+b")), "a.b(c")).toHaveLength(1);
   });
 
   it("trims to the text around the match, on one line", () => {
