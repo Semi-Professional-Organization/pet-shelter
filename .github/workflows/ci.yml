@@ -19,11 +19,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
-env:
-  # Every tier except `integration-db` is designed to run with no database at
-  # all, which is also how the application behaves. Only the job that needs
-  # Postgres provisions it.
-  NODE_VERSION: "22"
+# Every tier except `integration-db` is designed to run with no database at
+# all, which is also how the application behaves. Only the jobs that need
+# Postgres provision it.
+#
+# Node comes from `.nvmrc`, the one copy every workflow reads. It names the major that Vercel
+# deploys: `engines.node` in package.json is an open range, which Vercel resolves to the newest
+# major it supports. See tasks/open/productions-node-version-is-documented-not-observed.md.
 
 # Each job's `name` is a required status check in the repository ruleset "Basic" (Settings →
 # Rules → Rulesets). Renaming a job blocks every pull request until the ruleset names it too.
@@ -46,7 +48,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       # `postinstall` already runs this, but an npm cache hit can skip it and
@@ -73,7 +75,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -112,7 +114,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -160,7 +162,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate

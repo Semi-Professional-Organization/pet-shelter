@@ -33,7 +33,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: "22"
+          node-version-file: .nvmrc
       # No `npm ci`: the linter is dependency-free Node on purpose, so this job
       # reports in seconds and cannot be broken by an install failure.
       - name: Lint the commits this pull request adds
