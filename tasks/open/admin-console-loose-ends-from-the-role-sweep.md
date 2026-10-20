@@ -45,7 +45,21 @@ outage the boards show whatever the mirror holds — the bundled demo records on
 with nothing to say they are not the shelter's. Same family as
 `tasks/open/an-outage-serves-and-bills-fixture-animals.md`.
 
-## 7. Smaller ones
+## 7. The settings form starts from a personal email address
+
+The "Staff Notification Destination" field and a Super Admin's test-email recipient default to a
+hard-coded personal address, in `src/lib/client/settingsStore.ts`,
+`src/lib/server/settingsRepository.ts` and the settings form's placeholders. `loadShelterSettings`
+does not carry that field (`HYDRATED_SETTING_KEYS` in `src/actions/settings.ts`), so a stored
+value never replaces the default in the form. A Super Admin who presses "Send Test Email" without
+editing the field sends the shelter's test email to that inbox, and saving the form stores the
+address. Staff alerts are addressed from `SHELTER_NOTIFICATION_EMAIL` and are not affected, nor
+are members without `MANAGE_SETTINGS`, whose test email now defaults to their own address.
+
+Agent-checkable trigger: `grep -rn "@gmail.com" src` prints five lines today; closed when it
+prints none.
+
+## 8. Smaller ones
 
 - An Animal Manager can trigger supporter photo-update emails (pet saves need only `MANAGE_PETS`)
   without holding `SEND_SHELTER_EMAIL`.
