@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ROLES } from "@/lib/security/permissions";
-import { identityForRole, memberRowForId, signInAs } from "../setup/authSession";
+import { findMemberRow, identityForRole, signInAs } from "../setup/authSession";
 
 /**
  * The donation QR audit path: changing a code donors scan to send money must
@@ -53,7 +53,7 @@ const prismaDouble = vi.hoisted(() => ({
     // `memberRowForId` mirrors `identityForRole`, so whichever role a case
     // signs in as is the role the DAL reads back. An id no helper mints is
     // answered null on purpose — that is the deleted-member case.
-    findUnique: vi.fn(async (args?: { where?: { id?: string } }) => memberRowForId(args?.where?.id)),
+    findUnique: vi.fn((args?: { where?: { id?: string } }) => findMemberRow(args)),
   },
 }));
 

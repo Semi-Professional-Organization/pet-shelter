@@ -1,8 +1,8 @@
-import { hashPassword } from "@/lib/security/crypto";
 import { Role, ROLES } from "@/lib/security/rbac";
 import { USER_STATUSES, type UserStatus } from "@/lib/security/permissions";
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError } from "@/lib/persistenceMode";
+import { registerStateReset } from "@/lib/stateResets";
 
 interface DbUserRecord {
   id: string;
@@ -32,107 +32,104 @@ export interface UserRecord {
   updatedAt: string;
 }
 
-// Initial pre-seeded demo staff accounts
-const INITIAL_STAFF_USERS: Array<Omit<UserRecord, "passwordHash" | "status"> & { initialPassword: string }> = [
-  {
-    id: "usr-admin-01",
-    email: "admin@hopeforstrays.org",
-    name: "Dr. Sarah Tan",
-    role: ROLES.SUPER_ADMIN,
-    initialPassword: "admin123",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "usr-coord-01",
-    email: "coordinator@hopeforstrays.org",
-    name: "Priya Devi",
-    role: ROLES.VOLUNTEER_COORDINATOR,
-    initialPassword: "coord123",
-    createdAt: "2026-01-02T00:00:00.000Z",
-    updatedAt: "2026-01-02T00:00:00.000Z",
-  },
-  {
-    id: "usr-animal-01",
-    email: "animals@hopeforstrays.org",
-    name: "Ahmad Razak",
-    role: ROLES.ANIMAL_MANAGER,
-    initialPassword: "animal123",
-    createdAt: "2026-01-03T00:00:00.000Z",
-    updatedAt: "2026-01-03T00:00:00.000Z",
-  },
-  {
-    id: "usr-editor-01",
-    email: "content@hopeforstrays.org",
-    name: "Mei Ling",
-    role: ROLES.CONTENT_EDITOR,
-    initialPassword: "content123",
-    createdAt: "2026-01-04T00:00:00.000Z",
-    updatedAt: "2026-01-04T00:00:00.000Z",
-  },
-  {
-    id: "usr-staff-01",
-    email: "staff@hopeforstrays.org",
-    name: "Nurul Aina",
-    role: ROLES.STAFF,
-    initialPassword: "staff123",
-    createdAt: "2026-01-05T00:00:00.000Z",
-    updatedAt: "2026-01-05T00:00:00.000Z",
-  },
-];
+/**
+ * Initial pre-seeded demo staff accounts.
+ *
+ * Each `passwordHash` is `hashPassword()` of the account's published demo
+ * password, derived once and written down. scrypt is slow on purpose and these
+ * passwords are constants, so deriving them at runtime bought nothing — and the
+ * cost landed in every test file, whose first reset hashed all five. The
+ * passwords themselves are not kept here: they are published, and refused for
+ * real accounts, in `src/lib/security/publishedPasswords.ts`.
+ * `tests/unit/demoSeedPasswordHashes.test.ts` holds which one each account has,
+ * and fails if a hash and its password ever disagree.
+ *
+ * Frozen, because `seededStaff()` re-reads it on every reset: a change made
+ * through this export would otherwise outlive the reset meant to undo it.
+ */
+export const INITIAL_STAFF_USERS: ReadonlyArray<Readonly<Omit<UserRecord, "status">>> =
+  Object.freeze([
+    {
+      id: "usr-admin-01",
+      email: "admin@hopeforstrays.org",
+      name: "Dr. Sarah Tan",
+      role: ROLES.SUPER_ADMIN,
+      passwordHash:
+        "91b3ad750575b1795c5ba360c349afac:04a5997160b1a6edc9f9b6f04f379b7676670a685a545bda0e6211fd800f04d442d759a7ec172826ecae6f2f2a8e07e2815a061109b7226d4a2d444689c0ce56",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "usr-coord-01",
+      email: "coordinator@hopeforstrays.org",
+      name: "Priya Devi",
+      role: ROLES.VOLUNTEER_COORDINATOR,
+      passwordHash:
+        "797b92cb058c6a23cff13c567a886e63:d5fedf6158f81e40f9941b5d10817f2c67730afbb93ec17669e06481a03c494267914c0b0a84e44788f499a8a5249b6d9bb04d3b57168a58e91a9ba4f0ce8930",
+      createdAt: "2026-01-02T00:00:00.000Z",
+      updatedAt: "2026-01-02T00:00:00.000Z",
+    },
+    {
+      id: "usr-animal-01",
+      email: "animals@hopeforstrays.org",
+      name: "Ahmad Razak",
+      role: ROLES.ANIMAL_MANAGER,
+      passwordHash:
+        "b4fd1b7efba5519cdccb7e6f3a5e048e:04ad4c94d7817ef0a4bb9416ff68200bbad64517f307800c2f5cff21ebe5a57deaf2274f513e24d5c10487692debdcfab8663abde94c89852355de067ee8df5f",
+      createdAt: "2026-01-03T00:00:00.000Z",
+      updatedAt: "2026-01-03T00:00:00.000Z",
+    },
+    {
+      id: "usr-editor-01",
+      email: "content@hopeforstrays.org",
+      name: "Mei Ling",
+      role: ROLES.CONTENT_EDITOR,
+      passwordHash:
+        "5c770a0256e4bc8e151d4d549b35e856:7b150159130e73fb33dce700e10029f6315580983db106c59811f815b11438ef431d371f6badd1d3f0822caed08ed965dd7a54de9ba263503e471c8fe85be8f0",
+      createdAt: "2026-01-04T00:00:00.000Z",
+      updatedAt: "2026-01-04T00:00:00.000Z",
+    },
+    {
+      id: "usr-staff-01",
+      email: "staff@hopeforstrays.org",
+      name: "Nurul Aina",
+      role: ROLES.STAFF,
+      passwordHash:
+        "9d4b455ee9bc94087c448f7d61b1925e:ce0d57b9302ff00f64eb709adbceaea731f0f1ea76ed225b84b7be263e209c39d26b11e3e62423de1e341545d57b9e78851040590dc970cd2658020cd4950f21",
+      createdAt: "2026-01-05T00:00:00.000Z",
+      updatedAt: "2026-01-05T00:00:00.000Z",
+    },
+  ].map((seed) => Object.freeze(seed)));
 
 // In-memory fallback user store
 const usersStore: Map<string, UserRecord> = new Map();
 let isInitialized = false;
 let initPromise: Promise<void> | null = null;
 
-/**
- * The seeded staff records, hashed once per process.
- *
- * `hashPassword` is scrypt, which is expensive on purpose. The seed passwords
- * are compile-time constants, so re-deriving them is pure waste — and it is
- * waste the test lifecycle pays repeatedly, since `resetUserStore()` runs
- * before every test in the suite. Hashing once and re-cloning the records keeps
- * a full reset effectively free while leaving the hashes byte-identical to what
- * a fresh derivation would produce.
- *
- * Deliberately *not* cleared by `resetUserStore()`: these are derived from
- * constants, so they can never go stale.
- */
-let seededStaffPromise: Promise<UserRecord[]> | null = null;
-
-function getSeededStaff(): Promise<UserRecord[]> {
-  if (!seededStaffPromise) {
-    seededStaffPromise = Promise.all(
-      INITIAL_STAFF_USERS.map(async (staff) => ({
-        id: staff.id,
-        email: staff.email.toLowerCase(),
-        name: staff.name,
-        passwordHash: await hashPassword(staff.initialPassword),
-        role: staff.role,
-        // Demo accounts are always active; only a database row can be
-        // suspended or awaiting invitation.
-        status: USER_STATUSES.ACTIVE,
-        createdAt: staff.createdAt,
-        updatedAt: staff.updatedAt,
-      }))
-    ).catch((error: unknown) => {
-      // A failed derivation must not be cached: the next reset derives again.
-      seededStaffPromise = null;
-      throw error;
-    });
-  }
-  return seededStaffPromise;
+/** The seeded staff records, as the in-memory store holds them. */
+function seededStaff(): UserRecord[] {
+  return INITIAL_STAFF_USERS.map((staff) => ({
+    id: staff.id,
+    email: staff.email.toLowerCase(),
+    name: staff.name,
+    passwordHash: staff.passwordHash,
+    role: staff.role,
+    // Demo accounts are always active; only a database row can be
+    // suspended or awaiting invitation.
+    status: USER_STATUSES.ACTIVE,
+    createdAt: staff.createdAt,
+    updatedAt: staff.updatedAt,
+  }));
 }
 
 function ensureInitialized(): Promise<void> {
   if (isInitialized) return Promise.resolve();
   if (!initPromise) {
     initPromise = (async () => {
-      for (const staff of await getSeededStaff()) {
-        // Copied per seed so a caller mutating a returned record cannot write
-        // back into the cached template.
-        usersStore.set(staff.email, { ...staff });
+      // A fresh record per seed, so a caller mutating a returned record cannot
+      // write back into the next reset.
+      for (const staff of seededStaff()) {
+        usersStore.set(staff.email, staff);
       }
       isInitialized = true;
     })();
@@ -302,3 +299,5 @@ export async function resetUserStore(): Promise<void> {
   initPromise = null;
   await ensureInitialized();
 }
+
+registerStateReset("userStore", resetUserStore);

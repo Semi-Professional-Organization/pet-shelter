@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { prisma } from "@/lib/server/prisma";
 import { getServerPetsAsync } from "@/lib/server/petRepository";
 import {
   getServerApplicationsAsync,
@@ -20,14 +19,6 @@ describe("Database & Persistence Integration Layer", () => {
     role: ROLES.SUPER_ADMIN,
     expiresAt: Date.now() + 86400000,
   };
-
-  it("exports a valid PrismaClient instance", () => {
-    expect(prisma).toBeDefined();
-    expect(prisma.pet).toBeDefined();
-    expect(prisma.adoptionApplication).toBeDefined();
-    expect(prisma.user).toBeDefined();
-    expect(prisma.auditLog).toBeDefined();
-  });
 
   it("retrieves seeded pets list through persistence store", async () => {
     const pets = await getServerPetsAsync();

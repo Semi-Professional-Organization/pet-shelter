@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   LocalStorageProvider,
   S3StorageProvider,
@@ -14,15 +14,8 @@ vi.mock("fs/promises", () => ({
 }));
 
 describe("Storage Providers Abstraction", () => {
-  const originalEnv = { ...process.env };
-
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   describe("LocalStorageProvider", () => {
@@ -63,6 +56,11 @@ describe("Storage Providers Abstraction", () => {
 
   describe("S3StorageProvider", () => {
     it("should construct valid S3 URLs with custom bucket and region", async () => {
+      // Either would take precedence over the bucket URL asserted below. An empty string reads
+      // as unset: `@/lib/storage` reads every variable through `||` or a truthiness check.
+      vi.stubEnv("NEXT_PUBLIC_STORAGE_URL", "");
+      vi.stubEnv("AWS_S3_ENDPOINT", "");
+
       const provider = new S3StorageProvider({
         bucket: "hope-for-strays-bucket",
         region: "ap-southeast-1",
@@ -102,25 +100,25 @@ describe("Storage Providers Abstraction", () => {
 
   describe("getStorageProvider Factory", () => {
     it("should default to LocalStorageProvider when no env vars configured", () => {
-      delete process.env.STORAGE_PROVIDER;
-      delete process.env.AWS_S3_BUCKET;
-      delete process.env.CLOUDINARY_CLOUD_NAME;
+      vi.stubEnv("STORAGE_PROVIDER", "");
+      vi.stubEnv("AWS_S3_BUCKET", "");
+      vi.stubEnv("CLOUDINARY_CLOUD_NAME", "");
 
       const provider = getStorageProvider();
       expect(provider.name).toBe("local");
     });
 
     it("should return S3StorageProvider when configured", () => {
-      process.env.STORAGE_PROVIDER = "s3";
-      process.env.AWS_S3_BUCKET = "my-test-bucket";
+      vi.stubEnv("STORAGE_PROVIDER", "s3");
+      vi.stubEnv("AWS_S3_BUCKET", "my-test-bucket");
 
       const provider = getStorageProvider();
       expect(provider.name).toBe("s3");
     });
 
     it("should return CloudinaryStorageProvider when configured", () => {
-      process.env.STORAGE_PROVIDER = "cloudinary";
-      process.env.CLOUDINARY_CLOUD_NAME = "my-cloud";
+      vi.stubEnv("STORAGE_PROVIDER", "cloudinary");
+      vi.stubEnv("CLOUDINARY_CLOUD_NAME", "my-cloud");
 
       const provider = getStorageProvider();
       expect(provider.name).toBe("cloudinary");

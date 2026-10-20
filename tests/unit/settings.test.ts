@@ -97,8 +97,9 @@ describe("Shelter Settings & Live Test Email Action", () => {
     });
 
     it("should dispatch test email in simulation mode when API key is unset", async () => {
-      const originalKey = process.env.RESEND_API_KEY;
-      delete process.env.RESEND_API_KEY;
+      // The action sends with `RESEND_API_KEY || settings.resendApiKey`, so an empty string is
+      // unset. The settings half starts empty: the harness resets the settings before each test.
+      vi.stubEnv("RESEND_API_KEY", "");
 
       const result = await sendTestEmailAction({
         recipientEmail: "test-adopter@example.com",
@@ -112,10 +113,6 @@ describe("Shelter Settings & Live Test Email Action", () => {
       const logs = getAuditLogs(10);
       const testEmailLog = logs.find((l) => l.action === "TEST_EMAIL_SENT" && l.details?.recipient === "test-adopter@example.com");
       expect(testEmailLog).toBeDefined();
-
-      if (originalKey) {
-        process.env.RESEND_API_KEY = originalKey;
-      }
     });
   });
 });

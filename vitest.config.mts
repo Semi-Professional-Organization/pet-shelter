@@ -11,22 +11,38 @@ const alias = {
 /**
  * Shared by every project below. Kept as one object so a project cannot quietly
  * drift onto a different alias table or skip the global mock harness.
+ *
+ * `hermeticEnv.ts` runs first and scrubs the developer's shell environment;
+ * `hermeticRuntime.ts` pins the time zone and blocks the network. Both run
+ * before anything under test loads. `integration-db` takes this list without
+ * the scrub, because that tier needs its database.
  */
 const shared = {
   globals: true,
-  setupFiles: ["./tests/setup/nextMocks.ts"],
-  passWithNoTests: true,
+  // Workers are processes, not threads (Vitest's default, stated because it is
+  // relied on). The setup files set the time zone per worker, differently for the
+  // components tier, and ICU's zone is process-wide: threads would share one.
+  pool: "forks" as const,
+  setupFiles: ["./tests/setup/hermeticEnv.ts", "./tests/setup/hermeticRuntime.ts", "./tests/setup/nextMocks.ts"],
+  // Every tier has files now, so an empty run means a moved folder or a broken
+  // glob, and must fail rather than report green. A command that may select
+  // nothing on purpose (`vitest related`) passes `--passWithNoTests` itself.
+  passWithNoTests: false,
+  // `vi.stubEnv` and `vi.stubGlobal` are undone between tests (Vitest 4 restores
+  // them as each test starts), so a test cannot leak an environment variable or a
+  // global into the next one.
+  unstubEnvs: true,
+  unstubGlobals: true,
+  // A test that makes no assertion fails instead of passing vacuously.
+  expect: { requireAssertions: true },
 };
 
 export default defineConfig({
   resolve: { alias },
   test: {
-    // Tier 3 (`tests/integration`) and Tier 4 (`tests/components`) fill up over
-    // Tasks 02 and 03. Until a tier has files, vitest exits 1 on an empty run,
-    // which would red-light CI for work that is merely not written yet rather
-    // than broken. Needed at the root as well as per-project: the "nothing
-    // matched at all" check runs before any project config is consulted.
-    passWithNoTests: true,
+    // Needed at the root as well as per-project: the "nothing matched at all"
+    // check runs before any project config is consulted.
+    passWithNoTests: false,
 
     // Environment and env-var routing is per-project rather than
     // `environmentMatchGlobs`: that option was deprecated in Vitest 3 and
@@ -53,6 +69,10 @@ export default defineConfig({
           // (5507ms), clinical5NF. Raised rather than worked around — trimming
           // a guard to fit the clock would mean scanning less.
           testTimeout: 20_000,
+
+          // Off, whatever the shell says: a `STRICT_PERSISTENCE=true` copied from the
+          // integration tier would make every fallback here rethrow.
+          env: { STRICT_PERSISTENCE: "false" },
         },
       },
       {
@@ -77,6 +97,11 @@ export default defineConfig({
           // green while verifying nothing — the exact failure mode this tier
           // exists to prevent.
           env: { STRICT_PERSISTENCE: "true" },
+          // The same budget as the other two lanes. Several suites here import
+          // Server Actions whose first load is heavy, and under the load of
+          // concurrent sessions the 5s default failed them for time, not
+          // behaviour (`rbacAuthorization`'s "rejects an anonymous caller").
+          testTimeout: 20_000,
         },
       },
       {
@@ -87,13 +112,17 @@ export default defineConfig({
           environment: "node",
           include: ["tests/integration/db/**/*.test.{ts,tsx}"],
 
-          // Prepended, not appended: `nextMocks.ts` imports the repositories in
-          // its `beforeEach`, and those construct the Prisma pool from
-          // `DATABASE_URL`. Loading `.env.local` after it would hand Prisma the
-          // hardcoded `localhost:5432` fallback, and every assertion below would
-          // then fail against a refused connection instead of the real schema —
+          // The shared list without `hermeticEnv.ts`, which would delete the
+          // `DATABASE_URL` this tier exists to use. `integrationEnv.ts` comes
+          // first because the repositories build the Prisma pool from
+          // `DATABASE_URL` when they load; loading `.env.local` after them would
+          // hand Prisma no database at all, and every assertion below would
+          // then fail for a missing connection instead of the real schema —
           // which is indistinguishable from a genuine schema failure.
-          setupFiles: ["./tests/setup/integrationEnv.ts", ...shared.setupFiles],
+          setupFiles: [
+            "./tests/setup/integrationEnv.ts",
+            ...shared.setupFiles.filter((file) => file !== "./tests/setup/hermeticEnv.ts"),
+          ],
 
           // Tier 3b: the only suites that talk to a real PostgreSQL server.
           //
@@ -137,6 +166,9 @@ export default defineConfig({
           // `cleanup()`, and the browser APIs jsdom omits — and must not reach
           // the node lanes, where `document` does not exist.
           setupFiles: [...shared.setupFiles, "./tests/setup/componentSetup.ts"],
+
+          // Off, whatever the shell says; see the unit project.
+          env: { STRICT_PERSISTENCE: "false" },
         },
       },
     ],

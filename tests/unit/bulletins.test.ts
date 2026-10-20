@@ -905,7 +905,7 @@ describe("getPublicBulletins", () => {
  * Runs `fn` with one extra row in the fallback fixture, then restores it.
  *
  * The fallback store clones `src/data/bulletins.json` on every `resetBulletins()`,
- * and the harness's global `beforeEach` calls that through `resetServerStore()`,
+ * and the harness's global `beforeEach` runs it, since `bulletinRepository` registers it,
  * so the row is gone by the next test whether or not the `finally` runs.
  */
 async function withExtraFixtureRow(row: unknown, fn: () => Promise<void>): Promise<void> {

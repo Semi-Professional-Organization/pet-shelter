@@ -59,6 +59,19 @@ function pledgeRow(pledgeRef: string) {
   };
 }
 
+/**
+ * The random half of a reference, which is the half a redraw exists to change.
+ *
+ * Comparing whole references proves nothing: the redraw takes its date from the
+ * clock, so it differs from `DRAFT.pledgeRef` on every day but 2026-09-22 even
+ * if it kept the serial that collided.
+ */
+// ceiling: a correct redraw still lands on the draft's serial by chance, 1 in 900,000
+// per check; stub Math.random here if that ever shows up as a flake.
+function serialOf(pledgeRef: string): string {
+  return pledgeRef.slice(pledgeRef.lastIndexOf("-") + 1);
+}
+
 const DRAFT = {
   donorName: "Probe Donor",
   donorEmail: "probe@example.test",
@@ -146,7 +159,7 @@ describe("a colliding pledge reference is retried, not reported as a lost gift",
     expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
     // A *fresh* reference, not the one that collided.
     expect(record.pledgeRef).toMatch(/^HFS-GFT-\d{8}-\d{6}$/);
-    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+    expect(serialOf(record.pledgeRef)).not.toBe(serialOf(DRAFT.pledgeRef));
     expect(record.status).toBe("PENDING_PAYMENT");
     expect(record.receiptNumber).toBeNull();
   });
@@ -208,7 +221,7 @@ describe("the collision predicate survives every shape the error arrives in", ()
     const record = await recordDonationPledge(DRAFT);
 
     expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
-    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+    expect(serialOf(record.pledgeRef)).not.toBe(serialOf(DRAFT.pledgeRef));
   });
 
   it("retries when target is the index name rather than the column list", async () => {
@@ -225,7 +238,7 @@ describe("the collision predicate survives every shape the error arrives in", ()
     const record = await recordDonationPledge(DRAFT);
 
     expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
-    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+    expect(serialOf(record.pledgeRef)).not.toBe(serialOf(DRAFT.pledgeRef));
   });
 
   it("still refuses to retry the receiptNumber unique without a modelName", async () => {
@@ -288,7 +301,7 @@ describe("the collision predicate reads the driver adapter's own error shape", (
     const record = await recordDonationPledge(DRAFT);
 
     expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
-    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+    expect(serialOf(record.pledgeRef)).not.toBe(serialOf(DRAFT.pledgeRef));
   });
 
   it("refuses to retry when the adapter names receiptNumber", async () => {
@@ -323,6 +336,6 @@ describe("the collision predicate reads the driver adapter's own error shape", (
     const record = await recordDonationPledge(DRAFT);
 
     expect(prismaDouble.donationPledge.create).toHaveBeenCalledTimes(2);
-    expect(record.pledgeRef).not.toBe(DRAFT.pledgeRef);
+    expect(serialOf(record.pledgeRef)).not.toBe(serialOf(DRAFT.pledgeRef));
   });
 });

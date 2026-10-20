@@ -58,7 +58,7 @@ cp .env.example .env
 Key environment variables:
 | Variable | Description | Default / Example |
 |---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public` |
+| `DATABASE_URL` | PostgreSQL connection string. Without it the app runs on in-memory fixtures and says so once at start; the Prisma CLI and seed still default to the local container, so set it to use that database | *(no default)* `postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public` for the docker-compose database |
 | `SESSION_SECRET` | HMAC-SHA256 key for sealing cookies (32+ chars) | `dev-only-insecure-session-secret-change-me-before-deploy` *(the development default; production refuses to boot on it)* |
 | `STAFF_INVITE_SECRET` | Secret PIN for staff invite onboarding (16+ chars recommended; shorter boots with a warning) | `dev-only-insecure-staff-invite-code-change-me` *(the development default; production refuses to boot on it)* |
 | `RESEND_API_KEY` | Resend API key for transactional emails | `re_123456789...` *(optional; simulated if omitted)* |

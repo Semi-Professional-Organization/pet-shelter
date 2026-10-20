@@ -10,17 +10,17 @@ down. This entry records the numbers so that the next person knows what would ch
 
 From four runs on 2026-10-16 to 2026-10-19 (`gh run view --json jobs`), and 40 run timestamps
 (`gh run list`): wall clock 2.5 to 4.5 minutes. The test job took 150–235 s, of which vitest was 193 s and `npm ci` about 30 s.
-Playwright took 106–138 s. The fix in the same change caches the sponsor seed hashes that the
-global `beforeEach` used to re-derive before every test. On this machine it took `test:all` from
-174.6 s to 98.7 s, and summed test time from 1,508 s to 620 s.
+Playwright took 106–138 s. Most of the test job's cost was the global `beforeEach` re-deriving the sponsor seed
+hashes before every test. A cache for them, measured in this review, took `test:all` from
+174.6 s to 98.7 s on one machine; the change that landed instead precomputes the hashes (#141).
 
 ## Not adopted, and what would reopen each
 
 - **Test sharding.** Every shard pays its own runner start and `npm ci`, about 30 s, before it
   runs a test. With the suite near a minute after the fix, sharding would make the wall clock
   worse. *Reopen when* the unit, integration and component job passes about five minutes again.
-  Note first `tasks/open/unit-suite-is-order-dependent-in-both-directions.md`: a suite that varies
-  with its schedule would vary with its shards too.
+  Make sure first that the suite gives the same answer on every schedule: one that varies with
+  its schedule would vary with its shards too.
 - **Required approvals ("consensus") and a merge queue.** With two developers, a required approval
   blocks one of them whenever the other is away. A merge queue solves contention between many
   pull requests landing at once, which two developers do not produce. Required checks give the
