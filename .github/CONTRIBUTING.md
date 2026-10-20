@@ -249,11 +249,14 @@ Before hitting "Create Pull Request", verify:
 ### Merging into `master`
 
 `master` takes changes only through a pull request, squash-merged, once six checks pass:
-`Static & architecture analysis`, `Unit, integration & component tests`,
-`Strict persistence against Postgres`, `Playwright golden paths`, `Commit messages`, and `Vercel`
-(the preview build). No approval is required. Nobody can push, force-push or delete `master`
-directly, maintainers included. The rule is the repository ruleset "Basic" (Settings → Rules →
-Rulesets), and the reasons are in
+`Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
+`Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`. Vercel's
+preview status is not one of them: Vercel decides whether to deploy a commit by who wrote it, so
+it may never report on a pull request that Dependabot opens. No approval is required. Nobody can
+push, force-push or delete `master` directly, maintainers included. The rule is the repository ruleset "Basic" (Settings → Rules →
+Rulesets). **It is not switched on yet**: until it is, nothing enforces this section, and
+[`tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`](../tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md)
+holds the change to make. The reasons are in
 [`tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md`](../tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md).
 
 - **Renaming a CI job renames its check.** The rename cannot merge until the ruleset requires the

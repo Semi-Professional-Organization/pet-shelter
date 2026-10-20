@@ -180,6 +180,43 @@ green and its report unuploaded, so flakiness was invisible. Uploading every run
 
 Declined from that plan, with reasons sent back: caching Playwright's browsers (the measured
 install step and Playwright's own CI guide, in
-`tasks/decisions/2026-10-20-ci-skips-sharding-merge-queues-and-canary-releases.md`), and pinning
-Node through `.nvmrc` before production's version is known
-(`tasks/open/node-versions-differ-between-dev-ci-and-production.md`).
+`tasks/decisions/2026-10-20-ci-skips-sharding-merge-queues-and-canary-releases.md`). Its other
+ask, one Node version from `.nvmrc`, was declined at first and then adopted in review round 1
+below, once Vercel's documentation showed which major production runs.
+
+## Review round 1 — 2026-10-20
+
+`/code-review high` over `origin/master...claude/project-thread-2ne14n` at `0378de9`, seven
+findings. Each was checked by probe before acting.
+
+1. **Dependabot titles may come out lowercase.** Real, and already the documented fallback. Its
+   source was read further: it looks for its own last commit by `support@dependabot.com`, an
+   address GitHub's Dependabot does not commit as, so it always decides from recent human
+   commits, which are all capitalized. The decision now says so, and names the API-error path.
+   No code change.
+2. **A re-run's report upload could collide with the first attempt's.** `overwrite` exists in
+   upload-artifact v7 ("If false, the action will fail if an artifact for the given name already
+   exists"). Added `overwrite: true`.
+3. **A failed hash derivation was cached for the life of the process.** Confirmed by test: with
+   one `mockRejectedValueOnce`, the second reset rejected with the same error, in the sponsor
+   cache and in `userStore.ts`'s identical, older one. Both now clear the cache on rejection.
+   Fixing one copy only would have made them diverge.
+4. **The claim file must not merge.** Real; it is deleted at close.
+5. **Commits a person adds to a Dependabot branch go unaudited.** Real and accepted: squash
+   merging discards them. The workflow comment now says so.
+6. **`commit-messages.yml` copied the Node version.** Real. Vercel's "Supported Node.js
+   versions" page maps an open `engines` range such as `>=22.0.0` to the latest 24.x, so
+   production most likely runs 24 while CI ran 22. `.nvmrc` now says `24` and every workflow
+   reads it.
+7. **A required `Vercel` check could wait forever on Dependabot's pull requests.** Real: Vercel
+   checks a commit's author before deploying, and every commit on `master` so far is the
+   owner's. CI gains a `Production build` job, and the ruleset requires it instead of `Vercel`.
+   That retires K-A1 unevaluated; its successor is
+   `tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`.
+
+## Stop before merging — 2026-10-20
+
+The owner asked to push cleanly and stop before merging. The ruleset is therefore not switched
+on in this session: the exact change and its kill condition are in
+`tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`, and the
+decision records it as decided but not applied. K-A1′ is unevaluated, not fired.

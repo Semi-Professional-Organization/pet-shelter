@@ -1,6 +1,9 @@
 # Master merges only green, squashed pull requests
 
 **Decided:** 2026-10-20, by the owner, approving the plan in the project thread.
+**Applied:** not yet. The owner asked on 2026-10-20 to stop before it was switched on. The
+exact change, and the checks that prove it works, are in
+`tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`.
 
 ## What was there
 
@@ -21,9 +24,9 @@ each other.
 
 - no deletion and no force push, as before;
 - changes only through a pull request, squash-merged, with **no required approvals**;
-- six required checks: `Static & architecture analysis`, `Unit, integration & component tests`,
-  `Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`, each
-  required to come from GitHub Actions (integration id 15368), plus the `Vercel` commit status;
+- six required checks, each required to come from GitHub Actions (integration id 15368):
+  `Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
+  `Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`;
 - **no bypass actors**;
 - branches need not be up to date with `master` before merging.
 
@@ -42,16 +45,24 @@ each other.
 - **Not strict.** Requiring branches to be up to date costs a full CI cycle on every pull request
   each time `master` moves. The history shows nothing it would have caught. If two green pull
   requests ever do break `master` together, that is the measurement that reverses this.
-- **`Vercel` required.** It is the only check that runs `next build`; CI does not build. All 15 of
-  the most recent merged pull requests carried it, the docs-only ones included.
-- **Integration ids on the Actions checks.** They mean a commit status with the same name, posted
-  by anything other than GitHub Actions, cannot satisfy a check. `Vercel` has none, because its
-  status carries no app id to pin.
+- **A build in CI, and Vercel not required.** Until this change, Vercel's preview was the only
+  place `next build` ran, so the first plan required its `Vercel` status. Review found the flaw:
+  Vercel checks a commit's author before it deploys and blocks one without access to the project;
+  on a Hobby team, that is anyone but the owner (Vercel's guide "Why aren't commits triggering
+  deployments on Vercel?"). Every one of the last 200 commits on `master` is the owner's, so this
+  has never been tested here. Dependabot's commits are its own, so a required `Vercel` check could
+  wait forever on its pull requests. CI's `Production build` job runs `next build` with
+  throwaway secrets instead, and Vercel's status stays visible on every pull request without
+  gating it.
+- **Integration ids on every check.** A commit status with the same name, posted by anything
+  other than GitHub Actions, cannot satisfy a check.
 
 ## Consequences to remember
 
 - A job's `name` in `.github/workflows/` is a check name in this ruleset. Renaming a job blocks
   every pull request until the ruleset names the new check. Both workflows say so above their jobs.
+- `Production build` joins the ruleset only once the pull request that adds the job has merged.
+  Required earlier, it would block every other open pull request, since none of them runs it yet.
 - No session, agent or human can push a commit straight to `master` any more. Ledger-only and
   docs-only changes travel on a branch carrying code, which the repo's rules already required.
 
