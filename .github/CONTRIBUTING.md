@@ -250,7 +250,8 @@ Before hitting "Create Pull Request", verify:
 
 `master` takes changes only through a pull request, squash-merged, once six checks pass:
 `Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
-`Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`. Vercel's
+`Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`.
+`Production build` is the last to be required, once the job that runs it is on `master`. Vercel's
 preview status is not one of them: Vercel decides whether to deploy a commit by who wrote it, so
 it may never report on a pull request that Dependabot opens. No approval is required. Nobody can
 push, force-push or delete `master` directly, maintainers included. The rule is the repository ruleset "Basic" (Settings → Rules →

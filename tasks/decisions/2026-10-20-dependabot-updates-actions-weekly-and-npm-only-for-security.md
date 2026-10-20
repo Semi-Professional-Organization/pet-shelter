@@ -2,8 +2,10 @@
 
 **Decided:** 2026-10-20, by the owner, approving the plan in the project thread.
 
-`.github/dependabot.yml` has two entries, and the repository settings turn on Dependabot alerts
-and Dependabot security updates.
+`.github/dependabot.yml` has two entries. The npm one works only once the repository settings
+turn on Dependabot alerts and Dependabot security updates, and on 2026-10-20 both were off
+(`gh api repos/fergeley/pet-shelter/vulnerability-alerts` answered 404, and
+`automated-security-fixes` answered `enabled: false`). Switching them on is the owner's step.
 
 ## GitHub Actions: weekly, grouped, a week behind
 

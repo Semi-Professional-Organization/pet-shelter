@@ -22,9 +22,11 @@ updates:
       prefix: ci
       include: scope
 
-  # Security fixes only. A limit of 0 turns version updates off and leaves security updates, which
-  # the repository settings enable, untouched. Upgrading Next.js, React or Prisma on a schedule is
-  # not a chore here: each needs a person to read its migration notes first (AGENTS.md).
+  # Security fixes only. A limit of 0 turns version updates off and leaves security updates
+  # untouched. Those are a repository setting (Settings → Code security: Dependabot alerts and
+  # Dependabot security updates), and until both are on, this entry opens nothing at all.
+  # Upgrading Next.js, React or Prisma on a schedule is not a chore here: each needs a person to
+  # read its migration notes first (AGENTS.md).
   - package-ecosystem: npm
     directory: /
     schedule:

@@ -24,7 +24,8 @@ each other.
 
 - no deletion and no force push, as before;
 - changes only through a pull request, squash-merged, with **no required approvals**;
-- six required checks, each required to come from GitHub Actions (integration id 15368):
+- six required checks, each required to come from GitHub Actions (integration id 15368), the
+  sixth added once its job is on `master` (see "Consequences to remember"):
   `Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
   `Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`;
 - **no bypass actors**;
