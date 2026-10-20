@@ -134,6 +134,16 @@ export function memberRowForId(id: string | undefined): TestMemberRow | null {
   return memberRowFor(identityForRole(role as Role));
 }
 
+/**
+ * A `prisma.user.findUnique` double for the member re-read `getVerifiedSession`
+ * makes on every guarded call: it answers with `memberRowForId`. The one place
+ * that knows the lookup's shape, so a change to it is made once for every suite
+ * that signs in, not in each suite's own double.
+ */
+export async function findMemberRow(args?: { where?: { id?: string } }): Promise<TestMemberRow | null> {
+  return memberRowForId(args?.where?.id);
+}
+
 /** The stored row for an identity, mirroring it field for field. */
 function memberRowFor(identity: TestIdentity): TestMemberRow {
   return {

@@ -1,6 +1,7 @@
 import { vi } from "vitest";
+import type { AdoptionApplication } from "@prisma/client";
 import type { DbPetRecord } from "@/lib/server/petMappers";
-import { memberRowForId } from "../../setup/authSession";
+import { findMemberRow } from "../../setup/authSession";
 
 /**
  * Shared plumbing for Tier 3a — the strict-persistence suites that do *not*
@@ -26,6 +27,13 @@ export interface PrismaDouble {
   };
   adoptionApplication: {
     findMany: ReturnType<typeof vi.fn>;
+    /**
+     * Every single-row read: `findServerApplicationByIdAsync`, the re-read inside
+     * `atomicUpdateApplicationStatus`'s transaction, and `deleteServerApplication`
+     * for a row the mirror lacks. `findFirst`, which only the public tracking
+     * lookup calls, is left out until a suite here drives that path.
+     */
+    findUnique: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     updateMany: ReturnType<typeof vi.fn>;
@@ -79,7 +87,7 @@ export interface PrismaDouble {
  * and `faqEmptyPublishSet.test.ts` pins the FAQ reader that was right first.
  */
 export function createPrismaDouble(): PrismaDouble {
-  return {
+  const double: PrismaDouble = {
     pet: {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(null),
@@ -89,6 +97,7 @@ export function createPrismaDouble(): PrismaDouble {
     },
     adoptionApplication: {
       findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -105,28 +114,38 @@ export function createPrismaDouble(): PrismaDouble {
       // call, for whichever identity the suite signed in as. Resolving null
       // here used to authorize anyway, via a DAL fall-through to the cookie's
       // own claims that also kept deleted members signed in; see
-      // `memberRowForId`, which this mirrors.
-      findUnique: vi.fn(async (args?: { where?: { id?: string } }) =>
-        memberRowForId(args?.where?.id)
-      ),
+      // `findMemberRow`.
+      findUnique: vi.fn(findMemberRow),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({}),
     },
     faq: { findMany: vi.fn().mockResolvedValue([]) },
-    // Mirrors the real interactive form: the callback receives a transaction
-    // client, and here that client is the double itself, so a test can assert
-    // on the writes a transaction made.
+    // Wired below, so the callback runs against this double.
     $transaction: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
     $disconnect: vi.fn().mockResolvedValue(undefined),
   };
+  wireTransaction(double);
+  return double;
 }
 
-/** Wires `$transaction` to run its callback against the double, or to run an array of promises. */
-export function wireTransaction(double: PrismaDouble): void {
+/**
+ * Wires `$transaction` to run its callback against the double, or to run an array of promises.
+ *
+ * Mirrors the real interactive form: the callback receives a transaction
+ * client, and here that client is the double itself, so a test can assert on
+ * the writes a transaction made.
+ *
+ * Every double is wired from creation, and `resetPrismaDouble` re-wires it. It
+ * used to be a bare `vi.fn()` that nothing wired, which resolved `undefined`
+ * without calling the callback: a transaction that "committed" having run none
+ * of its reads, guards or writes, so an action built on one could report
+ * success for work that never happened.
+ */
+export function wireTransaction<T extends { $transaction: ReturnType<typeof vi.fn> }>(double: T): void {
   double.$transaction.mockImplementation(async (arg: unknown) => {
     if (typeof arg === "function") {
-      return (arg as (tx: PrismaDouble) => Promise<unknown>)(double);
+      return (arg as (tx: T) => Promise<unknown>)(double);
     }
     return Promise.all(arg as Promise<unknown>[]);
   });
@@ -182,6 +201,53 @@ export function makeDbPet(overrides: Partial<DbPetRecord> = {}): DbPetRecord {
 }
 
 /**
+ * A complete `adoption_applications` row as `prisma.adoptionApplication.findUnique` returns one.
+ *
+ * Typed against the generated model rather than a hand-kept shape, so a column
+ * the schema gains is a type error here instead of an `undefined` the mapper
+ * reads quietly. The default id is absent from `src/data/applications.json`, so
+ * the row exists only in the double.
+ */
+export function makeDbApplication(overrides: Partial<AdoptionApplication> = {}): AdoptionApplication {
+  rowCounter += 1;
+  return {
+    id: `itest-app-${rowCounter}`,
+    referenceCode: null,
+    petId: `itest-pet-${rowCounter}`,
+    petName: `Row${rowCounter}`,
+    petBreed: "Local Mixed",
+    applicantName: "Integration Applicant",
+    email: "applicant@example.test",
+    phone: "012-000 0000",
+    address: "1 Persisted Lane, Petaling Jaya",
+    identification: null,
+    housingType: "landed_terrace",
+    livingSituation: null,
+    hasFencedYard: "yes",
+    landlordApproval: null,
+    currentPets: "none",
+    currentPetDetails: null,
+    householdExperience: "experienced",
+    experienceDescription: null,
+    vetClinic: null,
+    dailyAloneHours: null,
+    applicantNotes: null,
+    message: null,
+    status: "SUBMITTED",
+    interviewAt: null,
+    interviewLocation: null,
+    interviewMeetingType: null,
+    homeVisitAt: null,
+    adminNotes: null,
+    adminReviewNotes: null,
+    reviewedBy: null,
+    createdAt: new Date("2026-08-12T00:00:00.000Z"),
+    updatedAt: new Date("2026-08-12T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+/**
  * Retrieves the double a file installed via `vi.mock("@/lib/server/prisma")`.
  *
  * The mock factory has to construct the double itself — `vi.mock` is hoisted
@@ -205,4 +271,6 @@ export function resetPrismaDouble(double: PrismaDouble): void {
   for (const [key, value] of Object.entries(fresh)) {
     (double as unknown as Record<string, unknown>)[key] = value;
   }
+  // The copied `$transaction` was wired to `fresh`; point it at this object.
+  wireTransaction(double);
 }

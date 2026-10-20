@@ -30,6 +30,7 @@
  */
 
 import { PUBLISHED_STAFF_PASSWORDS } from "./publishedPasswords";
+import { registerStateReset } from "@/lib/stateResets";
 
 /** Raised when a secret cannot be resolved safely in production. */
 export class SecretConfigurationError extends Error {
@@ -428,3 +429,5 @@ export function assertSecretsConfigured(): void {
 export function resetSecretWarnings(): void {
   warnedSecrets.clear();
 }
+
+registerStateReset("secretWarnings", resetSecretWarnings);

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { act, screen } from "@testing-library/react";
 
 import { Hero } from "@/components/layout/Hero";
 import { selectHomeMetrics } from "@/lib/domain/metrics";
@@ -85,36 +85,77 @@ describe("Hero impact metrics", () => {
     expect(screen.getAllByTestId(/^impact-stat-/)).toHaveLength(5);
   });
 
-  it("keeps a non-numeric figure verbatim rather than animating it to nothing", async () => {
-    // `ImpactStat.metricValue` is free-form. The count-up must leave anything
-    // without digits alone instead of rendering an empty or NaN counter.
-    renderWithLanguage(<Hero metrics={liveMetrics("home_collaborations", "Ongoing")} />);
-
-    expect(statValue("home_collaborations")).toBe("Ongoing");
-    await waitFor(() => expect(visibleValue("home_collaborations")).toBe("Ongoing"));
-  });
-
-  it("preserves a percentage suffix while the digits climb", async () => {
-    renderWithLanguage(<Hero metrics={liveMetrics("home_animals_adopted", "100%")} />);
-
-    expect(statValue("home_animals_adopted")).toBe("100%");
-    await waitFor(() => expect(visibleValue("home_animals_adopted")).toBe("100%"), {
-      timeout: 3000,
+  describe("count-up", () => {
+    // Hero's first state is the settled figure and the climb starts on the first
+    // animation frame, so a `waitFor` on the settled value passes at t=0 without
+    // seeing a frame. These drive the frames on a fake clock instead. Only the
+    // clocks the count-up reads are faked: requestAnimationFrame, and the
+    // performance.now() its timestamps are measured against.
+    beforeEach(() => {
+      vi.useFakeTimers({
+        toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"],
+      });
     });
-  });
 
-  it("settles a grouped figure back on the published string", async () => {
-    // Which intermediate frames are legal is settled deterministically in the
-    // node tier against `splitFigure`/`formatFigureFrame`; sampling frames here
-    // could only ever catch one of them and call it proof. What this tier owns
-    // is that the climb ends on the real figure rather than near it.
-    renderWithLanguage(<Hero metrics={liveMetrics("home_animals_neutered", "1,250")} />);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
-    expect(statValue("home_animals_neutered")).toBe("1,250");
-    await waitFor(
-      () => expect(visibleValue("home_animals_neutered")).toBe("1,250"),
-      { timeout: 3000 }
-    );
+    /** Runs one animation frame and commits what it rendered. */
+    function nextFrame() {
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+    }
+
+    /** Runs every remaining frame, so the climb has ended however long it takes. */
+    function finishClimb() {
+      act(() => {
+        vi.runAllTimers();
+      });
+    }
+
+    it("keeps a non-numeric figure verbatim rather than animating it to nothing", () => {
+      // `ImpactStat.metricValue` is free-form. The count-up must leave anything
+      // without digits alone instead of rendering an empty or NaN counter. The
+      // other four cards climb on these same frames, so it had frames to move on.
+      renderWithLanguage(<Hero metrics={liveMetrics("home_collaborations", "Ongoing")} />);
+
+      expect(statValue("home_collaborations")).toBe("Ongoing");
+      nextFrame();
+      expect(visibleValue("home_collaborations")).toBe("Ongoing");
+      finishClimb();
+      expect(visibleValue("home_collaborations")).toBe("Ongoing");
+    });
+
+    it("preserves a percentage suffix while the digits climb", () => {
+      renderWithLanguage(<Hero metrics={liveMetrics("home_animals_adopted", "100%")} />);
+
+      expect(statValue("home_animals_adopted")).toBe("100%");
+      nextFrame();
+      const midClimb = visibleValue("home_animals_adopted");
+      expect(midClimb).toMatch(/^\d+%$/);
+      expect(Number.parseInt(midClimb, 10)).toBeLessThan(100);
+
+      finishClimb();
+      expect(visibleValue("home_animals_adopted")).toBe("100%");
+    });
+
+    it("settles a grouped figure back on the published string", () => {
+      // Which intermediate frames are legal is settled deterministically in the
+      // node tier against `splitFigure`/`formatFigureFrame`. What this tier owns
+      // is that the climb really runs, then ends on the real figure, not near it.
+      renderWithLanguage(<Hero metrics={liveMetrics("home_animals_neutered", "1,250")} />);
+
+      expect(statValue("home_animals_neutered")).toBe("1,250");
+      nextFrame();
+      const midClimb = Number(visibleValue("home_animals_neutered").split(",").join(""));
+      expect(midClimb).toBeGreaterThanOrEqual(0);
+      expect(midClimb).toBeLessThan(1250);
+
+      finishClimb();
+      expect(visibleValue("home_animals_neutered")).toBe("1,250");
+    });
   });
 
   it("renders Malay labels on the Malay site", () => {

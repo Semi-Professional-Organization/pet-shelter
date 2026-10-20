@@ -1,6 +1,7 @@
 import initialRehabNeedsData from "@/data/rehabNeeds.json";
 import { RehabNeed, RehabNeedCategory } from "@/types/rehab";
 import { REHAB_CATEGORY_LABELS } from "@/lib/presentation/categoryTabs";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Rehabilitation-house wishlist reads.
@@ -19,10 +20,12 @@ function freshRehabNeeds(): RehabNeed[] {
 
 let serverRehabNeeds: RehabNeed[] = freshRehabNeeds();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetRehabNeeds(): void {
   serverRehabNeeds = freshRehabNeeds();
 }
+
+registerStateReset("rehabNeeds", resetRehabNeeds);
 
 export function getServerRehabNeeds(filters?: string | { category?: string; search?: string }): RehabNeed[] {
   let items = [...serverRehabNeeds];

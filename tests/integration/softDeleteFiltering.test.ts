@@ -6,15 +6,30 @@ import {
   type PrismaDouble,
 } from "./support/prismaDouble";
 import { signInAs } from "../setup/authSession";
+// Static, not imported inside each test: `vi.mock` is hoisted above every
+// import in this file, so the actions bind to the double either way, and a
+// dynamic import only made the first test load the whole action graph against
+// its own 5 s timeout.
+import { getAdminPets, getPetById, getPublicPets } from "@/actions/pets";
 
 /**
  * Tier 3a — soft-delete filtering under `STRICT_PERSISTENCE=true`.
  *
  * The point of this tier is that a *persisted* archive flag decides what the
- * public catalogue shows. Tier 2 already covers the pure predicates; what it
- * cannot cover is the join between the repository read, the mapper, and the
- * action's filter — the path where a renamed column or a dropped `include`
- * would otherwise be absorbed by the in-memory fallback and reported green.
+ * public catalogue shows. Tier 2 already covers the pure predicates; what this
+ * file adds is the join between the repository read, the mapper, and the
+ * action's filter, with the in-memory fallback switched off — so a read that
+ * failed, or that served `pets.json` instead of the rows, fails here rather
+ * than passing on fixtures.
+ *
+ * What it does not check is the query itself. The Prisma double answers
+ * `pet.findMany` and `pet.findUnique` with whatever rows a test arranged and
+ * ignores their `where`, `include` and `orderBy`, so a renamed column in a
+ * filter or a dropped `include` passes here. The rows also come from
+ * `makeDbPet`, built to the mapper's own `DbPetRecord` rather than the schema,
+ * so a schema column renamed under the mapper passes too. The `include` is
+ * pinned by its call arguments in `tests/unit/petHistory.test.ts`; the rest
+ * needs a real database.
  */
 
 /**
@@ -71,7 +86,6 @@ describe("soft-delete filtering under strict persistence", () => {
   describe("public catalogue", () => {
     it("serves persisted rows rather than the bundled fixtures", async () => {
       givenPersistedPets();
-      const { getPublicPets } = await import("@/actions/pets");
 
       const pets = await getPublicPets();
 
@@ -82,7 +96,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("excludes an archived animal", async () => {
       givenPersistedPets();
-      const { getPublicPets } = await import("@/actions/pets");
 
       const pets = await getPublicPets();
 
@@ -91,7 +104,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("excludes it however the caller filters", async () => {
       givenPersistedPets([makeDbPet({ id: "itest-archived-dog", species: "dog", isArchived: true })]);
-      const { getPublicPets } = await import("@/actions/pets");
 
       // The archive check must precede every other predicate; a filter that
       // narrowed first and archived second would leak the row here.
@@ -102,7 +114,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("preserves persisted rehabilitation progress through the mapper", async () => {
       givenPersistedPets();
-      const { getPublicPets } = await import("@/actions/pets");
 
       const rehab = (await getPublicPets()).find((p) => p.id === "itest-rehab");
 
@@ -116,7 +127,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("matches the legacy Rehabilitation spelling against the canonical one", async () => {
       givenPersistedPets([makeDbPet({ id: "itest-legacy", status: "Rehabilitation" })]);
-      const { getPublicPets } = await import("@/actions/pets");
 
       const pets = await getPublicPets({ status: "In Rehabilitation" });
 
@@ -132,7 +142,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("serves a persisted animal rather than the bundled fixture", async () => {
       givenPersistedPet(ACTIVE);
-      const { getPetById } = await import("@/actions/pets");
 
       const pet = await getPetById("itest-active");
 
@@ -153,7 +162,6 @@ describe("soft-delete filtering under strict persistence", () => {
       // reader too — the mirror has no such row, so it returns null for the wrong reason —
       // which is exactly the shape of assertion that makes a suite look green over a live bug.
       givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", isArchived: true }));
-      const { getPetById } = await import("@/actions/pets");
 
       expect(await getPetById("pet-001")).toBeNull();
     });
@@ -162,7 +170,6 @@ describe("soft-delete filtering under strict persistence", () => {
       // The converse of the same defect: a pet absent from the fixture mirror used to 404 on
       // any instance that had not already loaded the catalogue.
       givenPersistedPet(makeDbPet({ id: "itest-db-only", name: "Database Only" }));
-      const { getPetById } = await import("@/actions/pets");
 
       expect(await getPetById("itest-db-only")).toMatchObject({ id: "itest-db-only" });
     });
@@ -176,7 +183,6 @@ describe("soft-delete filtering under strict persistence", () => {
       // The case it looks like it covers — an id the database lacks and the *fixture holds* —
       // lives in `petMissingRowIsAnAnswer.test.ts`, which uses `pet-001` for that reason.
       givenPersistedPet(null);
-      const { getPetById } = await import("@/actions/pets");
 
       expect(await getPetById("itest-no-such-animal")).toBeNull();
     });
@@ -198,7 +204,6 @@ describe("soft-delete filtering under strict persistence", () => {
       prismaDouble.pet.findUnique.mockImplementation(async (args?: { where?: { id?: string } }) =>
         args?.where?.id === "pet-001" ? archived : null
       );
-      const { getPetById } = await import("@/actions/pets");
 
       // Variants first. Reading `pet-001` syncs the archived row into the mirror, after which the
       // mirror would hide the animal on its own and the variants would pass without the guard.
@@ -210,7 +215,6 @@ describe("soft-delete filtering under strict persistence", () => {
     it("still serves the animal at its exact id", async () => {
       // The guard is an exact-id match, so it must not have cost the canonical URL anything.
       givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", isArchived: false }));
-      const { getPetById } = await import("@/actions/pets");
 
       expect(await getPetById("pet-001")).toMatchObject({ id: "pet-001", name: "Bella" });
     });
@@ -227,7 +231,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("includes archived animals the public catalogue hides", async () => {
       givenPersistedPets();
-      const { getAdminPets } = await import("@/actions/pets");
 
       const pets = await getAdminPets();
 
@@ -238,7 +241,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("reports the archive flag and deletion timestamp it read back", async () => {
       givenPersistedPets();
-      const { getAdminPets } = await import("@/actions/pets");
 
       const archived = (await getAdminPets()).find((p) => p.id === "itest-archived");
 
@@ -250,7 +252,6 @@ describe("soft-delete filtering under strict persistence", () => {
   describe("strict mode surfaces failures instead of masking them", () => {
     it("rejects when the catalogue query fails", async () => {
       prismaDouble.pet.findMany.mockRejectedValue(new Error("relation \"pets\" does not exist"));
-      const { getPublicPets } = await import("@/actions/pets");
 
       // The behaviour this whole tier exists for. Outside strict mode this same
       // call resolves with fixture data and reports a healthy catalogue while
@@ -263,7 +264,6 @@ describe("soft-delete filtering under strict persistence", () => {
         code = "P2022";
       }
       prismaDouble.pet.findMany.mockRejectedValue(new PrismaKnownRequestError("column missing"));
-      const { getPublicPets } = await import("@/actions/pets");
 
       // The Prisma error code is the detail that names the broken column, so a
       // wrapper here would cost the diagnosis this tier is meant to deliver.
@@ -272,7 +272,6 @@ describe("soft-delete filtering under strict persistence", () => {
 
     it("returns an empty array without falling back to fixtures when the database is merely empty", async () => {
       prismaDouble.pet.findMany.mockResolvedValue([]);
-      const { getPublicPets } = await import("@/actions/pets");
 
       // An empty table is an answer, not an outage — returns [] without falling back.
       const pets = await getPublicPets();

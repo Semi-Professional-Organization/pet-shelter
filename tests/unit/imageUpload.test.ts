@@ -70,16 +70,6 @@ describe("ImageUpload Component", () => {
     expect(html).toContain("Custom Description");
   });
 
-  it("should handle valid image types in upload logic", () => {
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-
-    // These are the file types that should be accepted
-    expect(validTypes).toContain("image/jpeg");
-    expect(validTypes).toContain("image/png");
-    expect(validTypes).toContain("image/webp");
-    expect(validTypes).toContain("image/gif");
-  });
-
   it("should set maxImages default to 4", () => {
     const mockCallback = vi.fn();
 
@@ -91,12 +81,6 @@ describe("ImageUpload Component", () => {
 
     expect(html).toBeDefined();
     expect(html).toContain("0/4");
-  });
-
-  it("should have correct file size limit of 5MB", () => {
-    // The upload component should validate file sizes
-    const maxFileSize = 5 * 1024 * 1024; // 5MB
-    expect(maxFileSize).toBe(5242880);
   });
 
   it("should support up to maxImages count", () => {
@@ -114,23 +98,6 @@ describe("ImageUpload Component", () => {
       expect(html).toBeDefined();
       expect(html).toContain(`0/${maxImages}`);
     });
-  });
-
-  it("should render initial images and trigger callback structure", () => {
-    const mockCallback = vi.fn();
-
-    const html = renderToStaticMarkup(
-      React.createElement(ImageUpload, {
-        onImagesChange: mockCallback,
-        initialImages: [
-          { url: "/uploads/img1.jpg", name: "img1.jpg", size: 1024 },
-        ],
-      })
-    );
-
-    expect(html).toBeDefined();
-    expect(mockCallback).toBeDefined();
-    expect(typeof mockCallback).toBe("function");
   });
 });
 

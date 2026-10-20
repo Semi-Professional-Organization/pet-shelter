@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 
 import { PetFormDialog } from "@/components/admin/PetFormDialog";
 import {
@@ -152,6 +152,135 @@ describe("PetFormDialog birth date field", () => {
   });
 
   /**
+   * Two clicks back to back must save one pet record, not two. react-hook-form disables the
+   * button from the first click (`isSubmitting`); this pins the outcome, whichever guard holds.
+   */
+  it("hands the form to onSave once on a fast double-click", async () => {
+    const { onSave, user } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    const submit = screen.getByRole("button", { name: /create pet record/i });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * After a save the dialog closes, but it stays mounted while it animates out (which jsdom
+   * cannot show). Save stays locked through that window, and a submit that does not come from
+   * the button, as `form.requestSubmit()` can make, does not reach onSave a second time either.
+   */
+  it("keeps Save locked after a save while the dialog closes", async () => {
+    const { onSave, user } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    const submit = screen.getByRole("button", { name: /create pet record/i });
+    await user.click(submit);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form") as HTMLFormElement);
+    // The submit handler awaits only promises, so one macrotask runs it to the end.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * A handler that fails before taking the form leaves the dialog open, so the lock must not
+   * outlive the failure: the operator can try again, and the error is reported, not lost. The
+   * table's real handler is async, so its failure arrives as a rejection, not a throw.
+   */
+  it.each([
+    ["throws", () => { throw new Error("the table refused the save"); }],
+    ["rejects", () => Promise.reject(new Error("the table refused the save"))],
+  ])("unlocks Save and stays open when onSave %s, so the operator can try again", async (_, failure) => {
+    const { onSave, onOpenChange, user } = renderDialog();
+    onSave.mockImplementationOnce(failure);
+    const reported = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      await fillRequiredFields(user, "2023-04-15");
+      const submit = screen.getByRole("button", { name: /create pet record/i });
+      await user.click(submit);
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+      await waitFor(() => expect(submit).toBeEnabled());
+      expect(reported).toHaveBeenCalledWith(expect.stringContaining("onSave failed"), expect.any(Error));
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
+      // The operator is told, so a retry is a decision rather than a guess.
+      expect(screen.getByRole("alert")).toHaveTextContent(/not saved/i);
+
+      await user.click(submit);
+      await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    } finally {
+      reported.mockRestore();
+    }
+  });
+
+  /**
+   * A slow save that settles after the operator closed the dialog and opened it again belongs to
+   * the earlier opening: it must not close the new one, which would throw away what was typed.
+   */
+  it("does not let a save that settles after a reopen close the new opening", async () => {
+    const { onSave, onOpenChange, user, rerender } = renderDialog();
+    let settle = () => {};
+    onSave.mockImplementationOnce(() => new Promise<void>((resolve) => (settle = resolve)));
+
+    await fillRequiredFields(user, "2023-04-15");
+    await user.click(screen.getByRole("button", { name: /create pet record/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    const dialog = (open: boolean) => (
+      <PetFormDialog open={open} onOpenChange={onOpenChange} editingPet={null} onSave={onSave} />
+    );
+    rerender(dialog(false));
+    rerender(dialog(true));
+    await act(async () => settle());
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  /**
+   * Two submits dispatched before the dialog re-renders both run against the same render, so a
+   * guard kept only in state would let both through to onSave.
+   */
+  it("saves once when two submits arrive before it re-renders", async () => {
+    const { onSave, user } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    const form = screen.getByRole("button", { name: /create pet record/i }).closest("form") as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * The guard holds while the dialog closes (it stays mounted while it animates out, which jsdom
+   * cannot show) and is cleared only when the dialog opens again, so the next save goes through.
+   */
+  it("accepts a new save once the dialog opens again", async () => {
+    const { onSave, onOpenChange, user, rerender } = renderDialog();
+
+    await fillRequiredFields(user, "2023-04-15");
+    await user.click(screen.getByRole("button", { name: /create pet record/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+
+    const dialog = (open: boolean) => (
+      <PetFormDialog open={open} onOpenChange={onOpenChange} editingPet={null} onSave={onSave} />
+    );
+    rerender(dialog(false));
+    rerender(dialog(true));
+
+    await fillRequiredFields(user, "2023-04-15");
+    await user.click(screen.getByRole("button", { name: /create pet record/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+  });
+
+  /**
    * `petFormSchema` also rejects this ("...is after the intake date"), but the dialog never gets
    * that far and cannot render the message: the field carries `max={intakeDate}`, so the value is
    * `rangeOverflow` and constraint validation refuses the submit before react-hook-form runs the
@@ -169,12 +298,15 @@ describe("PetFormDialog birth date field", () => {
     pickDate(input, "2026-08-01");
     expect(input.validity.rangeOverflow).toBe(true);
 
+    // The refusal happens before any submit event is dispatched, so watch for the event itself
+    // rather than sleeping and hoping `onSave` would have been called by now. The submit spec
+    // above is the positive control: a click on this button does submit and reach `onSave`.
+    const submitted = vi.fn();
+    input.form!.addEventListener("submit", submitted);
+
     await user.click(screen.getByRole("button", { name: /update pet profile/i }));
 
-    // The accepted path resolves a 400 ms timer before it calls back (see the submit spec above,
-    // which proves a click on this button does reach `onSave`), so asserting immediately here
-    // would pass merely by running early.
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(submitted).not.toHaveBeenCalled();
     expect(onSave).not.toHaveBeenCalled();
   });
 });

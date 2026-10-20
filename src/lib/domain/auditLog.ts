@@ -2,6 +2,7 @@ import { after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError, isStrictPersistence } from "@/lib/persistenceMode";
+import { registerStateReset } from "@/lib/stateResets";
 
 interface DbAuditLogRecord {
   id: string;
@@ -84,6 +85,8 @@ export function resetAuditLogs(): void {
   pendingAuditWrites.clear();
   lastAuditWriteError = null;
 }
+
+registerStateReset("auditLog", resetAuditLogs);
 
 function auditLogCreateData(entry: AuditEntryInput) {
   return {

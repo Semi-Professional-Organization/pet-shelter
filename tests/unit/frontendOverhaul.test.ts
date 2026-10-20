@@ -89,23 +89,4 @@ describe("Frontend TNRM Overhaul & UI Contracts", () => {
       }
     });
   });
-
-  describe("Navigation & Route Integrity (FE-01, FE-08)", () => {
-    const verifiedRoutes = [
-      "/",
-      "/pets",
-      "/needs",
-      "/donate",
-      "/get-involved",
-      "/applications/track",
-      "/bulletins",
-    ];
-
-    it("should define all primary user-facing navigation destinations", () => {
-      expect(verifiedRoutes).toContain("/needs");
-      expect(verifiedRoutes).toContain("/get-involved");
-      expect(verifiedRoutes).toContain("/pets");
-      expect(verifiedRoutes).toContain("/donate");
-    });
-  });
 });

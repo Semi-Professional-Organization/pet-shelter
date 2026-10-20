@@ -1,3 +1,4 @@
+import net from "node:net";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { cookies, headers } from "next/headers";
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -11,13 +12,14 @@ import {
   mockCookieStore,
   MockNavigationError,
 } from "../setup/nextMocks";
+import { takeUnexpectedRequests } from "../setup/hermeticRuntime";
 
 import {
   getServerPets,
   getServerPetsAsync,
   insertServerPet,
 } from "@/lib/server/petRepository";
-import { resetServerStore } from "@/lib/server/fallbackState";
+import { resetRegisteredState } from "@/lib/stateResets";
 import { findUserByEmail, createUser, listUsers } from "@/lib/server/userStore";
 import {
   recordAuditLog,
@@ -239,6 +241,24 @@ describe("next/navigation mock", () => {
 });
 
 // ===========================================================================
+describe("hermetic runtime", () => {
+  it("runs server code in UTC, as on Vercel, whatever zone the machine is in", () => {
+    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe("UTC");
+    expect(new Date("2026-10-20T00:30:00Z").getHours()).toBe(0);
+  });
+
+  it("refuses fetch, and names the URL", async () => {
+    await expect(fetch("https://example.invalid/receipt")).rejects.toThrow(/Network access is disabled/);
+    expect(takeUnexpectedRequests()).toEqual([expect.objectContaining({ url: "https://example.invalid/receipt" })]);
+  });
+
+  it("refuses a socket while there is no database, and names the address", () => {
+    // What `pg` does when a test stubs a DATABASE_URL and leaves the client real.
+    expect(() => net.connect(5432, "127.0.0.1")).toThrow(/Sockets are disabled/);
+    expect(takeUnexpectedRequests()).toEqual([expect.objectContaining({ url: "socket 127.0.0.1:5432" })]);
+  });
+});
+
 describe("hermetic state isolation", () => {
   const FIXTURE_COUNT = (petsFixture as Pet[]).length;
 
@@ -254,17 +274,17 @@ describe("hermetic state isolation", () => {
     expect(getServerPets()).toHaveLength(FIXTURE_COUNT);
   });
 
-  it("resetServerStore restores an inserted pet away", async () => {
+  it("the registered resets restore an inserted pet away", async () => {
     await insertServerPet(makePet("pet-reset-probe"), actor);
     expect(getServerPets()).toHaveLength(FIXTURE_COUNT + 1);
 
-    resetServerStore();
+    await resetRegisteredState();
 
     expect(getServerPets()).toHaveLength(FIXTURE_COUNT);
     expect(getServerPets().some((p) => p.id === "pet-reset-probe")).toBe(false);
   });
 
-  it("resetServerStore restores a record mutated in place", () => {
+  it("the registered resets restore a record mutated in place", async () => {
     // Guards the `structuredClone` seeding. Under the previous shallow spread
     // the store shared element identity with the imported JSON module, so this
     // assignment corrupted the fixture for the rest of the process and no
@@ -272,7 +292,7 @@ describe("hermetic state isolation", () => {
     const original = getServerPets()[0].name;
     getServerPets()[0].name = "MUTATED IN PLACE";
 
-    resetServerStore();
+    await resetRegisteredState();
 
     expect(getServerPets()[0].name).toBe(original);
     expect((petsFixture as Pet[])[0].name).toBe(original);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import initialFaqs from "@/data/faqs.json";
 import {
   faqItemSchema,
@@ -11,7 +11,6 @@ import {
   fetchFaqsAction,
   getFaqByIdAction,
 } from "@/actions/faqs";
-import { resetServerStore } from "@/lib/server/fallbackState";
 import {
   getServerFaqs,
   getServerFaqsAsync,
@@ -29,10 +28,6 @@ const countIn = (category: string) =>
 const CATEGORIES_PRESENT = FAQ_CATEGORIES.filter((c) => countIn(c) > 0);
 
 describe("FAQ Data Layer & Server Actions", () => {
-  beforeEach(() => {
-    resetServerStore();
-  });
-
   describe("Fixture & Schema Validation", () => {
     it("should export defined FAQ category enum constants", () => {
       expect(FAQ_CATEGORIES.length).toBeGreaterThan(0);

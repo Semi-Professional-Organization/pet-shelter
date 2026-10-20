@@ -986,6 +986,11 @@ describe("Write failures", () => {
 
   it("surfaces the missing-row case to the editor as plain language", async () => {
     vi.stubEnv("NODE_ENV", "production");
+    // This is the file's first import of the action graph, so `crypto.ts` resolves the
+    // session secret now, under production rules — and a production process always has one.
+    // It passed before only because the global hook used to load `crypto.ts` first, in test
+    // mode, for every file.
+    vi.stubEnv("SESSION_SECRET", "transparency-test-only-session-secret-7f3a9c2e");
     const notFound = new Error("Record to delete does not exist") as Error & { code: string };
     notFound.code = "P2025";
     prismaMock.expenseItem.delete.mockRejectedValue(notFound);

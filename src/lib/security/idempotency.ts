@@ -1,3 +1,5 @@
+import { registerStateReset } from "@/lib/stateResets";
+
 interface IdempotencyRecord<T> {
   response: T;
   expiresAt: number;
@@ -90,3 +92,5 @@ export function resetIdempotencyStore(): void {
   inFlightOperations.clear();
   lastSweepAt = 0;
 }
+
+registerStateReset("idempotency", resetIdempotencyStore);

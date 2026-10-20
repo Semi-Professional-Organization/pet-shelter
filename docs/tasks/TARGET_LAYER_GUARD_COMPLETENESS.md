@@ -110,7 +110,8 @@ The regex runs over the whole source with no comment stripping, so this inside a
  */
 ```
 
-registers a **real edge** from that module to `fallbackState`. This is the inverse failure of §1 —
+registers a **real edge** from that module to `fallbackState` (removed on 2026-10-20, when each
+store began registering its own reset with `src/lib/stateResets.ts`). This is the inverse failure of §1 —
 a false positive, producing a violation report for an import that does not exist.
 
 **Verified**: no such comment exists in `src/` today. One does exist in

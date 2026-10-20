@@ -4,8 +4,8 @@ import { prisma } from "./prisma";
 import { listSponsorshipsByUserId } from "./sponsorshipLedger";
 import { isLedgerPersistent } from "./donationLedger";
 import type { SponsorshipRecord } from "./sponsorshipLedger";
-import { hashPassword } from "@/lib/security/crypto";
 import type { SponsorRecord, WallSponsor } from "@/types/supporter";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Supporter accounts for the sponsor portal.
@@ -48,7 +48,11 @@ interface SeedSponsor {
   id: string;
   email: string;
   name: string;
-  initialPassword: string;
+  /**
+   * `hashPassword()` of the account's published demo password, derived once. The
+   * password is not kept here; see `INITIAL_STAFF_USERS` in userStore.
+   */
+  passwordHash: string;
   displayOnWall: boolean;
   createdAt: string;
 }
@@ -59,13 +63,17 @@ interface SeedSponsor {
  * The standings themselves are not seeded here — they are derived from the commitments
  * `seedOfflineSponsorships()` records against these accounts, so the demo exercises the
  * real ledger rather than a fixture that can drift from it.
+ *
+ * Frozen, because every reset re-reads it: a change made through this export
+ * would otherwise outlive the reset meant to undo it.
  */
-export const SEED_SPONSORS: SeedSponsor[] = [
+export const SEED_SPONSORS: ReadonlyArray<Readonly<SeedSponsor>> = Object.freeze([
   {
     id: "spn-bronze-01",
     email: "bronze@example.com",
     name: "Nurul Aisyah",
-    initialPassword: "bronze123",
+    passwordHash:
+      "b96cb5ae68ce4148b14e30653c9be30e:9779422d6967b5c648052ec15c52fd19571bb5ba36d586acf70ece5ad501e320a2d2926aad67e2c519914db3a9bb628f1a18e6824e3e9f181101b4a39f881448",
     displayOnWall: true,
     createdAt: "2026-03-14T00:00:00.000Z",
   },
@@ -73,7 +81,8 @@ export const SEED_SPONSORS: SeedSponsor[] = [
     id: "spn-silver-01",
     email: "silver@example.com",
     name: "Jason Lim",
-    initialPassword: "silver123",
+    passwordHash:
+      "1cea98bd7c1dba22edaf9c2de505be0b:f2a130d6be0daa0c62168bb0e6c17050a9cb0887793f9cf9dc02f7b0c485e499432b809e794335a343e34240de839740d59d72e462fc34865b3dac62f3ca269e",
     displayOnWall: true,
     createdAt: "2026-01-09T00:00:00.000Z",
   },
@@ -81,11 +90,12 @@ export const SEED_SPONSORS: SeedSponsor[] = [
     id: "spn-gold-01",
     email: "gold@example.com",
     name: "Datin Sofia Rahman",
-    initialPassword: "gold123",
+    passwordHash:
+      "602f4a6c827a5f422ff0f8bc03c79077:ff3e09e9bb01e45b77eb6f6371dc4f703e521149f1284af6bcbb2fba8bc568584a414e9678b0e8389ff57b758666526716235cf10df6b5ea4afb963def6c4524",
     displayOnWall: true,
     createdAt: "2025-11-02T00:00:00.000Z",
   },
-];
+].map((seed) => Object.freeze(seed)));
 
 function ensureInitialised(): Promise<void> {
   if (initialised) return Promise.resolve();
@@ -97,7 +107,7 @@ function ensureInitialised(): Promise<void> {
             id: seed.id,
             email: seed.email,
             name: seed.name,
-            passwordHash: await hashPassword(seed.initialPassword),
+            passwordHash: seed.passwordHash,
             displayOnWall: seed.displayOnWall,
             createdAt: seed.createdAt,
             updatedAt: seed.createdAt,
@@ -263,3 +273,5 @@ export async function resetSponsorRepository(): Promise<void> {
   initPromise = null;
   await ensureInitialised();
 }
+
+registerStateReset("sponsorRepository", resetSponsorRepository);

@@ -26,6 +26,7 @@ import {
   summarizePetSponsorships,
 } from "@/lib/domain/petSponsorship";
 import { uniqueViolationOn } from "@/lib/server/uniqueViolation";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Repository for supporters' care commitments.
@@ -106,6 +107,8 @@ export function resetSponsorshipLedger(): void {
   memorySponsorships = [];
   memorySerial = 0;
 }
+
+registerStateReset("sponsorshipLedger", resetSponsorshipLedger);
 
 /** Diagnostic read of the in-memory ledger. */
 export function memorySponsorshipCount(): number {
