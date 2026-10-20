@@ -131,6 +131,17 @@ async function readFallbackAuthState(
 export const getVerifiedSession = cache(readVerifiedSession);
 
 /**
+ * Whether the request carries a sealed, unexpired session cookie at all, verified or not.
+ *
+ * Tells "nobody is signed in" from "signed in as someone the DAL will not honour"
+ * (suspended, deleted, held only in the in-memory store), which want different pages.
+ * Never authorizes anything: a true here says nothing about who may do what.
+ */
+export async function hasSessionCookie(): Promise<boolean> {
+  return (await getCurrentSession()) !== null;
+}
+
+/**
  * Resolves a verified session holding `permission`, or throws.
  *
  * Throws `UnauthorizedError` (401) when signed out and `ForbiddenError` (403)

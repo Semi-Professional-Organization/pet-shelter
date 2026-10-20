@@ -1,9 +1,7 @@
-import { ShieldAlert, DatabaseZap } from "lucide-react";
+import { DatabaseZap } from "lucide-react";
 
 import { BulletinDataTable } from "@/components/admin/BulletinDataTable";
-import { getVerifiedSession } from "@/lib/security/dal";
-import { hasPermission } from "@/lib/security/rbac";
-import { PERMISSIONS } from "@/lib/security/permissions";
+import { requireAdminSection } from "@/lib/security/adminSectionGate";
 import { listBulletinsAction } from "@/actions/bulletins";
 import { shelterToday } from "@/lib/domain/bulletinSchedule";
 import type { BulletinRecord } from "@/types/bulletin";
@@ -23,31 +21,12 @@ export const dynamic = "force-dynamic";
  */
 export default async function AdminBulletinsPage() {
   // Verified, so a suspended editor's unexpired cookie does not render the drafts.
-  const session = await getVerifiedSession();
-
-  if (!hasPermission(session, PERMISSIONS.MANAGE_CONTENT)) {
-    return (
-      <div className="max-w-xl border border-border bg-background rounded-2xl p-8 space-y-3">
-        <ShieldAlert className="size-7 text-destructive" />
-        <h1 className="font-heading text-xl font-bold text-foreground">
-          You do not have access to bulletin management
-        </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Posting community bulletins requires the{" "}
-          <strong className="text-foreground">MANAGE_CONTENT</strong> permission,
-          held by Administrator and Content Editor accounts. You are currently
-          signed in as{" "}
-          <strong className="text-foreground">{session?.role ?? "a guest"}</strong>.
-          Please ask an administrator if you need this permission.
-        </p>
-      </div>
-    );
-  }
+  await requireAdminSection("/admin/bulletins");
 
   /**
    * Read through the action rather than reaching past it into the repository.
    *
-   * The check above decides what this page *renders*; `listBulletinsAction`
+   * The gate above decides what this page *renders*; `listBulletinsAction`
    * re-asserts `MANAGE_CONTENT` on the server and is what actually permits the
    * read, so the drafts below are gated by the same call a client would face.
    * `tests/unit/bulletins.test.ts` holds that gate to anonymous, STAFF,

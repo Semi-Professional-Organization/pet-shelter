@@ -29,21 +29,41 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { scheduleApplicationInterview } from "@/actions/applications";
+import { CANONICAL_ROLES, PERMISSIONS, ROLE_LABELS, roleHasPermission } from "@/lib/security/permissions";
 import {
   APPLICATION_STATUS_SEQUENCE,
   getApplicationStatusPresentation,
 } from "@/lib/presentation/applicationStatusPresentation";
 
+// Who a reader should ask, read from the permission matrix rather than named here, so the
+// notice follows the matrix the actions enforce. "Super Admin or Volunteer Coordinator" today.
+const REVIEWER_ROLES = new Intl.ListFormat("en", { type: "disjunction" }).format(
+  CANONICAL_ROLES.filter((role) => roleHasPermission(role, PERMISSIONS.REVIEW_APPLICATIONS)).map(
+    (role) => ROLE_LABELS[role]
+  )
+);
+
 interface ApplicationDetailDialogProps {
   application: AdoptionApplicationRecord | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Resolves with the server's answer, which the dialog waits for before it reports. */
   onUpdateStatus: (
     id: string,
     status: ApplicationStatus,
     notes: string,
     notifyApplicant?: boolean
-  ) => { success: boolean; error?: string } | void;
+  ) => Promise<{ success: boolean; error?: string }>;
+  /** Shows on the board what a successful schedule wrote; it writes nothing itself. */
+  onInterviewScheduled: (
+    id: string,
+    written: { status: ApplicationStatus; adminReviewNotes: string }
+  ) => void;
+  /**
+   * REVIEW_APPLICATIONS. Without it the decision and scheduling tabs are not
+   * offered: both actions refuse a member who may only read applications.
+   */
+  canReview: boolean;
 }
 
 export function ApplicationDetailDialog({
@@ -51,6 +71,8 @@ export function ApplicationDetailDialog({
   open,
   onOpenChange,
   onUpdateStatus,
+  onInterviewScheduled,
+  canReview,
 }: ApplicationDetailDialogProps) {
   const [activeTab, setActiveTab] = useState<"review" | "interview">("review");
   const [status, setStatus] = useState<ApplicationStatus>("SUBMITTED");
@@ -69,6 +91,7 @@ export function ApplicationDetailDialog({
   );
   const [interviewNotes, setInterviewNotes] = useState("");
   const [scheduling, setScheduling] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [prevKey, setPrevKey] = useState<string | null>(null);
   const currentKey =
@@ -113,13 +136,18 @@ export function ApplicationDetailDialog({
     `Hi ${application.applicantName}, this is Hope for Strays regarding your adoption application for ${application.petName} (Ref: ${application.id}). You can track your status live at: ${trackingUrl}`
   )}`;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setErrorMessage(null);
     setSuccessMessage(null);
-    const result = onUpdateStatus(application.id, status, notes, notifyApplicant);
-    if (result && !result.success) {
-      setErrorMessage(result.error || "Failed to update status.");
-      return;
+    setSaving(true);
+    try {
+      const result = await onUpdateStatus(application.id, status, notes, notifyApplicant);
+      if (!result.success) {
+        setErrorMessage(result.error || "Failed to update status.");
+        return;
+      }
+    } finally {
+      setSaving(false);
     }
     setSuccessMessage("Application review saved successfully!");
     setTimeout(() => {
@@ -152,14 +180,18 @@ export function ApplicationDetailDialog({
       if (!res.success) {
         setErrorMessage(res.error || "Failed to schedule interview.");
       } else {
-        setSuccessMessage("Meet & Greet scheduled! Confirmation email dispatched.");
-        setStatus("UNDER_REVIEW");
-        onUpdateStatus(
-          application.id,
-          "UNDER_REVIEW",
-          `[Meet & Greet Scheduled: ${interviewDate} at ${interviewTime}] ${interviewNotes}`,
+        setSuccessMessage(
           notifyApplicant
+            ? "Meet & Greet scheduled! Confirmation email dispatched."
+            : "Meet & Greet scheduled. No email was sent."
         );
+        setStatus(res.status);
+        // The server has already written the status and the meeting's notes; the board
+        // only shows them. A status save here would be a second write.
+        onInterviewScheduled(application.id, {
+          status: res.status,
+          adminReviewNotes: res.adminReviewNotes,
+        });
         setTimeout(() => {
           onOpenChange(false);
         }, 800);
@@ -295,7 +327,26 @@ export function ApplicationDetailDialog({
             </div>
           )}
 
+          {!canReview && (
+            <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                You can read this application. Recording a decision or scheduling a meet and
+                greet needs the {REVIEWER_ROLES} role.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+                className="text-xs shrink-0"
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
           {/* Tab Navigation */}
+          {canReview && (
           <div className="border-b border-border flex gap-4 pt-2">
             <button
               type="button"
@@ -321,9 +372,10 @@ export function ApplicationDetailDialog({
               Schedule Meet & Greet
             </button>
           </div>
+          )}
 
           {/* Tab 1: Review & Decision */}
-          {activeTab === "review" && (
+          {canReview && activeTab === "review" && (
             <div className="space-y-4">
               
               {/* Quick 1-Click Status Selection Pills */}
@@ -392,19 +444,20 @@ export function ApplicationDetailDialog({
                   type="button"
                   size="sm"
                   onClick={handleSave}
+                  disabled={saving}
                   className="text-xs font-semibold uppercase tracking-wider px-6"
                 >
-                  Save Decision
+                  {saving ? "Saving..." : "Save Decision"}
                 </Button>
               </div>
             </div>
           )}
 
           {/* Tab 2: Schedule Meet & Greet */}
-          {activeTab === "interview" && (
+          {canReview && activeTab === "interview" && (
             <form onSubmit={handleScheduleInterview} className="space-y-4">
               <div className="p-3 tone-soft tone-info border rounded-lg text-xs">
-                Scheduling a Meet & Greet transitions the application to <strong>Under Review</strong>, dispatches a formal invitation email, and adds the session to the applicant&apos;s live tracking dashboard.
+                Scheduling a Meet & Greet moves a submitted application to <strong>Under Review</strong> (any other status stays as it is) and adds the session to the applicant&apos;s live tracking dashboard. The invitation email goes out only if the box below is ticked.
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

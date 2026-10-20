@@ -44,9 +44,15 @@ import { ApplicationStatusIcon } from "@/components/admin/ApplicationStatusIcon"
 
 export function ApplicationDataTable({
   initialApplications,
+  canReview,
+  canDelete,
 }: {
-  initialApplications?: AdoptionApplicationRecord[];
-} = {}) {
+  initialApplications: AdoptionApplicationRecord[];
+  /** REVIEW_APPLICATIONS: change a status, record a decision, schedule a meet and greet. */
+  canReview: boolean;
+  /** DELETE_APPLICATIONS: remove a record. */
+  canDelete: boolean;
+}) {
   const { state, handlers } = useApplicationTableController(initialApplications);
   const {
     applications,
@@ -69,9 +75,9 @@ export function ApplicationDataTable({
     setStatusError,
     handleQuickStatus,
     handleUpdateStatusWithNotes,
+    handleInterviewScheduled,
     confirmDelete,
     handleExportCsv,
-    resetToDefaultApplications,
   } = handlers;
 
   const columns = useMemo<ColumnDef<AdoptionApplicationRecord>[]>(
@@ -147,18 +153,20 @@ export function ApplicationDataTable({
           const app = row.original;
           return (
             <div className="flex items-center gap-1.5 justify-end">
-              <select
-                value={app.status}
-                onChange={(e) => handleQuickStatus(app.id, e.target.value as ApplicationStatus)}
-                className="bg-background border border-input text-xs font-medium px-2 py-1 focus:ring-1 focus:ring-foreground"
-                aria-label={`Change status for application from ${app.applicantName}`}
-              >
-                {APPLICATION_STATUS_SEQUENCE.map((status) => (
-                  <option key={status} value={status}>
-                    {getApplicationStatusPresentation(status).label}
-                  </option>
-                ))}
-              </select>
+              {canReview && (
+                <select
+                  value={app.status}
+                  onChange={(e) => handleQuickStatus(app.id, e.target.value as ApplicationStatus)}
+                  className="bg-background border border-input text-xs font-medium px-2 py-1 focus:ring-1 focus:ring-foreground"
+                  aria-label={`Change status for application from ${app.applicantName}`}
+                >
+                  {APPLICATION_STATUS_SEQUENCE.map((status) => (
+                    <option key={status} value={status}>
+                      {getApplicationStatusPresentation(status).label}
+                    </option>
+                  ))}
+                </select>
+              )}
 
               <Button
                 variant="outline"
@@ -173,21 +181,23 @@ export function ApplicationDataTable({
                 <Eye className="size-3" /> View
               </Button>
 
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setDeleteCandidate(app)}
-                className="text-xs text-destructive hover:text-destructive"
-                title="Archive / Delete application"
-              >
-                <Trash2 className="size-3" />
-              </Button>
+              {canDelete && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setDeleteCandidate(app)}
+                  className="text-xs text-destructive hover:text-destructive"
+                  title="Archive / Delete application"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              )}
             </div>
           );
         },
       },
     ],
-    [handleQuickStatus, setActiveAppForDetail, setIsDetailOpen, setDeleteCandidate]
+    [canReview, canDelete, handleQuickStatus, setActiveAppForDetail, setIsDetailOpen, setDeleteCandidate]
   );
 
   const table = useReactTable({
@@ -277,16 +287,9 @@ export function ApplicationDataTable({
           >
             <Download className="size-3" /> Export CSV ({filteredData.length})
           </Button>
-
-          <Button
-            variant="outline"
-            size="xs"
-            onClick={resetToDefaultApplications}
-            title="Reset to sample applications"
-            className="text-xs text-muted-foreground gap-1"
-          >
-            <RotateCcw className="size-3" /> Reset Sample Data
-          </Button>
+          {/* No "Reset Sample Data" here. It rewrote the browser's copy of the board,
+              which the board no longer shows (the page always passes the server's
+              applications), so it changed nothing anyone could see. */}
         </div>
       </div>
 
@@ -369,6 +372,8 @@ export function ApplicationDataTable({
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         onUpdateStatus={handleUpdateStatusWithNotes}
+        onInterviewScheduled={handleInterviewScheduled}
+        canReview={canReview}
       />
 
       {/* Delete / Archive Confirmation */}

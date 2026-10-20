@@ -1,5 +1,6 @@
 import { DonationPledgeReconciliation } from "@/components/admin/DonationPledgeReconciliation";
 import { SponsorshipReconciliation } from "@/components/admin/SponsorshipReconciliation";
+import { requireAdminSection } from "@/lib/security/adminSectionGate";
 
 /**
  * One receipt attempt may spend 5 seconds acquiring the transaction and 15 seconds
@@ -25,7 +26,11 @@ export const maxDuration = 60;
  * different tables — a coordinator matching `HFS-GFT-…` against a statement line
  * should not have to scan past sponsorship rows to find it.
  */
-export default function AdminDonationsPage() {
+export default async function AdminDonationsPage() {
+  // Both queues already refuse a role without RECONCILE_SPONSORSHIPS; this turns
+  // two refusal banners under the queue headings into one 403 page.
+  await requireAdminSection("/admin/donations");
+
   return (
     <div className="space-y-10">
       <DonationPledgeReconciliation />

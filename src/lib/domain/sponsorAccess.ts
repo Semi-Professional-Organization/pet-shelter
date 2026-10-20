@@ -62,6 +62,22 @@ export interface SponsorContext {
 }
 
 /**
+ * A sponsor session and the sponsor record it names: who is signed in to the portal.
+ *
+ * The one test the dashboard and the certificate page (through `getSponsorContext`) and
+ * /sponsor/login (through `sponsorSessionNamesASponsor`) all apply. Two copies of it
+ * disagreed once already, cookie alone on one side and cookie plus record on the other,
+ * and a sponsor whose record was gone went round between the two pages with none ever
+ * rendering.
+ */
+async function findSignedInSponsor(): Promise<{ session: SponsorSession; sponsor: SponsorRecord } | null> {
+  const session = await getCurrentSponsorSession();
+  if (!session) return null;
+  const sponsor = await findSponsorById(session.sponsorId);
+  return sponsor ? { session, sponsor } : null;
+}
+
+/**
  * Resolves the signed-in sponsor and their derived standing.
  *
  * Memoized with React `cache` so a page that renders several gates performs one ledger
@@ -72,11 +88,9 @@ export const getSponsorContext = cache(async (): Promise<SponsorContext | null> 
   // falls only on a request that actually looks at sponsorship state.
   await seedOfflineSponsorships();
 
-  const session = await getCurrentSponsorSession();
-  if (!session) return null;
-
-  const sponsor = await findSponsorById(session.sponsorId);
-  if (!sponsor) return null;
+  const signedIn = await findSignedInSponsor();
+  if (!signedIn) return null;
+  const { session, sponsor } = signedIn;
 
   const sponsorships = await listSponsorshipsByUserId(sponsor.id);
   return {
@@ -87,6 +101,25 @@ export const getSponsorContext = cache(async (): Promise<SponsorContext | null> 
     recognisedSen: recognisedContributionSen(sponsorships),
   };
 });
+
+/**
+ * Whether the sponsor session still names a sponsor, without reading their standing.
+ *
+ * For /sponsor/login, which only decides whether to send a visitor on to the dashboard:
+ * the dashboard's own test (a session, and a sponsor record behind it), minus the ledger
+ * read `getSponsorContext` adds. A database that cannot answer counts as "no", so the
+ * sign-in form still renders and the sponsor can start over rather than meeting a 500.
+ */
+export async function sponsorSessionNamesASponsor(): Promise<boolean> {
+  try {
+    return (await findSignedInSponsor()) !== null;
+  } catch (error) {
+    // Answered "no" so the page still renders, but logged: otherwise an outage here
+    // looks exactly like a signed-out visitor.
+    console.error("[Sponsor Sign-In] Could not check the session's sponsor:", error);
+    return false;
+  }
+}
 
 /** The current standing, or `null` for signed-out visitors and sub-Bronze sponsors. */
 export async function getCurrentSupporterTier(): Promise<SupporterTier | null> {

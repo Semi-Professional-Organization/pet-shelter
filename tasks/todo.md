@@ -15,6 +15,84 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Every role lands on, is shown and is offered only what it can use
+
+**Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`
+
+A fresh STAFF account's first screen after signing in was a refusal: every sign-in pushed to
+`/admin/pets`. The brief asked for that fixed first and the same class swept across every role,
+admin page, action and the sponsor portal, with the role × page × action matrix as evidence.
+
+Scope, written at close, when the owner's scope rule arrived. Written first, it would have named
+the review dialog's server path as in scope before the sixth round woke it
+(`tasks/lessons/2026-10-20-a-fix-that-wakes-a-dead-path-owns-everything-behind-it.md`):
+
+- **Done when:** every role, the five canonical ones and the three legacy aliases, is sent to,
+  shown and offered only what it can use in the admin console and the sponsor portal; each fix has
+  a test shown failing without it; every gate is green.
+- **In scope:** landing and redirects, nav against page gates, page gates against action gates,
+  controls per permission, signed-out and suspended states, sponsor-portal session dead ends, and
+  correctness bugs this branch made reachable.
+- **Not in scope:** everything in the four `tasks/open` entries listed under Review.
+
+- [x] Audit: lessons and open entries for role, permission, redirect, nav and suspension; no open
+      PR overlaps. Five read-only readers built the matrix, one per area.
+- [x] Landing: sign-in, registration, demo sign-in and invite acceptance enter the console by a
+      document load of `/admin`, which redirects to the first section the live role opens. The
+      first design (a client push) died on its kill condition: the admin layout, mounted on the
+      sign-in page while signed out, bounced every fresh-browser sign-in back to it.
+- [x] One section table for the nav, the landing and a gate every section page calls; FAQ
+      editing moved to `MANAGE_CONTENT`; the nav and `getCurrentUserAction` read the live role.
+- [x] Controls follow permissions: applications (decide, delete), settings (a coordinator gets
+      only the test email tool), transparency (PDF upload for `MANAGE_CONTENT`), own-row
+      role edit.
+- [x] Signed out or suspended: nobody signed in goes to the sign-in form from every section, from
+      `/admin` and from the proxy; a session the DAL will not honour gets the 401 page; the client
+      drops a cached user the server no longer recognises.
+- [x] Sponsor portal: the sign-in/dashboard loop for a sponsor whose record is gone; "Become a
+      sponsor" now leads to the rescues; "Claim your portal" offered to sponsors, not every donor.
+- [x] Tests for every fix, each shown failing against the base branch's code through an alias
+      probe; local browser run for Staff, Coordinator, Content Editor and Animal Manager.
+- [x] `/code-review high`: seven rounds and one pass by another session, then stopped under the
+      owner's scope rule (round 8 needs the owner's go-ahead); draft PR; CI.
+
+## Review
+
+**Review tally** (candidates: fixed / deferred to `tasks/open` / declined with a reason):
+round 1, 8: 6/0/2 · round 2, 8: 4/0/4 · round 3, 6: 6/0/0 · round 4, 6: 5/0/1 · round 5, 8: 8/0/0
+· round 6, 8: 6/0/2 · round 7, 8: 5/1/2 · other session's pass, 9: 5/3/1 · round 8 (asked for by
+the owner), 6: 3/1/2. Total 67: 48 fixed, 5 deferred, 14 declined. Round 8's one in-scope
+correctness bug: a stale mirror refused a decision the database allowed. The loop stopped there
+at the owner's word, not on a clean round.
+
+**Verified at the branch tip,** after merging `origin/master` (`474abbe`): `npm run check`
+(0 errors, 12 warnings, none new), `npm test` 2063 passed, `npm run test:components` 274,
+`npm run test:integration` 92, `npm run build` exit 0 offline with throwaway secrets.
+
+Deliberately not done, and why:
+
+- The applications board never sent a decision on a real application to the server: it checked
+  the browser's sample copy first and stopped at "Application not found". First filed as not a
+  role dead end, then fixed in the sixth review round, because the controls this branch offers
+  reviewers could not work without it. That made reachable two things the dialog did on its own,
+  fixed in the seventh: it said a decision was saved before the server answered, and it followed
+  every meet and greet with a status save of its own, which replaced the meeting's notes, sent a
+  second email and reopened decided applications. The scheduling action now answers with what it
+  wrote, and stops at a write the repository refused instead of sending the invitation anyway.
+- Content Editors first could not upload report PDFs (the button was hidden); the owner then
+  chose to widen `/api/upload` to PDFs for MANAGE_CONTENT holders:
+  `tasks/decisions/2026-10-20-content-editors-upload-report-pdfs.md`.
+- The proxy still reads the cookie, so a member promoted since signing in is refused at Staff &
+  Permissions until they sign in again; its 403 text now says so.
+- Sign-in has no return-to, staff account flows have further dead ends, and the sponsor portal has
+  loose ends unrelated to sessions: `tasks/open/staff-account-flows-with-no-way-forward.md`,
+  `tasks/open/admin-console-loose-ends-from-the-role-sweep.md`,
+  `tasks/open/sponsor-portal-loose-ends.md`.
+- The applications board stops following the server after its first change, rolls back every
+  row on a refusal, and scheduling replaces the review notes. All predate this branch; the first
+  two want the server's list as the board's source of truth, a restructure rather than a fix:
+  `tasks/open/applications-board-shows-its-own-copy-after-a-change.md`.
+
 # Measure what agent sessions cost: the `usage` command
 
 **Branch:** `claude/project-thread-facxqz` · opened 2026-10-20 · base `f1f448a`

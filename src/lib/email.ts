@@ -10,6 +10,7 @@ import {
   EMAIL_RECEIPT,
 } from "@/lib/presentation/emailTokens";
 import { getApplicationStatusPresentation } from "@/lib/presentation/applicationStatusPresentation";
+import { escapeHtml } from "@/lib/presentation/escapeHtml";
 import { isTaxClaimable, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 
 export interface EmailResult {
@@ -275,19 +276,6 @@ ${TONE_RULES}
 </body>
 </html>
   `.trim();
-}
-
-/**
- * Escapes free text before it is interpolated into an HTML email body. Donor- and applicant-typed
- * fields arrive here straight from a public form, so they cannot be trusted as markup.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 /**

@@ -20,7 +20,9 @@ export default function Unauthorized() {
           Your session has ended
         </h1>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Sign in again to continue to the shelter staff portal.
+          Sign in again to continue to the shelter staff portal. If this page comes back
+          straight after you sign in, ask a Super Admin to check your account under Staff
+          &amp; Permissions.
         </p>
       </div>
 

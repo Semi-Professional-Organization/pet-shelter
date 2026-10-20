@@ -337,7 +337,10 @@ export async function atomicUpdateApplicationStatus(
     return { success: false, error: "Application not found" };
   }
 
-  if (inMemoryApp) {
+  // With a database, the transaction below validates against the row it reads. This
+  // instance's mirror may be stale (another instance moved the application on), and
+  // checking it first refused transitions the database would allow.
+  if (inMemoryApp && !isDatabasePersistent()) {
     try {
       validateApplicationTransition(inMemoryApp.status, targetStatus);
     } catch (err: unknown) {
@@ -348,6 +351,13 @@ export async function atomicUpdateApplicationStatus(
 
   const today = toDayString(new Date());
   let currentDbApp: DbApplicationRecord | null = null;
+  // Whether this write is the one that approves the application. An approval's
+  // consequences, the animal marked adopted and every other open application for it
+  // closed, belong to that transition alone: they used to run on any write naming
+  // APPROVED, so saving new notes on an application approved long ago adopted an animal
+  // returned since and rejected whoever had applied for it in the meantime. Decided from
+  // the database's pre-state when there is a database, as the transition guard is.
+  let becomesApproved = targetStatus === "APPROVED" && inMemoryApp?.status !== "APPROVED";
 
   if (isDatabasePersistent()) {
     try {
@@ -376,7 +386,8 @@ export async function atomicUpdateApplicationStatus(
           );
         }
 
-        if (targetStatus === "APPROVED" && current.petId) {
+        becomesApproved = targetStatus === "APPROVED" && oldStatus !== "APPROVED";
+        if (becomesApproved && current.petId) {
           await tx.pet.updateMany({
             where: { id: current.petId },
             data: { status: "Adopted" },
@@ -419,7 +430,7 @@ export async function atomicUpdateApplicationStatus(
   const currentApp = serverApplications[appIndex];
   const oldStatus = currentApp.status;
 
-  if (targetStatus === "APPROVED") {
+  if (becomesApproved) {
     const adoptedPet = markCachedPetAdopted(currentApp.petId ?? "", currentApp.petName);
     if (adoptedPet) {
       recordAuditLog({

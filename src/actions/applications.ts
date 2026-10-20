@@ -17,7 +17,7 @@ import {
   PublicApplicationTrackingDTO,
   PublicInterviewDetails,
 } from "@/lib/validations/applicationTracking";
-import { AdoptionApplicationRecord } from "@/types/application";
+import { AdoptionApplicationRecord, ApplicationStatus } from "@/types/application";
 import { getVerifiedSession } from "@/lib/security/dal";
 import { assertHasPermission, PERMISSIONS } from "@/lib/security/rbac";
 import { checkRateLimit } from "@/lib/security/rateLimit";
@@ -262,7 +262,6 @@ export async function submitApplication(
       const newApp = await insertWithUniqueReferenceCode(draft);
       try {
         revalidatePath("/admin/applications");
-        revalidatePath("/admin");
       } catch {
         // Safe outside Next.js runtime
       }
@@ -333,9 +332,18 @@ export async function updateApplicationStatus(
   }
 }
 
+/**
+ * Schedules a meet and greet. Answers with the status and review notes it wrote, so the
+ * board can show them without a write of its own: the review dialog used to follow a
+ * schedule with a status save, which replaced these notes, sent a second email and reopened
+ * an application already decided.
+ */
 export async function scheduleApplicationInterview(
   input: ScheduleInterviewInput
-): Promise<{ success: boolean; error?: string }> {
+): Promise<
+  | { success: true; status: ApplicationStatus; adminReviewNotes: string }
+  | { success: false; error: string }
+> {
   try {
     const session = await getVerifiedSession();
     assertHasPermission(session, PERMISSIONS.REVIEW_APPLICATIONS);
@@ -350,22 +358,13 @@ export async function scheduleApplicationInterview(
     const meetingTypeLabel = validated.meetingType === "video_call" ? "Virtual Video Call" : "In-Person Visit";
     const formattedNotes = `[Meet & Greet Scheduled: ${validated.interviewDate} at ${validated.interviewTime} (${meetingTypeLabel}) - Location: ${validated.location}] ${validated.coordinatorNotes || ""}`.trim();
 
-    // If currently SUBMITTED, transition to UNDER_REVIEW
-    if (app.status === "SUBMITTED") {
-      await atomicUpdateApplicationStatus(
-        app.id,
-        "UNDER_REVIEW",
-        formattedNotes,
-        session
-      );
-    } else {
-      // Append interview details to review notes
-      await atomicUpdateApplicationStatus(
-        app.id,
-        app.status,
-        formattedNotes,
-        session
-      );
+    // A submitted application moves to Under Review; any other status is kept. Either way
+    // the review notes become the meeting's details. A write the repository refused stops
+    // here, before the milestones, the audit entry and the invitation claim it happened.
+    const status: ApplicationStatus = app.status === "SUBMITTED" ? "UNDER_REVIEW" : app.status;
+    const written = await atomicUpdateApplicationStatus(app.id, status, formattedNotes, session);
+    if (!written.success) {
+      return { success: false, error: written.error || "Failed to schedule interview" };
     }
 
     // Record the interview as structured data. The formatted note above stays
@@ -419,12 +418,11 @@ export async function scheduleApplicationInterview(
 
     try {
       revalidatePath("/admin/applications");
-      revalidatePath("/admin");
     } catch {
       // Safe outside Next.js runtime
     }
 
-    return { success: true };
+    return { success: true, status, adminReviewNotes: formattedNotes };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to schedule interview";
     return { success: false, error: msg };
@@ -482,7 +480,6 @@ export async function recordApplicationHomeVisit(
 
     try {
       revalidatePath("/admin/applications");
-      revalidatePath("/admin");
     } catch {
       // Safe outside Next.js runtime
     }

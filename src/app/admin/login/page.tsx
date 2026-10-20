@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   PawPrint,
@@ -17,15 +16,12 @@ import {
   EyeOff,
   Clock,
 } from "lucide-react";
-import { useAdminAuth } from "@/lib/client/adminAuth";
+import { enterAdminConsole, registerStaff, signInStaff } from "@/lib/client/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
-  const { login, register } = useAdminAuth();
-
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -64,9 +60,9 @@ export default function AdminLoginPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const result = await login(loginData.email, loginData.password);
+    const result = await signInStaff(loginData.email, loginData.password);
     if (result.success) {
-      router.push("/admin/pets");
+      enterAdminConsole();
     } else {
       if (result.retryAfterSeconds) {
         setCountdown(result.retryAfterSeconds);
@@ -91,7 +87,7 @@ export default function AdminLoginPage() {
     }
 
     setIsSubmitting(true);
-    const result = await register({
+    const result = await registerStaff({
       name: regData.name,
       email: regData.email,
       password: regData.password,
@@ -100,7 +96,7 @@ export default function AdminLoginPage() {
 
     if (result.success) {
       setSuccess("Account created successfully! Redirecting...");
-      router.push("/admin/pets");
+      enterAdminConsole();
     } else {
       if (result.retryAfterSeconds) {
         setCountdown(result.retryAfterSeconds);
@@ -114,9 +110,9 @@ export default function AdminLoginPage() {
     setLoginData({ email, password: pass });
     setError(null);
     setIsSubmitting(true);
-    const result = await login(email, pass);
+    const result = await signInStaff(email, pass);
     if (result.success) {
-      router.push("/admin/pets");
+      enterAdminConsole();
     } else {
       setError(result.error || "Quick demo login failed.");
       setIsSubmitting(false);

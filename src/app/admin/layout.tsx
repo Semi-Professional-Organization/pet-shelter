@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAdminAuth } from "@/lib/client/adminAuth";
 import { PERMISSIONS, roleHasPermission } from "@/lib/security/permissions";
+import { adminSectionsFor, type AdminSectionHref } from "@/lib/security/adminSections";
 import { getVolunteerFormLinks } from "@/actions/settings";
 import { isUsableFormUrl } from "@/lib/volunteerFormUrl";
 import {
@@ -21,8 +22,23 @@ import {
   ClipboardList,
   HelpCircle,
   Users,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Keyed by the section table's own hrefs, so a section added there without an icon
+// here fails to compile rather than rendering a tab with nothing in it.
+const SECTION_ICONS: Record<AdminSectionHref, LucideIcon> = {
+  "/admin/pets": Dog,
+  "/admin/applications": FileText,
+  "/admin/faqs": HelpCircle,
+  "/admin/transparency": Wallet,
+  "/admin/donations": HandCoins,
+  "/admin/members": Users,
+  "/admin/audit": ShieldCheck,
+  "/admin/settings": Settings,
+  "/admin/bulletins": Bell,
+};
 
 export default function AdminLayout({
   children,
@@ -31,22 +47,27 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, role, isAuthenticated, isLoading, logout } = useAdminAuth();
-  const [volunteerResponsesUrl, setVolunteerResponsesUrl] = useState("");
 
   // /admin/invite is reached from an emailed link by someone who has no
   // session yet, so it must not be forced through the sign-in redirect.
   const isPublicAdminRoute = pathname === "/admin/login" || pathname === "/admin/invite";
+
+  // No session check on those two pages: they render as they are, so the answer
+  // would be a member-row read nobody uses.
+  const { user, isAuthenticated, isLoading, logout } = useAdminAuth({ syncWithServer: !isPublicAdminRoute });
+  const [volunteerResponsesUrl, setVolunteerResponsesUrl] = useState("");
 
   // Volunteer intake lives in an external Google Form; whoever reviews
   // applications gets a direct shortcut to its responses sheet. Expressed as the
   // capability rather than as `ADMIN || COORDINATOR`: the literal pair predates
   // the permission matrix and silently excluded every role added since.
   // REVIEW_APPLICATIONS resolves to exactly the same people it used to.
-  const canOpenVolunteerResponses = roleHasPermission(role, PERMISSIONS.REVIEW_APPLICATIONS);
+  const canOpenVolunteerResponses = roleHasPermission(user?.role, PERMISSIONS.REVIEW_APPLICATIONS);
 
   useEffect(() => {
-    if (!isAuthenticated || !canOpenVolunteerResponses) return;
+    // Not before the server has answered: until then the role is the browser's cached
+    // copy, which may still hold one the member has since lost.
+    if (isLoading || !isAuthenticated || !canOpenVolunteerResponses) return;
     let active = true;
     getVolunteerFormLinks()
       .then((links) => {
@@ -58,7 +79,7 @@ export default function AdminLayout({
     return () => {
       active = false;
     };
-  }, [isAuthenticated, canOpenVolunteerResponses]);
+  }, [isLoading, isAuthenticated, canOpenVolunteerResponses]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isPublicAdminRoute) {
@@ -87,32 +108,14 @@ export default function AdminLayout({
     return null;
   }
 
-  // A tab is shown when the role holds ANY of its permissions. This is
-  // presentation, not enforcement: every route and action guards itself
-  // server-side. The settings page hosts two capabilities at different levels —
-  // a Super Admin edits the configuration, a Volunteer Coordinator only sends a
-  // test email — so gating it on the write permission alone would hide a page
-  // the coordinator still has legitimate work on.
+  // Presentation, not enforcement: every page and action guards itself
+  // server-side. Drawn from the table each page's gate also reads, so a tab is
+  // shown exactly when its page will open for this role.
   //
-  // Every tab must name a permission. The `permissions: null` opt-out that used
-  // to exist here had exactly one user — a "Community Bulletins" tab pointing at
-  // the PUBLIC /bulletins page — and it is how that tab was shown to every role
-  // including Volunteer, sending staff to a page whose "editing" wrote to their
-  // own browser. Requiring the field removes the shape of that mistake rather
-  // than just its instance.
-  const navLinks = [
-    { href: "/admin/pets", label: "Pet Management (CRUD)", icon: Dog, permissions: [PERMISSIONS.MANAGE_PETS] },
-    { href: "/admin/applications", label: "Adoption Applications", icon: FileText, permissions: [PERMISSIONS.VIEW_APPLICATIONS] },
-    { href: "/admin/faqs", label: "FAQ Knowledge Base", icon: HelpCircle, permissions: [PERMISSIONS.MANAGE_CONTENT] },
-    { href: "/admin/transparency", label: "Financial Transparency", icon: Wallet, permissions: [PERMISSIONS.MANAGE_CONTENT] },
-    { href: "/admin/donations", label: "Payment Reconciliation", icon: HandCoins, permissions: [PERMISSIONS.RECONCILE_SPONSORSHIPS] },
-    { href: "/admin/members", label: "Staff & Permissions", icon: Users, permissions: [PERMISSIONS.MANAGE_MEMBERS] },
-    { href: "/admin/audit", label: "Audit & Security Logs", icon: ShieldCheck, permissions: [PERMISSIONS.VIEW_AUDIT_LOG] },
-    { href: "/admin/settings", label: "Shelter Settings", icon: Settings, permissions: [PERMISSIONS.MANAGE_SETTINGS, PERMISSIONS.SEND_SHELTER_EMAIL] },
-    { href: "/admin/bulletins", label: "Community Bulletins", icon: Bell, permissions: [PERMISSIONS.MANAGE_CONTENT] },
-  ].filter((tab) =>
-    tab.permissions.some((permission) => roleHasPermission(role, permission))
-  );
+  // Gated on the role as the server reported it, not a normalised copy:
+  // `normalizeRole` folds VOLUNTEER onto STAFF, which would show a volunteer the
+  // applications tab that every guard behind it refuses.
+  const navLinks = adminSectionsFor(user?.role);
 
   return (
     <div className="min-h-screen bg-card flex flex-col">
@@ -180,8 +183,8 @@ export default function AdminLayout({
       <div className="border-b border-border bg-muted/30 px-6 sm:px-8">
         <nav className="flex space-x-6 overflow-x-auto" aria-label="Admin Tabs">
           {navLinks.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = pathname === tab.href || (tab.href === "/admin/pets" && pathname === "/admin");
+            const Icon = SECTION_ICONS[tab.href];
+            const isActive = pathname === tab.href;
             return (
               <Link
                 key={tab.href}

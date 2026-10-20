@@ -2,11 +2,7 @@ import { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import {
-  getSponsorCertificate,
-  getCurrentSupporterTier,
-} from "@/lib/domain/sponsorAccess";
-import { getCurrentSponsorSession } from "@/lib/security/sponsorSession";
+import { getSponsorCertificate, getSponsorContext } from "@/lib/domain/sponsorAccess";
 import { buttonVariants } from "@/components/ui/button";
 import { SponsorCertificate, UpgradeNudge } from "@/components/features/sponsors";
 
@@ -24,14 +20,18 @@ export const metadata: Metadata = {
  * hidden element.
  */
 export default async function SponsorCertificatePage() {
-  if (!(await getCurrentSponsorSession())) {
+  // The dashboard's own test, through the same per-request read: a sponsor session with a
+  // sponsor record behind it. On the cookie alone, a sponsor whose record is gone was
+  // shown this page, empty, while the dashboard and the sign-in page sent them to sign in.
+  // An outage fails here as it does on the dashboard; only the sign-in form answers one
+  // as "signed out".
+  const context = await getSponsorContext();
+  if (!context) {
     redirect("/sponsor/login");
   }
 
-  const [certificate, currentTier] = await Promise.all([
-    getSponsorCertificate(),
-    getCurrentSupporterTier(),
-  ]);
+  const certificate = await getSponsorCertificate();
+  const currentTier = context.tier;
 
   return (
     <section className="w-full px-6 py-12 sm:px-8 lg:px-12">

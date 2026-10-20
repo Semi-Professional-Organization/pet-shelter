@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { ShieldAlert } from "lucide-react";
+import { FORBIDDEN_COPY } from "@/lib/presentation/accessDenialCopy";
 
 /**
  * Rendered with an HTTP 403 whenever `forbidden()` is thrown.
  *
  * Deliberately says nothing about what lives behind the boundary, so a
- * lower-privileged staff member learns only that they lack access.
+ * lower-privileged staff member learns only that they lack access. Its words are
+ * shared with the proxy's 403 document (`FORBIDDEN_COPY`).
  */
 export default function Forbidden() {
   return (
@@ -16,24 +18,20 @@ export default function Forbidden() {
 
       <div className="space-y-1.5 max-w-md">
         <p className="text-xs font-bold uppercase tracking-widest text-destructive">
-          403 — Forbidden
+          {FORBIDDEN_COPY.label}
         </p>
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-          You do not have access to this area
+          {FORBIDDEN_COPY.heading}
         </h1>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Your staff account does not carry the permission required for this page.
-          If you believe this is a mistake, ask a Super Admin to review your role
-          under Staff &amp; Permissions.
-        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">{FORBIDDEN_COPY.body}</p>
       </div>
 
       <div className="flex items-center gap-2.5 pt-1">
         <Link
-          href="/admin/pets"
+          href={FORBIDDEN_COPY.backHref}
           className="inline-flex items-center text-xs font-semibold uppercase tracking-wider border border-border bg-background px-3 py-2 hover:bg-muted"
         >
-          Back to Admin
+          {FORBIDDEN_COPY.backLabel}
         </Link>
         <Link
           href="/"

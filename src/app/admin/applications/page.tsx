@@ -1,14 +1,18 @@
 import { ApplicationDataTable } from "@/components/admin/ApplicationDataTable";
 import { getApplications } from "@/actions/applications";
+import { requireAdminSection } from "@/lib/security/adminSectionGate";
+import { hasPermission, PERMISSIONS } from "@/lib/security/rbac";
 
 export default async function AdminApplicationsPage() {
-  let applications;
-  try {
-    applications = await getApplications();
-  } catch {
-    // If not authenticated in server context, let client controller handle auth redirect / display
-    applications = undefined;
-  }
+  // Refuses a role without VIEW_APPLICATIONS with the 403 page. The data load
+  // below used to be the only check, and its refusal was swallowed, so such a role
+  // got the browser's sample applications with every review control live.
+  const session = await requireAdminSection("/admin/applications");
+
+  // getApplications re-checks the same capability. Not caught: a failure that fell
+  // through to the client board's fallback would show the browser's sample
+  // applicants as though they were the shelter's.
+  const applications = await getApplications();
 
   return (
     <div className="space-y-6">
@@ -21,7 +25,14 @@ export default async function AdminApplicationsPage() {
         </p>
       </div>
 
-      <ApplicationDataTable initialApplications={applications} />
+      {/* Reading applications and deciding them are separate permissions: STAFF and
+          Animal Managers may read but not decide, and only a Super Admin may delete.
+          The board offers each member only the review controls the server will accept. */}
+      <ApplicationDataTable
+        initialApplications={applications}
+        canReview={hasPermission(session, PERMISSIONS.REVIEW_APPLICATIONS)}
+        canDelete={hasPermission(session, PERMISSIONS.DELETE_APPLICATIONS)}
+      />
     </div>
   );
 }

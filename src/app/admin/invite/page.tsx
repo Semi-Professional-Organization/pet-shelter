@@ -2,9 +2,10 @@
 
 import React, { Suspense, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle2, Loader2, PawPrint, ShieldCheck } from "lucide-react";
 import { acceptInvitation } from "@/actions/members";
+import { cacheUser, enterAdminConsole } from "@/lib/client/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,6 @@ import { Label } from "@/components/ui/label";
  * against a stored scrypt hash.
  */
 function AcceptInvitationForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const token = searchParams.get("token") ?? "";
@@ -46,8 +46,12 @@ function AcceptInvitationForm() {
 
     if (result.success) {
       setDone(true);
-      // acceptInvitation signs the new member in, so land them in the console.
-      router.push("/admin/pets");
+      // Accepting signs the new member in. Cache them as sign-in does, or a first session
+      // check that fails would leave the console with nobody and send them to the sign-in
+      // page; then land them in whichever section the invited role opens, by a fresh
+      // document load.
+      if (result.data) cacheUser(result.data);
+      enterAdminConsole();
       return;
     }
 

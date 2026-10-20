@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, unsealSession } from "@/lib/security/sessionToken";
-import { PERMISSIONS, roleHasPermission, type Permission } from "@/lib/security/permissions";
+import { canOpenAdminSection, type AdminSectionHref } from "@/lib/security/adminSections";
 import { EMAIL_BRAND, EMAIL_TONE } from "@/lib/presentation/emailTokens";
+import { FORBIDDEN_COPY } from "@/lib/presentation/accessDenialCopy";
+import { escapeHtml } from "@/lib/presentation/escapeHtml";
 
 /**
  * Pre-render authorization for privileged admin routes.
@@ -32,10 +34,12 @@ import { EMAIL_BRAND, EMAIL_TONE } from "@/lib/presentation/emailTokens";
  * permission matrix are reused here rather than reimplemented.
  */
 
-/** Routes that must answer with an accurate status before rendering. */
-const GUARDED_ROUTES: { prefix: string; permission: Permission }[] = [
-  { prefix: "/admin/members", permission: PERMISSIONS.MANAGE_MEMBERS },
-];
+/**
+ * Sections that must answer with an accurate status before rendering. Who may open
+ * one is the section table's answer (`adminSections.ts`), the one its nav tab and
+ * page gate give, so the three cannot drift; only the role read here is the cookie's.
+ */
+const GUARDED_SECTIONS: AdminSectionHref[] = ["/admin/members"];
 
 /**
  * Returns a document response, which is the documented way to produce a status
@@ -53,15 +57,19 @@ const GUARDED_ROUTES: { prefix: string; permission: Permission }[] = [
  *   next/dist/server/lib/router-utils/resolve-routes.js returns no statusCode,
  *   so the status is silently dropped and you are back to a 200.
  *
- * The residual gap — a client-side navigation receiving HTML — is not reachable
- * in practice: the admin nav only renders a tab to a role that holds its
- * permission, so a user this function would deny has no link to click and no
- * prefetch is issued for one. Reaching a denied route means typing the URL,
- * which is a document request, which is exactly the case this handles.
+ * The residual gap — a client-side navigation receiving HTML — is reachable
+ * where the nav and the cookie disagree. The admin nav draws its tabs from the
+ * member's live role when the console loads (from the browser's cached copy if
+ * that check fails), and this function reads the role sealed into the cookie at
+ * sign-in, so a member promoted since signing in is offered the tab and refused
+ * here. The sentence this document adds to the shared 403 words says what ends
+ * it: signing in again.
  */
-function denialResponse(status: 401 | 403, title: string, message: string): NextResponse {
+const STALE_ROLE_HINT = "If your role was changed since you signed in, sign out and sign in again.";
+
+function forbiddenResponse(): NextResponse {
   // Deliberately minimal: this is a network-boundary rejection, and the styled
-  // in-app equivalents are src/app/forbidden.tsx and src/app/unauthorized.tsx.
+  // in-app equivalent is src/app/forbidden.tsx, whose words it shares.
   //
   // Colours come from the email hex mirror rather than literals. This document
   // is assembled outside the CSS pipeline, so it cannot use the design-system
@@ -74,20 +82,20 @@ function denialResponse(status: 401 | 403, title: string, message: string): Next
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>${status} ${title}</title>
+<title>${escapeHtml(FORBIDDEN_COPY.label)}</title>
 </head>
 <body style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;margin:0;display:flex;min-height:100vh;align-items:center;justify-content:center;background:${EMAIL_BRAND.muted};color:${EMAIL_BRAND.foreground}">
 <main style="max-width:32rem;padding:2rem;text-align:center">
-<p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${EMAIL_TONE.danger.text};margin:0 0 .5rem">${status} — ${title}</p>
-<h1 style="font-size:1.5rem;margin:0 0 .75rem">${message}</h1>
-<p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">Ask a Super Admin to review your role under Staff &amp; Permissions.</p>
-<a href="/admin/pets" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">Back to Admin</a>
+<p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${EMAIL_TONE.danger.text};margin:0 0 .5rem">${escapeHtml(FORBIDDEN_COPY.label)}</p>
+<h1 style="font-size:1.5rem;margin:0 0 .75rem">${escapeHtml(FORBIDDEN_COPY.heading)}</h1>
+<p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">${escapeHtml(`${FORBIDDEN_COPY.body} ${STALE_ROLE_HINT}`)}</p>
+<a href="${escapeHtml(FORBIDDEN_COPY.backHref)}" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">${escapeHtml(FORBIDDEN_COPY.backLabel)}</a>
 </main>
 </body>
 </html>`;
 
   return new NextResponse(body, {
-    status,
+    status: 403,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
@@ -99,22 +107,31 @@ function denialResponse(status: 401 | 403, title: string, message: string): Next
 export function proxy(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
-  const guard = GUARDED_ROUTES.find(
-    (route) => pathname === route.prefix || pathname.startsWith(`${route.prefix}/`)
+  const section = GUARDED_SECTIONS.find(
+    (href) => pathname === href || pathname.startsWith(`${href}/`)
   );
-  if (!guard) return NextResponse.next();
+  if (!section) return NextResponse.next();
+
+  // Page requests only. A Server Function POSTs to the route it is used on and answers
+  // for itself, through the DAL, with a refusal its caller can read. A redirect in its
+  // place had the browser re-POST to the sign-in page, which answered "Server Action not
+  // found"; the 403 document is no more readable to it.
+  if (request.method !== "GET" && request.method !== "HEAD") return NextResponse.next();
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = token ? unsealSession(token) : null;
 
+  // No valid session — none, expired or tampered with: the sign-in form, as the
+  // section gates answer (`refuseMissingSession`). It used to be a 401 reading
+  // "Your session has ended", wrong for a session that never existed.
   if (!session) {
-    return denialResponse(401, "Sign in required", "Your session has ended");
+    return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
-  // roleHasPermission normalises the role, so a cookie issued before the RBAC
+  // The table resolves deprecated aliases, so a cookie issued before the RBAC
   // migration (role "ADMIN") is still recognised as a Super Admin here.
-  if (!roleHasPermission(session.role, guard.permission)) {
-    return denialResponse(403, "Forbidden", "You do not have access to this area");
+  if (!canOpenAdminSection(session.role, section)) {
+    return forbiddenResponse();
   }
 
   return NextResponse.next();

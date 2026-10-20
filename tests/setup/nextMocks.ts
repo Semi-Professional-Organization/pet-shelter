@@ -233,6 +233,13 @@ vi.mock("next/navigation", () => ({
   notFound: vi.fn(() => {
     throw new MockNavigationError("NEXT_NOT_FOUND");
   }),
+  // The digests the real ones throw, so a test can tell a 403 from a 401.
+  forbidden: vi.fn(() => {
+    throw new MockNavigationError("NEXT_HTTP_ERROR_FALLBACK;403");
+  }),
+  unauthorized: vi.fn(() => {
+    throw new MockNavigationError("NEXT_HTTP_ERROR_FALLBACK;401");
+  }),
   useRouter: () => routerMock,
   usePathname: () => currentPathname,
   useSearchParams: () => currentSearchParams,
