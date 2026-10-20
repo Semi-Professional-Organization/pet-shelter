@@ -16,9 +16,15 @@ export interface AdminUser {
 
 type AuthResult = { success: boolean; error?: string; retryAfterSeconds?: number };
 
-// The browser's copy of the last session the server confirmed. Guarded, because storage
-// access throws where site data is blocked, and losing the copy costs only a fallback.
-function cacheUser(user: AdminUser): void {
+/**
+ * Keeps the browser's copy of a session the server confirmed or has just sealed: the
+ * console's fallback should its first session check fail. Guarded, because storage access
+ * throws where site data is blocked, and losing the copy costs only that fallback.
+ *
+ * Exported for the invitation page, which calls its own action: importing that action here
+ * would bundle it into the admin layout and the sign-in page, which never use it.
+ */
+export function cacheUser(user: AdminUser): void {
   try {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
   } catch {
@@ -46,13 +52,11 @@ function forgetCachedUser(): void {
  * redirects to the first section the member's live role opens.
  *
  * The browser's cached user is what the console falls back on if its first session
- * check fails, so it must describe the new session. `signInStaff` and `registerStaff`
- * have just written it; a caller that cannot (invitation acceptance learns no role)
- * passes `forgetCachedUser`, or the previous person on a shared browser would be the
- * fallback.
+ * check fails, so it must describe the new session: `signInStaff` and `registerStaff`
+ * cache the session the server sealed, and the invitation page calls `cacheUser`, before
+ * any of them gets here.
  */
-export function enterAdminConsole({ forgetCachedUser: forget = false }: { forgetCachedUser?: boolean } = {}): void {
-  if (forget) forgetCachedUser();
+export function enterAdminConsole(): void {
   // The rule's advice, useRouter().push(), is exactly the navigation the layout bounced.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign("/admin");

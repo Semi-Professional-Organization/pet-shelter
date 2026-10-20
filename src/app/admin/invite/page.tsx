@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle, CheckCircle2, Loader2, PawPrint, ShieldCheck } from "lucide-react";
 import { acceptInvitation } from "@/actions/members";
-import { enterAdminConsole } from "@/lib/client/adminAuth";
+import { cacheUser, enterAdminConsole } from "@/lib/client/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,10 +46,12 @@ function AcceptInvitationForm() {
 
     if (result.success) {
       setDone(true);
-      // acceptInvitation signs the new member in, so land them in the console:
-      // whichever section the invited role opens, by a fresh document load. It
-      // returns no role to cache, so whoever this browser cached before is forgotten.
-      enterAdminConsole({ forgetCachedUser: true });
+      // Accepting signs the new member in. Cache them as sign-in does, or a first session
+      // check that fails would leave the console with nobody and send them to the sign-in
+      // page; then land them in whichever section the invited role opens, by a fresh
+      // document load.
+      if (result.data) cacheUser(result.data);
+      enterAdminConsole();
       return;
     }
 

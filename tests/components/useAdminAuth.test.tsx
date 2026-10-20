@@ -93,17 +93,6 @@ describe("useAdminAuth", () => {
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!)).toEqual(CACHED);
   });
 
-  it("forgets the cached user when the caller cannot say who signed in", () => {
-    // Invitation acceptance learns no role, so the previous person on a shared browser
-    // would otherwise be the fallback.
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(CACHED));
-    vi.spyOn(console, "error").mockImplementation(() => {});
-
-    enterAdminConsole({ forgetCachedUser: true });
-
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
-  });
-
   it("signs out cleanly where the browser blocks storage", async () => {
     // A throwing removeItem used to reject logout before it cleared the legacy token
     // cookie, and the layout calls it without awaiting.

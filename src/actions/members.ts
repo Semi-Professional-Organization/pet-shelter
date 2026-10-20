@@ -16,7 +16,7 @@ import { checkRateLimit } from "@/lib/security/rateLimit";
 import { checkAddressRateLimit } from "@/lib/security/clientAddress";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { sendStaffInvitationEmail } from "@/lib/email";
-import { setSessionCookie } from "@/lib/security/session";
+import { setSessionCookie, type SessionUser } from "@/lib/security/session";
 import {
   INVITE_REDEMPTION_FAILED_MESSAGE,
   countActiveSuperAdmins,
@@ -472,7 +472,7 @@ export async function acceptInvitation(input: {
   token: string;
   password: string;
   confirmPassword: string;
-}): Promise<ActionResult<{ email: string; name: string }>> {
+}): Promise<ActionResult<SessionUser>> {
   try {
     const parsed = acceptInvitationSchema.safeParse(input);
     if (!parsed.success) {
@@ -526,7 +526,7 @@ export async function acceptInvitation(input: {
     const passwordHash = await hashPassword(parsed.data.password);
     const member = await activateInvitedMember(verification.member.id, passwordHash);
 
-    await setSessionCookie({
+    const session = await setSessionCookie({
       id: member.id,
       email: member.email,
       name: member.name,
@@ -544,11 +544,9 @@ export async function acceptInvitation(input: {
     });
 
     revalidatePath(MEMBERS_PATH);
-    return {
-      success: true,
-      data: { email: member.email, name: member.name },
-      status: 200,
-    };
+    // The session it sealed, as sign-in returns its own: the browser caches it as the
+    // console's fallback should its first session check fail.
+    return { success: true, data: session, status: 200 };
   } catch (error) {
     return toFailure(error, "Failed to activate your staff account.");
   }
