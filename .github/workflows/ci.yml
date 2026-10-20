@@ -216,3 +216,5 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+          # A re-run of this job uploads under the same name, in the same workflow run.
+          overwrite: true
