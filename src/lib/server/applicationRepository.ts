@@ -6,6 +6,7 @@ import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
 import { markCachedPetAdopted } from "./petRepository";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * Internal signal distinguishing "the caller asked for an illegal transition or
@@ -67,10 +68,12 @@ function freshApplications(): AdoptionApplicationRecord[] {
 
 let serverApplications: AdoptionApplicationRecord[] = freshApplications();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetApplications(): void {
   serverApplications = freshApplications();
 }
+
+registerStateReset("applications", resetApplications);
 
 export function getServerApplications(): AdoptionApplicationRecord[] {
   return serverApplications;

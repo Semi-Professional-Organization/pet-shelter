@@ -1,3 +1,5 @@
+import { registerStateReset } from "@/lib/stateResets";
+
 interface RateLimitRecord {
   timestamps: number[];
 }
@@ -77,3 +79,5 @@ export function checkRateLimit(key: string, limit = 5, windowMs = 60000): RateLi
 export function resetRateLimitStore(): void {
   rateLimitStore.clear();
 }
+
+registerStateReset("rateLimit", resetRateLimitStore);

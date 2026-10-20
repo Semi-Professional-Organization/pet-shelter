@@ -94,6 +94,13 @@ describe("Shelter settings authorization boundary", () => {
   });
 
   describe("sendTestEmailAction", () => {
+    // No path here may reach Resend, even through a regressed guard. The action sends with
+    // `RESEND_API_KEY || settings.resendApiKey`: an empty string is unset, and the harness resets
+    // the settings before each test, so the key saved by the audit-trail test above is gone.
+    beforeEach(() => {
+      vi.stubEnv("RESEND_API_KEY", "");
+    });
+
     it("stays available to a VOLUNTEER_COORDINATOR, as it was pre-migration", async () => {
       currentRole.value = ROLES.VOLUNTEER_COORDINATOR;
       const res = await sendTestEmailAction({ recipientEmail: "coord@hopeforstrays.org" });

@@ -87,6 +87,11 @@ for flakes:
 
 ### P-1 — `prisma.ts` invents a database that nobody asked for 🔴
 
+> **Closed 2026-10-20.** With no `DATABASE_URL`, `src/lib/server/prisma.ts` now hands out an
+> offline client that refuses every query with P1001 and opens no socket
+> (`tasks/decisions/2026-10-20-no-database-url-means-no-database.md`). The record below is the
+> state at authoring. `prisma/env.ts` still falls back to localhost for the CLI and seed.
+
 ```ts
 src/lib/server/prisma.ts:13   process.env.DATABASE_URL ||
                               "postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public"

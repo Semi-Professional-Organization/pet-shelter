@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   sendApplicationConfirmationEmail,
   sendStaffApplicationAlert,
@@ -15,6 +15,30 @@ import {
   EMAIL_TONE,
 } from "@/lib/presentation/emailTokens";
 import { getApplicationStatusPresentation } from "@/lib/presentation/applicationStatusPresentation";
+
+// Restores every `fetch` spy whether or not the test passed. `RESEND_API_KEY` stubs are undone by
+// the config's `unstubEnvs`.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+/**
+ * Puts the mailer on its live path: a Resend key is configured, and `fetch` answers every call as
+ * an accepted send, so nothing can reach api.resend.com.
+ *
+ * `vi.spyOn` hands back the existing spy when `fetch` already is one, so `mockClear()` gives each
+ * arming its own call record: one test may render several emails and must count each send alone.
+ */
+function stubResendAccepts() {
+  vi.stubEnv("RESEND_API_KEY", "test_key");
+  return vi
+    .spyOn(globalThis, "fetch")
+    .mockClear()
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "resend-msg-test" }),
+    } as unknown as Response);
+}
 
 describe("Transactional Email Service", () => {
   const sampleApplication: AdoptionApplicationRecord = {
@@ -36,6 +60,8 @@ describe("Transactional Email Service", () => {
   };
 
   it("dispatches adopter confirmation email in simulation mode when RESEND_API_KEY is unset", async () => {
+    // The mailer tests the key for truthiness, so an empty string is unset.
+    vi.stubEnv("RESEND_API_KEY", "");
     const result = await sendApplicationConfirmationEmail(sampleApplication);
     expect(result.success).toBe(true);
     expect(result.simulated).toBe(true);
@@ -43,6 +69,7 @@ describe("Transactional Email Service", () => {
   });
 
   it("dispatches shelter staff alert email in simulation mode when RESEND_API_KEY is unset", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
     const result = await sendStaffApplicationAlert(sampleApplication);
     expect(result.success).toBe(true);
     expect(result.simulated).toBe(true);
@@ -50,22 +77,13 @@ describe("Transactional Email Service", () => {
   });
 
   it("handles network failure gracefully without crashing or throwing", async () => {
-    // Temporarily simulate RESEND_API_KEY present and fetch rejection
-    const originalEnv = process.env.RESEND_API_KEY;
-    process.env.RESEND_API_KEY = "test_key";
-
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network connection reset"));
+    // A configured key, and a network that rejects every request.
+    vi.stubEnv("RESEND_API_KEY", "test_key");
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network connection reset"));
 
     const result = await sendApplicationConfirmationEmail(sampleApplication);
     expect(result.success).toBe(false);
     expect(result.error).toContain("Network connection reset");
-
-    fetchSpy.mockRestore();
-    if (originalEnv) {
-      process.env.RESEND_API_KEY = originalEnv;
-    } else {
-      delete process.env.RESEND_API_KEY;
-    }
   });
 });
 
@@ -95,29 +113,14 @@ describe("Sec 44(6) donation receipt — the two halves must agree", () => {
   async function renderReceipt(
     overrides: Partial<DonationReceipt> = {}
   ): Promise<{ subject: string; text: string; html: string }> {
-    const originalEnv = process.env.RESEND_API_KEY;
-    process.env.RESEND_API_KEY = "test_key";
+    const fetchSpy = stubResendAccepts();
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "resend-msg-test" }),
-    } as unknown as Response);
+    const result = await sendDonationReceiptEmail({ ...baseReceipt, ...overrides });
+    expect(result.success).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    try {
-      const result = await sendDonationReceiptEmail({ ...baseReceipt, ...overrides });
-      expect(result.success).toBe(true);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-      const init = fetchSpy.mock.calls[0][1];
-      return JSON.parse(String(init?.body));
-    } finally {
-      fetchSpy.mockRestore();
-      if (originalEnv) {
-        process.env.RESEND_API_KEY = originalEnv;
-      } else {
-        delete process.env.RESEND_API_KEY;
-      }
-    }
+    const init = fetchSpy.mock.calls[0][1];
+    return JSON.parse(String(init?.body));
   }
 
   const RAIL_CASES: Array<{ method: DonationReceipt["paymentMethod"]; label: string }> = [
@@ -232,22 +235,11 @@ describe("rendered email colour parity", () => {
 
   /** Drives a builder down the live path and returns the payload Resend would receive. */
   async function capture(dispatch: () => Promise<unknown>): Promise<string> {
-    const originalEnv = process.env.RESEND_API_KEY;
-    process.env.RESEND_API_KEY = "test_key";
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "resend-msg-test" }),
-    } as unknown as Response);
+    const fetchSpy = stubResendAccepts();
 
-    try {
-      await dispatch();
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      return JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)).html as string;
-    } finally {
-      fetchSpy.mockRestore();
-      if (originalEnv) process.env.RESEND_API_KEY = originalEnv;
-      else delete process.env.RESEND_API_KEY;
-    }
+    await dispatch();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    return JSON.parse(String(fetchSpy.mock.calls[0][1]?.body)).html as string;
   }
 
   it("gives all seven tones a badge and a card, in the mirrored colours", async () => {
@@ -372,28 +364,13 @@ describe("staff application alert — the two halves must agree", () => {
   async function renderStaffAlert(
     overrides: Partial<AdoptionApplicationRecord> = {}
   ): Promise<{ subject: string; text: string; html: string }> {
-    const originalEnv = process.env.RESEND_API_KEY;
-    process.env.RESEND_API_KEY = "test_key";
+    const fetchSpy = stubResendAccepts();
 
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ id: "resend-msg-test" }),
-    } as unknown as Response);
+    const result = await sendStaffApplicationAlert({ ...baseApplication, ...overrides });
+    expect(result.success).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    try {
-      const result = await sendStaffApplicationAlert({ ...baseApplication, ...overrides });
-      expect(result.success).toBe(true);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-      return JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
-    } finally {
-      fetchSpy.mockRestore();
-      if (originalEnv) {
-        process.env.RESEND_API_KEY = originalEnv;
-      } else {
-        delete process.env.RESEND_API_KEY;
-      }
-    }
+    return JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
   }
 
   it("states the applicant's own notes in BOTH halves, not only the plain text", async () => {

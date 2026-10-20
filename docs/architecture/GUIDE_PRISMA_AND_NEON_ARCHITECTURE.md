@@ -91,38 +91,15 @@ A frequent point of confusion is whether the application uses **Prisma** or **Ne
 
 ## 4. How Neon and Prisma Connect in the Codebase
 
-### Connection Architecture ([`src/lib/prisma.ts`](file:///c:/Users/User/pet-shelter/src/lib/prisma.ts))
-In this project, Prisma 7 uses `@prisma/adapter-pg` combined with the Node.js `pg` driver to connect directly to Neon with SSL and pool management:
-
-```typescript
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
-import { resolveDatabaseSsl } from "./databaseSsl";
-
-function createPrismaClient(): PrismaClient {
-  const connectionString =
-    process.env.DATABASE_URL ||
-    "postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public";
-
-  // Verified TLS for a public host such as Neon; see src/lib/server/databaseSsl.ts
-  const sslPolicy = resolveDatabaseSsl(connectionString);
-  
-  // Reusable pool to prevent socket exhaustion during serverless reloads
-  const pool = new Pool({
-    connectionString: sslPolicy.connectionString,
-    ssl: sslPolicy.ssl,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  });
-
-  const adapter = new PrismaPg(pool);
-  return new PrismaClient({ adapter });
-}
-
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
-```
+### Connection Architecture (`src/lib/server/prisma.ts`)
+In this project, Prisma 7 uses `@prisma/adapter-pg` with the Node.js `pg` driver to connect
+directly to Neon, with verified TLS and a connection pool. `createPrismaClient` in
+`src/lib/server/prisma.ts` is the source, and Procedure D in
+`docs/runbooks/RUNBOOK_PRISMA_DATABASE_SETUP.md` lists what it sets. In short: no `DATABASE_URL`
+gives an offline client that refuses every query with P1001 and opens no socket, with no
+localhost fallback (`tasks/decisions/2026-10-20-no-database-url-means-no-database.md`); a
+`DATABASE_URL` gives a pool of up to 10 connections whose TLS `resolveDatabaseSsl`
+(`src/lib/server/databaseSsl.ts`) decides.
 
 ---
 

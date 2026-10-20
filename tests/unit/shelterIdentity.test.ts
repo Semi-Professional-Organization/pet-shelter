@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
@@ -14,6 +14,10 @@ import {
   STATUTORY_ROS_REGISTRATION_NO,
   currentIssuerIdentity,
 } from "@/lib/domain/shelterIdentity";
+
+// The module reads ROS_REGISTRATION_NO once, when the import above loads it. That load sees the
+// variable unset, and so the default the tests below pin, because tests/setup/hermeticEnv.ts
+// deletes it before any test file loads, whatever the shell exports.
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
 const SRC = join(ROOT, "src");
@@ -42,11 +46,6 @@ function offendersOutsideOwner(pattern: RegExp): string[] {
   }
   return offenders;
 }
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  vi.resetModules();
-});
 
 describe("statutory identifiers", () => {
   it("exposes the LHDN Subsection 44(6) approval reference", () => {
@@ -82,6 +81,8 @@ describe("the unresolved ROS registration discrepancy (P2)", () => {
   });
 
   it("can be corrected by configuration, without a code deploy", async () => {
+    // The one test that needs a fresh module: the override is read at load, so only a re-import
+    // can see it.
     vi.resetModules();
     vi.stubEnv("ROS_REGISTRATION_NO", "PPM-012-10-18042016");
 

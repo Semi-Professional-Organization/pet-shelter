@@ -87,6 +87,10 @@ export function usePetTableController(initialPets?: (Pet & { applicationCount?: 
     setIsFormOpen(true);
   };
 
+  // `PetFormDialog` awaits this and reads a rejection as "nothing was saved", unlocking Save for
+  // another try. So once the local store has changed, nothing here may reject, and nothing can:
+  // the store persists inside its own try/catch, the server action returns a promise whose
+  // failure the rollback handles, and the `setLocalPets` updaters run at render, not here.
   const handleFormSubmit = async (
     data: PetFormInput,
     notification?: PhotoNotificationOptions

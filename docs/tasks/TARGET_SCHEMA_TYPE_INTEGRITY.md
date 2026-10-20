@@ -115,7 +115,8 @@ by a Docker Desktop restart. Windows 11 **Home** rules out the Hyper-V backend a
 
 **Also landed since the review**: `PLAN_LIB_RESTRUCTURE` (`f75de27`) split the 883-line
 `serverStore.ts` into `src/lib/server/{petRepository,applicationRepository,petMappers,
-rehabNeedsCatalog,faqCatalog,fallbackState}.ts`. File references below use the new layout, and
+rehabNeedsCatalog,faqCatalog,fallbackState}.ts` (`fallbackState.ts` was removed on 2026-10-20:
+each store now registers its own reset with `src/lib/stateResets.ts`). File references below use the new layout, and
 `tests/unit/layerBoundaries.test.ts` now also guards that no `"use client"` module imports
 `src/lib/server/`. `donationLedger.ts` deliberately sits *outside* that directory — it is repository
 layer, but not dual-layer.

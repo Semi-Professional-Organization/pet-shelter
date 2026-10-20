@@ -9,6 +9,7 @@ import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError } from "@/lib/persistenceMode";
+import { registerStateReset } from "@/lib/stateResets";
 
 /**
  * FAQ reads and writes over the repository layer.
@@ -61,10 +62,12 @@ function freshFaqs(): FaqRecord[] {
 
 let serverFaqs: FaqRecord[] = freshFaqs();
 
-/** Test-only. Reached through `resetServerStore()` in `./fallbackState`. */
+/** Test-only. Registered below for the test harness. */
 export function resetFaqs(): void {
   serverFaqs = freshFaqs();
 }
+
+registerStateReset("faqs", resetFaqs);
 
 interface DbFaqRow {
   id: string;

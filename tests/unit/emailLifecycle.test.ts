@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   sendApplicationStatusUpdateEmail,
   sendInterviewInvitationEmail,
@@ -27,6 +27,13 @@ describe("Transactional Email Lifecycle & Meet & Greet Scheduling", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Simulation mode, which every test but the failure one asserts on or needs to succeed
+    // without a network. The mailer tests the key for truthiness, so an empty string is unset.
+    vi.stubEnv("RESEND_API_KEY", "");
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("dispatches APPROVED status update email and logs immutable audit trail", async () => {
@@ -95,11 +102,10 @@ describe("Transactional Email Lifecycle & Meet & Greet Scheduling", () => {
   });
 
   it("logs EMAIL_FAILED in audit trail when network or API fails", async () => {
-    const originalEnv = process.env.RESEND_API_KEY;
-    process.env.RESEND_API_KEY = "test_key_fail";
-
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response("Invalid API key", { status: 401 })
+    vi.stubEnv("RESEND_API_KEY", "test_key_fail");
+    // A fresh Response for every call, because a body can be read only once.
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response("Invalid API key", { status: 401 })
     );
 
     const result = await sendApplicationStatusUpdateEmail(sampleApp, "APPROVED");
@@ -110,12 +116,5 @@ describe("Transactional Email Lifecycle & Meet & Greet Scheduling", () => {
     const failLog = logs.find((l) => l.action === "EMAIL_FAILED" && l.entityId === sampleApp.id);
     expect(failLog).toBeDefined();
     expect(failLog?.details?.error).toContain("401");
-
-    fetchSpy.mockRestore();
-    if (originalEnv) {
-      process.env.RESEND_API_KEY = originalEnv;
-    } else {
-      delete process.env.RESEND_API_KEY;
-    }
   });
 });

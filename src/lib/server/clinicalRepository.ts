@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/server/prisma";
 import { handlePersistenceError } from "@/lib/persistenceMode";
+import { registerStateReset } from "@/lib/stateResets";
 
 export interface VeterinarianRecord {
   id: string;
@@ -247,3 +248,5 @@ export async function getMedicalProcedureCategories(): Promise<MedicalCategoryRe
 export function resetClinicalStore(): void {
   inMemoryAssignments = [];
 }
+
+registerStateReset("clinical", resetClinicalStore);

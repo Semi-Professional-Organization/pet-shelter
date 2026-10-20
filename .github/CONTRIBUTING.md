@@ -246,6 +246,27 @@ Before hitting "Create Pull Request", verify:
 - Request re-review after addressing feedback
 - Polite disagreement is okay—explain your reasoning clearly
 
+### Merging into `master`
+
+`master` takes changes only through a pull request, squash-merged, once six checks pass:
+`Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
+`Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`.
+`Production build` is the last to be required, once the job that runs it is on `master`. Vercel's
+preview status is not one of them: Vercel decides whether to deploy a commit by who wrote it, so
+it may never report on a pull request that Dependabot opens. No approval is required. Nobody can
+push, force-push or delete `master` directly, maintainers included. The rule is the repository ruleset "Basic" (Settings → Rules →
+Rulesets). **It is not switched on yet**: until it is, nothing enforces this section, and
+[`tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`](../tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md)
+holds the change to make. The reasons are in
+[`tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md`](../tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md).
+
+- **Renaming a CI job renames its check.** The rename cannot merge until the ruleset requires the
+  new name, so update the ruleset just before merging it, then merge `master` into any other open
+  pull request so that it reports the new name too.
+- **When a check is down rather than red** (a GitHub or Vercel outage), a maintainer can set the
+  ruleset's enforcement to Disabled, merge, and set it back to Active. Merging a red pull request
+  is not that case: it is how `master` broke twice in September 2026.
+
 ---
 
 ## Common Patterns & Anti-Patterns

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pet, PetStatus } from "@/types/pet";
@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, X, Loader2, Star, Eye, Send } from "lucide-react";
+import { AlertCircle, Plus, X, Loader2, Star, Eye, Send } from "lucide-react";
 import type { PhotoNotificationOptions } from "@/actions/pets";
 import {
   AGE_BANDS,
@@ -41,7 +41,16 @@ interface PetFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingPet?: Pet | null;
-  onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void;
+  /**
+   * Takes the form once per opening. The dialog waits for it (an async handler's promise) and
+   * then asks to close, keeping Save locked until it opens again, so a parent that keeps it open
+   * after a save must close and reopen it, with the closed dialog rendered in between. A handler
+   * that throws or rejects is taken to have saved nothing: Save unlocks for another try and the
+   * dialog stays open. So a handler that may already have saved must resolve, and report its
+   * failure itself, or a retry saves twice.
+   * (`tasks/decisions/2026-10-20-the-pet-form-locks-save-until-it-opens-again.md`)
+   */
+  onSave: (data: PetFormInput, notification?: PhotoNotificationOptions) => void | Promise<void>;
 }
 
 export function PetFormDialog({
@@ -99,8 +108,36 @@ export function PetFormDialog({
   const [prevKey, setPrevKey] = useState<string | null>(null);
   const currentKey = open ? (editingPet ? `edit-${editingPet.id}` : "create-new") : null;
 
+  // Set by the first submit and cleared only when the dialog opens again. The
+  // dialog stays mounted while it animates closed, and a click in that window
+  // must not hand the same form to `onSave` twice: that is two pet records.
+  // (A fast double-click is already stopped by `isSubmitting`, which
+  // react-hook-form sets on the first click.) The ref is the guard, read
+  // synchronously, so two submits dispatched before a re-render cannot both
+  // pass; the state is what locks the button.
+  const submittedRef = useRef(false);
+  const [submitted, setSubmitted] = useState(false);
+  // Shown when `onSave` fails before taking the form, so a retry is a decision, not a guess.
+  const [saveFailed, setSaveFailed] = useState(false);
+  // Which opening this is, so a save that settles after the dialog was closed and
+  // opened again cannot close or unlock the new opening.
+  const openingRef = useRef(0);
+  useLayoutEffect(() => {
+    // Here rather than beside `setSubmitted(false)` below, since a ref must not
+    // be written during render; and a layout effect, so the ref is cleared in the
+    // same commit as the button, before the reopened dialog can be used.
+    if (currentKey !== null) {
+      submittedRef.current = false;
+      openingRef.current += 1;
+    }
+  }, [currentKey]);
+
   if (currentKey !== prevKey) {
     setPrevKey(currentKey);
+    if (currentKey !== null) {
+      setSubmitted(false);
+      setSaveFailed(false);
+    }
     // Reset alongside every other per-pet field. Without this, a caregiver note
     // typed for one animal survives closing the dialog and would be emailed to a
     // different animal's supporters.
@@ -279,19 +316,42 @@ export function PetFormDialog({
   const canNotifySponsors = Boolean(editingPet) && newlyAddedPhotos.length > 0;
 
   const onSubmit = async (data: PetFormInput) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    setSubmitted(true);
+    setSaveFailed(false);
+    const opening = openingRef.current;
     // Update with current image selections
     const finalData = {
       ...data,
       image: primaryImage || data.image,
       galleryImages: galleryImages.map((img) => img.url),
     };
-    await new Promise((r) => setTimeout(r, 400));
-    onSave(
-      finalData as PetFormInput,
-      canNotifySponsors
-        ? { notifySponsors, caption: caregiverCaption.trim() || undefined }
-        : undefined
-    );
+    try {
+      // Awaited, so a handler that fails before taking the form is caught whether it throws or,
+      // being async, rejects. The table's handler applies the change locally and syncs with the
+      // server in the background, so this settles at once and the dialog closes as before.
+      await onSave(
+        finalData as PetFormInput,
+        canNotifySponsors
+          ? { notifySponsors, caption: caregiverCaption.trim() || undefined }
+          : undefined
+      );
+    } catch (error) {
+      // Reported rather than left unhandled. If this is still the opening that saved, the
+      // dialog stays open: unlock it so the operator can try again.
+      console.error("[PetFormDialog] onSave failed before taking the form:", error);
+      if (openingRef.current === opening) {
+        submittedRef.current = false;
+        setSubmitted(false);
+        setSaveFailed(true);
+      }
+      return;
+    }
+    // A save that settles after the dialog was closed and opened again belongs to the earlier
+    // opening: closing now would throw the new one away.
+    if (openingRef.current !== opening) return;
+    // The form closes itself, so the lock set above lasts only while it animates out.
     onOpenChange(false);
   };
 
@@ -758,13 +818,23 @@ export function PetFormDialog({
             </div>
           </div>
 
+          {saveFailed && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 border border-destructive/40 bg-destructive/10 px-4 py-3 rounded-xl text-sm text-destructive"
+            >
+              <AlertCircle className="size-4 mt-0.5 shrink-0" />
+              <span>The pet record was not saved. Check the form and try again.</span>
+            </div>
+          )}
+
           {/* Submit */}
           <div className="border-t border-border pt-5 flex justify-end gap-3">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="text-sm font-semibold px-5">
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="text-sm font-semibold px-7">
-              {isSubmitting ? (
+            <Button type="submit" disabled={isSubmitting || submitted} className="text-sm font-semibold px-7">
+              {isSubmitting || submitted ? (
                 <>
                   <Loader2 className="size-4 animate-spin mr-1.5" />
                   Saving...

@@ -93,6 +93,169 @@ Deliberately not done, and why:
   two want the server's list as the board's source of truth, a restructure rather than a fix:
   `tasks/open/applications-board-shows-its-own-copy-after-a-change.md`.
 
+# CI speed and a protected master, not yet switched on
+
+**Branch:** `claude/project-thread-2ne14n` · opened 2026-10-20 · base `f1f448a` · PR #140, draft
+
+The owner asked for the fastest, most secure CI a two-person team should run, and for sharding,
+consensus and canary releases to be considered. A measured audit came first, delivered in the
+project thread as `ci-review-2026-10-19.md`. The owner approved it and asked for the details to
+be critiqued before building, then asked to push cleanly and stop before merging.
+
+- [x] A seed hash cache was built and measured here, then dropped when #141 precomputed the
+      hashes, which removes the same cost and its failure path.
+- [x] `Commit messages` runs in its own workflow, again whenever the title is edited. Pull
+      requests that Dependabot opens skip the commit audit but not the title check.
+- [x] Actions pinned to commits at their current majors; `ubuntu-24.04`; read-only permissions;
+      no persisted token in `ci.yml`.
+- [x] Node 24, read from `.nvmrc` by every workflow.
+- [x] A `Production build` job and a `Doc invariants` step. `master` runs are never cancelled.
+      Playwright installs only the headless shell, and its report uploads on every run.
+- [x] Dependabot: Actions weekly, grouped, a week behind each release; npm security updates only.
+- [ ] The master ruleset is decided but not switched on, because the owner asked to stop first.
+      The payload and its kill condition are in
+      `tasks/open/the-five-check-master-ruleset-must-not-block-a-green-pull-request.md`.
+- [ ] Dependabot alerts and security updates are off, and switching them on is the owner's step.
+
+## Review
+
+**Verified:** PR #140's CI at `1ef6a0c`, 8 of 8 checks green, on Node 24 and `ubuntu-24.04`.
+Wall clock was 126 s, against 2.5 to 4.5 minutes before. The unit, integration and component job
+took 114 s (150–235 s before), of which its suites took 72 s (193 s). `Production build` took
+51 s. Playwright took 122 s, its Chromium step 19 s (22 s), and a 234 KB report uploaded from a
+green run. On one machine and tree, the unit project went from 130.4 s to 54.4 s. Local gates at
+the last code change: `typecheck` 0, `lint` 0 errors, `docs:check` OK, `build` exit 0, `test`
+1,935 passed, `test:components` 228, `test:integration` 92.
+
+**Kill conditions.** K-A4 did not fire. On one head commit, editing the title to a lowercase
+summary started a new `Commit messages` run that failed on rule 3, and restoring the title started
+one that passed; each event produced exactly one run. K-A1 was retired unevaluated, when review
+removed the `Vercel` requirement it guarded. Its successor, K-A1′, waits for the ruleset.
+
+**Review.** Two `/code-review high` rounds. Round 1 found seven issues. Five were fixed: the build
+check moved into CI, Node 24, `overwrite`, retry after a failed derivation in both stores, and a
+comment. The other two were already planned or accepted. Round 2 found seven. Two in-scope
+wording errors were fixed: npm security updates depend on a setting that is off, and five checks
+apply now with a sixth after merge. The rest were recorded and declined. Offline `initPromise`
+stickiness was pre-existing; #141 removed it by precomputing the hashes. Long Dependabot titles are an
+accepted edge. Precomputed hashes belong to the follow-up branch. The stale claim lines went
+with the claim file. There was no third round, per the owner's scope rule relayed on 2026-10-20.
+
+**Deliberately not done:**
+
+- The ruleset and the Dependabot settings are not switched on: the owner asked to stop before
+  merging, and both are the owner's steps.
+- No sharding, approvals, merge queue, canary or browser cache:
+  `tasks/decisions/2026-10-20-ci-skips-sharding-merge-queues-and-canary-releases.md`.
+- `engines.node` stays an open range: pinning it changes what Vercel deploys.
+- The API conformance linter (5 errors on `master`) and the always-green "Layer boundaries" step
+  were left to the scripts thread's catalogue of unwired checks.
+- The hash cache was dropped once #141 merged first, by a merge commit rather than a rewrite.
+# The test suite runs hermetic and pays only for what a test uses
+
+**Branch:** `claude/project-thread-jdktt3` · opened 2026-10-20 · base `f1f448a`
+
+From the measured plan in the "Test suite redesign plan" doc (owner said "go" on all five
+recommendations). Local `test:all` on this machine: 192-216 s on master, about 52 s here. The
+cause of the local-only failures was never test order: it was per-test scrypt in the shared hook,
+tests reaching whatever listened on `localhost:5432`, cold imports under a 5 s timeout, and the
+developer shell leaking in.
+
+- [x] `prisma.ts`: no `DATABASE_URL` means an offline client (lazy P1001 refusals, no socket).
+- [x] Demo seed password hashes are constants, with a test that each verifies its password.
+- [x] Store resets register themselves (`src/lib/stateResets.ts`); the hook imports nothing.
+- [x] `tests/setup/hermeticEnv.ts` scrubs the shell env (list in `ambientVariables.ts`, held to
+      what `src/` reads by a guard test); `hermeticRuntime.ts` pins `NODE_ENV` and the time zone
+      (UTC; `Asia/Kuala_Lumpur` for components) and blocks `fetch` in every tier; `unstubEnvs`, `unstubGlobals`, `requireAssertions`,
+      `passWithNoTests: false`.
+- [x] `npm test` regenerates the Prisma client only when the schema changed.
+- [x] `setupUser()` types with `delay: null`; `PetFormDialog` lost its artificial 400 ms delay.
+- [x] Env hygiene in 9 files (`vi.stubEnv` instead of hand-assigned `process.env`).
+- [x] Four authorization tests that passed for the wrong reason now pass the real check, each
+      proven to fail when authorization refuses. 18 tests that could not fail were removed and
+      6 repaired (Hero count-up, pledge-ref suffix, sponsor dispatch), each repair mutation-checked.
+- [x] Closed `unit-tests-write-to-whatever-is-on-localhost-5432` and
+      `unit-suite-is-order-dependent-in-both-directions`. The latter's `volunteerForm` lead turned
+      out to be seven suites authorized by the DAL's fallback, re-filed on its own (below).
+
+## Review
+
+**Verified on this branch:** `tsc --noEmit` exit 0. `npm run lint` 0 errors (13 warnings, all in
+lines this branch does not touch). `npm run docs:check` OK. `npm run build` exit 0 with throwaway
+secrets and no `DATABASE_URL`. `npm test` 110 files, 1,953 tests, 18 to 26 s (pre-test hook
+skipped the regeneration). Unit, integration and component suites together, after merging
+master at `474abbe`: 138 files, 2,321 tests, 40 to 52 s (master: 192 to 216 s). Shuffled test
+order (`--sequence.shuffle`, three seeds over the unit tier) passes too.
+
+**Review:** eighteen `/code-review` rounds over the whole diff raised 144 findings; each through
+round 17 was fixed, or checked by probe and answered, in the commit after it. The owner stopped the
+loop after round 18 under the new scope rule; its six minor findings are listed in PR #141, not
+fixed. Why it took so long: `tasks/lessons/2026-10-20-a-dismissed-finding-comes-back-until-the-answer-is-where-the-reviewer-reads.md`. Round 4 made `typecheck` hold the offline client's method list to
+the generated client, removed a `createPrismaClient` fallback that Prisma 7 refuses, and made the
+env guard fail on any `process.env` read it cannot name. Round 5 retired `resetServerStore()`
+(the registry already resets those six stores), made the app warn at start when it has no
+database while the CLI still defaults to localhost, and guarded the pet form with a ref so two
+submits before a re-render save once. Round 6 moved the components tier to `Asia/Kuala_Lumpur`
+(it stands in for the users' browsers; server tiers stay UTC), gave the offline client one
+delegate per model, and split the stale-client checks into `scripts/lib/prismaClientState.mjs`
+so the script needs no run-directly test. It also surfaced a product bug, filed rather than fixed
+here: `tasks/open/admin-date-defaults-use-the-utc-day.md`. Round 7 put the member-lookup double in
+one helper (`findMemberRow`), made the Silver caretaker test assert the gate itself, and brought
+the docs in line with the components tier's zone. Round 8 sent `npm run build` through the stale
+check too, fixed that check for a string ending in an escaped backslash, kept the 10 s connect
+timeout when its variable is empty, froze the staff seeds, unlocked the pet form when `onSave`
+throws, and gave `adminPetsAuthorization` the one test there the DAL's fallback cannot pass: a
+valid cookie for a member the database does not hold. Round 9 made the pet form await `onSave`, so
+the table's async handler failing unlocks Save instead of leaving an unhandled rejection, froze the
+sponsor seeds as well, and pinned the `forks` pool the per-project time zone depends on. Round 10
+kept an explicit `DB_CONNECT_TIMEOUT_MS=0`, made `petHistory`'s transaction double run callbacks as
+the shared one does, recorded the pet form's lock and its contract with parents
+(`tasks/decisions/2026-10-20-the-pet-form-locks-save-until-it-opens-again.md`), and filed the
+machine-locale gap (`tasks/open/default-locale-formatting-differs-between-machines.md`). Round 11
+made the offline client plain objects (spies and stubs on it now work, as on the real client),
+stopped caching it across dev reloads, kept a save that settles after a reopen from closing the
+new opening, and took the staff plaintext passwords out of the exported seed table. Round 12 made
+every tier without a database refuse sockets as well as `fetch`, so a test that stubs a
+`DATABASE_URL` and forgets to mock Prisma fails instead of reaching a local Postgres; keyed the
+cached client and pool to the URL they were built from; scrubbed the `PG*` variables `pg` reads;
+and replaced the runbook's and the guide's copies of `createPrismaClient` with what to check.
+Round 13 registered the three store resets the old harness never ran either (clinical,
+transparency, secret warnings) and added a guard that fails on any exported `reset*` left
+unregistered; `disconnectPrisma` now forgets the cached client, and a negative connect timeout
+falls back to 10 s. Round 14 made the stale check read a schema removed mid-check as stale and
+count the query compiler as part of a complete client, tightened the reset guard to real
+registration lines, and moved `petHistory` onto the shared `wireTransaction`. Round 15 made
+`disconnectPrisma` close a cached client that is not the module's own, wrote down why the pet
+table's save handler cannot reject after changing the store, and filed the same save-twice gap
+in the FAQ and bulletin dialogs (`tasks/open/faq-and-bulletin-dialogs-can-save-twice-while-closing.md`).
+Round 16 made a failed save visible in the pet form, closed `TARGET_PERSISTENCE_TARGETING`'s P-1,
+and recorded why repositories do not each check for a database. Round 17 corrected the operational
+runbook's `DATABASE_URL` row and marked the guard's one silent case as a ceiling. Not done, and
+filed: one shared walker for the eight tests that read `src/`
+(`tasks/open/tests-that-read-src-each-walk-it-their-own-way.md`), and scrubbing the environment in
+`integration-db`, which cannot be run here
+(`tasks/open/integration-db-tier-reads-the-developer-environment.md`).
+
+**Seen once, not explained:** `sponsorAuth.test.ts` failed as a whole file in one of four
+`npm test` runs made beside `npm run build`, and the error text was lost; filed as
+`tasks/open/sponsor-auth-file-failed-once-under-a-concurrent-build.md`.
+
+**Not verified here:** `npm run test:db`. The Prisma CLI's `db push` is refused to agents on this
+machine and no local Postgres runs, so the database tier is CI's to check. It now runs with
+`requireAssertions` and `passWithNoTests: false`; the one conditional assertion it has
+(`schemaIntegrity`, "leaves rehab columns null") asserts whenever the catalogue is seeded,
+which the CI job does first.
+
+**Deliberately not done (next PR):** the local database tier on embedded Postgres (owner said
+yes; blocked here by the same `db push` refusal, so it needs a run on CI or by a human), the
+`guards` project with a shared file index, and `npm run test:related`. Not done at all:
+`isolate: false` (179 failures from per-file mocks), Vitest's experimental `fsModuleCache`,
+happy-dom, and raising `hookTimeout`. Gaps filed in `tasks/open/`:
+`seven-unit-suites-are-authorized-by-the-dal-fallback.md` (measured: making the fallback refuse
+fails exactly those seven and the DAL's own test),
+`test-admin-shares-an-id-with-a-seeded-staff-account.md`,
+`behaviours-the-deleted-hollow-tests-claimed-to-cover.md`, and the two above.
+
 # A short staff invite code no longer takes the site down
 
 **Branch:** `fix/invite-code-any-length` · opened 2026-10-17 · base `d6dd030`

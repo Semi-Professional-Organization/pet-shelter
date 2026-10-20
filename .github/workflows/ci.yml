@@ -5,28 +5,50 @@ on:
     branches: [master, main]
   pull_request:
 
-# A new push supersedes an in-flight run on the same ref. Playwright and the
-# jsdom suite are the slow jobs, and there is no value in finishing them for a
-# commit that has already been replaced.
+# Read-only for every job. The repository default is read-only as well, but a workflow that states
+# its own permissions keeps them when that setting changes.
+permissions:
+  contents: read
+
+# A new push to a pull request supersedes the run in flight on it. Playwright and the jsdom suite
+# are the slow jobs, and there is no value in finishing them for a commit that has already been
+# replaced. A push to master is never cancelled: every master commit is a production deploy, and
+# while master shared one group, 13 of 100 master runs were cancelled by the next merge, leaving
+# those deploys with no verdict. Keying master runs on the commit gives each one its own group.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
-env:
-  # Every tier except `integration-db` is designed to run with no database at
-  # all, which is also how the application behaves. Only the job that needs
-  # Postgres provisions it.
-  NODE_VERSION: "22"
+# Every tier except `integration-db` is designed to run with no database at
+# all, which is also how the application behaves. Only the jobs that need
+# Postgres provision it.
+#
+# Node comes from `.nvmrc`, the one copy every workflow reads. It names the major that Vercel
+# deploys: `engines.node` in package.json is an open range, which Vercel resolves to the newest
+# major it supports. See tasks/open/productions-node-version-is-documented-not-observed.md.
 
+# Each job's `name` is a required status check in the repository ruleset "Basic" (Settings →
+# Rules → Rulesets). Renaming a job blocks every pull request until the ruleset names it too.
+#
+# `ubuntu-24.04` rather than `ubuntu-latest`: the label moves to Ubuntu 26.04 gradually between
+# 2026-10-19 and 2026-11-19 (actions/runner-images#14748), so two runs of one commit could see
+# different images. Move every job deliberately, in one change.
+#
+# Actions are pinned to a commit, with the release as a comment. Dependabot keeps both current
+# (.github/dependabot.yml).
 jobs:
   static:
     name: Static & architecture analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          # No step here needs the token, and `npm ci` runs install scripts from the
+          # registry. The same holds for every job in this file.
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       # `postinstall` already runs this, but an npm cache hit can skip it and
@@ -38,46 +60,46 @@ jobs:
         run: npx tsc --noEmit
       - name: Layer boundaries
         run: node docs/architecture/layer-graph.mjs
+      - name: Doc invariants
+        run: npm run docs:check
 
-  commits:
-    name: Commit messages
-    runs-on: ubuntu-latest
-    # Only the commits this PR adds. The 203 commits that predate
-    # docs/reference/COMMIT_MESSAGES.md are grandfathered — re-linting them would
-    # fail every run for messages nobody is writing any more.
-    if: github.event_name == 'pull_request'
+  # The commit-message check is .github/workflows/commit-messages.yml, so that a title edit can
+  # rerun it without rerunning everything here.
+
+  # The production build, which no other job runs: typecheck and lint pass code that
+  # `next build` still rejects. Vercel builds every push as well, but its status is not a
+  # required check. Vercel decides whether to deploy a commit by who wrote it, so a check that
+  # depended on it could stay pending forever on a pull request that Dependabot opens.
+  build:
+    name: Production build
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The default shallow clone has no base branch to diff against.
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
-      # No `npm ci`: the linter is dependency-free Node on purpose, so this job
-      # reports in seconds and cannot be broken by an install failure.
-      - name: Lint the commits this pull request adds
-        run: node scripts/commit-msg.mjs --audit --strict --verbose origin/${{ github.base_ref }}..HEAD
-      # This repository squash-merges, so the commits linted above are discarded
-      # and the pull request title becomes the only message that reaches master.
-      # It was the one message the standard did not govern: e622249 landed on
-      # master failing both subject-length and capitalize.
-      #
-      # The title is untrusted input, so it goes through the environment rather
-      # than `run:` interpolation, which would let a crafted title inject shell.
-      - name: Lint the pull request title (the squash-merge subject)
-        env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | node scripts/commit-msg.mjs --stdin
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `next build` runs as production, where the app refuses to start without its
+      # secrets. Random throwaway values satisfy that, and nothing built here is deployed.
+      # With no DATABASE_URL, pages that read the database render their offline fallback.
+      - name: Build
+        run: |
+          SESSION_SECRET="$(openssl rand -hex 32)" ADMIN_SECRET_KEY="$(openssl rand -hex 32)" \
+            npm run build
 
   unit-and-components:
     name: Unit, integration & component tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -88,7 +110,7 @@ jobs:
 
   database:
     name: Strict persistence against Postgres
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:17
@@ -111,10 +133,12 @@ jobs:
       # probes failed 28P01 against a database that was running fine.
       DATABASE_URL: postgresql://postgres:postgrespassword@localhost:5432/pet_shelter?schema=public
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -131,7 +155,7 @@ jobs:
 
   e2e:
     name: Playwright golden paths
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:17
@@ -157,10 +181,12 @@ jobs:
       SESSION_SECRET: ci-only-session-secret-not-used-anywhere-else-0000
       E2E_PORT: "3100"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - run: npx prisma generate
@@ -171,15 +197,24 @@ jobs:
           npx prisma db push
           npm run db:seed
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        # The headless shell only: the specs run headless with `devices["Desktop Chrome"]` and no
+        # `channel`, which is what the shell serves, so the full Chrome build is never used.
+        # Not cached: half of this step is apt packages, which a cache cannot hold, and
+        # Playwright's CI guide advises against caching the browsers themselves.
+        run: npx playwright install --with-deps --only-shell chromium
       - name: Run the golden paths
         run: npm run test:e2e
-      - name: Upload the report on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
+      # Every run, not only a red one. CI retries a failed spec once (`retries` in
+      # playwright.config.ts), so a flaky spec leaves the job green, and a report kept only on
+      # failure would never show it.
+      - name: Upload the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: playwright-report
           path: |
             playwright-report/
             test-results/
           retention-days: 7
+          # A re-run of this job uploads under the same name, in the same workflow run.
+          overwrite: true

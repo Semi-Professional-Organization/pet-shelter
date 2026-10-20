@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import initialRehabNeeds from "@/data/rehabNeeds.json";
 import {
   rehabNeedSchema,
@@ -11,7 +11,6 @@ import {
   fetchRehabNeedsAction,
   getRehabNeedByIdAction,
 } from "@/actions/rehabNeeds";
-import { resetServerStore } from "@/lib/server/fallbackState";
 import {
   getServerRehabNeeds,
   getServerRehabNeedsAsync,
@@ -20,10 +19,6 @@ import {
 } from "@/lib/server/rehabNeedsCatalog";
 
 describe("Rehabilitation Needs Data Layer & Server Actions", () => {
-  beforeEach(() => {
-    resetServerStore();
-  });
-
   describe("Fixture & Schema Validation", () => {
     it("should export defined category enum constants", () => {
       expect(REHAB_NEED_CATEGORIES.length).toBeGreaterThan(0);

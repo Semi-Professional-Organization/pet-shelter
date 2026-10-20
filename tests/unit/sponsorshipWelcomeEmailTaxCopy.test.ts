@@ -4,9 +4,9 @@ import { reconciliationNotice } from "@/lib/domain/petSponsorship";
 
 describe("identifier-free sponsorship welcome email", () => {
   it("makes no Section 44(6) or tax-exempt promise in either rendered half", async () => {
-    const previousApiKey = process.env.RESEND_API_KEY;
-    process.env.RESEND_API_KEY = "test_key";
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+    vi.stubEnv("RESEND_API_KEY", "test_key");
+    // Every call, not only the first, so a second send cannot fall through to an unstubbed fetch.
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({ id: "resend-msg-test" }),
     } as unknown as Response);
@@ -57,11 +57,6 @@ describe("identifier-free sponsorship welcome email", () => {
       }
     } finally {
       fetchSpy.mockRestore();
-      if (previousApiKey === undefined) {
-        delete process.env.RESEND_API_KEY;
-      } else {
-        process.env.RESEND_API_KEY = previousApiKey;
-      }
     }
   });
 });
