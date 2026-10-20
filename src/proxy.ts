@@ -3,6 +3,7 @@ import { SESSION_COOKIE_NAME, unsealSession } from "@/lib/security/sessionToken"
 import { canOpenAdminSection, type AdminSectionHref } from "@/lib/security/adminSections";
 import { EMAIL_BRAND, EMAIL_TONE } from "@/lib/presentation/emailTokens";
 import { FORBIDDEN_COPY } from "@/lib/presentation/accessDenialCopy";
+import { escapeHtml } from "@/lib/presentation/escapeHtml";
 
 /**
  * Pre-render authorization for privileged admin routes.
@@ -66,10 +67,6 @@ const GUARDED_SECTIONS: AdminSectionHref[] = ["/admin/members"];
  */
 const STALE_ROLE_HINT = "If your role was changed since you signed in, sign out and sign in again.";
 
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 function forbiddenResponse(): NextResponse {
   // Deliberately minimal: this is a network-boundary rejection, and the styled
   // in-app equivalent is src/app/forbidden.tsx, whose words it shares.
@@ -92,7 +89,7 @@ function forbiddenResponse(): NextResponse {
 <p style="font-size:.75rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${EMAIL_TONE.danger.text};margin:0 0 .5rem">${escapeHtml(FORBIDDEN_COPY.label)}</p>
 <h1 style="font-size:1.5rem;margin:0 0 .75rem">${escapeHtml(FORBIDDEN_COPY.heading)}</h1>
 <p style="font-size:.875rem;color:${EMAIL_BRAND.mutedForeground};margin:0 0 1.5rem">${escapeHtml(`${FORBIDDEN_COPY.body} ${STALE_ROLE_HINT}`)}</p>
-<a href="${FORBIDDEN_COPY.backHref}" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">${escapeHtml(FORBIDDEN_COPY.backLabel)}</a>
+<a href="${escapeHtml(FORBIDDEN_COPY.backHref)}" style="font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:${EMAIL_BRAND.foreground};border:1px solid ${EMAIL_BRAND.border};padding:.6rem 1rem;text-decoration:none">${escapeHtml(FORBIDDEN_COPY.backLabel)}</a>
 </main>
 </body>
 </html>`;
