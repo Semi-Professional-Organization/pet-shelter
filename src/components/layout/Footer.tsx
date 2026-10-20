@@ -1,6 +1,6 @@
 "use client";
 
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
+import { PUBLIC_ROS_REGISTRATION_NO, SHELTER_WHATSAPP_URL, SHELTER_WHATSAPP_DISPLAY, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import Link from "next/link";
 import { PawPrint, MapPin, Phone, Mail, Clock, MessageCircle } from "lucide-react";
 import { ThemeToggle } from "@/components/providers/ThemeToggle";
@@ -118,19 +118,19 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="size-4 text-foreground shrink-0" />
-                <a href="tel:+60378765432" className="text-foreground hover:underline font-semibold">
-                  03-7876 5432
+                <a href={`tel:${SHELTER_PHONE_TEL}`} className="text-foreground hover:underline font-semibold">
+                  {SHELTER_PHONE_DISPLAY}
                 </a>
               </li>
               <li className="flex items-center gap-2.5">
                 <MessageCircle className="size-4 tone-success tone-ink shrink-0" />
                 <a 
-                  href="https://wa.me/60123456789?text=Hi%20Hope%20for%20Strays%2C%20I%20have%20an%20enquiry%20regarding%20volunteering%20or%20fostering." 
+                  href={`${SHELTER_WHATSAPP_URL}?text=Hi%20Hope%20for%20Strays%2C%20I%20have%20an%20enquiry%20regarding%20volunteering%20or%20fostering.`} 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className="text-foreground hover:underline font-semibold"
                 >
-                  WhatsApp: +60 12-345 6789
+                  WhatsApp: {SHELTER_WHATSAPP_DISPLAY}
                 </a>
               </li>
               <li className="flex items-center gap-2.5">

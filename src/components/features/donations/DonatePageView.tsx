@@ -1,6 +1,6 @@
 "use client";
 
-import { LHDN_TAX_DEDUCTIBLE_REF, PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
+import { LHDN_TAX_DEDUCTIBLE_REF, PUBLIC_ROS_REGISTRATION_NO, SHELTER_PHONE_TEL, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 import React, { Suspense } from "react";
 import Link from "next/link";
 import {
@@ -291,10 +291,10 @@ export function DonatePageView({
                 </div>
                 <div>
                   <a
-                    href="tel:+60378765432"
+                    href={`tel:${SHELTER_PHONE_TEL}`}
                     className="font-mono font-bold text-foreground text-base hover:underline"
                   >
-                    03-7876 5432
+                    {SHELTER_PHONE_DISPLAY}
                   </a>
                   <p className="text-xs text-muted-foreground">info@hopeforstrays.org</p>
                 </div>
