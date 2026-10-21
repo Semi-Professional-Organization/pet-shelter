@@ -389,10 +389,38 @@ describe("suggestions", () => {
     expect(found).toContain("id:issuegroups");
   });
 
+  it("reads a path inside a markdown link as the same path written bare", () => {
+    const found = [...features(issue(9, { body: "see [src/lib/a.ts](src/lib/a.ts)" })).keys()];
+    expect(found.filter((f) => f.startsWith("path:"))).toEqual(["path:src/lib/a.ts"]);
+  });
+
   it("measures itself by hiding each grouped issue in turn", () => {
-    const { results, top1 } = evaluate(config, corpus);
+    const { results, right, wrong, unclear } = evaluate(config, corpus);
     expect(results).toHaveLength(4);
-    expect(top1).toBe(1);
+    expect([right, wrong, unclear]).toEqual([1, 0, 0]);
+  });
+
+  it("counts an issue that shares nothing as no clear group, not as a hit for the first group by name", () => {
+    const lonely = issue(6, { title: "zebra quokka" });
+    const { results, right, unclear } = evaluate({ groups: [group("aaa", [6, 1, 2]), group("agent-tooling", [3, 4])] }, [...corpus, lonely]);
+    expect(results.find((r: { number: number }) => r.number === 6)).toMatchObject({ rank: 1, clear: false });
+    expect(right).toBeLessThan(1);
+    expect(unclear).toBeGreaterThan(0);
+  });
+
+  it("leaves group parents out of the weights, so applying the grouping does not move a suggestion", () => {
+    const parent = parentFor(10, group("pet-form", [1, 2]), [1, 2]);
+    expect(suggest(config, [...corpus, parent], [corpus[4]])).toEqual(suggest(config, corpus, [corpus[4]]));
+  });
+});
+
+describe("standalone issues", () => {
+  it("says when a standalone issue is closed or gone, so the list does not go stale", () => {
+    const { notes } = planGroups({ groups: [group("a", [1])], standalone: [2, 3] }, [issue(1), issue(2, { state: "CLOSED" })], TARGET);
+    expect(notes).toEqual([
+      expect.stringMatching(/standalone #2 is not an open issue here/),
+      expect.stringMatching(/standalone #3 is not an open issue here/),
+    ]);
   });
 });
 

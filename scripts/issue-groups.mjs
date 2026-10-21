@@ -200,11 +200,19 @@ export function planGroups(config, issues, target) {
     removeUnwanted(key, parent);
     if (!isClosed(parent)) actions.push({ type: "close", key, number: parent.number });
   }
-  // Links out before links in, so a parent at GitHub's limit has room for what it gains; creates
-  // first, because a new parent's links need its id.
+  // Creates first, because a new parent's links need its id; removes before moves and adds, so a
+  // parent at GitHub's limit has room for what a removal frees. ceiling: moves keep file order, so a
+  // move into a full parent can still precede the move that empties a slot in it, and the run stops
+  // there; making room by hand and re-running finishes it. No group here is near 100.
   const phase = ["create", "reopen", "update", "remove", "move", "add", "close"];
   actions.sort((a, b) => phase.indexOf(a.type) - phase.indexOf(b.type));
 
+  for (const number of config.standalone ?? []) {
+    const issue = byNumber.get(number);
+    if (!issue || isClosed(issue) || parentNumbers.has(number)) {
+      notes.push(`standalone #${number} is not an open issue here (closed, a pull request, a parent or unused); drop it from the file.`);
+    }
+  }
   const listed = new Set([...wantedBy.keys(), ...(config.standalone ?? [])]);
   const unlinked = new Set(actions.filter((action) => action.type === "remove").map((action) => action.child));
   const ungrouped = issues
@@ -220,14 +228,15 @@ export const ref = (parent) => (typeof parent === "number" ? `#${parent}` : Stri
 // --- Suggestions --------------------------------------------------------------------------------
 
 const STOPWORDS = new Set(
-  ("the and for that this with from are was were not but its it's has have had all any can cannot " +
+  // Only words the tokenizer below can produce: three letters or more, no apostrophes.
+  ("the and for that this with from are was were not but its has have had all any can cannot " +
     "one two three four five six seven eight nine ten each every only also than then them they their " +
     "there here what when where which who whom why how does did done into onto over under out off " +
-    "per via vs yet still now new old same other more most less least such very just one's because " +
+    "per via yet still now new old same other more most less least such very just because " +
     "while before after again once both either neither nor own being been would could should will " +
     "may might must shall about above below between through during without within whose these those " +
-    "status open opened asserted read found code review reviews reasoned measured not fixed left " +
-    "pr entry tasks md see https github com blob master issue issues").split(/\s+/),
+    "status open opened asserted read found code review reviews reasoned measured fixed left " +
+    "entry tasks see https github com blob master issue issues").split(/\s+/),
 );
 
 /** The ledger mirror's marker and header line say the same thing on every ledger issue. */
@@ -249,7 +258,8 @@ export function features(issue) {
   // A repo-root directory only: not the `prisma/` in `@prisma/client` or the `docs/` deep in a path.
   const paths = text.match(/(?<![\w@/.-])(?:src|tests|scripts|prisma|docs|\.claude|\.github|\.codex)\/[\w.@[\]/-]+/g) ?? [];
   for (const raw of paths) {
-    const path = raw.replace(/[.:]+$/, "");
+    // Trailing punctuation, and the `]` of a markdown link around the path, are not part of it.
+    const path = raw.replace(/[.:\]]+$/, "");
     add(`path:${path.toLowerCase()}`, 2);
     // Every extension goes, so `issueGroups.test.ts` meets a backticked `issueGroups`.
     const base = path.slice(path.lastIndexOf("/") + 1).replace(/\..*$/, "");
@@ -334,30 +344,48 @@ export function rankGroups(number, vectors, groups, { exclude = null } = {}) {
 export const MIN_SCORE = 0.05;
 export const MIN_MARGIN = 0.01;
 
+const judge = ([best, next]) => ({
+  best,
+  next,
+  clear: Boolean(best) && best.score >= MIN_SCORE && (!next || best.score - next.score >= MIN_MARGIN),
+});
+
+/**
+ * Vectors over real issues only. A group parent repeats its summary and this script's header, so
+ * counting parents would shift every weight the moment the grouping is applied.
+ */
+const corpusVectors = (issues) =>
+  vectorise(new Map(issues.filter((issue) => !(hasLabel(issue) && keyFromMarker(issue.body))).map((issue) => [issue.number, features(issue)])));
+
 export function suggest(config, issues, candidates) {
-  const vectors = vectorise(new Map(issues.map((issue) => [issue.number, features(issue)])));
-  return candidates.map((issue) => {
-    const [best, next] = rankGroups(issue.number, vectors, config.groups);
-    const clear = best && best.score >= MIN_SCORE && (!next || best.score - next.score >= MIN_MARGIN);
-    return { number: issue.number, title: issue.title, best, next, clear };
-  });
+  const vectors = corpusVectors(issues);
+  return candidates.map((issue) => ({ number: issue.number, title: issue.title, ...judge(rankGroups(issue.number, vectors, config.groups)) }));
 }
 
-/** Leave-one-out over the file's own grouping: how often the top guess is the issue's real group. */
+/**
+ * Leave-one-out over the file's own grouping, judged as `--suggest` would print it: `right` is the
+ * share of issues whose clear proposal is their real group, `wrong` a clear proposal of another, and
+ * `unclear` the share printed as no clear group. `top2` ranks without the gate.
+ */
 export function evaluate(config, issues) {
-  const known = new Set(issues.map((issue) => issue.number));
-  const vectors = vectorise(new Map(issues.map((issue) => [issue.number, features(issue)])));
+  const vectors = corpusVectors(issues);
   const results = [];
   for (const group of config.groups) {
     for (const number of group.issues) {
-      if (!known.has(number)) continue;
+      if (!vectors.has(number)) continue;
       const ranked = rankGroups(number, vectors, config.groups, { exclude: number });
       const rank = ranked.findIndex((entry) => entry.key === group.key) + 1;
-      results.push({ number, actual: group.key, guess: ranked[0].key, rank });
+      results.push({ number, actual: group.key, guess: ranked[0].key, rank, clear: judge(ranked).clear });
     }
   }
   const share = (test) => (results.length === 0 ? 0 : results.filter(test).length / results.length);
-  return { results, top1: share((r) => r.rank === 1), top2: share((r) => r.rank <= 2) };
+  return {
+    results,
+    right: share((r) => r.clear && r.rank === 1),
+    wrong: share((r) => r.clear && r.rank !== 1),
+    unclear: share((r) => !r.clear),
+    top2: share((r) => r.rank <= 2),
+  };
 }
 
 // --- GitHub -------------------------------------------------------------------------------------
@@ -509,9 +537,16 @@ export function formatAction(action) {
 }
 
 // stderr is piped, not inherited: a refusal reaches the person once, in the error that stops the
-// run, and an expected NOT_FOUND prints nothing at all.
-const run = (command, args, input) =>
-  execFileSync(command, args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024, stdio: ["pipe", "pipe", "pipe"] }).trim();
+// run, and an expected NOT_FOUND prints nothing at all. The error carries gh's own words under a
+// one-line label, never the echoed command, whose GraphQL argument runs to many lines.
+const run = (command, args, input) => {
+  try {
+    return execFileSync(command, args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024, stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch (error) {
+    const said = String(error?.stderr ?? "").trim() || String(error?.message ?? error).split("\n").pop();
+    throw new Error(`${command} ${args.slice(0, 2).join(" ")} failed\n${said}`);
+  }
+};
 
 /** GitHub's answer for a number that is a pull request or no issue at all, as `gh` relays it. */
 export const isMissingIssueError = (error) => /Could not resolve to an Issue with the number of/.test(String(error?.message ?? error));
@@ -568,11 +603,13 @@ async function main(argv) {
   if (suggesting) {
     const write = (line) => process.stdout.write(`${line}\n`);
     if (evaluating) {
-      const { results, top1, top2 } = evaluate(config, issues);
-      write(`issue-groups: leave-one-out over ${results.length} grouped issues`);
-      write(`  top guess right: ${(top1 * 100).toFixed(1)}%   right group in top two: ${(top2 * 100).toFixed(1)}%`);
-      for (const miss of results.filter((r) => r.rank !== 1)) {
-        write(`  #${miss.number} is in ${miss.actual}, guessed ${miss.guess} (real group ranked ${miss.rank})`);
+      const { results, right, wrong, unclear, top2 } = evaluate(config, issues);
+      const pct = (share) => `${(share * 100).toFixed(1)}%`;
+      write(`issue-groups: leave-one-out over ${results.length} grouped issues, judged as --suggest prints them`);
+      write(`  right: ${pct(right)}   wrong: ${pct(wrong)}   no clear group: ${pct(unclear)}   real group in top two: ${pct(top2)}`);
+      for (const miss of results.filter((r) => !r.clear || r.rank !== 1)) {
+        const verdict = miss.clear ? `guessed ${miss.guess}` : `no clear group (leaning ${miss.guess})`;
+        write(`  #${miss.number} is in ${miss.actual}: ${verdict}, real group ranked ${miss.rank}`);
       }
       return;
     }

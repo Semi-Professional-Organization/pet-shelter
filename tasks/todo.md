@@ -32,8 +32,8 @@ the eleven groups were approved in the project thread before anything was built.
 ## Review
 
 Dry run against the live repository: 11 parents to create, 69 sub-issues to add, nothing else, with
-#130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69: 81.2% top guess, 92.8% in
-the top two.
+#130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69 as it prints them: 78.3%
+right, 14.5% wrong, 7.2% no clear group, real group in the top two for 92.8%.
 
 Deliberately not done: closing #130 and #131 (fixed by #144, the owner's call), settling #157 (its
 ruleset is active, but it is a ledger issue and closes only by moving its file), and fixing any of
@@ -53,6 +53,11 @@ repository matched by number alone, a linked closed issue read without its body,
 for `--apply`, and a parent at GitHub's 100 limit refusing an add the plan's own moves would have
 made room for. All fixed. Re-running live then hit GitHub's 500,000-node query cap (child labels),
 which no unit test could have shown; the child read no longer asks for labels.
+
+Round 3 found `--evaluate` scoring raw top guesses that `--suggest` prints as no clear group (81.2%
+became 78.3%), group parents counted in the suggester's weights, standalone numbers never checked,
+and refusal messages that quoted the whole GraphQL query. Fixed. Declined: more spellings in the
+ask-first rule (the ledger rule has the same two, by the decision that set it).
 
 # Every role lands on, is shown and is offered only what it can use
 
