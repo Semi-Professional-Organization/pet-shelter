@@ -82,6 +82,8 @@ describe("the hand-off file", () => {
     // A byte-order mark, which Windows PowerShell 5.1 writes, is not part of the title.
     const text = renderHandoff({ title: "Marked", date: "2026-10-21", session: SESSION, where: "w.", context: "c.", body: BODY });
     expect(readHeader(String.fromCharCode(0xfeff) + text).title).toBe("Marked");
+    // The writer keeps a title to one line, or every line read after it would move.
+    expect(readHeader(renderHandoff({ title: "Two\nlines ", date: "2026-10-21", session: SESSION, where: "w.", context: "c.", body: BODY }))).toEqual({ title: "Two lines", opened: "2026-10-21", session: SESSION });
     // Nor are spaces an editor left at the end of the title line.
     expect(readHeader(text.replace("# Hand-off: Marked", "# Hand-off: Marked \t ")).title).toBe("Marked");
   });
@@ -216,7 +218,9 @@ describe("ledger handoff", () => {
     // Never the developer's own transcripts, should a run get as far as looking up the session.
     const env = { CLAUDE_CODE_SESSION_ID: SESSION, CLAUDE_CONFIG_DIR: join(scratch, "nowhere") };
     expect((await run(["handoff", "x"], { cwd: top, stdin: BODY, env: {} })).code).toBe(2);
-    // Without a session it refuses before reading a body, so it never waits on a stdin that stays open.
+    // Without a session it refuses before reading a body, so it never waits on a stdin that stays
+    // open; so does an id too short to name one.
+    expect((await run(["handoff", "x", "--session", "abc"], { cwd: top, stdin: "", env: {} })).out).toMatch(/^ledger: ERROR a session id needs at least 8 characters, not abc\n/);
     expect((await run(["handoff", "x"], { cwd: top, stdin: "", env: {} })).out).toMatch(/^ledger: ERROR no session: CLAUDE_CODE_SESSION_ID is not set\nnext: pass --session <id>\n$/);
     expect((await run(["handoff", "x"], { cwd: top, stdin: "  \n", env })).code).toBe(2);
     expect((await run(["handoff", "名前"], { cwd: top, stdin: BODY, env })).code).toBe(2);
@@ -243,7 +247,7 @@ describe("which session", () => {
     };
     expect(refusal(undefined)).toBe("no session given");
     // What a command was given: --session first, else the environment, and neither is a refusal.
-    expect(givenSession("abc", { CLAUDE_CODE_SESSION_ID: SESSION })).toBe("abc");
+    expect(givenSession(OTHER.slice(0, 8).toUpperCase(), { CLAUDE_CODE_SESSION_ID: SESSION })).toBe(OTHER.slice(0, 8));
     expect(givenSession(undefined, { CLAUDE_CODE_SESSION_ID: SESSION })).toBe(SESSION);
     expect(() => givenSession(undefined, {})).toThrow("no session: CLAUDE_CODE_SESSION_ID is not set");
     expect(refusal("bbbbbbbb")).toMatch(/^no transcript of session bbbbbbbb here/);

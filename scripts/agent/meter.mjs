@@ -95,9 +95,8 @@ function extract(records) {
 
 /**
  * The meter's reading from an extraction: the last model request, as `usage` reads it (lines of
- * one request merged, synthetic messages skipped), that sent a prompt. One that sent none has not
- * written its usage (no line here lacks it, 2026-10-21), and read as the context it would be 0
- * tokens, which re-arms every level.
+ * one request merged, synthetic messages skipped; a line with no usage is a request of 0 tokens to
+ * both, a `ceiling:` in `createExtractor`).
  *
  * - `size`: what the next request carries at least, which is this request's prompt (fresh input,
  *   cache reads and cache writes) plus its output. `usage` calls the prompt alone `ctx`.
@@ -127,12 +126,11 @@ function extract(records) {
  */
 function readingFrom(extraction) {
   const { requests, compactions } = extraction;
-  const at = requests.findLastIndex((r) => promptOf(r) > 0);
-  if (at < 0 || at < (compactions.at(-1) ?? 0)) return null;
-  const last = requests[at];
+  if ((compactions.at(-1) ?? 0) >= requests.length) return null;
+  const last = requests.at(-1);
   let from = 0;
-  for (const i of segmentBreaks(extraction)) if (i <= at && i > from) from = i;
-  const since = requests.slice(from, at + 1);
+  for (const i of segmentBreaks(extraction)) if (i < requests.length && i > from) from = i;
+  const since = requests.slice(from);
   return {
     model: String(last.model),
     size: promptOf(last) + last.output_tokens,

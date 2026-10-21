@@ -26,7 +26,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { caseFolder } from "../lib/invokedAs.mjs";
-import { projectsDir as transcriptsHome } from "./transcript.mjs";
+import { projectsDir as transcriptsHome, sessionId } from "./transcript.mjs";
 
 // ================================ prices ================================
 
@@ -671,6 +671,10 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
           byKey.set(key, request);
           requests.push(request);
         }
+        // ceiling: a line with no usage adds 0 tokens to its request, so a request with no other
+        // line is one of 0 tokens, which segmentBreaks takes for a compaction and the meter for an
+        // empty context. None of the 25,798 assistant lines on the owner's machine lacked usage
+        // (2026-10-21).
         const usage = message.usage || {};
         for (const field of USAGE_FIELDS) request[field] = Math.max(request[field], Number(usage[field]) || 0);
         const creation = usage.cache_creation || {};
@@ -1368,7 +1372,7 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
   report.input = { files: files.length, dirs, malformedLines: extracted.reduce((a, f) => a + f.malformed, 0) };
 
   const key = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 8);
-  const logPath = join(tmp, `agent-usage-${env.CLAUDE_CODE_SESSION_ID || "nosession"}-${key}.json`);
+  const logPath = join(tmp, `agent-usage-${sessionId(env.CLAUDE_CODE_SESSION_ID) ?? "nosession"}-${key}.json`);
   try {
     writeFileSync(logPath, JSON.stringify(report, null, 2));
   } catch (error) {

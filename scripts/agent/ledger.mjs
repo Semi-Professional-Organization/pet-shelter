@@ -177,8 +177,7 @@ export async function main(argv, io = {}) {
   writeFileSync(
     path,
     renderHandoff({
-      // One line: a line break would end the H1 and start the file's own markdown.
-      title: opts.title.replace(/\s+/g, " ").trim(),
+      title: opts.title,
       date: localDate(now),
       session,
       where: describeWhere(w),

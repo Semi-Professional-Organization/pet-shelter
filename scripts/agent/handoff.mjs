@@ -45,7 +45,8 @@ export function slugOf(title) {
  * that does not match, as in a file edited by hand, reads as unknown.
  */
 const HEADER = [
-  { field: "title", write: (h) => `# Hand-off: ${h.title}`, read: /^# (?:Hand-off: )?(.+?)\s*$/ },
+  // One line: a line break would end the H1 and move every line read after it.
+  { field: "title", write: (h) => `# Hand-off: ${String(h.title).replace(/\s+/g, " ").trim()}`, read: /^# (?:Hand-off: )?(.+?)\s*$/ },
   { write: () => "" },
   { field: "opened", write: (h) => `**Status:** open · opened ${h.date}`, read: /^\*\*Status:\*\* open · opened (\d{4}-\d{2}-\d{2})$/ },
   { write: () => "" },
@@ -106,6 +107,10 @@ export function renderHandoff({ title, date, session, where, context, body, eol 
 /**
  * The header's fields (`title`, `opened`, `session`), each null where its line does not match. The
  * session is read as `sessionId` reads any session id, so it compares with the one a command runs as.
+ *
+ * ceiling: a header edited by hand so that its lines move reads as unknown where they moved. `orient`
+ * then names the file's session "unknown", and `ledger handoff` refuses to replace the file: a
+ * refusal (delete it and run again), never an overwrite.
  *
  * @returns {{ title: string | null, opened: string | null, session: string | null }}
  */

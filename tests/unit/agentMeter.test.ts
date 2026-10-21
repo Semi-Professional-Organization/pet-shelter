@@ -69,12 +69,9 @@ describe("the reading", () => {
     expect(readingOf(records)).toEqual({ model: "claude-opus-5-5", size: 3 + 102_000 + 1_000 + 400, start: Date.parse(at(2)), ttl: 60 });
   });
 
-  it("skips a synthetic message or one with no usage, and returns null when no request is in view", () => {
+  it("skips a synthetic message and returns null when no request is in view", () => {
     const synthetic = { ...line("s", 9, { read: 1 }), message: { ...line("s", 9).message, model: "<synthetic>" } };
     expect(readingOf([line("r1", 0, { read: 7 }), synthetic])?.size).toBe(7);
-    // Read as a request, a line with no usage would be a context of 0 and re-arm every level.
-    const bare = { ...line("b", 9), message: { ...line("b", 9).message, usage: undefined } };
-    expect(readingOf([line("r1", 0, { read: 7 }), bare])?.size).toBe(7);
     expect(readingOf([toolResult(0)])).toBeNull();
   });
 

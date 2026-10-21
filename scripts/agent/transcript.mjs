@@ -34,6 +34,18 @@ export function sessionId(value) {
 const refusal = (message, next) => Object.assign(new Error(message), { next });
 
 /**
+ * What a command line names a session by, lower-cased: a whole id, or its first MIN_PREFIX or more
+ * characters. Throws with the reason otherwise. It reads nothing, so it can run first.
+ */
+function nameOf(given) {
+  if (typeof given !== "string" || !given.trim()) throw refusal("no session given", "pass --session <id>");
+  const name = given.trim().toLowerCase();
+  if (!/^[0-9a-f-]+$/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
+  if (name.length < MIN_PREFIX) throw refusal(`a session id needs at least ${MIN_PREFIX} characters, not ${given}`, "pass --session <id>");
+  return name;
+}
+
+/**
  * The session a command names, as `{ session, path }`: `session` the whole id, as `sessionId`
  * writes it, and `path` its transcript, or null where none is found (Claude Code deletes them after
  * 30 days by default). Every command that takes a session from `--session` or from
@@ -48,10 +60,7 @@ const refusal = (message, next) => Object.assign(new Error(message), { next });
  * sessions or names none.
  */
 export function resolveSession(given, dir) {
-  if (typeof given !== "string" || !given.trim()) throw refusal("no session given", "pass --session <id>");
-  const name = given.trim().toLowerCase();
-  if (!/^[0-9a-f-]+$/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
-  if (name.length < MIN_PREFIX) throw refusal(`a session id needs at least ${MIN_PREFIX} characters, not ${given}`, "pass --session <id>");
+  const name = nameOf(given);
   const found = findTranscript(dir, name);
   if (found) return found;
   if (SESSION_ID.test(name)) return { session: name, path: null };
@@ -59,9 +68,10 @@ export function resolveSession(given, dir) {
 }
 
 /**
- * The session id a command was given: `--session`, else CLAUDE_CODE_SESSION_ID, for
- * `resolveSession`. Throws when neither is set. Cheap, so a command can refuse before it reads a
- * body or walks the transcript folders.
+ * The session a command was given, as `nameOf` writes it: `--session`, else
+ * CLAUDE_CODE_SESSION_ID, for `resolveSession`. Throws when neither is set or what is set cannot
+ * name a session. It reads nothing, so a command can refuse before it reads a body or walks the
+ * transcript folders.
  *
  * @param {string | undefined} flag
  * @param {Record<string, string | undefined>} [env]
@@ -69,7 +79,7 @@ export function resolveSession(given, dir) {
 export function givenSession(flag, env = process.env) {
   const given = flag ?? env.CLAUDE_CODE_SESSION_ID;
   if (typeof given !== "string" || !given.trim()) throw refusal("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
-  return given;
+  return nameOf(given);
 }
 
 /**

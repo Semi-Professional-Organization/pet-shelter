@@ -130,3 +130,10 @@ command lines by hand, four times (`usage`, `meter`, `ledger`, `recall`), and ea
 option's value its own way; an empty `--session` had to be refused in three of them at once.
 `node:util`'s `parseArgs` could replace all four. No finding has come from the parsers otherwise,
 so it waits for the pull request that next changes their options.
+
+Beyond a stated ceiling, from the same pass's third review: an assistant line with no usage counts
+as a request of 0 tokens in `usage`'s extractor, which `segmentBreaks` takes for a compaction and
+the meter for an empty context. None of the 25,798 assistant lines on the owner's machine lacked
+usage (2026-10-21); the `ceiling:` is in `createExtractor`. A hand-off header edited by hand so its
+lines move reads as unknown, and `ledger handoff` then refuses to replace the file rather than
+overwriting it (a `ceiling:` on `readHeader`).
