@@ -163,7 +163,9 @@ async function main(argv) {
   // --apply never needs the working copy; only the dry run plans it.
   const working = apply ? null : readFileSync(workingPath, "utf8");
   const config = parse(apply ? published : working);
-  if (!apply && working.trim() !== (published ?? "").trim()) {
+  // Line endings differ by checkout (core.autocrlf), not by content.
+  const same = (a, b) => String(a ?? "").replace(/\r\n/g, "\n").trim() === String(b ?? "").replace(/\r\n/g, "\n").trim();
+  if (!apply && !same(working, published)) {
     write(`issue-groups: planning your working copy of ${CONFIG_PATH}, which differs from origin/${branch}; --apply uses origin/${branch}.`);
   }
 

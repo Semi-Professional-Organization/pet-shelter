@@ -8,15 +8,18 @@
  *     number is recorded, a group adopts the one labelled issue whose marker names it.
  *   - The plan is a difference of two whole states, both keyed by GitHub node id: the links the file
  *     wants against the links that exist on every parent this script manages.
- *   - Every rule GitHub enforces is checked on the finished tree before anything is written, and the
- *     links are ordered by simulating them against those rules, so a refusal can only be run-wide.
+ *   - The links are ordered by simulating each one against GitHub's rules on the tree as it will be
+ *     at that step, before anything is written. What the simulation cannot order, or cannot check
+ *     because this account cannot see part of it, is refused; so a refusal at apply is run-wide.
  */
 
 export const CONFIG_PATH = ".github/issue-groups.json";
 export const LABEL = "group";
 
-// GitHub's own limits. Titles over 256 characters and bodies over 65,536 are refused; the margins
-// leave room for the rendered header and for any difference in how GitHub counts characters.
+// GitHub's own limits. Titles over 256 characters and bodies over 65,536 are refused. The summary is
+// counted in UTF-8 bytes, the strictest way GitHub could count, and keeps room for the header.
+// ceiling: a title is counted in code points; if GitHub counts UTF-16 units, 240 code points of
+// emoji would exceed 256 and be refused at apply.
 export const LIMITS = { title: 240, summary: 59_000, children: 100, depth: 8 };
 
 const MARKER = /^\s*<!--\s*issue-group:\s*([a-z0-9-]+)\s*-->/;
@@ -76,7 +79,7 @@ export function validateConfig(config) {
     if (typeof group?.title !== "string" || !group.title.trim()) errors.push(`${where}: needs a title`);
     else if ([...group.title].length > LIMITS.title) errors.push(`${where}: title is over ${LIMITS.title} characters`);
     if (group?.summary !== undefined && typeof group.summary !== "string") errors.push(`${where}: summary must be text`);
-    else if ([...String(group?.summary ?? "")].length > LIMITS.summary) errors.push(`${where}: summary is over ${LIMITS.summary} characters`);
+    else if (new TextEncoder().encode(String(group?.summary ?? "")).length > LIMITS.summary) errors.push(`${where}: summary is over ${LIMITS.summary} bytes`);
     if (group?.parent !== undefined) {
       if (!Number.isInteger(group.parent) || group.parent < 1) errors.push(`${where}: parent ${JSON.stringify(group.parent)} is not an issue number`);
       else if (parents.has(group.parent)) errors.push(`${where}: parent #${group.parent} is also the parent of ${parents.get(group.parent)}`);
@@ -200,6 +203,14 @@ export function planGroups(config, snapshot, target) {
     const issue = byNumber.get(number);
     if (!issue) problems.push(`#${number} (in ${key}) is not an issue in this repository`);
     else if (managed.has(issue.id)) problems.push(`#${number} (in ${key}) is itself a group parent`);
+  }
+  // A parent this script manages must be wholly visible: a sub-issue it cannot see can be neither
+  // kept nor removed, and the verify step would call the parent matched while it holds one.
+  for (const id of managed) {
+    const issue = byId.get(id);
+    if ((issue.hiddenChildren ?? 0) > 0) {
+      problems.push(`group parent #${issue.number} has ${issue.hiddenChildren} sub-issues this account cannot see; someone who can see them must unlink them first`);
+    }
   }
   if (config.groups.length === 0 && retired.some((issue) => !isClosed(issue))) {
     // An emptied file is likelier to be a bad edit than a decision to ungroup everything.

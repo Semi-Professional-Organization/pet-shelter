@@ -41,10 +41,10 @@ a parent this script manages, keyed by GitHub node id and never by number, since
 cross repositories. *Rejected:* walking the file group by group, which needed a special case for
 every state found and missed the rest (departed groups, closed duplicates, foreign children).
 
-**GitHub's rules are checked on the finished tree, before any write.** One parent per issue, 100
+**GitHub's rules are checked before any write, link by link.** One parent per issue, 100
 sub-issues, no loops at any depth, eight levels of nesting, title and body limits, and the fields
 the file may hold (an unknown one is refused, since `--apply` rewrites the file). The links are
-ordered by simulating them against those rules, with counts and heights moving as they would, so
+ordered by simulating each against those rules on the tree as it will be at that step, so
 an unlink or a move that frees a slot or clears a path runs before the link that needs it. What
 that ordering cannot make legal (a parent nested under its own member) is refused by the dry run. To count depth rather than guess
 it, the reader follows sub-issues all the way down below every member and parent, and every
@@ -52,8 +52,9 @@ ancestor above each parent. A refusal at apply is then run-wide (access, network
 which is why apply stops at the first one.
 
 **States the rules cannot be checked against are refused, not planned around** (owner's decision,
-2026-10-21). An issue this account cannot see, as a member's parent, above a group's parent or below
-a member; and links no simple order makes legal, such as two full parents swapping issues. The dry
+2026-10-21). An issue this account cannot see, as a member's parent, above a group's parent, below
+a member or under a group's parent; and links the simple order cannot sequence, such as two full
+parents swapping issues, even though the finished tree would be legal. The dry
 run stops and says what to fix by hand. This repository never has those states, and handling them
 grew a solver in which four review rounds kept finding cases it got wrong (6, 6, 5, then 9).
 Two assumptions remain, marked `ceiling:` in the code: an unreadable parent comes back as an error
@@ -77,10 +78,11 @@ closed, duplicate, unlabelled, recased and edited parents; departed groups; fore
 hand-made links). Every state converges in one apply, without a refused write, a second parent, or
 a touched link the file does not own, or is refused for a reason the test confirms in the fake's
 whole truth: a loop, more than eight levels or more than 100 sub-issues in the finished tree, an
-issue this account cannot see where the planner must look, or an emptied file. A second check
+issue this account cannot see where the planner must look, or an emptied file. (No generated parent
+is full, so refusing what only the simple order cannot sequence is shown by an example test.) A second check
 reads the fake's truth, not the reader, to confirm every sub-issue of a managed parent belongs
-there. Measured 2026-10-21: 3,515 converged, 379 refused an impossible tree, 883 refused for
-something hidden in the way, 224 an emptied file. One-off runs of 30,000 seeds held every check
+there. Measured 2026-10-21: 3,287 converged, 353 refused an impossible tree, 1,155 refused for
+something hidden in the way, 206 an emptied file. One-off runs of 30,000 seeds held every check
 (one found seed 15244, now fixed and run every time).
 The first version planned from the fake's whole state and so missed a gap in the reader; review
 caught it, and every plan in the tests now comes through the reader.

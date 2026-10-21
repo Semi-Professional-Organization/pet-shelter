@@ -100,6 +100,15 @@ function world(seed: number) {
     }
     if (rand() < 0.2) chain[0].hidden = true;
   }
+  if (rand() < 0.1 && parents.length > 0) {
+    const hiddenChild = github.add();
+    try {
+      github.link(pick(parents).id, hiddenChild.id);
+    } catch {
+      // too deep; GitHub would refuse it
+    }
+    hiddenChild.hidden = true;
+  }
   if (rand() < 0.2 && groups.length > 0) {
     const hidden = github.add({});
     const member = github.byNumber(pick(groups).issues[0])!;
@@ -149,11 +158,13 @@ function whyImpossible(github: FakeGitHub, config: { groups: Group[] }, parentOf
 
 /**
  * Whether something this account cannot see sits where the planner would need to look: as a
- * member's parent, above a group's parent, or below a member. The planner refuses those states by
+ * member's parent, above a group's parent, below a member, or under a parent this script manages. The planner refuses those states by
  * the owner's decision of 2026-10-21, rather than planning around them.
  */
-function hiddenInTheWay(github: FakeGitHub, config: { groups: Group[] }, parentOf: Map<string, string>) {
+function hiddenInTheWay(github: FakeGitHub, config: { groups: Group[] }, parentOf: Map<string, string>, managed: Set<string>) {
   const below = (id: string): FakeIssue[] => github.children(id).flatMap((child) => [child, ...below(child.id)]);
+  // A parent this script manages must be wholly visible.
+  for (const id of managed) if (github.children(id).some((child) => child.hidden)) return true;
   for (const group of config.groups) {
     const target = parentOf.get(group.key);
     if (target && [target, ...github.ancestors(target)].some((id) => github.issues.get(id)?.hidden)) return true;
@@ -183,14 +194,15 @@ describe("one apply makes GitHub match the file, from any state", () => {
         plan = planGroups(config, readFrom(github, config), TARGET);
       } catch (error) {
         // An emptied file with open parents is refused on purpose: likelier a bad edit than intent.
-        if (config.groups.length === 0) {
+        if (config.groups.length === 0 && !/cannot see/.test(String(error))) {
           expect(String(error), where).toMatch(/has no groups but group parents are open/);
           expect([...github.issues.values()].some((issue) => looksLikeParent(issue) && issue.state === "OPEN"), where).toBe(true);
           outcomes.refusedEmpty += 1;
           continue;
         }
         // Otherwise a refusal must be earned in the fake's truth: something hidden in the way, or a
-        // tree no order can build.
+        // finished tree that breaks a rule. (Refusing what only the simple order cannot sequence,
+        // such as full parents swapping, is shown by an example test: no generated parent is full.)
         const parentOf = new Map(config.groups.filter((group) => group.parent).map((group) => [group.key, github.byNumber(group.parent!)!.id]));
         // Unrecorded groups adopt an issue that claims them: open before closed, then the oldest.
         const claimants = [...github.issues.values()]
@@ -201,7 +213,7 @@ describe("one apply makes GitHub match the file, from any state", () => {
           if (!parentOf.has(key)) parentOf.set(key, issue.id);
         }
         if (/cannot see/.test(String(error))) {
-          expect(hiddenInTheWay(github, config, parentOf), `${where}: refused for something hidden that is not there: ${error}`).toBe(true);
+          expect(hiddenInTheWay(github, config, parentOf, managedBefore), `${where}: refused for something hidden that is not there: ${error}`).toBe(true);
           outcomes.refusedUnseen += 1;
           continue;
         }
@@ -240,7 +252,7 @@ describe("one apply makes GitHub match the file, from any state", () => {
       // from the fake's truth, so a gap in what the reader sees cannot hide a stale link here.
       const parentOfGroup = new Map<string, Set<number>>(settled.groups.map((group: Group) => [github.byNumber(group.parent!)!.id, new Set(group.issues)]));
       for (const issue of github.issues.values()) {
-        if (!issue.parentId || issue.hidden) continue;
+        if (!issue.parentId) continue;
         const holder = github.issues.get(issue.parentId)!;
         if (!looksLikeParent(holder) && !parentOfGroup.has(holder.id)) continue;
         const wanted = parentOfGroup.get(holder.id);
@@ -250,8 +262,8 @@ describe("one apply makes GitHub match the file, from any state", () => {
       expect(created.size, where).toBeLessThanOrEqual(config.groups.filter((group) => !group.parent).length);
       outcomes.converged += 1;
     }
-    // Measured 2026-10-21: 3,515 converged, 379 refused an impossible tree, 883 for something hidden in
-    // the way, 224 an emptied file. Most
+    // Measured 2026-10-21: 3,287 converged, 353 refused an impossible tree, 1,155 for something hidden
+    // in the way, 206 an emptied file. Most
     // must converge, or the generator is only producing refusals; both refusals must occur, or
     // the oracle above was never consulted.
     expect(outcomes.converged).toBeGreaterThan(SEEDS * 0.65);

@@ -227,6 +227,18 @@ describe("planning: two whole states compared by node id", () => {
     expect(() => plan(fake, { groups: [group("a", [1])] })).toThrow(/#1 \(in a\) is under an issue this account cannot see; someone who can see it must unlink it first/);
   });
 
+  it("refuses a group parent holding a sub-issue this account cannot see, rather than call it matched", () => {
+    // Final review: such a sub-issue could be neither kept nor removed, and --apply printed Verified.
+    const fake = github(1);
+    const g = group("a", [1]);
+    const parent = parentOn(fake, g);
+    fake.link(parent.id, fake.byNumber(1)!.id);
+    const hidden = fake.add();
+    fake.link(parent.id, hidden.id);
+    hidden.hidden = true;
+    expect(() => plan(fake, { groups: [{ ...g, parent: parent.number }] })).toThrow(/group parent #2 has 1 sub-issues this account cannot see/);
+  });
+
   it("lists open issues in no group, without the parents, the standalone ones or a link the plan removes", () => {
     const fake = github(4);
     const gone = parentOn(fake, group("gone", [2]));

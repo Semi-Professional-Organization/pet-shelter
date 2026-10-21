@@ -27,7 +27,7 @@ the eleven groups were approved in the project thread before anything was built.
 - [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
 - [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
 - [x] Rebuilt after an owner-requested audit: `scripts/lib/issueGroups/{plan,github,suggest}.mjs`
-- [x] Tests: `issueGroups.test.ts` (examples), `issueGroupsConverge.test.ts` (3,000 states through
+- [x] Tests: `issueGroups.test.ts` (examples), `issueGroupsConverge.test.ts` (5,000 states through
       the real reader against `tests/unit/support/fakeGitHub.ts`), `issueGroupsSuggest.test.ts`
 - [ ] Owner approves the PR, then `npm run issues:groups -- --apply`, which must print "Verified";
       commit the `parent` numbers it records
@@ -92,7 +92,8 @@ Rebuild round 1 found that the convergence test planned from the fake's whole st
 reader, which hid a real reader gap (a recorded parent without its label was read without its
 sub-issues); that heights were static in the simulation; that two full parents could not swap; and
 that a failed working-copy write could lose created parent numbers. All fixed; every test plan now
-comes through `readSnapshot`, and mutations reintroducing the gap or the swap deadlock fail.
+comes through `readSnapshot`, and a mutation reintroducing the gap fails. (The swap handling added
+then was later removed by the owner's refusal decision below.)
 Recorded as ceilings, not fixed: a member's sub-issues read one level deep, and the shape of
 GitHub's answer for an unreadable parent (assumed an error, not observed).
 
@@ -117,6 +118,9 @@ Rebuild round 4 found 9 more, all in planning around hidden issues, full parents
 Findings were not falling, so per the owner's rule the owner was asked, and chose refusal: those
 states now stop the dry run with what to fix by hand, and the skip and room-making code is gone.
 Round 4's other three (subdirectory runs, 20-label reads, a dry run saying in sync) were fixed.
+Round 5, on the narrowed design, found a hidden sub-issue under a group parent passing as matched
+(now refused), a CRLF checkout always reading as changed, an overclaimed character count, and stale
+text. All fixed.
 
 # Every role lands on, is shown and is offered only what it can use
 
