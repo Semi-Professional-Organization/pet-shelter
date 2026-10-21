@@ -61,8 +61,14 @@ describe("the grouping file", () => {
   it("the shipped file is valid, and in the layout --apply writes, so recording a parent changes one line", () => {
     const config = validateConfig(JSON.parse(shipped));
     expect(formatConfig(config)).toBe(shipped);
-    const recorded = formatConfig(recordParents(config, new Map([["bulletins", 181]]))).split("\n");
-    const before = shipped.split("\n");
+    // From a file with no parents recorded, so the check holds whatever the shipped file records.
+    const bare = { ...config, groups: config.groups.map((group: Group) => {
+      const copy = { ...group };
+      delete copy.parent;
+      return copy;
+    }) };
+    const recorded = formatConfig(recordParents(bare, new Map([["bulletins", 181]]))).split("\n");
+    const before = formatConfig(bare).split("\n");
     expect(recorded.length).toBe(before.length + 1);
     expect(recorded.filter((line) => !before.includes(line))).toEqual(['      "parent": 181,']);
   });
