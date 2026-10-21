@@ -110,7 +110,9 @@ export function renderHandoff({ title, date, session, where, context, body, eol 
  * @returns {{ title: string | null, opened: string | null, session: string | null }}
  */
 export function readHeader(text) {
-  const lines = String(text).split(/\r?\n/);
+  // An editor that saves UTF-8 with a byte-order mark, as Windows PowerShell 5.1 does, puts it
+  // before the title.
+  const lines = String(text).replace(new RegExp(`^${String.fromCharCode(0xfeff)}`), "").split(/\r?\n/);
   const fields = {};
   HEADER.forEach((line, i) => {
     if (!line.field) return;

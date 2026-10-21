@@ -54,7 +54,7 @@ export function parseArgs(argv) {
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--from" || a === "--session") {
       const v = argv[++i];
-      if (v === undefined || v.startsWith("--")) throw new Error(`${a} needs a value`);
+      if (v === undefined || !v.trim() || v.startsWith("--")) throw new Error(`${a} needs a value`);
       opts[a.slice(2)] = v;
     } else if (a.startsWith("--")) throw new Error(`unknown argument: ${a}`);
     else rest.push(a);

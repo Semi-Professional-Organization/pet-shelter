@@ -94,7 +94,7 @@ export function orientLines(w, handoffs, options = {}) {
       ? `git: no origin/master to compare with; ${w.uncommitted} uncommitted paths`
       : `git: ${w.ahead} ahead and ${w.behind} behind origin/master ${fetched}; ${w.uncommitted} uncommitted paths`,
   );
-  const waiting = handoffs.filter((h) => h.session !== session);
+  const waiting = handoffs.filter((h) => !session || h.session !== session);
   for (const h of waiting.slice(0, 3)) {
     lines.push(`hand-off: ${h.file} "${h.title}", from session ${(h.session ?? "unknown").slice(0, 8)}${h.opened ? ` on ${h.opened}` : ""}`);
   }

@@ -31,7 +31,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CACHE_TTL_MINUTES, createExtractor, lifetimeHolding, priceKey } from "./usage.mjs";
+import { CACHE_TTL_MINUTES, createExtractor, lifetimeHolding, priceKey, segmentBreaks } from "./usage.mjs";
 import { findTranscript, hookEvent, projectsDir, readTail, resolveSession } from "./transcript.mjs";
 
 // ================================ the rule ================================
@@ -101,7 +101,8 @@ function extract(records) {
  *   cache reads and cache writes) plus its output. `usage` calls the prompt alone `ctx`.
  * - `start`: when its first line was written, which is when it last read the cache, in ms.
  * - `ttl`: in minutes, the cache lifetime holding most of what the requests in view wrote since
- *   the last compaction, decided as `coldResumes` decides it (`lifetimeHolding`); 60 when nothing
+ *   the context last began, at a compaction or at the drop `usage` takes for an unmarked one
+ *   (`segmentBreaks`), decided as `coldResumes` decides it (`lifetimeHolding`); 60 when nothing
  *   written is in view.
  *
  * Null when no request is in view, or none since the last compaction: Claude Code writes no
@@ -122,11 +123,11 @@ function extract(records) {
  * levels of 250K and up, a line can come a call late, not a level late; against Haiku's, see
  * `RULES`.
  */
-function readingFrom({ requests, compactions }) {
-  const from = compactions.at(-1) ?? 0;
-  if (from >= requests.length) return null;
+function readingFrom(extraction) {
+  const { requests, compactions } = extraction;
+  if ((compactions.at(-1) ?? 0) >= requests.length) return null;
   const last = requests.at(-1);
-  const since = requests.slice(from);
+  const since = requests.slice(Math.max(0, ...[...segmentBreaks(extraction)].filter((i) => i < requests.length)));
   return {
     model: String(last.model),
     size: last.input_tokens + last.cache_read_input_tokens + last.cache_creation_input_tokens + last.output_tokens,
@@ -331,7 +332,7 @@ export function parseArgs(argv) {
     else if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--session") {
       const v = argv[++i];
-      if (v === undefined || v.startsWith("--")) throw new Error("--session needs a value");
+      if (v === undefined || !v.trim() || v.startsWith("--")) throw new Error("--session needs a value");
       opts.session = v;
     } else throw new Error(`unknown argument: ${a}`);
   }

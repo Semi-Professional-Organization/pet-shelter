@@ -79,6 +79,9 @@ describe("the hand-off file", () => {
     expect(readHandoffs(top).map((h) => [h.title, h.opened, h.session]).sort()).toEqual(titles.map((title) => [title, "2026-10-21", SESSION]).sort());
     // Lines that are not the header's read as unknown, never as something found further down.
     expect(readHeader(`Notes\n\n${body}`)).toEqual({ title: null, opened: null, session: null });
+    // A byte-order mark, which Windows PowerShell 5.1 writes, is not part of the title.
+    const text = renderHandoff({ title: "Marked", date: "2026-10-21", session: SESSION, where: "w.", context: "c.", body: BODY });
+    expect(readHeader(String.fromCharCode(0xfeff) + text).title).toBe("Marked");
   });
 
   it("checks only that each section is a heading with something under it", () => {
@@ -238,6 +241,9 @@ describe("which session", () => {
     expect(refusal("bbbbbbbb")).toMatch(/^no transcript of session bbbbbbbb here/);
     expect(refusal("aaaa")).toMatch(/at least 8 characters/);
     expect(refusal("../../etc")).toBe("../../etc is not a session id");
+    // A prefix that names two sessions says what to pass instead.
+    writeFileSync(join(dir, "D--Dev-Repos-x", `${SESSION.slice(0, 8)}-ffff-2222-3333-444444444444.jsonl`), "");
+    expect(() => resolveSession(SESSION.slice(0, 8), dir)).toThrow(expect.objectContaining({ next: "pass more of the session's id" }));
     expect(sessionId(SESSION.toUpperCase())).toBe(SESSION);
     expect(sessionId("aaaaaaaa")).toBeNull();
     const event = { hook_event_name: "PostToolUse", session_id: SESSION.toUpperCase(), transcript_path: "t.jsonl", agent_id: "a1" };
@@ -251,6 +257,12 @@ describe("which session", () => {
     const mine = io({ cwd: top, env: { CLAUDE_CODE_SESSION_ID: SESSION } });
     expect(await orient(["--brief"], mine.io)).toBe(0);
     expect(mine.sink.text).not.toContain("HANDOFF-mine.md");
+    // With its own session unknown, nothing waiting is taken for its own, even a hand-off whose
+    // session line was edited past reading.
+    writeFileSync(join(top, "tasks", "open", "HANDOFF-edited.md"), "# Hand-off: Edited\n\nby hand\n");
+    const nobody = io({ cwd: top, env: {} });
+    expect(await orient(["--brief"], nobody.io)).toBe(0);
+    expect(nobody.sink.text).toContain('hand-off: tasks/open/HANDOFF-edited.md "Edited", from session unknown');
   });
 });
 

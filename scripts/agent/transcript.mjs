@@ -52,7 +52,12 @@ export function resolveSession(given, dir) {
   const name = given.trim().toLowerCase();
   if (!/^[0-9a-f-]+$/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
   if (name.length < MIN_PREFIX) throw refusal(`a session id needs at least ${MIN_PREFIX} characters, not ${given}`, "pass --session <id>");
-  const found = findTranscript(dir, name);
+  let found;
+  try {
+    found = findTranscript(dir, name);
+  } catch (error) {
+    throw refusal(error.message, "pass more of the session's id");
+  }
   if (found) return found;
   if (SESSION_ID.test(name)) return { session: name, path: null };
   throw refusal(`no transcript of session ${given} here, and a prefix needs one to stand for a whole id`, "pass the session's whole id");
@@ -74,14 +79,13 @@ export function hookEvent(stdin) {
 }
 
 /**
- * The transcript of one session, by its id or a prefix of at least MIN_PREFIX characters, searched
- * across every project folder, since a session's folder is named after the directory it started
+ * The transcript of one session, by its id or a prefix of one (`resolveSession` checks which it is
+ * given), searched across every project folder, since a session's folder is named after the directory it started
  * in and that is not known here. Returns `{ session, path }`, or null when there is none.
  * Throws when a prefix names more than one session.
  */
 export function findTranscript(dir, id) {
   if (!id || !existsSync(dir)) return null;
-  if (id.length < MIN_PREFIX) throw new Error(`a session id needs at least ${MIN_PREFIX} characters, not ${id}`);
   const found = new Map();
   for (const folder of readdirSync(dir)) {
     let names;

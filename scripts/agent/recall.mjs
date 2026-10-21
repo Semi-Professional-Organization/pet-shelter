@@ -127,7 +127,7 @@ export function parseArgs(argv) {
     if (a === "--help" || a === "-h") opts.help = true;
     else if (a === "--session") {
       const v = argv[++i];
-      if (v === undefined || v.startsWith("--")) throw new Error("--session needs a value");
+      if (v === undefined || !v.trim() || v.startsWith("--")) throw new Error("--session needs a value");
       opts.session = v;
     } else if (a.startsWith("--")) throw new Error(`unknown argument: ${a}`);
     else opts.words.push(a);

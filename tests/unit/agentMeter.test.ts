@@ -69,9 +69,12 @@ describe("the reading", () => {
     expect(readingOf(records)).toEqual({ model: "claude-opus-5-5", size: 3 + 102_000 + 1_000 + 400, start: Date.parse(at(2)), ttl: 60 });
   });
 
-  it("skips a synthetic message and returns null when no request is in view", () => {
+  it("skips a synthetic message or one with no usage, and returns null when no request is in view", () => {
     const synthetic = { ...line("s", 9, { read: 1 }), message: { ...line("s", 9).message, model: "<synthetic>" } };
     expect(readingOf([line("r1", 0, { read: 7 }), synthetic])?.size).toBe(7);
+    // Read as a request, a line with no usage would be a context of 0 and re-arm every level.
+    const bare = { ...line("b", 9), message: { ...line("b", 9).message, usage: undefined } };
+    expect(readingOf([line("r1", 0, { read: 7 }), bare])?.size).toBe(7);
     expect(readingOf([toolResult(0)])).toBeNull();
   });
 
@@ -80,12 +83,16 @@ describe("the reading", () => {
     expect(readingOf([line("a", 0, { w5: 10 }), line("b", 1, { read: 10 })])?.ttl).toBe(5);
     expect(readingOf([line("a", 0, { read: 10 })])?.ttl).toBe(60);
     // A small 5-minute write on top of a context cached for an hour does not expire the context.
-    expect(readingOf([line("a", 0, { w1h: 300_000 }), line("b", 1, { w5: 2_000 })])?.ttl).toBe(60);
+    // Each request re-reads what the ones before it wrote, as real ones do.
+    expect(readingOf([line("a", 0, { w1h: 300_000 }), line("b", 1, { read: 300_000, w5: 2_000 })])?.ttl).toBe(60);
     // It is the total that counts, not the oldest write or the newest.
-    expect(readingOf([line("a", 0, { w5: 1_000 }), line("b", 1, { w1h: 900 }), line("c", 2, { w1h: 900 }), line("d", 3, { w5: 10 })])?.ttl).toBe(60);
+    const total = [line("a", 0, { w5: 1_000 }), line("b", 1, { read: 1_000, w1h: 900 }), line("c", 2, { read: 1_900, w1h: 900 }), line("d", 3, { read: 2_800, w5: 10 })];
+    expect(readingOf(total)?.ttl).toBe(60);
     // What was written before a compaction is no longer in the context.
     const boundary = { type: "system", subtype: "compact_boundary", timestamp: at(2) };
     expect(readingOf([line("a", 0, { w1h: 300_000 }), boundary, line("b", 3, { w5: 2_000 })])?.ttl).toBe(5);
+    // Nor is what was written before a drop usage takes for a compaction left unmarked.
+    expect(readingOf([line("a", 0, { w1h: 300_000 }), line("b", 3, { read: 1_000, w5: 2_000 })])?.ttl).toBe(5);
   });
 
   it("has none after a compaction until the new context's first request", () => {
@@ -338,6 +345,10 @@ describe("by hand", () => {
       out = "";
       expect(await main([], { env: {}, now: T0, out: { write: (s: string) => (out += s) } })).toBe(2);
       expect(out).toMatch(/^meter: ERROR no session/);
+      // An empty --session is no value, not a reason to blame the environment.
+      out = "";
+      expect(await main(["--session", ""], { env: { CLAUDE_CODE_SESSION_ID: id(1) }, now: T0, out: { write: (s: string) => (out += s) } })).toBe(2);
+      expect(out).toMatch(/^meter: ERROR --session needs a value/);
     } finally {
       rmSync(config, { recursive: true, force: true });
     }
