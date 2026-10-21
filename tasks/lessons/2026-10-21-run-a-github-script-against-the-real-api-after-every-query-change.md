@@ -10,6 +10,6 @@ which exceeds the maximum limit of 500,000`. Nested page sizes multiply (100 par
 children x 50 labels), and only GitHub counts them.
 
 **Rule:** after any change to a query string in a script that talks to GitHub, run its read-only
-path (`--dry-run`, the default, `--suggest`) against the real repository before the next review
+path (its default dry run, or `--suggest`) against the real repository before the next review
 round. Keep the read cheap enough to run every time: a nested connection asks only for the fields
 the planner uses.
