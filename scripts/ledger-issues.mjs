@@ -30,11 +30,14 @@ export const LABEL = "ledger";
 // marker (a bug report about this script, say) is not mistaken for a mirror and closed.
 const MARKER = /^\s*<!--\s*ledger-mirror:\s*(\S+)\s*-->/;
 
-/** Top-level markdown entries only. `CLAIM-*` files are session locks, not threads. */
+/**
+ * Top-level markdown entries only. `CLAIM-*` files are session locks and `HANDOFF-*` files one
+ * session's working state for the next (`scripts/agent/handoff.mjs`), not threads.
+ */
 export function isMirroredPath(path) {
   if (!path.startsWith(LEDGER_DIR) || !path.endsWith(".md")) return false;
   const name = path.slice(LEDGER_DIR.length);
-  return !name.includes("/") && !name.startsWith("CLAIM-");
+  return !name.includes("/") && !name.startsWith("CLAIM-") && !name.startsWith("HANDOFF-");
 }
 
 const encodePath = (path) => path.split("/").map(encodeURIComponent).join("/");

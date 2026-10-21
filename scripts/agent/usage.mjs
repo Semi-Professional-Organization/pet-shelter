@@ -22,10 +22,11 @@
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { caseFolder } from "../lib/invokedAs.mjs";
+import { projectsDir as transcriptsHome, sessionId } from "./transcript.mjs";
 
 // ================================ prices ================================
 
@@ -89,7 +90,7 @@ const BEFORE_4_6_STANDARD_PROMPT = 200_000;
 export class UnpriceableError extends Error {}
 
 /** The PRICES key for a model id: a dated snapshot (`claude-haiku-4-5-20251001`) prices as its model. */
-const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
+export const priceKey = (model) => String(model).replace(/-\d{8}$/, "");
 
 /**
  * The rates one request pays, or a throw. `model` is the model that served the request
@@ -670,6 +671,10 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
           byKey.set(key, request);
           requests.push(request);
         }
+        // ceiling: a line with no usage adds 0 tokens to its request, so a request with no other
+        // line is one of 0 tokens, which segmentBreaks takes for a compaction and the meter for an
+        // empty context. None of the 25,798 assistant lines on the owner's machine lacked usage
+        // (2026-10-21).
         const usage = message.usage || {};
         for (const field of USAGE_FIELDS) request[field] = Math.max(request[field], Number(usage[field]) || 0);
         const creation = usage.cache_creation || {};
@@ -724,7 +729,8 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
 
 // ================================ pricing a file ================================
 
-const promptOf = (r) => r.input_tokens + r.cache_read_input_tokens + r.cache_creation_input_tokens;
+/** What a request sent: fresh input, cache reads and cache writes. */
+export const promptOf = (r) => r.input_tokens + r.cache_read_input_tokens + r.cache_creation_input_tokens;
 
 /**
  * Prices, in place, every request of the extracted files that falls in the window. Throws one
@@ -797,7 +803,7 @@ export const CONTEXT_BUCKETS = [
 const COMPACTION_DROP = 0.6;
 
 /** Indexes of the requests that start a new context, after a compaction. */
-function segmentBreaks(file) {
+export function segmentBreaks(file) {
   const breaks = new Set(file.compactions);
   for (let i = 1; i < file.requests.length; i++) {
     if (promptOf(file.requests[i]) < COMPACTION_DROP * promptOf(file.requests[i - 1])) breaks.add(i);
@@ -856,6 +862,13 @@ export function carriedOutput(file, breaks = segmentBreaks(file)) {
 export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 
 /**
+ * The lifetime, in minutes, that holds most of a context written as `w5` tokens with the 5-minute
+ * lifetime and `w1h` with the hour's: its expiry is the one that forces the whole context to be
+ * re-written, and a small write in the other lifetime does not change it. An hour when the two tie.
+ */
+export const lifetimeHolding = (w5, w1h) => CACHE_TTL_MINUTES[w5 > w1h ? "5m" : "1h"];
+
+/**
  * Main-session requests that came after the cache expired and re-wrote the whole context: idle
  * longer than the lifetime the context was last written with (1 hour, or 5 minutes),
  * and not the first request after a compaction, which re-writes a new, smaller context anyway.
@@ -871,14 +884,13 @@ export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 export function coldResumes(file, breaks = segmentBreaks(file)) {
   if (file.sub) return [];
   const out = [];
-  // The lifetime that holds most of the context, counted since the last compaction, is the one
-  // whose expiry forces the re-write; one small write in the other lifetime does not change it.
+  // The context's lifetime is counted over what was written since the last compaction; before
+  // anything is, the request's own writes decide it.
   let held = { "5m": 0, "1h": 0 };
   let previous;
   for (const r of file.requests) {
     if (breaks.has(r.index)) held = { "5m": 0, "1h": 0 };
-    const total = held["5m"] + held["1h"];
-    const ttl = CACHE_TTL_MINUTES[total ? (held["5m"] > held["1h"] ? "5m" : "1h") : r.w5 > r.w1h ? "5m" : "1h"];
+    const ttl = held["5m"] + held["1h"] ? lifetimeHolding(held["5m"], held["1h"]) : lifetimeHolding(r.w5, r.w1h);
     held["5m"] += r.w5;
     held["1h"] += r.w1h;
     const before = previous;
@@ -1144,10 +1156,15 @@ function mainCheckoutRoot(cwd) {
   return common ? dirname(common) : null;
 }
 
-/** git's answer, trimmed, or null when git cannot give one. */
-function git(cwd, args) {
+/**
+ * git's answer, trimmed, or null when git cannot give one. Optional locks are off, as in
+ * `agent-guard.mjs`: a `git status` here would otherwise take `index.lock` in a checkout other
+ * sessions are committing in.
+ */
+export function git(cwd, args) {
   try {
-    return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+    return execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
   }
@@ -1320,7 +1337,7 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
     return 0;
   }
 
-  const projectsDir = join(env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "projects");
+  const projectsDir = transcriptsHome(env);
   let dirs = opts.dirs;
   if (!dirs.length) {
     const root = mainCheckoutRoot(cwd);
@@ -1355,7 +1372,7 @@ async function run(argv, { env = process.env, cwd = process.cwd(), out = process
   report.input = { files: files.length, dirs, malformedLines: extracted.reduce((a, f) => a + f.malformed, 0) };
 
   const key = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 8);
-  const logPath = join(tmp, `agent-usage-${env.CLAUDE_CODE_SESSION_ID || "nosession"}-${key}.json`);
+  const logPath = join(tmp, `agent-usage-${sessionId(env.CLAUDE_CODE_SESSION_ID) ?? "nosession"}-${key}.json`);
   try {
     writeFileSync(logPath, JSON.stringify(report, null, 2));
   } catch (error) {

@@ -73,3 +73,14 @@ session-start caveat applies to frontmatter only.
 **Why this does not settle the entry:** the measurement is of `settings.json`, while the open
 question is *frontmatter* wiring for `schema-auditor` and `atomic-commit`, which have still never
 produced a line. It also does not test a matcherless entry. Both settle conditions stand unchanged.
+
+---
+
+## 2026-10-21: a matcherless `settings.json` entry fires for non-shell tools
+
+In a headless session on Claude Code 2.1.304, a `PostToolUse` entry with no `matcher`, wired in
+`.claude/settings.local.json` of a clean clone, logged one line for each of `Read`, `Grep` and
+`Glob`. That is the second half of the settle condition above, for `settings.json`-style wiring.
+The context meter's `PostToolUse` entry relies on it (it must see every tool, not only shells and
+edits). The first half, frontmatter wiring for `schema-auditor` and `atomic-commit`, is still
+unobserved, so this entry stays open and the matcher in their frontmatter stays.

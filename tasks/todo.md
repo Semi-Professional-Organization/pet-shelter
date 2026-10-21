@@ -15,6 +15,142 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# The context meter's root-cause pass
+
+**Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `caa7fce`
+
+The owner held the meter's pull request after seven review rounds and asked for the problems to be
+found again by class and fixed at their roots, with a plan discussed first. The plan is the Claude
+Doc "Context meter: root-cause plan": 17 of the 27 in-scope findings came from three design choices.
+
+- **Done when:** the meter reads transcripts through `usage`'s extractor; one resolver names a
+  session for every command; the hand-off header is written and read from one line list and the
+  body check is headings only; the meter's behaviour is unchanged by replay; every gate is green.
+- **In scope:** the six `scripts/agent/` files this pull request adds, the `usage.mjs` exports they
+  need, their tests, ceilings and ledger entries. The owner added: no dollar figures in the meter's
+  lines.
+- **Not in scope:** new behaviour; `usage`'s analyses; one parser for the command lines; the
+  temp-folder layout.
+
+- [x] Plan by class, discussed with the owner (answers: always ask before a hand-off; review at
+      high; drop the dollar figures).
+- [x] Root 3 `995691b`, root 1 `1c83777`, root 2 `e02881c`, each with a `tasks/decisions/` entry.
+- [x] Review rounds until two in a row found no core-logic bug.
+
+## Review
+
+`/code-review high` on the whole diff. Findings per round, with the in-scope correctness bugs: round
+1, 9 (orient hid an unreadable hand-off when its own session was unknown; a line with no usage read
+as a 0-token context; the meter ignored `usage`'s unmarked compactions), fixed in `cd88332`; round 2,
+7 (both bugs in round 1's own fixes: the extractor change moved `usage`'s report, and ledger
+stopped refusing a missing session before reading stdin), fixed in `c018db4`; round 3, 6 (the
+meter-only guard disagreed with `segmentBreaks`; an invalid id still read stdin first; the writer
+did not keep a title to one line), fixed in `9be01a0`; round 4, 9, no core-logic bug, small fixes in
+`81d5f93`; round 5, 6, no core-logic bug. The loop stopped there. Each fix round's new cases were
+shown failing without the fix, and the meter's reading was replayed against the old reader over this
+machine's transcripts after every round: 0 of 4,597 points differ at the end.
+
+The thread ran past the owner's 500K level, to 514K, before it noticed: its hooks are on this
+branch, and threads start in the main checkout. The owner then asked for one thread per pull request;
+the coordinator cannot restart a thread with a fresh session, and a Remote Control session cannot
+clear itself, so the choice between 500K and a 750K level is the owner's (see the thread).
+
+**Deliberately not done:**
+
+- Round 5's six points, none in core logic: transcript file names in upper case (Claude Code writes
+  lower-case UUIDs), a subagent event with a malformed session_id being logged, a request continued
+  after a compaction (none in the 7 compactions here), `findTranscript`'s callers validating its
+  input, which environment value a refusal blames, and the K-token formatter that `usage` also has.
+- A line with no usage counts as a 0-token request, and a header edited by hand so its lines move
+  reads as unknown: both are `ceiling:` comments, recorded in the cost entry.
+- One parser for the four command lines: recorded in the cost entry, out of scope.
+- The meter still re-runs the extractor when its tail read grows: 141 ms on the whole 124 MB
+  transcript.
+
+# The context meter: `meter`, `ledger handoff`, `recall`, `orient --brief`
+
+**Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `9c79a8e`
+
+The second pull request of the agent-scripts plan: hooks that tell an agent its real context size
+and the state of its cache, and the three commands that make a fresh start cheap. The owner's
+hand-off rule (2026-10-19): above 250K, write the hand-off state before going quiet; on a cold
+resume above 250K, answer, then hand off; backstops at 300K and 500K; on Haiku 5.5, warn at 80K
+and hand off before 100K; never compact. Design rule carried from the planning thread: price a
+call by the context it re-reads, not by the tokens it prints.
+
+- **Done when:** the three hooks are wired in `.claude/settings.json` and observed firing in a
+  headless session started in a clean clone; `ledger handoff` writes a hand-off an agent can
+  continue from, `recall` finds detail in the session that wrote it; the meter's reading and its
+  cold-resume call are measured against `usage` on this repo's transcripts; every gate is green.
+- **In scope:** the `meter` hook (PostToolUse, UserPromptSubmit), a minimal `orient --brief`
+  (SessionStart), `ledger handoff`, `recall`, the docs that prescribed the manual steps, and
+  keeping hand-off entries out of the public issue mirror.
+- **Not in scope:** the full `orient` (PR 5) and the rest of `ledger` with the todo.md split
+  (PR 7); a Stop hook that forces the hand-off; idle-compaction settings; subagent models.
+- **Ceiling:** the meter reads the last request the transcript has finished writing, so it can be
+  a turn behind; how far, and how often its cold-resume call agrees with `usage`, is measured by
+  replay and recorded in its `ceiling:` comments.
+- The CLAUDE.md step 6 scope rule the brief assigned here is already on `master` (#143): nothing
+  to copy.
+
+- [x] Register what success looks like for the new commands in `tasks/open/`, before building.
+- [x] `meter`: thresholds once each, cold resumes, model-aware, silent inside subagents, never
+      blocks a prompt.
+- [x] `ledger handoff`, `recall`, `orient --brief`.
+- [x] Wiring, AGENTS.md, `tasks/README.md`, the mirror exclusion.
+- [x] Accuracy replay; hooks observed firing in a headless session.
+- [x] `/code-review` rounds under the scope rule.
+
+## Review
+
+Built by two sessions: the first ran out of room at 449K and handed off with this branch's own
+`ledger handoff`; the second continued from that file and deleted it at close. The hand-off was
+enough to pick up without asking anything.
+
+**Review tally** (findings: fixed / ceiling stated / declined): round 1, 10: 10/0/0 · round 2, 10:
+6/1/2, plus the hand-off file, deleted at close · round 3, 6: 1/0/5 · round 4, 7: 5/0/2. Round
+2's in-scope correctness bugs: after a compaction the meter read the context the compaction
+replaced (Claude Code writes no request for the compaction itself), so idle compaction would have
+produced a false cold-resume line; it priced fast mode and US-only inference at standard rates;
+`orient`'s hook took its session only from the environment; `recall` picked the newest of several
+sessions' hand-offs in a shared checkout. Round 3's: the hand-off said "no transcript was found"
+when the transcript was there but ended in a compaction, a message round 2's compaction fix made
+false; its five declined findings are new behaviour, recorded in the cost entry, or the
+`postTokens` choice below. Round 4's: two tests read the developer's own transcripts, and
+`recall`'s log of transcript excerpts was readable by anyone sharing the temp folder; also fixed,
+an event with no session shared one marker folder, and two lines here. Declined: a kept message
+re-written after a compaction (none in the 7 compactions on the owner's machine), and the
+hand-off's "unknown" line, which is true of the transcript when a request is still being written.
+Round 5, 7: 2/2/3, and no in-scope correctness bug: a weak test assertion and the order of
+`ledger handoff`'s transcript lookup fixed; one user per temp folder stated as a ceiling; declined
+a fallback for events with no session (every hook event has one), name collisions between session
+ids (they are UUIDs), and calling `recall` read-only while it logs to the temp folder, as `usage`
+does. Round 6, 10: 8/1/1, three of them in-scope correctness bugs in `ledger handoff`'s input,
+all there since round 1: a `~~~` line inside a code block opened by backticks closed it, so a
+real section after it went missing; a session prefix with no transcript to expand it was recorded
+as the session, locking the session out of its own file; and a line break in a title ended the
+H1. Round 7, 7: 7/0/0, five of them more of the same input's edge cases (a field inside a fence,
+inline triple-backtick code, a fence indented four spaces or a tab, an upper-case session id, a
+title quoting the session field); the fence rules now carry a `ceiling:` saying which CommonMark
+structure they model. In-scope findings went 10, 6, 1, 2, 0, 3, 5, so the loop stopped at round 7
+for the owner's word, as the scope rule asks when they stop falling. Later rounds, if any, are
+tallied in the pull request's body.
+
+**Deliberately not done:**
+
+- No Stop hook: the hand-off is asked for, not enforced. Kill condition 3 in
+  `tasks/open/agent-scripts-must-cut-what-a-session-costs.md` decides whether it must be.
+- The price table stays in `usage.mjs`. Importing it is 0.02 s of the hook's 0.34 s on Windows;
+  recorded in the same entry.
+- After a compaction the meter says nothing until the next request, rather than reading
+  `compactMetadata.postTokens`: no level can be crossed in that gap, so the hooks need no number,
+  and a hand-off written in it says the size is unknown, which was accepted over trusting a field
+  older transcripts lack.
+- Haiku's 90K level is unmeasured on Haiku: no session here ran on it. Stated as a `ceiling:` in
+  `RULES`.
+- The hooks were observed in a headless CLI session, not in the desktop app, and a real cold
+  resume was not run end to end; the replay fed old transcripts to the hook's code instead.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

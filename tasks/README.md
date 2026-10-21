@@ -71,3 +71,8 @@ same path, and git merges the directories without a merge driver, a lock, or a p
   `open/CLAIM-<task>.md` and deletes it at close. Reading `open/` at session start therefore shows
   what every other session is working on — no lock, no new concept. For live back-and-forth, use
   cross-session messaging rather than leaving notes here.
+- **A hand-off is just an open entry too.** `node scripts/agent.mjs ledger handoff "<title>"`
+  writes `open/HANDOFF-<slug>.md`: one session's state, in six sections the command checks, for the
+  session that continues its work. Like a claim it is never mirrored, and the session that finishes
+  the work deletes it at its close. Commit it with the branch's work only when the next session
+  will start in another checkout.
