@@ -622,9 +622,6 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
           synthetic++;
           return;
         }
-        // A line with no usage is not a request: read as one, it would be a context of 0 tokens.
-        // None of the 25,798 assistant lines on the owner's machine lacked it (2026-10-21).
-        if (!message.usage || typeof message.usage !== "object") return;
         const key = record.requestId || message.id || record.uuid;
         // When the previous request started, copied history included, so the first new request of
         // a forked or relocated transcript still knows how long the session sat idle. The start,
@@ -728,7 +725,8 @@ export function createExtractor({ session, sub }, seen = new Set(), vitest = new
 
 // ================================ pricing a file ================================
 
-const promptOf = (r) => r.input_tokens + r.cache_read_input_tokens + r.cache_creation_input_tokens;
+/** What a request sent: fresh input, cache reads and cache writes. */
+export const promptOf = (r) => r.input_tokens + r.cache_read_input_tokens + r.cache_creation_input_tokens;
 
 /**
  * Prices, in place, every request of the extracted files that falls in the window. Throws one

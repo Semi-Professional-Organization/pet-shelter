@@ -31,8 +31,8 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CACHE_TTL_MINUTES, createExtractor, lifetimeHolding, priceKey, segmentBreaks } from "./usage.mjs";
-import { findTranscript, hookEvent, projectsDir, readTail, resolveSession } from "./transcript.mjs";
+import { CACHE_TTL_MINUTES, createExtractor, lifetimeHolding, priceKey, promptOf, segmentBreaks } from "./usage.mjs";
+import { findTranscript, givenSession, hookEvent, projectsDir, readTail, resolveSession } from "./transcript.mjs";
 
 // ================================ the rule ================================
 
@@ -95,7 +95,9 @@ function extract(records) {
 
 /**
  * The meter's reading from an extraction: the last model request, as `usage` reads it (lines of
- * one request merged, synthetic messages skipped).
+ * one request merged, synthetic messages skipped), that sent a prompt. One that sent none has not
+ * written its usage (no line here lacks it, 2026-10-21), and read as the context it would be 0
+ * tokens, which re-arms every level.
  *
  * - `size`: what the next request carries at least, which is this request's prompt (fresh input,
  *   cache reads and cache writes) plus its output. `usage` calls the prompt alone `ctx`.
@@ -125,12 +127,15 @@ function extract(records) {
  */
 function readingFrom(extraction) {
   const { requests, compactions } = extraction;
-  if ((compactions.at(-1) ?? 0) >= requests.length) return null;
-  const last = requests.at(-1);
-  const since = requests.slice(Math.max(0, ...[...segmentBreaks(extraction)].filter((i) => i < requests.length)));
+  const at = requests.findLastIndex((r) => promptOf(r) > 0);
+  if (at < 0 || at < (compactions.at(-1) ?? 0)) return null;
+  const last = requests[at];
+  let from = 0;
+  for (const i of segmentBreaks(extraction)) if (i <= at && i > from) from = i;
+  const since = requests.slice(from, at + 1);
   return {
     model: String(last.model),
-    size: last.input_tokens + last.cache_read_input_tokens + last.cache_creation_input_tokens + last.output_tokens,
+    size: promptOf(last) + last.output_tokens,
     start: Date.parse(last.ts),
     ttl: lifetimeHolding(since.reduce((n, r) => n + r.w5, 0), since.reduce((n, r) => n + r.w1h, 0)),
   };
@@ -268,6 +273,7 @@ function hook({ stdin, env, tmp, now, out }) {
   // A subagent's context is not the session's, and a line about the session's size would land in
   // the wrong agent. Without a session id there is nowhere to keep which levels it was told, and a
   // shared folder would silence one session's levels for another; with one, it names the folder.
+  // (One that is not a session id throws in `hookEvent`, so the error log shows the meter is off.)
   if (subagent || !session) return;
   if (event !== "PostToolUse" && event !== "UserPromptSubmit") return;
   const path = transcript || findTranscript(projectsDir(env), session)?.path;
@@ -299,7 +305,7 @@ function manual({ session, json, env, now, out }) {
   };
   let found;
   try {
-    found = resolveSession(session ?? env.CLAUDE_CODE_SESSION_ID, projectsDir(env));
+    found = resolveSession(givenSession(session, env), projectsDir(env));
   } catch (error) {
     return fail(error.message, error.next);
   }

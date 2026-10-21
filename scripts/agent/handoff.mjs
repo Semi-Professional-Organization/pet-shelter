@@ -45,7 +45,7 @@ export function slugOf(title) {
  * that does not match, as in a file edited by hand, reads as unknown.
  */
 const HEADER = [
-  { field: "title", write: (h) => `# Hand-off: ${h.title}`, read: /^# (?:Hand-off: )?(.+)$/ },
+  { field: "title", write: (h) => `# Hand-off: ${h.title}`, read: /^# (?:Hand-off: )?(.+?)\s*$/ },
   { write: () => "" },
   { field: "opened", write: (h) => `**Status:** open · opened ${h.date}`, read: /^\*\*Status:\*\* open · opened (\d{4}-\d{2}-\d{2})$/ },
   { write: () => "" },

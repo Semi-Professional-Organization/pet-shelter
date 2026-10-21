@@ -17,7 +17,7 @@ import { join, resolve } from "node:path";
 import { HANDOFF_DIR, HANDOFF_PREFIX, SECTIONS, checkBody, readHeader, renderHandoff, slugOf } from "./handoff.mjs";
 import { readLatest, tokens } from "./meter.mjs";
 import { describeWhere, whereAmI } from "./orient.mjs";
-import { projectsDir, resolveSession } from "./transcript.mjs";
+import { givenSession, projectsDir, resolveSession } from "./transcript.mjs";
 
 const HELP = `usage: node scripts/agent.mjs ledger handoff "<title>" [--from <file>] [--session <id>]
 
@@ -108,6 +108,13 @@ export async function main(argv, io = {}) {
     say("ERROR", "a hand-off needs a title with letters or digits", 'node scripts/agent.mjs ledger handoff "<title>" --from <file>');
     return 2;
   }
+  let given;
+  try {
+    given = givenSession(opts.session, env);
+  } catch (error) {
+    say("ERROR", error.message, error.next);
+    return 2;
+  }
   let body;
   try {
     body = opts.from !== undefined ? readFileSync(resolve(cwd, opts.from), "utf8") : (io.stdin ?? (process.stdin.isTTY ? "" : readFileSync(0, "utf8")));
@@ -139,7 +146,7 @@ export async function main(argv, io = {}) {
   // command compare against. Looked up last, since it walks every transcript folder.
   let found;
   try {
-    found = resolveSession(opts.session ?? env.CLAUDE_CODE_SESSION_ID, projectsDir(env));
+    found = resolveSession(given, projectsDir(env));
   } catch (error) {
     say("ERROR", error.message, error.next);
     return 2;

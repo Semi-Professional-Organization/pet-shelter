@@ -247,13 +247,16 @@ describe("the hook", () => {
     const traces = () => {
       const dir = join(tmp, "claude-meter");
       const log = join(dir, "errors.log");
-      return { folders: existsSync(dir) ? readdirSync(dir).sort() : [], errors: existsSync(log) ? readFileSync(log, "utf8") : "" };
+      return { folders: existsSync(dir) ? readdirSync(dir).filter((name) => name !== "errors.log").sort() : [], errors: existsSync(log) ? readFileSync(log, "utf8") : "" };
     };
     const before = traces();
     expect(await run({ transcript_path: big, hook_event_name: "PostToolUse", tool_name: "Read" })).toEqual({ code: 0, out: "" });
-    // Nor for one whose session is not a session id, which would otherwise name a folder.
-    expect(await run({ session_id: "../escape", transcript_path: big, hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
     expect(traces()).toEqual(before);
+    // Nor for one whose session is not a session id, which would otherwise name a folder; that
+    // would be a new format, so the error log says the meter is off.
+    expect(await run({ session_id: "../escape", transcript_path: big, hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
+    expect(traces().folders).toEqual(before.folders);
+    expect(traces().errors).toContain('session_id is not a session id: "../escape"');
   });
 
   it("says nothing inside a subagent, whose context is not the session's", async () => {

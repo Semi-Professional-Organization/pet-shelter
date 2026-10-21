@@ -48,31 +48,43 @@ const refusal = (message, next) => Object.assign(new Error(message), { next });
  * sessions or names none.
  */
 export function resolveSession(given, dir) {
-  if (typeof given !== "string" || !given.trim()) throw refusal("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
+  if (typeof given !== "string" || !given.trim()) throw refusal("no session given", "pass --session <id>");
   const name = given.trim().toLowerCase();
   if (!/^[0-9a-f-]+$/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
   if (name.length < MIN_PREFIX) throw refusal(`a session id needs at least ${MIN_PREFIX} characters, not ${given}`, "pass --session <id>");
-  let found;
-  try {
-    found = findTranscript(dir, name);
-  } catch (error) {
-    throw refusal(error.message, "pass more of the session's id");
-  }
+  const found = findTranscript(dir, name);
   if (found) return found;
   if (SESSION_ID.test(name)) return { session: name, path: null };
   throw refusal(`no transcript of session ${given} here, and a prefix needs one to stand for a whole id`, "pass the session's whole id");
 }
 
 /**
+ * The session id a command was given: `--session`, else CLAUDE_CODE_SESSION_ID, for
+ * `resolveSession`. Throws when neither is set. Cheap, so a command can refuse before it reads a
+ * body or walks the transcript folders.
+ *
+ * @param {string | undefined} flag
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function givenSession(flag, env = process.env) {
+  const given = flag ?? env.CLAUDE_CODE_SESSION_ID;
+  if (typeof given !== "string" || !given.trim()) throw refusal("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
+  return given;
+}
+
+/**
  * The fields a hook event's stdin carries that these scripts read: `event`, `session` (as
- * `sessionId` reads it), `transcript`, and `subagent`, set when a subagent's tool call fired it.
- * Throws when the input is not JSON.
+ * `sessionId` reads it, null when there is none), `transcript`, and `subagent`, set when a
+ * subagent's tool call fired it. Throws when the input is not JSON, or names a session with
+ * something that is not a session id, which would be Claude Code changing its format.
  */
 export function hookEvent(stdin) {
   const input = JSON.parse(stdin) ?? {};
+  const session = sessionId(input.session_id);
+  if (input.session_id != null && input.session_id !== "" && !session) throw new Error(`the hook event's session_id is not a session id: ${JSON.stringify(input.session_id)}`);
   return {
     event: input.hook_event_name,
-    session: sessionId(input.session_id),
+    session,
     transcript: typeof input.transcript_path === "string" && input.transcript_path ? input.transcript_path : null,
     subagent: Boolean(input.agent_id),
   };
@@ -105,7 +117,7 @@ export function findTranscript(dir, id) {
     }
   }
   if (found.has(id)) return { session: id, path: found.get(id) };
-  if (found.size > 1) throw new Error(`${id} names ${found.size} sessions: ${[...found.keys()].slice(0, 3).join(", ")}`);
+  if (found.size > 1) throw refusal(`${id} names ${found.size} sessions: ${[...found.keys()].slice(0, 3).join(", ")}`, "pass more of the session's id");
   const [entry] = found;
   return entry ? { session: entry[0], path: entry[1] } : null;
 }

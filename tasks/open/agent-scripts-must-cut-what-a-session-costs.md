@@ -124,3 +124,9 @@ would keep its own mode. A per-user folder fixes both, if these scripts ever run
 Also beyond a ceiling, from the sixth review: `recall` holds a whole transcript in memory while it
 searches, and two sessions handing off under one title in the same instant could overwrite each
 other (a `ceiling:` in `scripts/agent/ledger.mjs`).
+
+Out of scope, from the root-cause pass's second review (2026-10-21): the agent scripts parse their
+command lines by hand, four times (`usage`, `meter`, `ledger`, `recall`), and each checks an
+option's value its own way; an empty `--session` had to be refused in three of them at once.
+`node:util`'s `parseArgs` could replace all four. No finding has come from the parsers otherwise,
+so it waits for the pull request that next changes their options.
