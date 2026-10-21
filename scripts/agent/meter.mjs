@@ -164,8 +164,10 @@ const sizeLine = (reading) => `context ${tokens(reading.size)} on ${reading.mode
 
 const levelLine = (kind, reading) => `meter: ${sizeLine(reading)}. ${advice(kind)}`;
 
+const lifeOf = (ttl) => (ttl === CACHE_TTL_MINUTES["5m"] ? "5 minutes" : "1 hour");
+
 function coldLine(reading, idleMinutes) {
-  const life = reading.ttl === CACHE_TTL_MINUTES["5m"] ? "5 minutes" : "1 hour";
+  const life = lifeOf(reading.ttl);
   return (
     `meter: cold resume. The last request was ${ago(idleMinutes)} ago and this session's cache lives ${life}, ` +
     `so this turn re-writes the whole ${tokens(reading.size)} context. ` +
@@ -223,8 +225,8 @@ export function helpText() {
        node scripts/agent.mjs meter --hook   (reads a hook event on stdin; .claude/settings.json runs it)
 
 The context meter: this session's real context size and whether its cache is still warm, read
-from the session's transcript. Read-only, except that the
-hook keeps which levels it has announced in <tmp>/claude-meter/<session>/.
+from the session's transcript. Read-only, except that the hook keeps which levels it has
+announced in <tmp>/claude-meter/<session>/.
 
 As a hook it adds one line to the agent's context at each level of the hand-off rule, once per
 level, and a line when a message arrives after the cache expired, saying what that turn re-wrote:
@@ -319,7 +321,7 @@ function manual({ session, json, env, now, out }) {
   }
   const lines = [
     `meter: PASS ${sizeLine(reading)}`,
-    `cache: last request ${ago(idleMinutes)} ago; it lives ${reading.ttl === CACHE_TTL_MINUTES["5m"] ? "5 minutes" : "1 hour"}, so it is ${warm ? "warm" : "cold"}`,
+    `cache: last request ${ago(idleMinutes)} ago; it lives ${lifeOf(reading.ttl)}, so it is ${warm ? "warm" : "cold"}`,
   ];
   if (crossed) lines.push(`next: ${advice(crossed[0])}`);
   lines.push(`transcript: ${found.path}`);

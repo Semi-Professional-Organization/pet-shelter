@@ -247,12 +247,15 @@ describe("which session", () => {
     };
     expect(refusal(undefined)).toBe("no session given");
     // What a command was given: --session first, else the environment, and neither is a refusal.
-    expect(givenSession(OTHER.slice(0, 8).toUpperCase(), { CLAUDE_CODE_SESSION_ID: SESSION })).toBe(OTHER.slice(0, 8));
+    expect(givenSession(OTHER.slice(0, 8).toUpperCase(), { CLAUDE_CODE_SESSION_ID: SESSION })).toBe(OTHER.slice(0, 8).toUpperCase());
     expect(givenSession(undefined, { CLAUDE_CODE_SESSION_ID: SESSION })).toBe(SESSION);
     expect(() => givenSession(undefined, {})).toThrow("no session: CLAUDE_CODE_SESSION_ID is not set");
     expect(refusal("bbbbbbbb")).toMatch(/^no transcript of session bbbbbbbb here/);
     expect(refusal("aaaa")).toMatch(/at least 8 characters/);
     expect(refusal("../../etc")).toBe("../../etc is not a session id");
+    expect(refusal("-1234567")).toBe("-1234567 is not a session id");
+    // An empty --session is a name to refuse, not a reason to blame the environment.
+    expect(() => givenSession("", { CLAUDE_CODE_SESSION_ID: SESSION })).toThrow("no session given");
     // A prefix that names two sessions says what to pass instead.
     writeFileSync(join(dir, "D--Dev-Repos-x", `${SESSION.slice(0, 8)}-ffff-2222-3333-444444444444.jsonl`), "");
     expect(() => resolveSession(SESSION.slice(0, 8), dir)).toThrow(expect.objectContaining({ next: "pass more of the session's id" }));
@@ -261,6 +264,7 @@ describe("which session", () => {
     const event = { hook_event_name: "PostToolUse", session_id: SESSION.toUpperCase(), transcript_path: "t.jsonl", agent_id: "a1" };
     expect(hookEvent(JSON.stringify(event))).toEqual({ event: "PostToolUse", session: SESSION, transcript: "t.jsonl", subagent: true });
     expect(hookEvent("null")).toEqual({ event: undefined, session: null, transcript: null, subagent: false });
+    expect(hookEvent(JSON.stringify({ session_id: "  " })).session).toBeNull();
   });
 
   it("compares as one id everywhere, so a hand-off recorded in upper case is still its writer's", async () => {

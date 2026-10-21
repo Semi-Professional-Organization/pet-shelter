@@ -20,7 +20,7 @@ export const projectsDir = (env = process.env) => join(env.CLAUDE_CONFIG_DIR || 
 export const MIN_PREFIX = 8;
 
 /** A whole session id: a lower-case UUID, as its transcript's file name shows. */
-export const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /**
  * A whole session id in the one form the scripts record and compare, lower case, or null for
@@ -42,6 +42,7 @@ function nameOf(given) {
   const name = given.trim().toLowerCase();
   if (!/^[0-9a-f-]+$/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
   if (name.length < MIN_PREFIX) throw refusal(`a session id needs at least ${MIN_PREFIX} characters, not ${given}`, "pass --session <id>");
+  if (!/^[0-9a-f]{8}/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
   return name;
 }
 
@@ -68,8 +69,8 @@ export function resolveSession(given, dir) {
 }
 
 /**
- * The session a command was given, as `nameOf` writes it: `--session`, else
- * CLAUDE_CODE_SESSION_ID, for `resolveSession`. Throws when neither is set or what is set cannot
+ * The session a command was given: `--session`, else CLAUDE_CODE_SESSION_ID, for
+ * `resolveSession`. Throws when neither is set or what is set cannot
  * name a session. It reads nothing, so a command can refuse before it reads a body or walks the
  * transcript folders.
  *
@@ -78,8 +79,9 @@ export function resolveSession(given, dir) {
  */
 export function givenSession(flag, env = process.env) {
   const given = flag ?? env.CLAUDE_CODE_SESSION_ID;
-  if (typeof given !== "string" || !given.trim()) throw refusal("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
-  return nameOf(given);
+  if (flag === undefined && (typeof given !== "string" || !given.trim())) throw refusal("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
+  nameOf(given);
+  return given;
 }
 
 /**
@@ -91,7 +93,8 @@ export function givenSession(flag, env = process.env) {
 export function hookEvent(stdin) {
   const input = JSON.parse(stdin) ?? {};
   const session = sessionId(input.session_id);
-  if (input.session_id != null && input.session_id !== "" && !session) throw new Error(`the hook event's session_id is not a session id: ${JSON.stringify(input.session_id)}`);
+  const blank = input.session_id == null || (typeof input.session_id === "string" && !input.session_id.trim());
+  if (!blank && !session) throw new Error(`the hook event's session_id is not a session id: ${JSON.stringify(input.session_id)}`);
   return {
     event: input.hook_event_name,
     session,
