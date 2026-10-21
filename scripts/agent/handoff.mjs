@@ -12,6 +12,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { sessionId } from "./transcript.mjs";
+
 export const HANDOFF_DIR = "tasks/open";
 export const HANDOFF_PREFIX = "HANDOFF-";
 
@@ -51,6 +53,7 @@ const HEADER = [
     field: "session",
     write: (h) => `- **From session:** \`${h.session}\`, whose transcript \`node scripts/agent.mjs recall <term>\` searches.`,
     read: /^- \*\*From session:\*\* `([^`]+)`/,
+    as: sessionId,
   },
   { write: (h) => `- **Where:** ${h.where}` },
   { write: (h) => `- **Context at hand-off:** ${h.context}` },
@@ -100,12 +103,19 @@ export function renderHandoff({ title, date, session, where, context, body, eol 
   return eol === "\n" ? text : text.replace(/\n/g, eol);
 }
 
-/** The header's fields (`title`, `opened`, `session`), each null where its line does not match. */
+/**
+ * The header's fields (`title`, `opened`, `session`), each null where its line does not match. The
+ * session is read as `sessionId` reads any session id, so it compares with the one a command runs as.
+ *
+ * @returns {{ title: string | null, opened: string | null, session: string | null }}
+ */
 export function readHeader(text) {
   const lines = String(text).split(/\r?\n/);
   const fields = {};
   HEADER.forEach((line, i) => {
-    if (line.field) fields[line.field] = line.read.exec(lines[i] ?? "")?.[1] ?? null;
+    if (!line.field) return;
+    const value = line.read.exec(lines[i] ?? "")?.[1] ?? null;
+    fields[line.field] = value !== null && line.as ? line.as(value) : value;
   });
   return fields;
 }

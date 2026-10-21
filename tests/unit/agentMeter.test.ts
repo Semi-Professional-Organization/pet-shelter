@@ -51,6 +51,9 @@ const toolResult = (minutes: number) => ({
 /** A reading of `size` tokens whose last request started `idle` minutes before T0. */
 const reading = (size: number, { idle = 1, ttl = 60, model = "claude-opus-5-5" } = {}) => ({ model, size, start: T0 - idle * 60_000, ttl });
 
+/** The n-th session's id, a UUID as Claude Code writes one. */
+const id = (n: number) => `${String(n).padStart(8, "0")}-0000-4000-8000-000000000000`;
+
 const levels = (r: ReturnType<typeof reading>, fired: string[] = [], event = "PostToolUse") => assess({ event, reading: r, fired: new Set(fired), now: T0 });
 
 describe("the reading", () => {
@@ -207,18 +210,20 @@ describe("the hook", () => {
   }
 
   it("adds its line to the agent's context once, as the hook's additional context", async () => {
-    const event = { session_id: "s-once", transcript_path: big, hook_event_name: "PostToolUse", tool_name: "Bash" };
+    const event = { session_id: id(1), transcript_path: big, hook_event_name: "PostToolUse", tool_name: "Bash" };
     const first = await run(event);
     expect(first.code).toBe(0);
     expect(JSON.parse(first.out)).toEqual({
       hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: expect.stringMatching(/^meter: context 521K .* Hand off now/) },
     });
-    expect(readdirSync(join(tmp, "claude-meter", "s-once")).sort()).toEqual(["milestone-300000", "now-500000", "quiet-250000"]);
+    expect(readdirSync(join(tmp, "claude-meter", id(1))).sort()).toEqual(["milestone-300000", "now-500000", "quiet-250000"]);
     expect(await run(event)).toEqual({ code: 0, out: "" });
+    // The same session in upper case is the same session, with the same levels already told.
+    expect(await run({ ...event, session_id: id(1).toUpperCase() })).toEqual({ code: 0, out: "" });
   });
 
   it("answers a message under its own event name", async () => {
-    const { out } = await run({ session_id: "s-prompt", transcript_path: big, hook_event_name: "UserPromptSubmit", prompt: "hi" }, T0 + 3 * 3_600_000);
+    const { out } = await run({ session_id: id(2), transcript_path: big, hook_event_name: "UserPromptSubmit", prompt: "hi" }, T0 + 3 * 3_600_000);
     const added = JSON.parse(out).hookSpecificOutput;
     expect(added.hookEventName).toBe("UserPromptSubmit");
     expect(added.additionalContext).toMatch(/^meter: cold resume\. The last request was 3 hours ago/);
@@ -227,10 +232,10 @@ describe("the hook", () => {
   it("says nothing when a message arrives after a compaction, before the new context's first request", async () => {
     // Idle compaction runs shortly before the cache expires, so the next message comes after it.
     const compacted = transcript("compacted", [line("r1", 0, { read: 520_000, w1h: 1_000 }), { type: "system", subtype: "compact_boundary", timestamp: at(55) }]);
-    expect(await run({ session_id: "s-compacted", transcript_path: compacted, hook_event_name: "UserPromptSubmit", prompt: "back" }, T0 + 3 * 3_600_000)).toEqual({ code: 0, out: "" });
+    expect(await run({ session_id: id(3), transcript_path: compacted, hook_event_name: "UserPromptSubmit", prompt: "back" }, T0 + 3 * 3_600_000)).toEqual({ code: 0, out: "" });
   });
 
-  it("says nothing for an event with no session, which has nowhere of its own to keep its levels", async () => {
+  it("says nothing for an event with no session id, which has nowhere of its own to keep its levels", async () => {
     // What the meter left behind: its marker folders and its error log, which a throw would grow.
     const traces = () => {
       const dir = join(tmp, "claude-meter");
@@ -239,12 +244,14 @@ describe("the hook", () => {
     };
     const before = traces();
     expect(await run({ transcript_path: big, hook_event_name: "PostToolUse", tool_name: "Read" })).toEqual({ code: 0, out: "" });
+    // Nor for one whose session is not a session id, which would otherwise name a folder.
+    expect(await run({ session_id: "../escape", transcript_path: big, hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
     expect(traces()).toEqual(before);
   });
 
   it("says nothing inside a subagent, whose context is not the session's", async () => {
-    expect(await run({ session_id: "s-sub", agent_id: "a1", agent_type: "Explore", transcript_path: big, hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
-    expect(existsSync(join(tmp, "claude-meter", "s-sub"))).toBe(false);
+    expect(await run({ session_id: id(4), agent_id: "a1", agent_type: "Explore", transcript_path: big, hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
+    expect(existsSync(join(tmp, "claude-meter", id(4)))).toBe(false);
   });
 
   it("never fails or blocks the call: bad input is logged and exits 0 in silence", async () => {
@@ -252,7 +259,7 @@ describe("the hook", () => {
     const write = (s: string) => (out += s);
     expect(await main(["--hook"], { stdin: "not json", tmp, now: T0, out: { write } })).toBe(0);
     expect(await main(["--hook", "--bogus"], { stdin: "{}", tmp, now: T0, out: { write } })).toBe(0);
-    expect(await run({ session_id: "s-missing", transcript_path: join(tmp, "nope.jsonl"), hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
+    expect(await run({ session_id: id(5), transcript_path: join(tmp, "nope.jsonl"), hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
     expect(out).toBe("");
     expect(readFileSync(join(tmp, "claude-meter", "errors.log"), "utf8")).toContain("SyntaxError");
   });

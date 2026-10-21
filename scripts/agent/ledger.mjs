@@ -17,7 +17,7 @@ import { join, resolve } from "node:path";
 import { HANDOFF_DIR, HANDOFF_PREFIX, SECTIONS, checkBody, readHeader, renderHandoff, slugOf } from "./handoff.mjs";
 import { readLatest, tokens } from "./meter.mjs";
 import { describeWhere, whereAmI } from "./orient.mjs";
-import { SESSION_ID, findTranscript, projectsDir } from "./transcript.mjs";
+import { projectsDir, resolveSession } from "./transcript.mjs";
 
 const HELP = `usage: node scripts/agent.mjs ledger handoff "<title>" [--from <file>] [--session <id>]
 
@@ -108,11 +108,6 @@ export async function main(argv, io = {}) {
     say("ERROR", "a hand-off needs a title with letters or digits", 'node scripts/agent.mjs ledger handoff "<title>" --from <file>');
     return 2;
   }
-  const given = opts.session ?? env.CLAUDE_CODE_SESSION_ID;
-  if (!given) {
-    say("ERROR", "no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
-    return 2;
-  }
   let body;
   try {
     body = opts.from !== undefined ? readFileSync(resolve(cwd, opts.from), "utf8") : (io.stdin ?? (process.stdin.isTTY ? "" : readFileSync(0, "utf8")));
@@ -140,23 +135,16 @@ export async function main(argv, io = {}) {
     return 2;
   }
 
-  // A prefix stands for the session it starts. The file records the full id, which is what
-  // `recall`, `orient` and a later run of this command compare against. Looked up last, since it
-  // walks every transcript folder.
+  // The file records the whole id, which is what `recall`, `orient` and a later run of this
+  // command compare against. Looked up last, since it walks every transcript folder.
   let found;
   try {
-    found = findTranscript(projectsDir(env), given);
+    found = resolveSession(opts.session ?? env.CLAUDE_CODE_SESSION_ID, projectsDir(env));
   } catch (error) {
-    say("ERROR", error.message);
+    say("ERROR", error.message, error.next);
     return 2;
   }
-  // Without a transcript a prefix cannot be expanded, and recorded as it is it would lock the
-  // session out of its own file.
-  if (!found && !SESSION_ID.test(given)) {
-    say("ERROR", `no transcript of session ${given} here, and it is not a whole session id to record as it is`, "pass the session's full id, a lower-case UUID");
-    return 2;
-  }
-  const session = found?.session ?? given;
+  const { session } = found;
 
   const file = `${HANDOFF_DIR}/${HANDOFF_PREFIX}${slugOf(opts.title)}.md`;
   const path = join(w.top, file);
@@ -171,7 +159,7 @@ export async function main(argv, io = {}) {
   }
 
   let context = "unknown: no transcript of this session was found.";
-  if (found) {
+  if (found.path) {
     try {
       const { reading, why } = readLatest(found.path);
       context = reading ? `${tokens(reading.size)} tokens on ${reading.model}.` : `unknown: no model request in its transcript ${why}.`;

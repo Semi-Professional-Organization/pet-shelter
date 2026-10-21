@@ -18,7 +18,7 @@ import { join } from "node:path";
 
 import { readHandoffs } from "./handoff.mjs";
 import { git } from "./usage.mjs";
-import { findTranscript, projectsDir, readRecords, subagentTranscripts } from "./transcript.mjs";
+import { projectsDir, readRecords, resolveSession, sessionId, subagentTranscripts } from "./transcript.mjs";
 
 /** Lines of matches shown; the rest are in the log. */
 export const SHOWN = 25;
@@ -162,7 +162,8 @@ export async function main(argv, io = {}) {
     // Threads share a checkout, so with more than one session's hand-off here the newest is not
     // necessarily the one being continued.
     const top = git(cwd, ["rev-parse", "--show-toplevel"]);
-    const others = top ? readHandoffs(top).filter((h) => h.session && h.session !== env.CLAUDE_CODE_SESSION_ID) : [];
+    const self = sessionId(env.CLAUDE_CODE_SESSION_ID);
+    const others = top ? readHandoffs(top).filter((h) => h.session && h.session !== self) : [];
     const sessions = new Set(others.map((h) => h.session));
     if (!sessions.size) return fail(2, "ERROR", "no hand-off from another session in tasks/open/ names a session", "pass --session <id>");
     if (sessions.size > 1) {
@@ -173,11 +174,11 @@ export async function main(argv, io = {}) {
   }
   let found;
   try {
-    found = findTranscript(projectsDir(env), id);
+    found = resolveSession(id, projectsDir(env));
   } catch (error) {
-    return fail(2, "ERROR", error.message);
+    return fail(2, "ERROR", error.message, error.next);
   }
-  if (!found) return fail(2, "ERROR", `no transcript for session ${id} in ${projectsDir(env)}; Claude Code may have deleted it`);
+  if (!found.path) return fail(2, "ERROR", `no transcript for session ${found.session} in ${projectsDir(env)}; Claude Code may have deleted it`);
 
   const pieces = [
     ...piecesOf(readRecords(found.path)),

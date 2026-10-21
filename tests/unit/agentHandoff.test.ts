@@ -8,6 +8,7 @@ import { SECTIONS, checkBody, readHandoffs, readHeader, renderHandoff, slugOf } 
 import { main as ledger } from "../../scripts/agent/ledger.mjs";
 import { main as orient, orientLines, whereAmI } from "../../scripts/agent/orient.mjs";
 import { SHOWN, main as recall, piecesOf, search, snippet } from "../../scripts/agent/recall.mjs";
+import { hookEvent, resolveSession, sessionId } from "../../scripts/agent/transcript.mjs";
 
 /**
  * A fresh session is cheap only if the old one's state survives the move: `ledger handoff` writes
@@ -182,11 +183,12 @@ describe("ledger handoff", () => {
     // of its own file.
     const lost = await run(["handoff", "Lost", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env: { CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
     expect(lost.code).toBe(2);
-    expect(lost.out).toBe("ledger: ERROR no transcript of session aaaaaaaa here, and it is not a whole session id to record as it is\nnext: pass the session's full id, a lower-case UUID\n");
-    // Session ids are compared as written, so an upper-case one would lock the session out too.
-    const upper = await run(["handoff", "Lost", "--session", SESSION.toUpperCase()], { cwd: top, stdin: BODY, env: { CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
-    expect(upper.code).toBe(2);
-    expect(readHandoffs(top).map((h) => h.file)).toEqual(["tasks/open/HANDOFF-prefixed.md"]);
+    expect(lost.out).toBe("ledger: ERROR no transcript of session aaaaaaaa here, and a prefix needs one to stand for a whole id\nnext: pass the session's whole id\n");
+    // A UUID ignores case, so an upper-case id is the same session, recorded as transcripts name it.
+    const upper = await run(["handoff", "Upper", "--session", SESSION.toUpperCase()], { cwd: top, stdin: BODY, env: { CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
+    expect(upper.code).toBe(0);
+    expect(readFileSync(join(top, "tasks", "open", "HANDOFF-upper.md"), "utf8")).toContain("- **From session:** `" + SESSION + "`");
+    expect(readHandoffs(top).map((h) => h.file).sort()).toEqual(["tasks/open/HANDOFF-prefixed.md", "tasks/open/HANDOFF-upper.md"]);
   });
 
   it("checks the body before it looks for the session, and keeps the title to one line", async () => {
@@ -213,6 +215,42 @@ describe("ledger handoff", () => {
     expect((await run(["handoff", "名前"], { cwd: top, stdin: BODY, env })).code).toBe(2);
     expect((await run(["handoff", "two", "words"], { cwd: top, stdin: BODY, env })).code).toBe(2);
     expect((await run(["lint"], { cwd: top, env })).out).toMatch(/^ledger: ERROR unknown subcommand lint: only handoff exists yet/);
+  });
+});
+
+describe("which session", () => {
+  it("is one whole id in lower case, however it was given", () => {
+    const dir = join(config(SESSION, []).dir, "projects");
+    expect(resolveSession(SESSION, dir)).toEqual({ session: SESSION, path: expect.stringMatching(/aaaaaaaa-1111-2222-3333-444444444444\.jsonl$/) });
+    expect(resolveSession(SESSION.slice(0, 8).toUpperCase(), dir).session).toBe(SESSION);
+    expect(resolveSession(` ${SESSION.toUpperCase()} `, dir).session).toBe(SESSION);
+    // A whole id with no transcript still names its session; a prefix needs one to expand it.
+    expect(resolveSession(OTHER, dir)).toEqual({ session: OTHER, path: null });
+    const refusal = (given: unknown) => {
+      try {
+        resolveSession(given, dir);
+      } catch (error) {
+        return (error as Error).message;
+      }
+      return "accepted";
+    };
+    expect(refusal(undefined)).toBe("no session: CLAUDE_CODE_SESSION_ID is not set");
+    expect(refusal("bbbbbbbb")).toMatch(/^no transcript of session bbbbbbbb here/);
+    expect(refusal("aaaa")).toMatch(/at least 8 characters/);
+    expect(refusal("../../etc")).toBe("../../etc is not a session id");
+    expect(sessionId(SESSION.toUpperCase())).toBe(SESSION);
+    expect(sessionId("aaaaaaaa")).toBeNull();
+    const event = { hook_event_name: "PostToolUse", session_id: SESSION.toUpperCase(), transcript_path: "t.jsonl", agent_id: "a1" };
+    expect(hookEvent(JSON.stringify(event))).toEqual({ event: "PostToolUse", session: SESSION, transcript: "t.jsonl", subagent: true });
+    expect(hookEvent("null")).toEqual({ event: undefined, session: null, transcript: null, subagent: false });
+  });
+
+  it("compares as one id everywhere, so a hand-off recorded in upper case is still its writer's", async () => {
+    const top = repo();
+    writeFileSync(join(top, "tasks", "open", "HANDOFF-mine.md"), renderHandoff({ title: "Mine", date: "2026-10-21", session: SESSION.toUpperCase(), where: "w", context: "c", body: BODY }));
+    const mine = io({ cwd: top, env: { CLAUDE_CODE_SESSION_ID: SESSION } });
+    expect(await orient(["--brief"], mine.io)).toBe(0);
+    expect(mine.sink.text).not.toContain("HANDOFF-mine.md");
   });
 });
 

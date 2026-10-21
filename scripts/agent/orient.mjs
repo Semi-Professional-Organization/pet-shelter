@@ -16,6 +16,7 @@ import { join, resolve } from "node:path";
 import { caseFolder } from "../lib/invokedAs.mjs";
 import { readHandoffs } from "./handoff.mjs";
 import { ago } from "./meter.mjs";
+import { hookEvent, sessionId } from "./transcript.mjs";
 import { git } from "./usage.mjs";
 
 /** The per-worktree folders under a repository's common git directory. */
@@ -105,15 +106,14 @@ export function orientLines(w, handoffs, options = {}) {
 }
 
 /**
- * The session a hook event names, or undefined. The SessionStart hook is given its session on
- * stdin; the environment is only a fallback, since nothing documents it for hook processes.
+ * The session a hook event names, or null. The SessionStart hook is given its session on stdin;
+ * the environment is only a fallback, since nothing documents it for hook processes.
  */
 function hookSession(read) {
   try {
-    const id = JSON.parse(read()).session_id;
-    return typeof id === "string" && id ? id : undefined;
+    return hookEvent(read()).session;
   } catch {
-    return undefined;
+    return null;
   }
 }
 
@@ -151,7 +151,7 @@ export async function main(argv, io = {}) {
       out.write(`orient: ERROR ${cwd} is not in a git repository\n`);
       return hook ? 0 : 2;
     }
-    const session = (hook ? hookSession(() => io.stdin ?? (process.stdin.isTTY ? "" : readFileSync(0, "utf8"))) : undefined) ?? env.CLAUDE_CODE_SESSION_ID;
+    const session = (hook ? hookSession(() => io.stdin ?? (process.stdin.isTTY ? "" : readFileSync(0, "utf8"))) : null) ?? sessionId(env.CLAUDE_CODE_SESSION_ID);
     const lines = orientLines(w, readHandoffs(w.top), { hook, session });
     out.write(`${lines.join("\n")}\n`);
     return hook || !w.stray ? 0 : 1;

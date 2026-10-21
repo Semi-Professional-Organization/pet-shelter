@@ -1,7 +1,7 @@
 /**
- * Finding and reading Claude Code session transcripts, for the agent scripts that look at one
- * session rather than all of them (`meter`, `recall`, `ledger handoff`). `usage`, which reads them
- * all, keeps its own streaming reader.
+ * Which session a command acts for, and finding and reading its transcript, for the agent scripts
+ * that look at one session rather than all of them (`meter`, `orient`, `recall`, `ledger
+ * handoff`). `usage`, which reads them all, keeps its own streaming reader.
  *
  * A transcript is `<projects>/<folder>/<session>.jsonl`, one JSON record per line, and its
  * subagents' are `<projects>/<folder>/<session>/subagents/*.jsonl`. Lines are split on "\n" only:
@@ -19,11 +19,59 @@ export const projectsDir = (env = process.env) => join(env.CLAUDE_CONFIG_DIR || 
 /** A session id short enough to match more than one session by accident is refused. */
 export const MIN_PREFIX = 8;
 
-/**
- * A whole session id: a lower-case UUID, as its transcript's file name shows. Ids are compared as
- * written everywhere, so an upper-case copy is a different session.
- */
+/** A whole session id: a lower-case UUID, as its transcript's file name shows. */
 export const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * A whole session id in the one form the scripts record and compare, lower case, or null for
+ * anything that is not one. UUIDs ignore case, so an upper-case copy names the same session.
+ */
+export function sessionId(value) {
+  const id = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return SESSION_ID.test(id) ? id : null;
+}
+
+const refusal = (message, next) => Object.assign(new Error(message), { next });
+
+/**
+ * The session a command names, as `{ session, path }`: `session` the whole id, as `sessionId`
+ * writes it, and `path` its transcript, or null where none is found (Claude Code deletes them after
+ * 30 days by default). Every command that takes a session from `--session` or from
+ * CLAUDE_CODE_SESSION_ID goes through here, so they all agree on what names a session.
+ * CLAUDE_CODE_SESSION_ID is the session's current id: Claude Code 2.1.304 sets it in each shell it
+ * starts, from the session's id at that moment (read from its bundle, not watched across a
+ * `/clear`).
+ *
+ * A prefix of MIN_PREFIX or more characters stands for the one session whose transcript it starts,
+ * so it needs that transcript. Throws, with the reason and a `next` step, when nothing is named,
+ * the name is not a session id or the start of one, or a prefix is too short, names several
+ * sessions or names none.
+ */
+export function resolveSession(given, dir) {
+  if (typeof given !== "string" || !given.trim()) throw refusal("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
+  const name = given.trim().toLowerCase();
+  if (!/^[0-9a-f-]+$/.test(name)) throw refusal(`${given} is not a session id`, "pass --session <id>");
+  if (name.length < MIN_PREFIX) throw refusal(`a session id needs at least ${MIN_PREFIX} characters, not ${given}`, "pass --session <id>");
+  const found = findTranscript(dir, name);
+  if (found) return found;
+  if (SESSION_ID.test(name)) return { session: name, path: null };
+  throw refusal(`no transcript of session ${given} here, and a prefix needs one to stand for a whole id`, "pass the session's whole id");
+}
+
+/**
+ * The fields a hook event's stdin carries that these scripts read: `event`, `session` (as
+ * `sessionId` reads it), `transcript`, and `subagent`, set when a subagent's tool call fired it.
+ * Throws when the input is not JSON.
+ */
+export function hookEvent(stdin) {
+  const input = JSON.parse(stdin) ?? {};
+  return {
+    event: input.hook_event_name,
+    session: sessionId(input.session_id),
+    transcript: typeof input.transcript_path === "string" && input.transcript_path ? input.transcript_path : null,
+    subagent: Boolean(input.agent_id),
+  };
+}
 
 /**
  * The transcript of one session, by its id or a prefix of at least MIN_PREFIX characters, searched

@@ -32,7 +32,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { CACHE_TTL_MINUTES, createExtractor, lifetimeHolding, priceKey } from "./usage.mjs";
-import { findTranscript, projectsDir, readTail } from "./transcript.mjs";
+import { findTranscript, hookEvent, projectsDir, readTail, resolveSession } from "./transcript.mjs";
 
 // ================================ the rule ================================
 
@@ -262,21 +262,18 @@ function claim(path) {
   }
 }
 
-const safeName = (id) => String(id).replace(/[^A-Za-z0-9-]/g, "_");
-
 function hook({ stdin, env, tmp, now, out }) {
-  const input = JSON.parse(stdin);
-  // A subagent's tool call carries `agent_id`; its context is not the session's, and a line about
-  // the session's size would land in the wrong agent. Without a session there is nowhere to keep
-  // which levels it was told, and a shared folder would silence one session's levels for another.
-  if (input.agent_id || typeof input.session_id !== "string" || !input.session_id) return;
-  const event = input.hook_event_name;
+  const { event, session, transcript, subagent } = hookEvent(stdin);
+  // A subagent's context is not the session's, and a line about the session's size would land in
+  // the wrong agent. Without a session id there is nowhere to keep which levels it was told, and a
+  // shared folder would silence one session's levels for another; with one, it names the folder.
+  if (subagent || !session) return;
   if (event !== "PostToolUse" && event !== "UserPromptSubmit") return;
-  const path = input.transcript_path || findTranscript(projectsDir(env), input.session_id)?.path;
+  const path = transcript || findTranscript(projectsDir(env), session)?.path;
   if (!path || !existsSync(path)) return;
   const { reading } = readLatest(path);
   if (!reading) return;
-  const dir = join(tmp, "claude-meter", safeName(input.session_id));
+  const dir = join(tmp, "claude-meter", session);
   mkdirSync(dir, { recursive: true });
   const lines = settle(dir, assess({ event, reading, fired: new Set(readdirSync(dir)), now }));
   if (lines.length) out.write(JSON.stringify({ hookSpecificOutput: { hookEventName: event, additionalContext: lines.join("\n") } }));
@@ -299,10 +296,13 @@ function manual({ session, json, env, now, out }) {
     out.write(`meter: ERROR ${message}\n${next ? `next: ${next}\n` : ""}`);
     return 2;
   };
-  const id = session ?? env.CLAUDE_CODE_SESSION_ID;
-  if (!id) return fail("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
-  const found = findTranscript(projectsDir(env), id);
-  if (!found) return fail(`no transcript for session ${id} in ${projectsDir(env)}`);
+  let found;
+  try {
+    found = resolveSession(session ?? env.CLAUDE_CODE_SESSION_ID, projectsDir(env));
+  } catch (error) {
+    return fail(error.message, error.next);
+  }
+  if (!found.path) return fail(`no transcript for session ${found.session} in ${projectsDir(env)}`);
   const { reading, why } = readLatest(found.path);
   if (!reading) return fail(`no model request in ${found.path} ${why}`);
   const idleMinutes = (now - reading.start) / 60_000;
