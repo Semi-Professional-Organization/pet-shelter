@@ -96,6 +96,14 @@ comes through `readSnapshot`, and mutations reintroducing the gap or the swap de
 Recorded as ceilings, not fixed: a member's sub-issues read one level deep, and the shape of
 GitHub's answer for an unreadable parent (assumed an error, not observed).
 
+Rebuild round 2 found the depth check still guessing (a member's read-time height kept after its
+sub-issues moved, refusing legal trees), the verify step able to lose new parents' numbers, an
+oracle that judged emptiness through the same reader and accepted only loops, ancestors under an
+unreadable issue treated as top-level, and a fake that answered a missing node silently. The reader
+now follows sub-issues all the way down, so heights are counted; unknowable depth skips the link
+with a note; numbers are recorded before verifying; the oracle checks the fake's truth and every
+rule; the generator builds deep chains. The first ceiling above is gone. 30,000 seeds held once.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

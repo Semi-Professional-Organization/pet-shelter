@@ -224,9 +224,10 @@ async function main(argv) {
     }
   }
 
+  // Record first: if the check below fails to read, the numbers must already be safe.
+  recordInWorkingCopy(record);
   // Proof that it finished: read GitHub again, with every parent recorded, and plan again.
   const after = planGroups(recordParents(config, record), readSnapshot(graphql, { repo, numbers: [...numbers, ...record.values()], parents: [...parents, ...record.values()] }), target);
-  recordInWorkingCopy(record);
   if (after.actions.length > 0) {
     write(`\nGitHub still differs from the file after applying; ${after.actions.length} actions remain:`);
     write(after.actions.map(formatAction).join("\n"));

@@ -313,6 +313,33 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     expect(next.actions).toEqual([]);
   });
 
+  it("leaves an issue alone, with a note, when sub-issues it cannot see make its depth unknowable", () => {
+    // The generator found this: a member's hidden sub-issue had a long visible chain below it.
+    const fake = github(1);
+    const hidden = fake.add();
+    const chain = Array.from({ length: 7 }, () => fake.add());
+    fake.link(fake.byNumber(1)!.id, hidden.id);
+    fake.link(hidden.id, chain[0].id);
+    for (let i = 1; i < chain.length; i += 1) fake.link(chain[i - 1].id, chain[i].id);
+    hidden.hidden = true;
+    const result = plan(fake, { groups: [group("a", [1])] });
+    expect(types(result.actions)).toEqual(["create"]);
+    expect(result.notes).toEqual([expect.stringMatching(/#1 \(in a\) is left where it is: it has sub-issues this account cannot see/)]);
+  });
+
+  it("reads a member's sub-issues all the way down, so a deep one is counted, not guessed", () => {
+    const fake = github(1);
+    const chain = Array.from({ length: 7 }, () => fake.add());
+    fake.link(fake.byNumber(1)!.id, chain[0].id);
+    for (let i = 1; i < chain.length; i += 1) fake.link(chain[i - 1].id, chain[i].id);
+    const g = group("a", [1]);
+    const parent = parentOn(fake, g);
+    const top = fake.add();
+    fake.link(top.id, parent.id);
+    // #1 has seven levels below it; under a parent that is itself a sub-issue, that is nine.
+    expect(() => plan(fake, { groups: [{ ...g, parent: parent.number }] })).toThrow(/nest deeper than 8 levels/);
+  });
+
   it("refuses nesting deeper than GitHub's eight levels", () => {
     const fake = github(1);
     const chain = Array.from({ length: LIMITS.depth }, () => fake.add());

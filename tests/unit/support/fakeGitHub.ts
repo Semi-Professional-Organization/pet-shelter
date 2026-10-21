@@ -144,7 +144,14 @@ export class FakeGitHub {
     }
     if (query.includes("nodes(ids")) {
       const ids = variables.ids as string[];
-      return { data: { nodes: ids.map((id, i) => (this.issues.get(id) && !this.issues.get(id)!.hidden ? fields(this.issues.get(id)!, ["nodes", i]) : null)) }, errors };
+      const nodes = ids.map((id, i) => {
+        const issue = this.issues.get(id);
+        if (issue && !issue.hidden) return query.includes("subIssues(") ? withChildren(issue, ["nodes", i]) : fields(issue, ["nodes", i]);
+        // Observed on GitHub 2026-10-21: an id it cannot resolve is null with NOT_FOUND at its path.
+        errors.push({ type: "NOT_FOUND", path: ["nodes", i], message: `Could not resolve to a node with the global id of '${id}'` });
+        return null;
+      });
+      return { data: { nodes }, errors };
     }
     const repository: Record<string, unknown> = {};
     for (const [, alias, number] of query.matchAll(/(i\d+): issue\(number: (\d+)\)/g)) {

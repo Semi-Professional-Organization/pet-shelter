@@ -47,12 +47,15 @@ the file may hold (an unknown one is refused, since `--apply` rewrites the file)
 ordered by simulating them against those rules, with counts and heights moving as they would, so
 no link is refused for a slot, a loop or a depth that another link would have cleared; two full
 parents swapping an issue get one unlinked first to make room. What no order can make legal (a
-parent nested under its own member) is refused by the dry run. A refusal at apply is then
-run-wide (access, network, rate limit), which is why apply stops at the first one. Two limits
-remain, each marked `ceiling:` in the code: a member's own sub-issues are read one level deep, so
-deeper nesting below a member could still be refused for depth; and an unreadable parent is
-assumed to come back as an error, which was not observed. Rate limits are waited out (60s, 120s,
-180s; `gh` hides Retry-After). An issue under a parent this account cannot see is left alone.
+parent nested under its own member) is refused by the dry run. To count depth rather than guess
+it, the reader follows sub-issues all the way down below every member and parent, and every
+ancestor above each parent. Where an issue this account cannot see makes a depth unknowable (above
+the parent, or below the issue), that link is skipped with a note instead of risked; an issue under
+a parent this account cannot see is likewise left alone. A refusal at apply is then run-wide
+(access, network, rate limit), which is why apply stops at the first one. One assumption remains,
+marked `ceiling:` in the code: an unreadable parent comes back as an error at its path, which was
+not observed (an unresolvable node id was: NOT_FOUND at its path). Rate limits are waited out (60s,
+120s, 180s; `gh` hides Retry-After).
 
 **Dry run from the working copy; `--apply` from the default branch, and it must finish.** A dry run
 plans the working copy, so an edit shows before it is committed, and says when it differs from
@@ -69,7 +72,10 @@ rules, over 3,000 generated states (missing,
 closed, duplicate, unlabelled, recased and edited parents; departed groups; foreign, hidden and
 hand-made links). Every state converges in one apply, without a refused write, a second parent, or
 a touched link the file does not own, or is refused for a reason the test confirms (a real loop, an
-emptied file). Measured 2026-10-21: 2,667 converged, 193 refused a real loop, 140 an emptied file.
+emptied file). The oracle judges a refusal from the fake's whole truth: a loop, more than eight
+levels, more than 100 sub-issues. A second check reads the fake's truth, not the reader, to confirm
+every sub-issue of a managed parent belongs there. Measured 2026-10-21: 2,607 converged, 253 refused
+an impossible tree, 140 an emptied file; a one-off run of 30,000 seeds held every check.
 The first version planned from the fake's whole state and so missed a gap in the reader; review
 caught it, and every plan in the tests now comes through the reader.
 

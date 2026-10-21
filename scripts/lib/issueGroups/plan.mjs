@@ -252,7 +252,8 @@ export function planGroups(config, snapshot, target) {
   }
 
   // 5. Simulate the links against GitHub's rules, in an order that keeps every step legal.
-  const orderedLinks = orderLinks({ byId, unlinks, links, hiddenChildren: hiddenChildrenOf(snapshot) });
+  const { ordered: orderedLinks, skipped } = orderLinks({ byId, unlinks, links, hiddenChildren: hiddenChildrenOf(snapshot) });
+  for (const { action, reason } of skipped) notes.push(`#${action.child} (in ${action.key}) is left where it is: ${reason}. Someone who can see it must sort it out.`);
 
   for (const number of config.standalone ?? []) {
     const issue = byNumber.get(number);
@@ -304,11 +305,14 @@ function hiddenChildrenOf(snapshot) {
  * it goes, so every check sees the tree as it will be at that step. Unlinks run first and free
  * slots, and each link frees one in the parent it leaves. When only a full parent blocks progress
  * and another link is due to take one of its issues elsewhere, that issue is unlinked first to make
- * room. A link that no order can make legal is a problem, reported before anything is written.
+ * room.
  *
- * ceiling: below an issue whose sub-issues were not read (a member's own sub-issues), its height
- * counts one level if it has any. A member with sub-issues nested deeper could still pass here and
- * be refused for depth. Nothing in this repository nests below one level.
+ * Two outcomes for a link no order makes legal. If a rule is broken whatever is unknown, it is a
+ * problem, reported before anything is written. If the depth cannot be known, because an issue this
+ * account cannot see sits above the parent or below the issue, the link is skipped with a note:
+ * nothing can prove it legal, and GitHub might refuse it.
+ *
+ * Returns `{ ordered, skipped }`.
  */
 function orderLinks({ byId, unlinks, links, hiddenChildren }) {
   const parent = new Map([...byId.values()].map((issue) => [issue.id, issue.parentId ?? null]));
@@ -340,21 +344,38 @@ function orderLinks({ byId, unlinks, links, hiddenChildren }) {
     for (let at = parent.get(id); at && !seen.includes(at); at = parent.get(at)) seen.push(at);
     return seen;
   };
+  // The reader follows sub-issues all the way down, so a sub-issue GitHub counts but the snapshot
+  // lacks is one this account cannot see: below it, the height is unknown.
   const height = (id, seen = new Set()) => {
     if (seen.has(id)) return 0;
     seen.add(id);
-    const issue = byId.get(id);
-    let levels = issue && !issue.childrenRead ? issue.height ?? 0 : 0;
+    if ((hiddenChildren.get(id) ?? 0) > 0) return Infinity;
+    let levels = 0;
     for (const child of kids.get(id) ?? []) levels = Math.max(levels, 1 + height(child, seen));
     return levels;
   };
+  // Likewise above: a chain that reaches an issue this account cannot see, or one not read.
+  const chainKnown = (id) => {
+    for (const at of [id, ...ancestors(id)]) {
+      if (at.startsWith("new:")) return true; // a parent this run creates is top-level
+      const issue = byId.get(at);
+      if (!issue || issue.parentHidden) return false;
+    }
+    return true;
+  };
   const full = (action) => current(action.parentId) >= LIMITS.children;
+  const loops = (action) => action.parentId === action.childId || ancestors(action.parentId).includes(action.childId);
+  const unknowable = (action) => !chainKnown(action.parentId) || height(action.childId) === Infinity;
   const why = (action) => {
     if (full(action)) return `its parent already has ${LIMITS.children} sub-issues`;
-    if (action.parentId === action.childId || ancestors(action.parentId).includes(action.childId)) return "it would make a loop";
+    if (loops(action)) return "it would make a loop";
+    if (!chainKnown(action.parentId)) return "its parent sits below an issue this account cannot see, so the depth cannot be checked";
+    if (height(action.childId) === Infinity) return "it has sub-issues this account cannot see, so the depth cannot be checked";
     if (ancestors(action.parentId).length + 2 + height(action.childId) > LIMITS.depth + 1) return `it would nest deeper than ${LIMITS.depth} levels`;
     return null;
   };
+
+  const skipped = [];
   const pending = [...links];
   while (pending.length > 0) {
     const index = pending.findIndex((action) => why(action) === null);
@@ -367,12 +388,24 @@ function orderLinks({ byId, unlinks, links, hiddenChildren }) {
     // Stuck on a full parent: unlink an issue another link will take out of it anyway.
     const blocked = pending.find(full);
     const leaving = blocked && pending.find((action) => parent.get(action.childId) === blocked.parentId);
-    if (!leaving) throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action)}`).join("\n"));
-    ordered.push({ type: "unlink", parentId: blocked.parentId, parent: byId.get(blocked.parentId)?.number, childId: leaving.childId, child: `#${leaving.child}` });
-    move(leaving.childId, null);
-    leaving.from = null;
+    if (leaving) {
+      ordered.push({ type: "unlink", parentId: blocked.parentId, parent: byId.get(blocked.parentId)?.number, childId: leaving.childId, child: `#${leaving.child}` });
+      move(leaving.childId, null);
+      leaving.from = null;
+      continue;
+    }
+    // Stuck on what cannot be seen: set those aside, and see whether the rest can go.
+    const unknown = pending.filter((action) => !full(action) && !loops(action) && unknowable(action));
+    if (unknown.length > 0) {
+      for (const action of unknown) {
+        skipped.push({ action, reason: why(action) });
+        pending.splice(pending.indexOf(action), 1);
+      }
+      continue;
+    }
+    throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action)}`).join("\n"));
   }
-  return ordered;
+  return { ordered, skipped };
 }
 
 // --- Applying -----------------------------------------------------------------------------------

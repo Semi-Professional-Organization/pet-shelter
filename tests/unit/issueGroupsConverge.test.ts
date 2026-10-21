@@ -6,7 +6,8 @@ import { FakeGitHub, readFrom, type FakeIssue } from "./support/fakeGitHub";
  * One rule over many states, rather than one test per bug: from any state GitHub can be in, one
  * `--apply` makes the next plan empty, never creates a second parent for a group, never touches a
  * link the file does not own, and never sends a write GitHub refuses. When the planner refuses a
- * state instead, the state must really be impossible: the links the file asks for would make a loop.
+ * state instead, the state must really be impossible: `whyImpossible` must name a rule the finished
+ * tree would break, judged from the fake's whole truth.
  *
  * Every plan is made from what the real reader (`readSnapshot`) returns through the fake's GraphQL,
  * not from the fake's whole state, so a gap in what is read fails here too. The states are generated
@@ -83,6 +84,18 @@ function world(seed: number) {
       // GitHub would refuse it, so it cannot exist.
     }
   }
+  // Deep chains, so depth is exercised: a group's parent hung below one, or one hung below a member.
+  if (rand() < 0.3) {
+    const chain = Array.from({ length: 3 + Math.floor(rand() * 7) }, () => github.add());
+    for (let i = 1; i < chain.length; i += 1) github.link(chain[i - 1].id, chain[i].id);
+    try {
+      if (rand() < 0.5 && parents.length > 0) github.link(chain[chain.length - 1].id, pick(parents).id);
+      else if (groups.length > 0) github.link(github.byNumber(pick(groups).issues[0])!.id, chain[0].id);
+    } catch {
+      // too deep already; GitHub would refuse it
+    }
+    if (rand() < 0.2) chain[0].hidden = true;
+  }
   if (rand() < 0.2 && groups.length > 0) {
     const hidden = github.add({});
     const member = github.byNumber(pick(groups).issues[0])!;
@@ -96,33 +109,51 @@ function world(seed: number) {
   return { github, config: { groups, standalone } };
 }
 
-/** Whether the links the file asks for, with every other link left as it is, would make a loop. */
-function wantsALoop(github: FakeGitHub, config: { groups: Group[] }, parentOf: Map<string, string>, managed: Set<string>) {
+/**
+ * Why the tree the file asks for cannot be built, judged from the fake's whole truth (hidden issues
+ * included), or null if it can. The planner may refuse a state only when this names a reason.
+ */
+function whyImpossible(github: FakeGitHub, config: { groups: Group[] }, parentOf: Map<string, string>, managed: Set<string>) {
   const members = new Set(config.groups.flatMap((group) => group.issues.map((number) => github.byNumber(number)!.id)));
   // Links on managed parents that the file does not want are removed first.
   const parent = new Map(
     [...github.issues.values()].map((issue) => [issue.id, issue.parentId && managed.has(issue.parentId) && !members.has(issue.id) ? null : issue.parentId]),
   );
+  const targets = new Set<string>();
   for (const group of config.groups) {
-    const target = parentOf.get(group.key);
+    const target = parentOf.get(group.key) ?? `new:${group.key}`;
     for (const number of group.issues) {
       const member = github.byNumber(number)!;
-      if (!github.issues.get(member.parentId ?? "")?.hidden) parent.set(member.id, target ?? `new:${group.key}`);
+      if (github.issues.get(member.parentId ?? "")?.hidden) continue;
+      parent.set(member.id, target);
+      targets.add(target);
     }
   }
-  for (const start of parent.keys()) {
-    const seen = new Set<string>();
-    for (let at: string | null | undefined = start; at; at = parent.get(at)) {
-      if (seen.has(at)) return true;
-      seen.add(at);
+  const chain = (start: string) => {
+    const seen: string[] = [];
+    for (let at = parent.get(start); at; at = parent.get(at)) {
+      if (seen.includes(at)) return null;
+      seen.push(at);
     }
+    return seen;
+  };
+  const count = new Map<string, number>();
+  for (const of of parent.values()) if (of) count.set(of, (count.get(of) ?? 0) + 1);
+  for (const id of parent.keys()) {
+    const above = chain(id);
+    if (above === null) return "a loop";
+    if (above.length > 8) return "deeper than eight levels";
   }
-  return false;
+  if ([...count.values()].some((n) => n > 100)) return "more than 100 sub-issues";
+  for (const target of targets) {
+    if ([target, ...(chain(target) ?? [])].some((id) => github.issues.get(id)?.hidden)) return "a parent below an issue nobody here can see";
+  }
+  return null;
 }
 
 describe("one apply makes GitHub match the file, from any state", () => {
   it(`converges across ${SEEDS} generated states`, () => {
-    const outcomes = { converged: 0, refusedALoop: 0, refusedEmpty: 0 };
+    const outcomes = { converged: 0, refusedImpossible: 0, refusedEmpty: 0 };
     for (let seed = 1; seed <= SEEDS; seed += 1) {
       const { github, config } = world(seed);
       const where = `seed ${seed}`;
@@ -155,8 +186,8 @@ describe("one apply makes GitHub match the file, from any state", () => {
           const key = keyFromMarker(issue.body)!;
           if (!parentOf.has(key)) parentOf.set(key, issue.id);
         }
-        expect(wantsALoop(github, config, parentOf, managedBefore), `${where}: refused without a loop: ${error}`).toBe(true);
-        outcomes.refusedALoop += 1;
+        expect(whyImpossible(github, config, parentOf, managedBefore), `${where}: refused a buildable tree: ${error}`).not.toBeNull();
+        outcomes.refusedImpossible += 1;
         continue;
       }
 
@@ -175,11 +206,18 @@ describe("one apply makes GitHub match the file, from any state", () => {
         const claiming = [...github.issues.values()].filter((issue) => looksLikeParent(issue) && keyFromMarker(issue.body) === group.key && issue.state === "OPEN");
         expect(claiming.map((issue) => issue.number), where).toEqual([group.parent]);
       }
-      // 3. Each member sits under its group's parent, unless it is under one nobody here can see.
+      // 3. Each member sits under its group's parent, unless the plan said it could not see enough
+      // to link it safely; then it has not moved.
+      const leftAlone = new Set(
+        plan.notes
+          .map((note: string) => /^#(\d+) \(in [^)]+\) (?:is under an issue this account cannot see|is left where it is)/.exec(note)?.[1])
+          .filter(Boolean)
+          .map(Number),
+      );
       for (const group of settled.groups) {
         for (const number of group.issues) {
           const member = github.byNumber(number)!;
-          if (github.issues.get(before.get(member.id) ?? "")?.hidden) expect(member.parentId, where).toBe(before.get(member.id));
+          if (leftAlone.has(number)) expect(member.parentId, where).toBe(before.get(member.id));
           else expect(member.parentId, where).toBe(github.byNumber(group.parent!)!.id);
         }
       }
@@ -189,15 +227,26 @@ describe("one apply makes GitHub match the file, from any state", () => {
         const owned = (issue.repo === REPO && members.has(issue.number)) || (was && managedBefore.has(was));
         if (!owned && before.has(issue.id)) expect(issue.parentId, `${where}: #${issue.number} moved`).toBe(was);
       }
+      // 4b. Every sub-issue of a parent this script manages is a member of that parent's group, read
+      // from the fake's truth, so a gap in what the reader sees cannot hide a stale link here.
+      const parentOfGroup = new Map<string, Set<number>>(settled.groups.map((group: Group) => [github.byNumber(group.parent!)!.id, new Set(group.issues)]));
+      for (const issue of github.issues.values()) {
+        if (!issue.parentId || issue.hidden) continue;
+        const holder = github.issues.get(issue.parentId)!;
+        if (!looksLikeParent(holder) && !parentOfGroup.has(holder.id)) continue;
+        const wanted = parentOfGroup.get(holder.id);
+        if (issue.repo === REPO && leftAlone.has(issue.number)) continue;
+        expect(Boolean(wanted && issue.repo === REPO && wanted.has(issue.number)), `${where}: #${issue.number} left under #${holder.number}`).toBe(true);
+      }
       // 5. Parents are only created for groups that had none to repair or adopt.
       expect(created.size, where).toBeLessThanOrEqual(config.groups.filter((group) => !group.parent).length);
       outcomes.converged += 1;
     }
-    // Measured 2026-10-21: 2,667 converged, the rest refused as an emptied file or a real loop. Most
-    // must converge, or the generator is only producing refusals; both refusals must occur, or the
-    // oracle above was never consulted.
-    expect(outcomes.converged).toBeGreaterThan(SEEDS * 0.85);
-    expect(outcomes.refusedALoop).toBeGreaterThan(0);
+    // Measured 2026-10-21: 2,607 converged, 253 refused an impossible tree, 140 an emptied file. Most
+    // must converge, or the generator is only producing refusals; both refusals must occur, or
+    // the oracle above was never consulted.
+    expect(outcomes.converged).toBeGreaterThan(SEEDS * 0.8);
+    expect(outcomes.refusedImpossible).toBeGreaterThan(0);
     expect(outcomes.refusedEmpty).toBeGreaterThan(0);
   });
 

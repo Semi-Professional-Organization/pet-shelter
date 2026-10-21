@@ -36,6 +36,7 @@ const byNumbersQuery = (numbers) => `query($owner: String!, $name: String!) {
 }`;
 
 const NODES_QUERY = `query($ids: [ID!]!) { nodes(ids: $ids) { ... on Issue { ${FIELDS} } } }`;
+const DESCEND_QUERY = `query($ids: [ID!]!) { nodes(ids: $ids) { ... on Issue { ${WITH_CHILDREN} } } }`;
 
 const LINK = `mutation($issueId: ID!, $subIssueId: ID!) {
   addSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId, replaceParent: true }) { issue { number } }
@@ -63,6 +64,7 @@ function partial({ data, errors = [] }, { allowMissingAlias = false } = {}) {
     if (seeable && last === "parent") hidden.push(path.slice(0, -1));
     else if (seeable && path.includes("subIssues")) continue; // a child we cannot see; counts still hold it
     else if (allowMissingAlias && error.type === "NOT_FOUND" && path.length === 2) continue; // a pull request or unused number
+    else if (seeable && path[0] === "nodes" && path.length === 2) continue; // an ancestor gone or unreadable: its chain stays unknown
     else throw new Error(`GitHub: ${error.message}`);
   }
   const at = (path) => path.reduce((value, key) => value?.[key], data);
@@ -147,17 +149,44 @@ export function readSnapshot(graphql, { repo, numbers, parents = [] }) {
     for (const node of Object.values(result.data.repository ?? {})) add(node);
   }
 
-  // Ancestors of every possible parent, so loops and depth are checked on the whole chain.
+  // Ancestors of every possible parent, so loops and depth are checked on the whole chain. An
+  // ancestor that cannot be read is asked for once; its chain stays unknown to the planner.
   const labelled = (issue) => issue.labels.some((label) => label.toLowerCase() === LABEL);
   const isParentish = (issue) => local(issue) && ((labelled(issue) && keyFromMarker(issue.body)) || parents.includes(issue.number));
+  const tried = new Set();
   for (let level = 0; level < LIMITS.depth; level += 1) {
-    const wanted = [...new Set([...issues.values()].filter(isParentish).flatMap(function chain(issue) {
-      return issue.parentId && !issues.has(issue.parentId) ? [issue.parentId] : issue.parentId ? chain(issues.get(issue.parentId)) : [];
-    }))];
+    const top = (issue, seen = new Set()) => {
+      if (!issue.parentId || seen.has(issue.id)) return null;
+      seen.add(issue.id);
+      return issues.has(issue.parentId) ? top(issues.get(issue.parentId), seen) : issue.parentId;
+    };
+    const wanted = [...new Set([...issues.values()].filter(isParentish).map((issue) => top(issue)))].filter((id) => id && !tried.has(id));
     if (wanted.length === 0) break;
+    for (const id of wanted) tried.add(id);
     const result = partial(graphql(NODES_QUERY, { ids: wanted }));
     markHidden(result.hiddenParents);
     for (const node of result.data.nodes ?? []) add(node);
+  }
+
+  // Sub-issues below every issue the file names and every possible parent, all the way down, so the
+  // planner counts heights instead of guessing them. What still cannot be read stays counted by
+  // GitHub and missing here, which the planner treats as an unknown depth.
+  const roots = new Set([...issues.values()].filter((issue) => local(issue) && (numbers.includes(issue.number) || isParentish(issue))).map((issue) => issue.id));
+  const underRoot = (issue, seen = new Set()) => {
+    if (roots.has(issue.id)) return true;
+    if (!issue.parentId || seen.has(issue.id) || !issues.has(issue.parentId)) return false;
+    seen.add(issue.id);
+    return underRoot(issues.get(issue.parentId), seen);
+  };
+  for (let level = 0; level <= LIMITS.depth; level += 1) {
+    const wanted = [...issues.values()].filter((issue) => issue.childCount > 0 && !issue.childrenRead && !tried.has(issue.id) && underRoot(issue)).map((issue) => issue.id);
+    if (wanted.length === 0) break;
+    for (const id of wanted) tried.add(id);
+    for (let i = 0; i < wanted.length; i += 50) {
+      const result = partial(graphql(DESCEND_QUERY, { ids: wanted.slice(i, i + 50) }));
+      markHidden(result.hiddenParents);
+      for (const node of result.data.nodes ?? []) add(node);
+    }
   }
   return { repo, issues: [...issues.values()] };
 }
