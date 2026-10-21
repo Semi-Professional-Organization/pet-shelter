@@ -525,9 +525,7 @@ export function applyActions(actions, { repo, exec, log }) {
           const labels = JSON.parse(
             exec("gh", ["api", "-X", "POST", `repos/${repo}/issues/${issue.number}/labels`, "--input", "-"], JSON.stringify({ labels: [LABEL] })),
           );
-          if (!labels.some((label) => label.name === LABEL)) {
-            throw new Error(`#${issue.number} was created without the ${LABEL} label and could not be given it; label it by hand before re-running`);
-          }
+          if (!labels.some((label) => label.name === LABEL)) throw new Error("GitHub kept no label on the new issue");
         }
       } else if (action.type === "update") {
         patch(action.number, { title: action.title, body: action.body });
@@ -559,6 +557,7 @@ export function applyActions(actions, { repo, exec, log }) {
 /**
  * Who may apply. Setting a new issue's labels needs push access, labelling an existing one needs
  * triage, and without either every run would leave an unlabelled parent behind, so check first.
+ * Creating the label itself, on a repository's first run, needs write; `main` checks that too.
  */
 export const canApply = (permission) => ["TRIAGE", "WRITE", "MAINTAIN", "ADMIN"].includes(permission);
 
@@ -695,6 +694,8 @@ async function main(argv) {
   if (!canApply(permission)) throw new Error(`--apply needs triage access or more to ${repo}, and this account has ${permission}; nothing was changed`);
   const labels = JSON.parse(run("gh", ["label", "list", "--repo", repo, "--limit", "1000", "--json", "name"]));
   if (!labels.some((label) => label.name === LABEL)) {
+    // Creating a label, unlike applying one, needs write access: the first run on a repository.
+    if (permission === "TRIAGE") throw new Error(`the ${LABEL} label does not exist yet, and creating it needs write access to ${repo}; nothing was changed`);
     run("gh", ["label", "create", LABEL, "--repo", repo, "--color", "0e8a16", "--description", `Parent issue managed from ${CONFIG_PATH}`]);
   }
   applyActions(actions, { repo, exec: run, log: (line) => process.stdout.write(`${line}\n`) });

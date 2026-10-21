@@ -358,7 +358,7 @@ describe("applying", () => {
   it("stops before linking anything when a new parent cannot be labelled, since the next run would make another", () => {
     const { calls, exec } = createDropsLabel([]);
     const { actions } = planGroups({ groups: [group("a", [1])] }, [issue(1)], TARGET);
-    expect(() => applyActions(actions, { repo: "owner/repo", exec, log: () => {} })).toThrow(/#50 was created without the group label/);
+    expect(() => applyActions(actions, { repo: "owner/repo", exec, log: () => {} })).toThrow(/GitHub kept no label on the new issue #50 was created without the group label: label or close it by hand/);
     expect(calls).toHaveLength(2);
   });
 
