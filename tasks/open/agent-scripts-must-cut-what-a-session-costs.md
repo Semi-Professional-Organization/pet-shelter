@@ -121,3 +121,6 @@ Beyond a stated ceiling, declined in the fifth review: the meter's markers
 `TEMP` is per user. On a host whose users share `/tmp`, the first user's `claude-meter` folder
 would shut every other user's meter off, and a log another user created first under the same name
 would keep its own mode. A per-user folder fixes both, if these scripts ever run on such a host.
+Also beyond a ceiling, from the sixth review: `recall` holds a whole transcript in memory while it
+searches, and two sessions handing off under one title in the same instant could overwrite each
+other (a `ceiling:` in `scripts/agent/ledger.mjs`).

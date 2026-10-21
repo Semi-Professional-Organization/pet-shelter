@@ -191,9 +191,10 @@ export async function main(argv, io = {}) {
   const log = join(tmp, `agent-recall-${short}-${key}.txt`);
   let logged = true;
   try {
-    // Transcript text can hold anything a tool printed, so a new log is readable by its owner
-    // only. ceiling: one user per temp folder, as for the meter's markers; a log another user
-    // created first under the same name keeps its own mode.
+    // Transcript text can hold anything a tool printed, so where the system keeps mode bits a new
+    // log is readable by its owner only; Windows ignores them, and its TEMP is per user instead.
+    // ceiling: one user per temp folder, as for the meter's markers; a log another user created
+    // first under the same name keeps its own mode.
     writeFileSync(
       log,
       hits.map((h) => `${h.at} ${h.kind}: ${snippet(h.text, h.match, h.length, { before: 400, after: 800 })}`).join("\n\n") + "\n",

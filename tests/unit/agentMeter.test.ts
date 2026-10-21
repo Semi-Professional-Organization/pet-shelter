@@ -257,10 +257,15 @@ describe("the hook", () => {
   });
 
   it("says nothing for an event with no session, which has nowhere of its own to keep its levels", async () => {
-    const folders = () => (existsSync(join(tmp, "claude-meter")) ? readdirSync(join(tmp, "claude-meter")).sort() : []);
-    const before = folders();
+    // What the meter left behind: its marker folders and its error log, which a throw would grow.
+    const traces = () => {
+      const dir = join(tmp, "claude-meter");
+      const log = join(dir, "errors.log");
+      return { folders: existsSync(dir) ? readdirSync(dir).sort() : [], errors: existsSync(log) ? readFileSync(log, "utf8") : "" };
+    };
+    const before = traces();
     expect(await run({ transcript_path: big, hook_event_name: "PostToolUse", tool_name: "Read" })).toEqual({ code: 0, out: "" });
-    expect(folders()).toEqual(before);
+    expect(traces()).toEqual(before);
   });
 
   it("says nothing inside a subagent, whose context is not the session's", async () => {

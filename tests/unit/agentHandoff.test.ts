@@ -68,6 +68,12 @@ describe("the hand-off file", () => {
   it("does not count a heading inside a code block, or let the body set the title or the fields", () => {
     const fenced = BODY.replace("## Open\n\nOpen goes here.\n", "```\n## Open\nnot a section\n```\n");
     expect(checkBody(fenced)).toContain('it has no "## Open" section');
+    // A fence closes only on its own kind, at least as long and with nothing after it, as in
+    // CommonMark: pasted output holding "~~~" or "```js" does not end a block opened by "```" or "````".
+    const pasted = (block: string) => BODY.replace("Commands and results goes here.\n", `${block}\n`);
+    expect(checkBody(pasted("```\noutput\n~~~\nmore\n```"))).toEqual([]);
+    expect(checkBody(pasted("````\n```js\n## Verified\n```\n````"))).toEqual([]);
+    expect(checkBody(pasted("```\n```js\n## Open\n```"))).toEqual([]);
     expect(checkBody(`# My own title\n\n${BODY}`)).toEqual(["the body has its own H1, but the title is the H1"]);
     expect(checkBody(`${BODY}\n**Settles when:** never\n`)).toHaveLength(1);
   });
@@ -161,6 +167,24 @@ describe("ledger handoff", () => {
     expect(sessionOf(readFileSync(join(top, "tasks", "open", "HANDOFF-prefixed.md"), "utf8"))).toBe(SESSION);
     expect((await run(["handoff", "Prefixed"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
     expect((await run(["handoff", "Prefixed", "--session", "short"], { cwd: top, stdin: BODY, env })).code).toBe(2);
+    // With no transcript to expand it, a prefix would be recorded as the session and lock it out
+    // of its own file.
+    const lost = await run(["handoff", "Lost", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env: { CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
+    expect(lost.code).toBe(2);
+    expect(lost.out).toMatch(/^ledger: ERROR no transcript to expand the prefix aaaaaaaa into a session id\nnext: pass the full session id\n$/);
+    expect(readHandoffs(top).map((h) => h.file)).toEqual(["tasks/open/HANDOFF-prefixed.md"]);
+  });
+
+  it("checks the body before it looks for the session, and keeps the title to one line", async () => {
+    const top = repo();
+    // A prefix that names two sessions makes the lookup fail, so a refused body shows it never ran.
+    const { dir, folder } = config(SESSION, []);
+    writeFileSync(join(folder, `${SESSION.slice(0, 8)}-ffff-2222-3333-444444444444.jsonl`), "");
+    const env = { CLAUDE_CONFIG_DIR: dir };
+    expect((await run(["handoff", "Short", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: "## Decided\n\nyes\n", env })).code).toBe(1);
+    expect((await run(["handoff", "Long", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env })).code).toBe(2);
+    expect((await run(["handoff", "Line one\n# Injected"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
+    expect(readFileSync(join(top, "tasks", "open", "HANDOFF-line-one-injected.md"), "utf8")).toMatch(/^# Hand-off: Line one # Injected\n\n\*\*Status:\*\*/);
   });
 
   it("could not run without a session, a body, a usable title or a known subcommand", async () => {

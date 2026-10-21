@@ -39,15 +39,19 @@ export function slugOf(title) {
 
 /**
  * What is wrong with a body, as sentences; empty when nothing is. A heading inside a fenced code
- * block is not a section.
+ * block is not a section. As in CommonMark, a fence closes only on a line of its own character, at
+ * least as long, with nothing after it, so pasted output holding "~~~" or "```js" stays inside.
  */
 export function checkBody(body) {
   const problems = [];
   const counts = new Map();
   let section = null;
-  let fenced = false;
+  let fence = "";
   for (const line of String(body).replace(/\r\n/g, "\n").split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (marker && !fence) fence = marker;
+    else if (marker && marker[0] === fence[0] && marker.length >= fence.length && !line.trim().slice(marker.length).trim()) fence = "";
+    const fenced = Boolean(fence);
     if (!fenced && /^# /.test(line)) problems.push("the body has its own H1, but the title is the H1");
     const heading = fenced ? null : /^##\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading) {

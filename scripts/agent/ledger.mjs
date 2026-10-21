@@ -45,6 +45,9 @@ another checkout; the session that finishes the work deletes it.
 
 Exit codes: 0 written, 1 refused (a missing section, another session's file), 2 could not run.`;
 
+/** A whole Claude Code session id, which is a UUID, as its transcript's file name shows. */
+const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function parseArgs(argv) {
   const opts = { sub: undefined, title: undefined, from: undefined, session: undefined, help: false };
   const rest = [];
@@ -129,18 +132,6 @@ export async function main(argv, io = {}) {
     return 1;
   }
 
-  // A prefix stands for the session it starts. The file records the full id, which is what
-  // `recall`, `orient` and a later run of this command compare against. Looked up only once the
-  // body passes, since it walks every transcript folder.
-  let found;
-  try {
-    found = findTranscript(projectsDir(env), given);
-  } catch (error) {
-    say("ERROR", error.message);
-    return 2;
-  }
-  const session = found?.session ?? given;
-
   const w = whereAmI(cwd, { now });
   if (!w) {
     say("ERROR", `${cwd} is not in a git repository`);
@@ -150,8 +141,27 @@ export async function main(argv, io = {}) {
     say("ERROR", `${w.top} has no ${HANDOFF_DIR}/`);
     return 2;
   }
+
+  // A prefix stands for the session it starts. The file records the full id, which is what
+  // `recall`, `orient` and a later run of this command compare against. Looked up last, since it
+  // walks every transcript folder.
+  let found;
+  try {
+    found = findTranscript(projectsDir(env), given);
+  } catch (error) {
+    say("ERROR", error.message);
+    return 2;
+  }
+  if (!found && !SESSION_ID.test(given)) {
+    say("ERROR", `no transcript to expand the prefix ${given} into a session id`, "pass the full session id");
+    return 2;
+  }
+  const session = found?.session ?? given;
+
   const file = `${HANDOFF_DIR}/${HANDOFF_PREFIX}${slugOf(opts.title)}.md`;
   const path = join(w.top, file);
+  // ceiling: the check and the write below are not one step, so two sessions writing the same
+  // title in the same instant could both pass it; titles name each session's own work.
   if (existsSync(path)) {
     const owner = sessionOf(readFileSync(path, "utf8"));
     if (owner !== session) {
@@ -170,7 +180,8 @@ export async function main(argv, io = {}) {
   writeFileSync(
     path,
     renderHandoff({
-      title: opts.title.trim(),
+      // One line: a line break would end the H1 and start the file's own markdown.
+      title: opts.title.replace(/\s+/g, " ").trim(),
       date: localDate(now),
       session,
       where: describeWhere(w),

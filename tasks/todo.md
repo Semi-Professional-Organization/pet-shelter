@@ -73,7 +73,11 @@ Round 5, 7: 2/2/3, and no in-scope correctness bug: a weak test assertion and th
 `ledger handoff`'s transcript lookup fixed; one user per temp folder stated as a ceiling; declined
 a fallback for events with no session (every hook event has one), name collisions between session
 ids (they are UUIDs), and calling `recall` read-only while it logs to the temp folder, as `usage`
-does. Later rounds are tallied in the pull request's body.
+does. Round 6, 10: 8/1/1, three of them in-scope correctness bugs in `ledger handoff`'s input,
+all there since round 1: a `~~~` line inside a code block opened by backticks closed it, so a
+real section after it went missing; a session prefix with no transcript to expand it was recorded
+as the session, locking the session out of its own file; and a line break in a title ended the
+H1. Later rounds are tallied in the pull request's body.
 
 **Deliberately not done:**
 
