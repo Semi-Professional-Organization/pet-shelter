@@ -339,10 +339,11 @@ function centroid(vectors, members) {
  * Ranks the groups for one issue by cosine similarity to each group's centroid, with the
  * features that contributed most. `exclude` leaves an issue out of the centroids (leave-one-out).
  *
- * ceiling: bag of words plus named files, compared with each group's mean. It cannot read meaning,
+ * ceiling: bag of words plus named files, compared with each group's direction. It cannot read meaning,
  * so an issue about a group's subject in new vocabulary scores low, and one that merely names a
  * shared file scores high. Accuracy is measured by `--suggest --evaluate`, which hides each grouped
- * issue in turn and checks the top guess; the figure for the first grouping is in
+ * issue in turn and scores the proposal as `--suggest` would print it, ties counted against the real
+ * group; the figures for the first grouping are in
  * `tasks/decisions/2026-10-21-issue-groups-are-native-sub-issues.md`. Suggestions are only printed:
  * a human puts an issue in the file.
  */
@@ -555,11 +556,11 @@ export function applyActions(actions, { repo, exec, log }) {
 }
 
 /**
- * Who may apply. Setting a new issue's labels needs push access, labelling an existing one needs
- * triage, and without either every run would leave an unlabelled parent behind, so check first.
- * Creating the label itself, on a repository's first run, needs write; `main` checks that too.
+ * Who may apply: write access or more. Below it GitHub drops a new issue's labels and refuses to
+ * create one, and every run would leave an unlabelled parent behind. Triage may be enough for the
+ * links, but only ADMIN has been observed, so write is the floor this script asks for.
  */
-export const canApply = (permission) => ["TRIAGE", "WRITE", "MAINTAIN", "ADMIN"].includes(permission);
+export const canApply = (permission) => ["WRITE", "MAINTAIN", "ADMIN"].includes(permission);
 
 export function formatAction(action) {
   const parent = action.parent ? `#${action.parent}` : `new ${action.key} parent`;
@@ -691,11 +692,9 @@ async function main(argv) {
   const permission = JSON.parse(
     run("gh", ["api", "graphql", "-f", "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { viewerPermission } }", "-f", `owner=${owner}`, "-f", `name=${name}`]),
   ).data.repository.viewerPermission;
-  if (!canApply(permission)) throw new Error(`--apply needs triage access or more to ${repo}, and this account has ${permission}; nothing was changed`);
+  if (!canApply(permission)) throw new Error(`--apply needs write access or more to ${repo}, and this account has ${permission}; nothing was changed`);
   const labels = JSON.parse(run("gh", ["label", "list", "--repo", repo, "--limit", "1000", "--json", "name"]));
   if (!labels.some((label) => label.name === LABEL)) {
-    // Creating a label, unlike applying one, needs write access: the first run on a repository.
-    if (permission === "TRIAGE") throw new Error(`the ${LABEL} label does not exist yet, and creating it needs write access to ${repo}; nothing was changed`);
     run("gh", ["label", "create", LABEL, "--repo", repo, "--color", "0e8a16", "--description", `Parent issue managed from ${CONFIG_PATH}`]);
   }
   applyActions(actions, { repo, exec: run, log: (line) => process.stdout.write(`${line}\n`) });

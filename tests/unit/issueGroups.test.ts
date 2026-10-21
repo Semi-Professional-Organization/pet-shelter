@@ -401,8 +401,8 @@ describe("applying", () => {
     );
   });
 
-  it("applies only for an account that can label issues", () => {
-    expect(["READ", "TRIAGE", "WRITE", "MAINTAIN", "ADMIN", null].map(canApply)).toEqual([false, true, true, true, true, false]);
+  it("applies only with write access or more, the least that can create and label a parent", () => {
+    expect(["READ", "TRIAGE", "WRITE", "MAINTAIN", "ADMIN", null].map(canApply)).toEqual([false, false, true, true, true, false]);
   });
 
   it("stops at the first refusal and says how many actions landed", () => {

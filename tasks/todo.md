@@ -69,6 +69,11 @@ Round 5 found that a caller without triage access would still leave an unlabelle
 The suggester now uses true cosine (unit-length centroids no longer favour small groups), counts a
 tie against the real group, keeps `Pet.age` whole, and drops Next.js route-file names like `page`.
 
+Rounds 6 and 7 found no correctness bug, which ends the loop under the owner's rule. Their wording
+fixes: `--apply` now asks for write access, since creating the `group` label needs it and nothing
+shows triage is enough for sub-issue links; a stale ceiling comment now describes the gated
+measurement; an unlabelled-parent message is said once.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`
