@@ -16,6 +16,7 @@
     "commit:audit": "node scripts/commit-msg.mjs --audit",
     "commit:hook": "node scripts/install-git-hooks.mjs commit-msg",
     "ledger:issues": "node scripts/ledger-issues.mjs",
+    "issues:groups": "node scripts/issue-groups.mjs",
     "pretest": "node scripts/prisma-generate-if-stale.mjs",
     "test": "vitest run --project unit tests/unit",
     "pretest:watch": "node scripts/prisma-generate-if-stale.mjs",

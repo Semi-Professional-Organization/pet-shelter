@@ -1,0 +1,72 @@
+{
+  "$comment": "Parent issues and their sub-issues. Applied by scripts/issue-groups.mjs; see its header. Each issue belongs to at most one group. `standalone` lists open issues left out of every group on purpose, so the script stops reporting them as ungrouped.",
+  "groups": [
+    {
+      "key": "database-outage-fallbacks",
+      "title": "Database outage fallbacks",
+      "summary": "What the site serves, writes or claims while the database cannot answer, and readers that cannot tell an empty table from an unreachable one.",
+      "issues": [90, 97, 65]
+    },
+    {
+      "key": "adoption-and-status-guards",
+      "title": "Adoption and pet status guards",
+      "summary": "Where an animal's status decides what a visitor or coordinator may do, and the places that let a refused or archived animal through.",
+      "issues": [98, 99, 96, 101, 91, 58]
+    },
+    {
+      "key": "admin-pet-form-and-dates",
+      "title": "Admin pet form and birth dates",
+      "summary": "The admin pet form, the birth-date migration, and how dates are validated and defaulted in the admin dialogs.",
+      "issues": [107, 146, 111, 112, 118, 126, 105, 106, 149, 62]
+    },
+    {
+      "key": "public-gallery-and-navigation",
+      "title": "Public pet gallery and site navigation",
+      "summary": "The public gallery's filters and URL state, the pet profile page, and the site navigation.",
+      "issues": [53, 54, 55, 57, 64, 121]
+    },
+    {
+      "key": "language-and-site-copy",
+      "title": "Language and site copy",
+      "summary": "Malay and English rendering, the translation dictionary, and copy that contradicts what staff can edit.",
+      "issues": [49, 122, 123, 124, 125]
+    },
+    {
+      "key": "bulletins",
+      "title": "Bulletins",
+      "summary": "Bulletin bylines, the seeded launch notices, and the stored Malay text nothing shows.",
+      "issues": [115, 116, 120]
+    },
+    {
+      "key": "admin-accounts-after-role-sweep",
+      "title": "Admin accounts after the role sweep",
+      "summary": "Admin console and staff account loose ends recorded, not fixed, by the role dead-end sweep (#144).",
+      "issues": [168, 169, 171]
+    },
+    {
+      "key": "donations-receipts-and-sponsors",
+      "title": "Donations, receipts and sponsor portal",
+      "summary": "General donations and their receipts, follow-ups from #109, and the sponsor portal.",
+      "issues": [50, 70, 170, 132, 133, 134]
+    },
+    {
+      "key": "production-secrets-deploys-and-ci",
+      "title": "Production secrets, deploys and CI",
+      "summary": "Boot-time secrets, encrypted environment files, what production and previews actually run, and CI settings not yet observed.",
+      "issues": [129, 69, 135, 156, 157, 158, 155]
+    },
+    {
+      "key": "test-suite",
+      "title": "Test suite",
+      "summary": "Gaps and leaks in the test tiers: missing coverage, environment and locale leaks, flaky runs and shared helpers.",
+      "issues": [142, 145, 147, 150, 151, 152, 153, 154, 148]
+    },
+    {
+      "key": "agent-tooling-and-process",
+      "title": "Agent tooling and session process",
+      "summary": "Agent hooks, the drift log, permission rules, the agent scripts and the session close-out.",
+      "issues": [48, 51, 52, 59, 66, 117, 127, 159, 160, 161, 162]
+    }
+  ],
+  "standalone": [138]
+}

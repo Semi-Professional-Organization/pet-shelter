@@ -15,6 +15,32 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Open issues are grouped under parent issues from one file
+
+**Branch:** `claude/project-thread-c0pu58` · opened 2026-10-21 · base `e2dfb51`
+
+The owner asked for the open issues organised into parents and children, preferring prebuilt tools
+and solving their gaps in a script, with a discovery mode for issues a grouping misses. The plan and
+the eleven groups were approved in the project thread before anything was built.
+
+- [x] Survey: native sub-issues answer on this repo; `gh` 2.98 has no command for them
+- [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
+- [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
+- [x] `tests/unit/issueGroups.test.ts`: 27 tests; six planner mutations each fail one or more
+- [ ] Owner approves the PR, then `npm run issues:groups -- --apply` and a second run that plans nothing
+
+## Review
+
+Dry run against the live repository: 11 parents to create, 69 sub-issues to add, nothing else, with
+#130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69: 81.2% top guess, 92.8% in
+the top two.
+
+Deliberately not done: closing #130 and #131 (fixed by #144, the owner's call), settling #157 (its
+ruleset is active, but it is a ledger issue and closes only by moving its file), and fixing any of
+the grouped bugs themselves, which go to their own threads. No workflow runs the script: grouping is
+a judgement, so it stays a dry run a person reads. Links surviving a ledger body rewrite is read
+from `ledger-issues.mjs`, not yet observed; the first apply is where to observe it.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

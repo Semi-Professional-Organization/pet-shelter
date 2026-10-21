@@ -1,0 +1,315 @@
+import { describe, it, expect } from "vitest";
+import { execFileSync, spawnSync } from "child_process";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { fileURLToPath } from "url";
+// The shipped planner, not a copy of it.
+import {
+  CONFIG_PATH,
+  LABEL,
+  markerFor,
+  keyFromMarker,
+  validateConfig,
+  renderParent,
+  planGroups,
+  issuesFromPages,
+  applyActions,
+  suggest,
+  evaluate,
+} from "../../scripts/issue-groups.mjs";
+
+/**
+ * Tests for `scripts/issue-groups.mjs`, which makes GitHub's parent issues and sub-issues match
+ * `.github/issue-groups.json`.
+ *
+ * Only the pure half is tested, as for `ledger-issues.mjs`: the `gh` calls would change a public
+ * repository. `applyActions` runs against a recording `exec`.
+ */
+
+const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
+const SCRIPT = resolve(ROOT, "scripts", "issue-groups.mjs");
+const TARGET = { repo: "owner/repo", branch: "master" };
+
+type Issue = {
+  number: number;
+  id: string;
+  title: string;
+  state: "OPEN" | "CLOSED";
+  body: string;
+  labels: { name: string }[];
+  parent: number | null;
+  children?: { number: number; id: string; state: string }[];
+};
+
+const issue = (number: number, extra: Partial<Issue> = {}): Issue => ({
+  number,
+  id: `I_${number}`,
+  title: `Issue ${number}`,
+  state: "OPEN",
+  body: "",
+  labels: [],
+  parent: null,
+  ...extra,
+});
+
+const group = (key: string, issues: number[], title = `Group ${key}`) => ({ key, title, summary: `About ${key}.`, issues });
+
+/** A parent exactly as the script would have left it, with `children` linked. */
+const parentFor = (number: number, g: ReturnType<typeof group>, children: number[], extra: Partial<Issue> = {}): Issue => {
+  const rendered = renderParent(g, TARGET);
+  return issue(number, {
+    title: rendered.title,
+    body: rendered.body,
+    labels: [{ name: LABEL }],
+    children: children.map((child) => ({ number: child, id: `I_${child}`, state: "OPEN" })),
+    ...extra,
+  });
+};
+
+const types = (actions: { type: string }[]) => actions.map((action) => action.type);
+
+describe("the grouping file", () => {
+  it("the shipped file is valid", () => {
+    expect(() => validateConfig(JSON.parse(readFileSync(resolve(ROOT, CONFIG_PATH), "utf8")))).not.toThrow();
+  });
+
+  it("refuses an issue in two groups, because an issue can have only one parent", () => {
+    expect(() => validateConfig({ groups: [group("a", [1, 2]), group("b", [2])] })).toThrow(/#2 is in both a and b/);
+  });
+
+  it("refuses an issue that is both grouped and standalone", () => {
+    expect(() => validateConfig({ groups: [group("a", [1])], standalone: [1] })).toThrow(/#1 is in both a and standalone/);
+  });
+
+  it("names every problem at once", () => {
+    const error = (() => {
+      try {
+        validateConfig({ groups: [group("Bad Key", [1]), group("a", []), group("a", [0]), { key: "c", issues: [3] }] });
+      } catch (e) {
+        return String(e);
+      }
+    })();
+    expect(error).toMatch(/Bad Key: key must be/);
+    expect(error).toMatch(/a: needs at least one issue/);
+    expect(error).toMatch(/a: key is used twice/);
+    expect(error).toMatch(/0 is not an issue number/);
+    expect(error).toMatch(/c: needs a title/);
+  });
+
+  it("reads a parent's key only from a marker at the top of its body", () => {
+    expect(keyFromMarker(`${markerFor("test-suite")}\nrest`)).toBe("test-suite");
+    expect(keyFromMarker(`quoting it: ${markerFor("test-suite")}`)).toBeNull();
+  });
+});
+
+describe("planning", () => {
+  it("creates each parent and adds its issues when nothing exists yet", () => {
+    const { actions } = planGroups({ groups: [group("a", [1, 2])] }, [issue(1), issue(2)], TARGET);
+    expect(actions.map((a: { type: string; child?: number }) => [a.type, a.child ?? null])).toEqual([
+      ["create", null],
+      ["add", 1],
+      ["add", 2],
+    ]);
+    expect(actions[0]).toMatchObject({ body: expect.stringMatching(new RegExp(`^${markerFor("a")}\n`)) });
+  });
+
+  it("plans nothing when GitHub already matches, so a second run is a no-op", () => {
+    const g = group("a", [1, 2]);
+    const issues = [parentFor(10, g, [1, 2]), issue(1, { parent: 10 }), issue(2, { parent: 10 })];
+    expect(planGroups({ groups: [g] }, issues, TARGET).actions).toEqual([]);
+  });
+
+  it("moves an issue from another parent, naming the one it leaves, and does not also remove it", () => {
+    const a = group("a", [1]);
+    const b = group("b", [2]);
+    const issues = [parentFor(10, a, [1, 2]), parentFor(11, b, []), issue(1, { parent: 10 }), issue(2, { parent: 10 })];
+    const { actions } = planGroups({ groups: [a, b] }, issues, TARGET);
+    expect(actions).toEqual([
+      expect.objectContaining({ type: "move", child: 2, from: 10, parent: 11, parentId: "I_11", childId: "I_2" }),
+    ]);
+  });
+
+  it("moves an issue a person linked under a parent the script does not manage", () => {
+    const { actions } = planGroups({ groups: [group("a", [1])] }, [issue(1, { parent: 99 }), issue(99)], TARGET);
+    expect(actions[1]).toMatchObject({ type: "move", child: 1, from: 99, parent: null });
+  });
+
+  it("removes a sub-issue no group wants any more", () => {
+    const g = group("a", [1]);
+    const issues = [parentFor(10, g, [1, 2]), issue(1, { parent: 10 }), issue(2, { parent: 10 })];
+    expect(planGroups({ groups: [g] }, issues, TARGET).actions).toEqual([
+      expect.objectContaining({ type: "remove", parent: 10, child: 2, childId: "I_2" }),
+    ]);
+  });
+
+  it("updates a parent whose title or description differs from the file", () => {
+    const g = group("a", [1]);
+    const issues = [parentFor(10, g, [1], { title: "Edited on GitHub" }), issue(1, { parent: 10 })];
+    expect(planGroups({ groups: [g] }, issues, TARGET).actions).toEqual([
+      expect.objectContaining({ type: "update", number: 10, title: g.title }),
+    ]);
+  });
+
+  it("reopens a closed parent whose group is in the file, and closes one whose group left it", () => {
+    const a = group("a", [1]);
+    const gone = group("gone", [2]);
+    const issues = [
+      parentFor(10, a, [1], { state: "CLOSED" }),
+      parentFor(11, gone, [2]),
+      issue(1, { parent: 10 }),
+      issue(2, { parent: 11 }),
+    ];
+    const { actions } = planGroups({ groups: [a] }, issues, TARGET);
+    expect(actions).toEqual([
+      expect.objectContaining({ type: "reopen", number: 10 }),
+      expect.objectContaining({ type: "close", number: 11, key: "gone" }),
+    ]);
+  });
+
+  it("does not trust a marker without the label: anyone can open an issue on a public repository", () => {
+    const g = group("a", [1]);
+    const planted = parentFor(10, g, [], { labels: [] });
+    const { actions, ungrouped } = planGroups({ groups: [g] }, [planted, issue(1)], TARGET);
+    expect(types(actions)).toEqual(["create", "add"]);
+    expect(ungrouped.map((i: Issue) => i.number)).toEqual([10]);
+  });
+
+  it("stops when two open parents claim one group, and lets an open parent beat a closed one", () => {
+    const g = group("a", [1]);
+    expect(() => planGroups({ groups: [g] }, [parentFor(10, g, []), parentFor(11, g, []), issue(1)], TARGET)).toThrow(
+      /#10 and #11 are both open parents of group a/,
+    );
+    const { actions } = planGroups({ groups: [g] }, [parentFor(9, g, [], { state: "CLOSED" }), parentFor(11, g, [1]), issue(1, { parent: 11 })], TARGET);
+    expect(actions).toEqual([]);
+  });
+
+  it("refuses an emptied file while parents are open, rather than closing them all", () => {
+    expect(() => planGroups({ groups: [] }, [parentFor(10, group("a", [1]), [])], TARGET)).toThrow(/has no groups/);
+  });
+
+  it("refuses a number that is not an issue here, or that is itself a parent", () => {
+    expect(() => planGroups({ groups: [group("a", [5])] }, [], TARGET)).toThrow(/#5 \(in a\) is not an issue/);
+    const b = group("b", [1]);
+    expect(() => planGroups({ groups: [group("a", [10]), b] }, [parentFor(10, b, []), issue(1)], TARGET)).toThrow(/#10 \(in a\) is itself a group parent/);
+  });
+
+  it("keeps a closed sub-issue linked and says so, since a renamed ledger entry closes its issue", () => {
+    const g = group("a", [1]);
+    const { actions, notes } = planGroups({ groups: [g] }, [parentFor(10, g, [1]), issue(1, { parent: 10, state: "CLOSED" })], TARGET);
+    expect(actions).toEqual([]);
+    expect(notes).toEqual([expect.stringMatching(/#1 \(in a\) is closed/)]);
+  });
+
+  it("lists open issues in no group, leaving out standalone ones, parents and closed issues", () => {
+    const g = group("a", [1]);
+    const issues = [parentFor(10, g, [1]), issue(1, { parent: 10 }), issue(2), issue(3), issue(4, { state: "CLOSED" })];
+    const { ungrouped } = planGroups({ groups: [g], standalone: [3] }, issues, TARGET);
+    expect(ungrouped.map((i: Issue) => i.number)).toEqual([2]);
+  });
+});
+
+describe("reading GitHub", () => {
+  const page = (nodes: unknown[]) => ({ data: { repository: { issues: { nodes } } } });
+  const node = (number: number, extra: Record<string, unknown> = {}) => ({
+    number,
+    id: `I_${number}`,
+    title: `Issue ${number}`,
+    body: "",
+    state: "OPEN",
+    labels: { nodes: [] },
+    parent: null,
+    ...extra,
+  });
+
+  it("merges parents and their children, including closed children the open read cannot see", () => {
+    const parent = node(10, {
+      labels: { nodes: [{ name: LABEL }] },
+      subIssues: { totalCount: 2, nodes: [{ number: 1, id: "I_1", title: "one", state: "OPEN" }, { number: 2, id: "I_2", title: "two", state: "CLOSED" }] },
+    });
+    const issues = issuesFromPages([page([node(1, { parent: { number: 10 } }), node(10)])], [page([parent])]);
+    const byNumber = new Map(issues.map((i: Issue) => [i.number, i]));
+    expect(byNumber.get(10)?.children?.map((c) => c.number)).toEqual([1, 2]);
+    expect(byNumber.get(1)?.parent).toBe(10);
+    expect(byNumber.get(2)).toMatchObject({ state: "CLOSED", parent: 10 });
+  });
+
+  it("refuses a parent with more sub-issues than one page reads", () => {
+    const parent = node(10, { subIssues: { totalCount: 101, nodes: [] } });
+    expect(() => issuesFromPages([], [page([parent])])).toThrow(/101 sub-issues/);
+  });
+});
+
+describe("applying", () => {
+  it("links a new parent's issues by the node id GitHub returned when it was created", () => {
+    const calls: string[][] = [];
+    const exec = (_command: string, args: string[], input?: string) => {
+      calls.push(args);
+      if (args.includes("POST")) {
+        expect(JSON.parse(input ?? "{}").labels).toEqual([LABEL]);
+        return JSON.stringify({ number: 50, node_id: "I_50" });
+      }
+      return "{}";
+    };
+    const { actions } = planGroups({ groups: [group("a", [1])] }, [issue(1)], TARGET);
+    const log: string[] = [];
+    applyActions(actions, { repo: "owner/repo", exec, log: (line: string) => log.push(line) });
+    expect(calls[1]).toEqual(expect.arrayContaining(["issueId=I_50", "subIssueId=I_1"]));
+    expect(log).toEqual(["  created #50 for a", "  added #1 to #50"]);
+  });
+
+  it("asks GitHub to replace the old parent on a move, which a plain add would refuse", () => {
+    const queries: string[] = [];
+    const exec = (_command: string, args: string[]) => {
+      queries.push(args.find((arg) => arg.startsWith("query=")) ?? "");
+      return "{}";
+    };
+    const actions = [{ type: "move", key: "a", parent: 11, parentId: "I_11", child: 2, childId: "I_2", from: 10 }];
+    applyActions(actions, { repo: "owner/repo", exec, log: () => {} });
+    expect(queries[0]).toMatch(/addSubIssue\(input: \{[^}]*replaceParent: true/);
+  });
+
+  it("stops at the first refusal and says how many actions landed", () => {
+    const exec = (_command: string, args: string[]) => {
+      if (args.includes("subIssueId=I_2")) throw new Error("gh api graphql\nGraphQL: refused");
+      return "{}";
+    };
+    const g = group("a", [1, 2, 3]);
+    const { actions } = planGroups({ groups: [g] }, [parentFor(10, g, []), issue(1), issue(2), issue(3)], TARGET);
+    expect(() => applyActions(actions, { repo: "owner/repo", exec, log: () => {} })).toThrow(/after 1 of 3 actions applied: GraphQL: refused/);
+  });
+});
+
+describe("suggestions", () => {
+  const corpus = [
+    issue(1, { title: "Pet form wipes the medical timeline", body: "`PetFormDialog` in src/components/admin/PetFormDialog.tsx resets the timeline." }),
+    issue(2, { title: "Pet form defaults the intake date", body: "src/components/admin/PetFormDialog.tsx uses the UTC day for intake." }),
+    issue(3, { title: "Drift log misses merges", body: "The hook in .claude/hooks/agent-guard.mjs records the drift log." }),
+    issue(4, { title: "Drift log empty for some sessions", body: "agent-guard writes no drift log line for linked worktrees." }),
+    issue(5, { title: "Birth date field in the pet form", body: "`PetFormDialog` shows the birth date estimate nowhere." }),
+  ];
+  const config = { groups: [group("pet-form", [1, 2]), group("agent-tooling", [3, 4])] };
+
+  it("proposes the group whose issues name the same file, with that file as evidence", () => {
+    const [proposal] = suggest(config, corpus, [corpus[4]]);
+    expect(proposal).toMatchObject({ number: 5, clear: true, best: { key: "pet-form" } });
+    expect(proposal.best.evidence).toContain("petformdialog");
+  });
+
+  it("measures itself by hiding each grouped issue in turn", () => {
+    const { results, top1 } = evaluate(config, corpus);
+    expect(results).toHaveLength(4);
+    expect(top1).toBe(1);
+  });
+});
+
+describe("the CLI", () => {
+  it("prints usage for --help without reaching GitHub", () => {
+    expect(execFileSync("node", [SCRIPT, "--help"], { cwd: ROOT, encoding: "utf8" })).toContain("--suggest");
+  });
+
+  it("refuses --apply with --suggest, and --evaluate alone, before reading anything", () => {
+    for (const args of [["--apply", "--suggest"], ["--evaluate"], ["--bogus"]]) {
+      expect(spawnSync("node", [SCRIPT, ...args], { cwd: ROOT, encoding: "utf8" }).status).toBe(1);
+    }
+  });
+});
