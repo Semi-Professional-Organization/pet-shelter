@@ -83,3 +83,57 @@ record; it cannot be recomputed later.
 
 **Settles when:** kill condition 1 fires, or the success measure is met and recorded as a decision
 in `tasks/decisions/`.
+
+## 2026-10-21: what the meter's pull request adds, and how its two new commands are judged
+
+Item 2 lands as hooks in `.claude/settings.json` and three commands: the `meter` hook, after tool
+calls and when a message arrives; `orient --brief`, when a session starts; `ledger handoff`, which
+writes the hand-off state as `tasks/open/HANDOFF-<slug>.md`; and `recall`, which searches the
+session that wrote it. The success measure above is the meter's. Kill condition 2 cannot judge
+`ledger handoff` or `recall`, because there is no family of manual calls for either to replace, so
+these two are registered before either is built, and are as immutable as the two above:
+
+3. Of the first five main sessions to pass 300K context after the meter merges, if fewer than
+   three write a hand-off with `ledger handoff` before they reach 500K, a line in context did not
+   change what agents do: no further command is built until the hand-off is enforced by a hook
+   rather than asked for.
+4. `recall` is deleted if it is not called once in the sessions that continue the first five
+   hand-offs.
+
+Both are counted from transcripts, by the commands' names in tool calls.
+
+The meter's `PostToolUse` hook runs after every tool call, so it adds wall time to each. Measured
+on 2026-10-21 on the owner's Windows machine: 0.34 s a call, of which starting node is 0.22 s and
+importing `usage.mjs` for its price table 0.02 s. Moving the table into a module of its own would
+save those 0.02 s and was declined in review; if the delay is ever felt, starting node is where it
+is.
+
+Declined in the third review as new behaviour, for whoever keeps `recall` past kill condition 4:
+with no `--session`, `recall` refuses whenever hand-offs from two or more other sessions are in the
+checkout, even if only one of those sessions still has a transcript, and it cannot take the
+hand-off's path instead of an id; a session that continues a hand-off and writes its own records
+only its own id, so the session before it is reachable only through what the new body says; and
+`ledger handoff` and `recall` know the current session only from `CLAUDE_CODE_SESSION_ID`, which
+was not checked after `/clear` (`--session` overrides it).
+
+Beyond a stated ceiling, declined in the fifth review: the meter's markers
+(`<tmp>/claude-meter/`) and `recall`'s logs assume one user per temp folder, as on Windows, where
+`TEMP` is per user. On a host whose users share `/tmp`, the first user's `claude-meter` folder
+would shut every other user's meter off, and a log another user created first under the same name
+would keep its own mode. A per-user folder fixes both, if these scripts ever run on such a host.
+Also beyond a ceiling, from the sixth review: `recall` holds a whole transcript in memory while it
+searches, and two sessions handing off under one title in the same instant could overwrite each
+other (a `ceiling:` in `scripts/agent/ledger.mjs`).
+
+Out of scope, from the root-cause pass's second review (2026-10-21): the agent scripts parse their
+command lines by hand, four times (`usage`, `meter`, `ledger`, `recall`), and each checks an
+option's value its own way; an empty `--session` had to be refused in three of them at once.
+`node:util`'s `parseArgs` could replace all four. No finding has come from the parsers otherwise,
+so it waits for the pull request that next changes their options.
+
+Beyond a stated ceiling, from the same pass's third review: an assistant line with no usage counts
+as a request of 0 tokens in `usage`'s extractor, which `segmentBreaks` takes for a compaction and
+the meter for an empty context. None of the 25,798 assistant lines on the owner's machine lacked
+usage (2026-10-21); the `ceiling:` is in `createExtractor`. A hand-off header edited by hand so its
+lines move reads as unknown, and `ledger handoff` then refuses to replace the file rather than
+overwriting it (a `ceiling:` on `readHeader`).

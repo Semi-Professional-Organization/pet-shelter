@@ -1,7 +1,7 @@
 name: Ledger issues
 
 # Mirrors tasks/open/ into GitHub issues once a change to it has landed on master. The rules — the
-# file wins, deleting an entry closes its issue, CLAIM-* files are skipped — live in
+# file wins, deleting an entry closes its issue, CLAIM-* and HANDOFF-* files are skipped — live in
 # scripts/ledger-issues.mjs and tasks/decisions/2026-09-18-ledger-issues-are-a-one-way-mirror.md.
 #
 # Deliberately not on pull_request: a branch's entries are unmerged, and publishing them would make
