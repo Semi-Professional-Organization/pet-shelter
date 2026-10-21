@@ -159,7 +159,7 @@ export async function main(argv, io = {}) {
     }
   }
 
-  let context = "unknown: no transcript of this session was found.";
+  let context = found ? "unknown: no model request in its transcript yet, or none since its last compaction." : "unknown: no transcript of this session was found.";
   try {
     const reading = found && readLatest(found.path);
     if (reading) context = `${Math.round(reading.ctx / 1000)}K tokens on ${reading.model}.`;

@@ -56,12 +56,15 @@ Built by two sessions: the first ran out of room at 449K and handed off with thi
 enough to pick up without asking anything.
 
 **Review tally** (findings: fixed / ceiling stated / declined): round 1, 10: 10/0/0 · round 2, 10:
-6/1/2, plus the hand-off file, deleted at close. Round 2's in-scope correctness bugs: after a
-compaction the meter read the context the compaction replaced (Claude Code writes no request for
-the compaction itself), so idle compaction would have produced a false cold-resume line; it
-priced fast mode and US-only inference at standard rates; `orient`'s hook took its session only
-from the environment; `recall` picked the newest of several sessions' hand-offs in a shared
-checkout. Later rounds are tallied in the pull request's body.
+6/1/2, plus the hand-off file, deleted at close · round 3, 6: 1/0/5. Round 2's in-scope
+correctness bugs: after a compaction the meter read the context the compaction replaced (Claude
+Code writes no request for the compaction itself), so idle compaction would have produced a false
+cold-resume line; it priced fast mode and US-only inference at standard rates; `orient`'s hook
+took its session only from the environment; `recall` picked the newest of several sessions'
+hand-offs in a shared checkout. Round 3's: the hand-off said "no transcript was found" when the transcript was there but
+ended in a compaction, a message round 2's compaction fix made false. Its five declined findings
+are new behaviour, recorded in the cost entry, or the `postTokens` choice below. Later rounds are
+tallied in the pull request's body.
 
 **Deliberately not done:**
 

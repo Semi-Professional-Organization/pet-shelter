@@ -107,3 +107,11 @@ on 2026-10-21 on the owner's Windows machine: 0.34 s a call, of which starting n
 importing `usage.mjs` for its price table 0.02 s. Moving the table into a module of its own would
 save those 0.02 s and was declined in review; if the delay is ever felt, starting node is where it
 is.
+
+Declined in the third review as new behaviour, for whoever keeps `recall` past kill condition 4:
+with no `--session`, `recall` refuses whenever hand-offs from two or more other sessions are in the
+checkout, even if only one of those sessions still has a transcript, and it cannot take the
+hand-off's path instead of an id; a session that continues a hand-off and writes its own records
+only its own id, so the session before it is reachable only through what the new body says; and
+`ledger handoff` and `recall` know the current session only from `CLAUDE_CODE_SESSION_ID`, which
+was not checked after `/clear` (`--session` overrides it).

@@ -118,6 +118,18 @@ describe("ledger handoff", () => {
     expect(readFileSync(join(top, "tasks", "open", "HANDOFF-from-a-file.md"), "utf8")).toContain("- **Context at hand-off:** unknown: no transcript of this session was found.");
   });
 
+  it("says the size is unknown, not the transcript missing, when nothing has been asked since a compaction", async () => {
+    const top = repo();
+    const { dir } = config(SESSION, [
+      { type: "assistant", requestId: "r1", timestamp: "2026-10-21T09:00:00.000Z", message: { id: "m", model: "claude-opus-5-5", content: [], usage: { input_tokens: 1, cache_read_input_tokens: 480_000, cache_creation_input_tokens: 0, output_tokens: 9 } } },
+      { type: "system", subtype: "compact_boundary", timestamp: "2026-10-21T09:05:00.000Z" },
+    ]);
+    expect((await run(["handoff", "Compacted"], { cwd: top, stdin: BODY, env: { CLAUDE_CODE_SESSION_ID: SESSION, CLAUDE_CONFIG_DIR: dir } })).code).toBe(0);
+    expect(readFileSync(join(top, "tasks", "open", "HANDOFF-compacted.md"), "utf8")).toContain(
+      "- **Context at hand-off:** unknown: no model request in its transcript yet, or none since its last compaction.",
+    );
+  });
+
   it("refuses a body missing a section, and writes nothing", async () => {
     const top = repo();
     const result = await run(["handoff", "Short"], { cwd: top, stdin: "## Decided\n\nyes\n", env: { CLAUDE_CODE_SESSION_ID: SESSION } });
