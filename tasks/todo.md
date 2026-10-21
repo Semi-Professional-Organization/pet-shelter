@@ -77,7 +77,12 @@ does. Round 6, 10: 8/1/1, three of them in-scope correctness bugs in `ledger han
 all there since round 1: a `~~~` line inside a code block opened by backticks closed it, so a
 real section after it went missing; a session prefix with no transcript to expand it was recorded
 as the session, locking the session out of its own file; and a line break in a title ended the
-H1. Later rounds are tallied in the pull request's body.
+H1. Round 7, 7: 7/0/0, five of them more of the same input's edge cases (a field inside a fence,
+inline triple-backtick code, a fence indented four spaces or a tab, an upper-case session id, a
+title quoting the session field); the fence rules now carry a `ceiling:` saying which CommonMark
+structure they model. In-scope findings went 10, 6, 1, 2, 0, 3, 5, so the loop stopped at round 7
+for the owner's word, as the scope rule asks when they stop falling. Later rounds, if any, are
+tallied in the pull request's body.
 
 **Deliberately not done:**
 

@@ -37,10 +37,16 @@ export function slugOf(title) {
     .replace(/-+$/, "");
 }
 
+const FIELD = /^\s*(?:- )?\*\*(?:Status|Settles when|From session):\*\*/;
+
 /**
- * What is wrong with a body, as sentences; empty when nothing is. A heading inside a fenced code
- * block is not a section. As in CommonMark, a fence closes only on a line of its own character, at
- * least as long, with nothing after it, so pasted output holding "~~~" or "```js" stays inside.
+ * What is wrong with a body, as sentences; empty when nothing is. Inside a fenced code block, a
+ * heading is not a section and a field is pasted output, not the body repeating the header.
+ *
+ * ceiling: fences follow CommonMark's own rules (up to three spaces of indent; a backtick fence's
+ * info string holds no backtick; it closes on the same character, at least as long, with nothing
+ * after it), so pasted output holding "~~~" or "```js" stays inside one. Other block structure,
+ * such as fences inside lists or block quotes and indented code, is not modelled.
  */
 export function checkBody(body) {
   const problems = [];
@@ -48,11 +54,12 @@ export function checkBody(body) {
   let section = null;
   let fence = "";
   for (const line of String(body).replace(/\r\n/g, "\n").split("\n")) {
-    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
-    if (marker && !fence) fence = marker;
-    else if (marker && marker[0] === fence[0] && marker.length >= fence.length && !line.trim().slice(marker.length).trim()) fence = "";
+    const [, marker = "", rest = ""] = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line) ?? [];
+    if (marker && !fence && !(marker[0] === "`" && rest.includes("`"))) fence = marker;
+    else if (marker && fence && marker[0] === fence[0] && marker.length >= fence.length && !rest.trim()) fence = "";
     const fenced = Boolean(fence);
     if (!fenced && /^# /.test(line)) problems.push("the body has its own H1, but the title is the H1");
+    if (!fenced && FIELD.test(line)) problems.push("the body repeats a field the command writes (Status, Settles when, From session)");
     const heading = fenced ? null : /^##\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading) {
       section = heading[1].toLowerCase();
@@ -63,9 +70,6 @@ export function checkBody(body) {
     const n = counts.get(name.toLowerCase());
     if (n === undefined) problems.push(`it has no "## ${name}" section`);
     else if (!n) problems.push(`its "## ${name}" section is empty`);
-  }
-  if (/^\s*(?:- )?\*\*(?:Status|Settles when|From session):\*\*/m.test(body)) {
-    problems.push("the body repeats a field the command writes (Status, Settles when, From session)");
   }
   return [...new Set(problems)];
 }
@@ -92,9 +96,9 @@ export function renderHandoff({ title, date, session, where, context, body, eol 
   return eol === "\n" ? text : text.replace(/\n/g, eol);
 }
 
-const FROM = /\*\*From session:\*\* `([^`]+)`/;
+const FROM = /^- \*\*From session:\*\* `([^`]+)`/m;
 
-/** The session a hand-off file records, or null. */
+/** The session a hand-off file records in its own field line, or null. */
 export const sessionOf = (text) => FROM.exec(text)?.[1] ?? null;
 
 /** The hand-offs in a checkout, newest first. */

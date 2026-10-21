@@ -20,6 +20,12 @@ export const projectsDir = (env = process.env) => join(env.CLAUDE_CONFIG_DIR || 
 export const MIN_PREFIX = 8;
 
 /**
+ * A whole session id: a lower-case UUID, as its transcript's file name shows. Ids are compared as
+ * written everywhere, so an upper-case copy is a different session.
+ */
+export const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
  * The transcript of one session, by its id or a prefix of at least MIN_PREFIX characters, searched
  * across every project folder, since a session's folder is named after the directory it started
  * in and that is not known here. Returns `{ session, path }`, or null when there is none.

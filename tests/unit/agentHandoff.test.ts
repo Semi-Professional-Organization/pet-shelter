@@ -74,6 +74,12 @@ describe("the hand-off file", () => {
     expect(checkBody(pasted("```\noutput\n~~~\nmore\n```"))).toEqual([]);
     expect(checkBody(pasted("````\n```js\n## Verified\n```\n````"))).toEqual([]);
     expect(checkBody(pasted("```\n```js\n## Open\n```"))).toEqual([]);
+    // Inline code is not a fence, nor is a line indented four spaces or a tab; and inside a fence,
+    // a ledger entry's own fields are pasted output, not the body repeating the header.
+    expect(checkBody(pasted("```npm test``` returned 0"))).toEqual([]);
+    expect(checkBody(pasted("```\n    ```\n## Open\n```"))).toEqual([]);
+    expect(checkBody(pasted("\t```\nindented"))).toEqual([]);
+    expect(checkBody(pasted("```\n$ cat tasks/open/x.md\n**Status:** open\n```"))).toEqual([]);
     expect(checkBody(`# My own title\n\n${BODY}`)).toEqual(["the body has its own H1, but the title is the H1"]);
     expect(checkBody(`${BODY}\n**Settles when:** never\n`)).toHaveLength(1);
   });
@@ -171,7 +177,10 @@ describe("ledger handoff", () => {
     // of its own file.
     const lost = await run(["handoff", "Lost", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env: { CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
     expect(lost.code).toBe(2);
-    expect(lost.out).toMatch(/^ledger: ERROR no transcript to expand the prefix aaaaaaaa into a session id\nnext: pass the full session id\n$/);
+    expect(lost.out).toBe("ledger: ERROR no transcript of session aaaaaaaa here, and it is not a whole session id to record as it is\nnext: pass the session's full id, a lower-case UUID\n");
+    // Session ids are compared as written, so an upper-case one would lock the session out too.
+    const upper = await run(["handoff", "Lost", "--session", SESSION.toUpperCase()], { cwd: top, stdin: BODY, env: { CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
+    expect(upper.code).toBe(2);
     expect(readHandoffs(top).map((h) => h.file)).toEqual(["tasks/open/HANDOFF-prefixed.md"]);
   });
 
@@ -185,6 +194,9 @@ describe("ledger handoff", () => {
     expect((await run(["handoff", "Long", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env })).code).toBe(2);
     expect((await run(["handoff", "Line one\n# Injected"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
     expect(readFileSync(join(top, "tasks", "open", "HANDOFF-line-one-injected.md"), "utf8")).toMatch(/^# Hand-off: Line one # Injected\n\n\*\*Status:\*\*/);
+    // The session is read from its own field, not from a title that quotes one.
+    expect((await run(["handoff", "Fix **From session:** `other`"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
+    expect(sessionOf(readFileSync(join(top, "tasks", "open", "HANDOFF-fix-from-session-other.md"), "utf8"))).toBe(SESSION);
   });
 
   it("could not run without a session, a body, a usable title or a known subcommand", async () => {

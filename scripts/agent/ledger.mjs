@@ -17,7 +17,7 @@ import { join, resolve } from "node:path";
 import { HANDOFF_DIR, HANDOFF_PREFIX, SECTIONS, checkBody, renderHandoff, sessionOf, slugOf } from "./handoff.mjs";
 import { readLatest } from "./meter.mjs";
 import { describeWhere, whereAmI } from "./orient.mjs";
-import { findTranscript, projectsDir } from "./transcript.mjs";
+import { SESSION_ID, findTranscript, projectsDir } from "./transcript.mjs";
 
 const HELP = `usage: node scripts/agent.mjs ledger handoff "<title>" [--from <file>] [--session <id>]
 
@@ -41,12 +41,10 @@ From PowerShell:   write the body to a file, then pass --from <file>.
 The file is not committed. Commit it with the branch's work when the next session will start in
 another checkout; the session that finishes the work deletes it.
 
-  --session <id>  the session handing off (default: CLAUDE_CODE_SESSION_ID)
+  --session <id>  the session handing off (default: CLAUDE_CODE_SESSION_ID); a prefix of 8 or
+                  more characters will do where the session's transcript is found
 
 Exit codes: 0 written, 1 refused (a missing section, another session's file), 2 could not run.`;
-
-/** A whole Claude Code session id, which is a UUID, as its transcript's file name shows. */
-const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function parseArgs(argv) {
   const opts = { sub: undefined, title: undefined, from: undefined, session: undefined, help: false };
@@ -152,8 +150,10 @@ export async function main(argv, io = {}) {
     say("ERROR", error.message);
     return 2;
   }
+  // Without a transcript a prefix cannot be expanded, and recorded as it is it would lock the
+  // session out of its own file.
   if (!found && !SESSION_ID.test(given)) {
-    say("ERROR", `no transcript to expand the prefix ${given} into a session id`, "pass the full session id");
+    say("ERROR", `no transcript of session ${given} here, and it is not a whole session id to record as it is`, "pass the session's full id, a lower-case UUID");
     return 2;
   }
   const session = found?.session ?? given;
