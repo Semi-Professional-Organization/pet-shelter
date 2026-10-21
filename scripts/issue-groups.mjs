@@ -103,9 +103,7 @@ const parse = (text, where) => validateConfig(JSON.parse(text), where);
 export const canApply = (permission) => ["WRITE", "MAINTAIN", "ADMIN"].includes(permission);
 
 function report(plan) {
-  if (plan.actions.length > 0) write(plan.actions.map(formatAction).join("\n"));
-  else if (plan.skipped.length > 0) write(`  nothing it can change, but ${plan.skipped.length} links cannot be made safely (see the notes): not in sync`);
-  else write("  in sync, nothing to do");
+  write(plan.actions.length === 0 ? "  in sync, nothing to do" : plan.actions.map(formatAction).join("\n"));
   for (const [key, number] of plan.record) write(`  note: #${number} is the parent of ${key}; --apply records it in ${CONFIG_PATH}.`);
   for (const note of plan.notes) write(`  note: ${note}`);
   if (plan.ungrouped.length > 0) {
@@ -234,11 +232,9 @@ async function main(argv) {
   recordInWorkingCopy(record);
   // Proof that it finished: read GitHub again, with every parent recorded, and plan again.
   const after = planGroups(recordParents(config, record), readSnapshot(graphql, { repo, numbers: [...numbers, ...record.values()], parents: [...parents, ...record.values()] }), target);
-  // A link skipped because its depth cannot be known is not done either, whatever the plan's length.
-  if (after.actions.length > 0 || after.skipped.length > 0) {
-    write(`\nGitHub still differs from the file after applying:`);
-    if (after.actions.length > 0) write(after.actions.map(formatAction).join("\n"));
-    for (const { child, key, reason } of after.skipped) write(`  #${child} is not under ${key}: ${reason}`);
+  if (after.actions.length > 0) {
+    write(`\nGitHub still differs from the file after applying; ${after.actions.length} actions remain:`);
+    write(after.actions.map(formatAction).join("\n"));
     process.exitCode = 1;
     return;
   }

@@ -113,6 +113,11 @@ the note says so); a skipped link fails the verify step; the room-making unlink 
 whose own link can then run; one predicate decides what looks like a parent. A 30,000-seed run
 found seed 15244 (a set-aside link that became legal); fixed and kept as a regression seed.
 
+Rebuild round 4 found 9 more, all in planning around hidden issues, full parents and deep nesting.
+Findings were not falling, so per the owner's rule the owner was asked, and chose refusal: those
+states now stop the dry run with what to fix by hand, and the skip and room-making code is gone.
+Round 4's other three (subdirectory runs, 20-label reads, a dry run saying in sync) were fixed.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

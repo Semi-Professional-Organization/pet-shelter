@@ -45,18 +45,20 @@ every state found and missed the rest (departed groups, closed duplicates, forei
 sub-issues, no loops at any depth, eight levels of nesting, title and body limits, and the fields
 the file may hold (an unknown one is refused, since `--apply` rewrites the file). The links are
 ordered by simulating them against those rules, with counts and heights moving as they would, so
-no link is refused for a slot, a loop or a depth that another link would have cleared; two full
-parents swapping an issue get one unlinked first to make room. What no order can make legal (a
-parent nested under its own member) is refused by the dry run. To count depth rather than guess
+an unlink or a move that frees a slot or clears a path runs before the link that needs it. What
+that ordering cannot make legal (a parent nested under its own member) is refused by the dry run. To count depth rather than guess
 it, the reader follows sub-issues all the way down below every member and parent, and every
-ancestor above each parent. Where an issue this account cannot see makes a depth unknowable (above
-the parent, or below the issue), that link is skipped with a note instead of risked; an issue under
-a parent this account cannot see is likewise left alone. A refusal at apply is then run-wide
-(access, network, rate limit), which is why apply stops at the first one. Two assumptions remain,
-marked `ceiling:` in the code: an unreadable parent comes back as an error at its path, and an
-unreadable sub-issue as null in its list while still counted. Neither was observed (an unresolvable
-node id was: NOT_FOUND at its path). A link the depth of which cannot be known is left undone, and
-`--apply` then reports GitHub as still different rather than verified. Rate limits are waited out (60s,
+ancestor above each parent. A refusal at apply is then run-wide (access, network, rate limit),
+which is why apply stops at the first one.
+
+**States the rules cannot be checked against are refused, not planned around** (owner's decision,
+2026-10-21). An issue this account cannot see, as a member's parent, above a group's parent or below
+a member; and links no simple order makes legal, such as two full parents swapping issues. The dry
+run stops and says what to fix by hand. This repository never has those states, and handling them
+grew a solver in which four review rounds kept finding cases it got wrong (6, 6, 5, then 9).
+Two assumptions remain, marked `ceiling:` in the code: an unreadable parent comes back as an error
+at its path, and an unreadable sub-issue as null in its list while still counted. Neither was
+observed (an unresolvable node id was: NOT_FOUND at its path). Rate limits are waited out (60s,
 120s, 180s; `gh` hides Retry-After).
 
 **Dry run from the working copy; `--apply` from the default branch, and it must finish.** A dry run
@@ -73,13 +75,13 @@ the planner against a fake GitHub that answers the reader's GraphQL and enforces
 rules, over 5,000 generated states (missing,
 closed, duplicate, unlabelled, recased and edited parents; departed groups; foreign, hidden and
 hand-made links). Every state converges in one apply, without a refused write, a second parent, or
-a touched link the file does not own, or is refused for a reason the test confirms (a real loop, an
-emptied file). The oracle judges a refusal from the fake's whole truth: a loop, more than eight
-levels, more than 100 sub-issues. A second check reads the fake's truth, not the reader, to confirm
-every sub-issue of a managed parent belongs there, and that each link skipped for want of sight has
-something hidden in its way. Measured 2026-10-21: 4,327 converged, 450 refused an impossible tree,
-224 an emptied file. A one-off run of 30,000 seeds found one more case (seed 15244), now fixed and
-run every time, and then held every check.
+a touched link the file does not own, or is refused for a reason the test confirms in the fake's
+whole truth: a loop, more than eight levels or more than 100 sub-issues in the finished tree, an
+issue this account cannot see where the planner must look, or an emptied file. A second check
+reads the fake's truth, not the reader, to confirm every sub-issue of a managed parent belongs
+there. Measured 2026-10-21: 3,515 converged, 379 refused an impossible tree, 883 refused for
+something hidden in the way, 224 an emptied file. One-off runs of 30,000 seeds held every check
+(one found seed 15244, now fixed and run every time).
 The first version planned from the fake's whole state and so missed a gap in the reader; review
 caught it, and every plan in the tests now comes through the reader.
 

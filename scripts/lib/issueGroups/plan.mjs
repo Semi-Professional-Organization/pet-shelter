@@ -235,7 +235,6 @@ export function planGroups(config, snapshot, target) {
   for (const [number, key] of memberOf) wanted.set(byNumber.get(number).id, node(key));
   const unlinks = [];
   const links = [];
-  const unseen = [];
   for (const issue of snapshot.issues) {
     if (issue.parentId && managed.has(issue.parentId) && !wanted.has(issue.id)) {
       unlinks.push({ type: "unlink", parentId: issue.parentId, parent: byId.get(issue.parentId).number, childId: issue.id, child: refOf(issue, repo) });
@@ -247,7 +246,7 @@ export function planGroups(config, snapshot, target) {
     if (isClosed(issue)) notes.push(`#${number} (in ${key}) is closed. If its ledger entry was renamed, put the new issue in its place.`);
     if (issue.parentId === target) continue;
     if (issue.parentHidden) {
-      unseen.push({ child: number, key, reason: "it is under an issue this account cannot see", removedFrom: null });
+      problems.push(`#${number} (in ${key}) is under an issue this account cannot see; someone who can see it must unlink it first`);
       continue;
     }
     const from = issue.parentId ? parentRefOf(issue, byId, repo) : null;
@@ -257,15 +256,10 @@ export function planGroups(config, snapshot, target) {
     links.push({ type: "link", key, parentId: target, childId: issue.id, child: number, from });
   }
 
+  if (problems.length > 0) throw new Error(problems.join("\n"));
+
   // 5. Simulate the links against GitHub's rules, in an order that keeps every step legal.
-  const { ordered: orderedLinks, skipped: unknowable } = orderLinks({ byId, unlinks, links, absent: absentChildrenOf(snapshot), managed });
-  // Links left undone because this account cannot see enough to make them safely. The plan is not
-  // finished while any remain, and `--apply` says so rather than claiming GitHub matches the file.
-  const skipped = [...unseen, ...unknowable];
-  for (const { child, key, reason, removedFrom } of skipped) {
-    const where = removedFrom ? `is taken out of #${removedFrom} but not linked` : "is left where it is";
-    notes.push(`#${child} (in ${key}) ${where}: ${reason}. Someone who can see it must sort it out.`);
-  }
+  const orderedLinks = orderLinks({ byId, unlinks, links, absent: absentChildrenOf(snapshot) });
 
   for (const number of config.standalone ?? []) {
     const issue = byNumber.get(number);
@@ -287,7 +281,7 @@ export function planGroups(config, snapshot, target) {
 
   const order = ["create", "label", "reopen", "update"];
   parentActions.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
-  return { actions: [...parentActions, ...orderedLinks, ...closes], notes, ungrouped, record, skipped };
+  return { actions: [...parentActions, ...orderedLinks, ...closes], notes, ungrouped, record };
 }
 
 /**
@@ -320,18 +314,16 @@ function absentChildrenOf(snapshot) {
  * Orders the links so each is legal when it runs: the parent has a free slot, the link makes no
  * loop, and nesting stays within GitHub's depth. The simulation moves links, counts and heights as
  * it goes, so every check sees the tree as it will be at that step. Unlinks run first and free
- * slots, and each link frees one in the parent it leaves. When only a full parent blocks progress
- * and another link, legal but for room, is due to take one of its issues elsewhere, that issue is
- * unlinked first to make room.
+ * slots, and each link frees one in the parent it leaves.
  *
- * Depth is judged on bounds. What cannot be seen or was not read counts as at least one level, above
- * the parent or below the issue. A link too deep even at the least is a problem, like a loop or a
- * full parent nothing can empty: reported before anything is written. A link that is legal at the
- * least but whose true depth is unknown is skipped with a note, since nothing can prove it legal.
- *
- * Returns `{ ordered, skipped }`.
+ * Anything the rules cannot be checked against is refused, never planned around: an issue this
+ * account cannot see above the parent or below the issue, or sub-issues that were not read. So is a
+ * set of links that no order of this simple kind makes legal, such as two full parents swapping
+ * issues. Each is reported before anything is written, with what to fix by hand. Owner's decision,
+ * 2026-10-21: this repository never has those states, and handling them grew a solver that every
+ * review found wrong somewhere.
  */
-function orderLinks({ byId, unlinks, links, absent, managed }) {
+function orderLinks({ byId, unlinks, links, absent }) {
   const parent = new Map([...byId.values()].map((issue) => [issue.id, issue.parentId ?? null]));
   const kids = new Map();
   const count = new Map();
@@ -394,63 +386,29 @@ function orderLinks({ byId, unlinks, links, absent, managed }) {
   };
   const full = (action) => current(action.parentId) >= LIMITS.children;
   const loops = (action) => action.parentId === action.childId || above(action.parentId).chain.includes(action.childId);
-  /** Why the link cannot run now, ignoring room, or null; `unknown` when only knowledge is missing. */
-  const blockedBesidesRoom = (action) => {
-    if (loops(action)) return { reason: "it would make a loop" };
+  /** Why the link cannot run now, or null. */
+  const why = (action) => {
+    if (full(action)) return `its parent already has ${LIMITS.children} sub-issues`;
+    if (loops(action)) return "it would make a loop";
     const up = above(action.parentId);
     const down = below(action.childId);
-    const least = up.chain.length + up.extra + 2 + down.levels;
-    if (least > LIMITS.depth + 1) return { reason: `it would nest deeper than ${LIMITS.depth} levels` };
-    if (!up.exact) return { reason: "its parent sits below an issue this account cannot see, so the depth cannot be checked", unknown: true };
-    if (!down.exact) return { reason: "it has sub-issues this account cannot see, so the depth cannot be checked", unknown: true };
+    if (up.chain.length + up.extra + 2 + down.levels > LIMITS.depth + 1) return `it would nest deeper than ${LIMITS.depth} levels`;
+    if (!up.exact) return "its parent sits below an issue this account cannot see, so the depth cannot be checked";
+    if (!down.exact) return "it has sub-issues this account cannot see, so the depth cannot be checked";
     return null;
   };
-  const why = (action) => (full(action) ? { reason: `its parent already has ${LIMITS.children} sub-issues` } : blockedBesidesRoom(action));
 
-  const skipped = [];
   const pending = [...links];
   while (pending.length > 0) {
     const index = pending.findIndex((action) => why(action) === null);
-    if (index !== -1) {
-      const [action] = pending.splice(index, 1);
-      move(action.childId, action.parentId);
-      ordered.push(action);
-      continue;
+    if (index === -1) {
+      throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action)}`).join("\n"));
     }
-    // Stuck on a full parent: unlink an issue that another link, legal but for room, will take out.
-    const blocked = pending.find(full);
-    const leaving = blocked && pending.find((action) => parent.get(action.childId) === blocked.parentId && blockedBesidesRoom(action) === null);
-    if (leaving) {
-      ordered.push({ type: "unlink", parentId: blocked.parentId, parent: byId.get(blocked.parentId)?.number, childId: leaving.childId, child: `#${leaving.child}` });
-      move(leaving.childId, null);
-      leaving.from = null;
-      continue;
-    }
-    // Stuck on what cannot be known: set those aside, and see whether the rest can go. An issue set
-    // aside while under another group's parent still does not belong there, and taking it out is
-    // always legal, so it comes out; that may also make the room something else was waiting for.
-    const unknown = pending.filter((action) => !full(action) && why(action)?.unknown);
-    if (unknown.length > 0) {
-      for (const action of unknown) {
-        // An earlier one coming out may have cleared this one's path: re-ask before setting it aside.
-        if (!why(action)?.unknown) continue;
-        const from = parent.get(action.childId);
-        const removed = Boolean(from && managed.has(from));
-        if (removed) {
-          ordered.push({ type: "unlink", parentId: from, parent: byId.get(from)?.number, childId: action.childId, child: `#${action.child}` });
-          move(action.childId, null);
-          action.from = null;
-          // Out of the way, the unknown part may no longer be in its path: then it simply links.
-          if (why(action) === null) continue;
-        }
-        skipped.push({ child: action.child, key: action.key, reason: why(action).reason, removedFrom: removed ? byId.get(from)?.number ?? null : null });
-        pending.splice(pending.indexOf(action), 1);
-      }
-      continue;
-    }
-    throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action).reason}`).join("\n"));
+    const [action] = pending.splice(index, 1);
+    move(action.childId, action.parentId);
+    ordered.push(action);
   }
-  return { ordered, skipped };
+  return ordered;
 }
 
 // --- Applying -----------------------------------------------------------------------------------

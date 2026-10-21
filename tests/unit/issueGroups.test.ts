@@ -219,15 +219,12 @@ describe("planning: two whole states compared by node id", () => {
     expect(plan(fake, { groups: [group("a", [1])] }).notes).toEqual([expect.stringMatching(/#1 is under #2, which this script does not manage/)]);
   });
 
-  it("leaves alone an issue under a parent this account cannot see, and says who must act", () => {
+  it("refuses an issue under a parent this account cannot see, and says who must act", () => {
     const fake = github(1);
     const hidden = fake.add();
     fake.link(hidden.id, fake.byNumber(1)!.id);
     hidden.hidden = true;
-    const result = plan(fake, { groups: [group("a", [1])] });
-    expect(types(result.actions)).toEqual(["create"]);
-    expect(result.notes).toEqual([expect.stringMatching(/#1 \(in a\) is left where it is: it is under an issue this account cannot see/)]);
-    expect(result.skipped).toEqual([expect.objectContaining({ child: 1, key: "a" })]);
+    expect(() => plan(fake, { groups: [group("a", [1])] })).toThrow(/#1 \(in a\) is under an issue this account cannot see; someone who can see it must unlink it first/);
   });
 
   it("lists open issues in no group, without the parents, the standalone ones or a link the plan removes", () => {
@@ -300,7 +297,7 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     expect(() => plan(fake, { groups: [{ ...a, parent: parentA.number }, { ...b, parent: parentB.number }] })).toThrow(/nest deeper than 8 levels/);
   });
 
-  it("lets two full parents swap an issue, unlinking one first to make room", () => {
+  it("refuses two full parents swapping an issue, which no simple order can do", () => {
     const fake = github(200);
     const a = group("a", [...Array.from({ length: 99 }, (_, i) => i + 1), 200]);
     const b = group("b", [100, ...Array.from({ length: 99 }, (_, i) => i + 101)]);
@@ -309,12 +306,10 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     for (let n = 1; n <= 100; n += 1) fake.link(parentA.id, fake.byNumber(n)!.id);
     for (let n = 101; n <= 200; n += 1) fake.link(parentB.id, fake.byNumber(n)!.id);
     const config = { groups: [{ ...a, parent: parentA.number }, { ...b, parent: parentB.number }] };
-    const { first, next } = converge(fake, config);
-    expect(types(first.actions)).toEqual(["unlink", "link", "link"]);
-    expect(next.actions).toEqual([]);
+    expect(() => plan(fake, config)).toThrow(/its parent already has 100 sub-issues/);
   });
 
-  it("leaves an issue alone, with a note, when sub-issues it cannot see make its depth unknowable", () => {
+  it("refuses an issue whose depth sub-issues it cannot see make unknowable", () => {
     // The generator found this: a member's hidden sub-issue had a long visible chain below it.
     const fake = github(1);
     const hidden = fake.add();
@@ -323,9 +318,7 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     fake.link(hidden.id, chain[0].id);
     for (let i = 1; i < chain.length; i += 1) fake.link(chain[i - 1].id, chain[i].id);
     hidden.hidden = true;
-    const result = plan(fake, { groups: [group("a", [1])] });
-    expect(types(result.actions)).toEqual(["create"]);
-    expect(result.notes).toEqual([expect.stringMatching(/#1 \(in a\) is left where it is: it has sub-issues this account cannot see/)]);
+    expect(() => plan(fake, { groups: [group("a", [1])] })).toThrow(/#1 cannot be linked to a: it has sub-issues this account cannot see/);
   });
 
   it("reads below an issue first met as an ancestor, so nothing visible is mistaken for hidden", () => {
@@ -342,7 +335,6 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     fake.byNumber(2)!.state = "CLOSED";
     fake.byNumber(3)!.state = "CLOSED";
     const result = plan(fake, { groups: [a, { ...b, parent: parentB.number }] });
-    expect(result.skipped).toEqual([]);
     expect(types(result.actions)).toEqual(["create", "link", "link"]);
   });
 
@@ -359,10 +351,7 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     expect(() => plan(fake, { groups: [{ ...g, parent: parent.number }] })).toThrow(/nest deeper than 8 levels/);
   });
 
-  it("takes an unknowable issue out of a parent that is not its own, and says so, rather than claim it stayed", () => {
-    // Review round 3: the room-making unlink took out an issue whose own link was then skipped, and
-    // the note still said it was left where it was. It does not belong under group one's parent
-    // either way, so it comes out, the note says so, and that makes the room #100 needs.
+  it("refuses rather than reshuffles when a full parent waits on an issue whose depth is unknowable", () => {
     const fake = github(101);
     const one = group("one", Array.from({ length: 100 }, (_, i) => i + 1));
     const two = group("two", [101]);
@@ -374,14 +363,7 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     fake.link(fake.byNumber(101)!.id, hidden.id);
     hidden.hidden = true;
     const config = { groups: [{ ...one, parent: parentOne.number }, { ...two, parent: parentTwo.number }] };
-    const result = plan(fake, config);
-    expect(result.actions.map((a: { type: string; child?: unknown }) => [a.type, a.child])).toEqual([
-      ["unlink", "#101"],
-      ["link", 100],
-    ]);
-    expect(result.notes).toEqual([expect.stringMatching(/#101 \(in two\) is taken out of #\d+ but not linked: it has sub-issues this account cannot see/)]);
-    applyPlan(result, fake.port());
-    expect(fake.byNumber(101)!.parentId).toBeNull();
+    expect(() => plan(fake, config)).toThrow(/#101 cannot be linked to two: it has sub-issues this account cannot see/);
   });
 
   it("reads a member's sub-issues all the way down, so a deep one is counted, not guessed", () => {
