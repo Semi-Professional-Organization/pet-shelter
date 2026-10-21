@@ -151,6 +151,113 @@ tallied in the pull request's body.
 - The hooks were observed in a headless CLI session, not in the desktop app, and a real cold
   resume was not run end to end; the replay fed old transcripts to the hook's code instead.
 
+# Open issues are grouped under parent issues from one file
+
+**Branch:** `claude/project-thread-c0pu58` · opened 2026-10-21 · base `e2dfb51`
+
+The owner asked for the open issues organised into parents and children, preferring prebuilt tools
+and solving their gaps in a script, with a discovery mode for issues a grouping misses. The plan and
+the eleven groups were approved in the project thread before anything was built.
+
+- [x] Survey: native sub-issues answer on this repo; `gh` 2.98 has no command for them
+- [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
+- [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
+- [x] Rebuilt after an owner-requested audit: `scripts/lib/issueGroups/{plan,github,suggest}.mjs`
+- [x] Tests: `issueGroups.test.ts` (examples), `issueGroupsConverge.test.ts` (5,000 states through
+      the real reader against `tests/unit/support/fakeGitHub.ts`), `issueGroupsSuggest.test.ts`
+- [ ] Owner approves the PR, then `npm run issues:groups -- --apply`, which must print "Verified";
+      commit the `parent` numbers it records
+
+## Review
+
+Dry run against the live repository: 11 parents to create, 69 sub-issues to add, nothing else, with
+#130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69 as it prints them: 79.7%
+right, 11.6% wrong, 8.7% no clear group, real group in the top two for 95.7%.
+
+Deliberately not done: closing #130 and #131 (fixed by #144, the owner's call), settling #157 (its
+ruleset is active, but it is a ledger issue and closes only by moving its file), and fixing any of
+the grouped bugs themselves, which go to their own threads. No workflow runs the script: grouping is
+a judgement, so it stays a dry run a person reads. Links surviving a ledger body rewrite is read
+from `ledger-issues.mjs`, not yet observed: `tasks/open/issue-group-links-through-ledger-sync-unobserved.md`.
+
+Review round 1 found three bugs, all fixed: a departed group's parent closed but kept its links, a
+bare `catch` turned any `gh` failure into "not an issue", and a non-array `standalone` crashed.
+Declined, with reasons in the PR: a guard against a file that drops most groups (the dry run is the
+guard, and a wrongly closed parent reopens on the next run), batching the closed-issue reads and the
+leave-one-out centroids (a handful of calls, 69 x 11 sums), and sharing `run`/`normalise` with
+`ledger-issues.mjs` (two identical one-liners; the repo waits for a third copy).
+
+Round 2 found the round-1 class again for a closed duplicate parent, plus sub-issues from another
+repository matched by number alone, a linked closed issue read without its body, no ask-first rule
+for `--apply`, and a parent at GitHub's 100 limit refusing an add the plan's own moves would have
+made room for. All fixed. Re-running live then hit GitHub's 500,000-node query cap (child labels),
+which no unit test could have shown; the child read no longer asks for labels.
+
+Round 3 found `--evaluate` scoring raw top guesses that `--suggest` prints as no clear group (81.2%
+became 78.3%), group parents counted in the suggester's weights, standalone numbers never checked,
+and refusal messages that quoted the whole GraphQL query. Fixed. Declined: more spellings in the
+ask-first rule (the ledger rule has the same two, by the decision that set it).
+
+Round 4 found a new parent created by someone without push access silently losing its label, so
+every run would make another, and a parent nested under its own member, which GitHub refuses as a
+loop at apply though the dry run showed it fine. Both fixed, plus kebab-case and `./` paths in the
+suggester (top two now 94.2%).
+
+Round 5 found that a caller without triage access would still leave an unlabelled parent per run;
+`--apply` now checks `viewerPermission` before any write and names a parent a failed create left.
+The suggester now uses true cosine (unit-length centroids no longer favour small groups), counts a
+tie against the real group, keeps `Pet.age` whole, and drops Next.js route-file names like `page`.
+
+Rounds 6 and 7 found no correctness bug, which ended that loop under the owner's rule. Their wording
+fixes: `--apply` now asks for write access, since creating the `group` label needs it and nothing
+shows triage is enough for sub-issue links; a stale ceiling comment now describes the gated
+measurement; an unlabelled-parent message is said once.
+
+## Rebuild (owner asked for root causes, not patches)
+
+A fresh read-only audit found 8 more cases (stale-checkout apply, duplicate parents after a label or
+marker edit, deep loops and over-long bodies wedging every run, two concurrent applies, hidden
+parents, rate limits). All 23 bugs traced to four choices: identity from label and marker, a plan
+walked case by case, GitHub's rules found one refusal at a time, unchecked writes. The rebuild
+answers each (recorded parents, a two-state diff by node id, rules checked on the finished tree by
+simulation, `--apply` from origin/master that re-reads and must plan nothing). The owner approved
+the plan, recording parents in the grouping file, master-only apply, and including rate limits and
+hidden parents. Review of the rebuild runs as a new loop from round 1.
+
+Rebuild round 1 found that the convergence test planned from the fake's whole state, bypassing the
+reader, which hid a real reader gap (a recorded parent without its label was read without its
+sub-issues); that heights were static in the simulation; that two full parents could not swap; and
+that a failed working-copy write could lose created parent numbers. All fixed; every test plan now
+comes through `readSnapshot`, and a mutation reintroducing the gap fails. (The swap handling added
+then was later removed by the owner's refusal decision below.)
+Recorded as ceilings, not fixed: a member's sub-issues read one level deep, and the shape of
+GitHub's answer for an unreadable parent (assumed an error, not observed).
+
+Rebuild round 2 found the depth check still guessing (a member's read-time height kept after its
+sub-issues moved, refusing legal trees), the verify step able to lose new parents' numbers, an
+oracle that judged emptiness through the same reader and accepted only loops, ancestors under an
+unreadable issue treated as top-level, and a fake that answered a missing node silently. The reader
+now follows sub-issues all the way down, so heights are counted; unknowable depth skips the link
+with a note; numbers are recorded before verifying; the oracle checks the fake's truth and every
+rule; the generator builds deep chains. The first ceiling above is gone. 30,000 seeds held once.
+
+Rebuild round 3 found that "not read" and "cannot be seen" were one guess in the planner: an issue
+first read as an ancestor was never descended, so a visible sub-issue looked hidden and a legal link
+was skipped. The reader now reports hidden sub-issues explicitly and descends independently of the
+ancestor read; depth is judged on bounds, so a link too deep even at the least is refused and only
+a truly unknowable one is skipped; a skipped issue under another group's parent is taken out (and
+the note says so); a skipped link fails the verify step; the room-making unlink only takes an issue
+whose own link can then run; one predicate decides what looks like a parent. A 30,000-seed run
+found seed 15244 (a set-aside link that became legal); fixed and kept as a regression seed.
+
+Rebuild round 4 found 9 more, all in planning around hidden issues, full parents and deep nesting.
+Findings were not falling, so per the owner's rule the owner was asked, and chose refusal: those
+states now stop the dry run with what to fix by hand, and the skip and room-making code is gone.
+Round 4's other three (subdirectory runs, 20-label reads, a dry run saying in sync) were fixed.
+Round 5, on the narrowed design, found a hidden sub-issue under a group parent passing as matched
+(now refused), a CRLF checkout always reading as changed, an overclaimed character count, and stale
+text. All fixed.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

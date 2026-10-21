@@ -71,7 +71,11 @@
       "Bash(npm run ledger:issues *--apply*)",
       "Bash(node scripts/ledger-issues.mjs *--apply*)",
       "PowerShell(npm run ledger:issues *--apply*)",
-      "PowerShell(node scripts/ledger-issues.mjs *--apply*)"
+      "PowerShell(node scripts/ledger-issues.mjs *--apply*)",
+      "Bash(npm run issues:groups *--apply*)",
+      "Bash(node scripts/issue-groups.mjs *--apply*)",
+      "PowerShell(npm run issues:groups *--apply*)",
+      "PowerShell(node scripts/issue-groups.mjs *--apply*)"
     ],
     "allow": [
       "gh pr merge"

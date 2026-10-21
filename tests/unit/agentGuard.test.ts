@@ -449,6 +449,13 @@ describe("agent guard", () => {
       expect(covered("npm run ledger:issues -- --branch master", tool)).toBe(false);
     });
 
+    it.each(["Bash", "PowerShell"])("asks before the issue grouping changes GitHub, and not for its dry run or suggestions, in %s", (tool) => {
+      expect(covered("npm run issues:groups -- --apply", tool)).toBe(true);
+      expect(covered("node scripts/issue-groups.mjs --apply", tool)).toBe(true);
+      expect(covered("npm run issues:groups", tool)).toBe(false);
+      expect(covered("node scripts/issue-groups.mjs --suggest --evaluate", tool)).toBe(false);
+    });
+
     it("catches the destructive commands only when they lead the string", () => {
       // The rules work. This is the control for the test below it.
       for (const command of [
