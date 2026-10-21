@@ -136,6 +136,8 @@ describe("ledger handoff", () => {
     const theirs = await run(["handoff", "Shared title"], { cwd: top, stdin: BODY, env: env(OTHER) });
     expect(theirs.code).toBe(1);
     expect(theirs.out).toContain(`was written by session ${SESSION}, not this one`);
+    // A session continuing that one's work is the one that should replace it.
+    expect(theirs.out).toContain("next: if you are continuing its work, delete tasks/open/HANDOFF-shared-title.md and run this again; if not, choose another title");
     expect(readFileSync(join(top, "tasks", "open", "HANDOFF-shared-title.md"), "utf8")).toBe(mine);
   });
 
@@ -206,7 +208,7 @@ describe("orient", () => {
     const plain = io({ cwd: ghost, env: {} });
     expect(await orient([], plain.io)).toBe(1);
     expect(plain.sink.text).toMatch(/^orient: FAIL .*ghost is not a registered worktree, so git resolves it to .*: edits here land in that checkout\nwhere: main checkout /);
-    const hook = io({ cwd: ghost, env: {} });
+    const hook = io({ cwd: ghost, env: {}, stdin: "{}" });
     expect(await orient(["--brief", "--hook"], hook.io)).toBe(0);
     expect(hook.sink.text).toContain("orient: FAIL");
   });
@@ -220,12 +222,24 @@ describe("orient", () => {
     expect(whereAmI(top, { now: Date.now() })?.fetchedMinutesAgo).toBeLessThan(5);
   });
 
+  it("as the hook, knows its own session from the event, so its own hand-off is not news to it", async () => {
+    const top = repo();
+    writeFileSync(join(top, "tasks", "open", "HANDOFF-mine.md"), renderHandoff({ title: "Mine", date: "2026-10-21", session: SESSION, where: "w", context: "c", body: BODY }));
+    const resumed = io({ cwd: top, env: {}, stdin: JSON.stringify({ hook_event_name: "SessionStart", source: "resume", session_id: SESSION }) });
+    expect(await orient(["--brief", "--hook"], resumed.io)).toBe(0);
+    expect(resumed.sink.text).not.toContain("HANDOFF-mine.md");
+    // The event names the session; the environment is only a fallback.
+    const fresh = io({ cwd: top, env: { CLAUDE_CODE_SESSION_ID: SESSION }, stdin: JSON.stringify({ hook_event_name: "SessionStart", source: "startup", session_id: OTHER }) });
+    expect(await orient(["--brief", "--hook"], fresh.io)).toBe(0);
+    expect(fresh.sink.text).toContain('hand-off: tasks/open/HANDOFF-mine.md "Mine", from session aaaaaaaa on 2026-10-21');
+  });
+
   it("exits 0 as the hook even outside a repository, where it could not run", async () => {
     const outside = mkdtempSync(join(tmpdir(), "not-a-repo-"));
     try {
       const plain = io({ cwd: outside, env: {} });
       expect(await orient([], plain.io)).toBe(2);
-      expect(await orient(["--hook"], io({ cwd: outside, env: {} }).io)).toBe(0);
+      expect(await orient(["--hook"], io({ cwd: outside, env: {}, stdin: "not json" }).io)).toBe(0);
       expect(await orient(["--brief"], io({ cwd: outside, env: {} }).io)).toBe(2);
     } finally {
       rmSync(outside, { recursive: true, force: true });
@@ -267,12 +281,17 @@ describe("recall", () => {
     expect(snippet("short needle", 6, 6)).toBe("short needle");
   });
 
-  it("searches the session the newest hand-off from another session records, subagents included", async () => {
+  const leave = (top: string, name: string, session: string) =>
+    writeFileSync(join(top, "tasks", "open", `HANDOFF-${name}.md`), renderHandoff({ title: name, date: "2026-10-21", session, where: "w", context: "c", body: BODY }));
+
+  it("searches the session the hand-off from another session records, subagents included", async () => {
     const top = repo();
     const { dir, folder } = config(OTHER, records);
     mkdirSync(join(folder, OTHER, "subagents"), { recursive: true });
     writeFileSync(join(folder, OTHER, "subagents", "agent-1.jsonl"), JSON.stringify({ type: "user", uuid: "s1", timestamp: "2026-10-21T09:05:00Z", message: { content: "subagent saw the meter" } }) + "\n");
-    writeFileSync(join(top, "tasks", "open", "HANDOFF-x.md"), renderHandoff({ title: "X", date: "2026-10-21", session: OTHER, where: "w", context: "c", body: BODY }));
+    leave(top, "x", OTHER);
+    // This session's own hand-off is not the one it continues from.
+    leave(top, "mine", SESSION);
     const { sink, io: opts } = io({ cwd: top, env: { CLAUDE_CONFIG_DIR: dir, CLAUDE_CODE_SESSION_ID: SESSION }, tmp: scratch });
     expect(await recall(["Meter"], opts)).toBe(0);
     const lines = sink.text.trimEnd().split("\n");
@@ -280,6 +299,22 @@ describe("recall", () => {
     expect(lines[1]).toBe("10-21 09:01Z user: Build the METER please");
     expect(lines[6]).toBe("10-21 09:05Z sub user: subagent saw the meter");
     expect(lines[7]).toMatch(/^log: .*agent-recall-bbbbbbbb-[0-9a-f]{8}\.txt$/);
+  });
+
+  it("asks which session to search when hand-offs from more than one other session are waiting", async () => {
+    // Threads share a checkout, so the newest hand-off is not necessarily the one being continued.
+    const top = repo();
+    const { dir } = config(OTHER, records);
+    leave(top, "x", OTHER);
+    leave(top, "y", "cccccccc-1111-2222-3333-444444444444");
+    leave(top, "mine", SESSION);
+    const { sink, io: opts } = io({ cwd: top, env: { CLAUDE_CONFIG_DIR: dir, CLAUDE_CODE_SESSION_ID: SESSION }, tmp: scratch });
+    expect(await recall(["meter"], opts)).toBe(2);
+    expect(sink.text).toMatch(/^recall: ERROR hand-offs from 2 other sessions are waiting here: /);
+    expect(sink.text).toContain("tasks/open/HANDOFF-x.md (bbbbbbbb)");
+    expect(sink.text).toContain("tasks/open/HANDOFF-y.md (cccccccc)");
+    expect(sink.text).not.toContain("HANDOFF-mine.md");
+    expect(sink.text).toMatch(/\nnext: pass --session <id> from the hand-off you are continuing\n$/);
   });
 
   it(`shows the last ${SHOWN} matches and logs them all; no match is a finding`, async () => {

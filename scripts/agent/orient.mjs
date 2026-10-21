@@ -10,7 +10,7 @@
  * Read-only: it runs git, never fetches, and reads `tasks/open/HANDOFF-*.md`.
  */
 
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { caseFolder } from "../lib/invokedAs.mjs";
@@ -104,6 +104,19 @@ export function orientLines(w, handoffs, options = {}) {
   return lines;
 }
 
+/**
+ * The session a hook event names, or undefined. The SessionStart hook is given its session on
+ * stdin; the environment is only a fallback, since nothing documents it for hook processes.
+ */
+function hookSession(read) {
+  try {
+    const id = JSON.parse(read()).session_id;
+    return typeof id === "string" && id ? id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 
 Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/master
@@ -112,9 +125,9 @@ tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one gi
 which silently resolves to the checkout above it. Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
-  --hook   as the SessionStart hook in .claude/settings.json runs it: the short form, a line
-           saying the meter is on, and exit 0 whatever happens, since a hook's output reaches
-           the session only then
+  --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,
+           the short form, a line saying the meter is on, and exit 0 whatever happens, since a
+           hook's output reaches the session only then
 
 Exit codes: 0 pass, 1 a warning (the stray folder), 2 could not run.`;
 
@@ -138,7 +151,8 @@ export async function main(argv, io = {}) {
       out.write(`orient: ERROR ${cwd} is not in a git repository\n`);
       return hook ? 0 : 2;
     }
-    const lines = orientLines(w, readHandoffs(w.top), { hook, session: env.CLAUDE_CODE_SESSION_ID });
+    const session = (hook ? hookSession(() => io.stdin ?? (process.stdin.isTTY ? "" : readFileSync(0, "utf8"))) : undefined) ?? env.CLAUDE_CODE_SESSION_ID;
+    const lines = orientLines(w, readHandoffs(w.top), { hook, session });
     out.write(`${lines.join("\n")}\n`);
     return hook || !w.stray ? 0 : 1;
   } catch (error) {

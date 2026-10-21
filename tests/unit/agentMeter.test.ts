@@ -86,6 +86,16 @@ describe("the reading", () => {
     expect(readingOf([line("a", 0, { w1h: 300_000 }), boundary, line("b", 3, { w5: 2_000 })])?.ttl).toBe(5);
   });
 
+  it("has none after a compaction until the new context's first request", () => {
+    // Claude Code writes no request for the compaction itself, so the last one before the boundary
+    // measured the context the compaction replaced.
+    const boundary = { type: "system", subtype: "compact_boundary", timestamp: at(5), compactMetadata: { trigger: "auto", preTokens: 480_000, postTokens: 21_000 } };
+    const summary = { type: "user", isCompactSummary: true, timestamp: at(5), message: { role: "user", content: "the summary" } };
+    const compacted = [line("r1", 0, { read: 480_000 }), boundary, summary];
+    expect(readingOf(compacted)).toBeNull();
+    expect(readingOf([...compacted, line("r2", 6, { w1h: 21_000 })])?.ctx).toBe(21_000);
+  });
+
   it("reads a request as usage does: the same size, model and start", () => {
     const records = [
       line("r1", 0, { input: 4, read: 10_000, w1h: 500, out: 20 }),
@@ -169,6 +179,12 @@ describe("the levels", () => {
     // A 5-minute lifetime re-writes at the 5-minute rate, $5.
     expect(priceOf(reading(600_000, { ttl: 5 }))?.rewrite).toBeCloseTo(600_000 * (5 - 0.2) / 1e6, 10);
     expect(priceOf(reading(600_000, { model: "claude-unknown-9" }))).toBeNull();
+    // Fast mode doubles Opus 5.5's rates and US-only inference adds a tenth, as usage prices them.
+    const plain = line("f", 0, { read: 600_000 });
+    const fast = readingOf([{ ...plain, message: { ...plain.message, usage: { ...plain.message.usage, speed: "fast", inference_geo: "us", service_tier: "standard" } } }]);
+    expect(fast).toMatchObject({ speed: "fast", geo: "us", tier: "standard" });
+    expect(priceOf(fast)?.read).toBeCloseTo((600_000 * 0.2 * 2 * 1.1) / 1e6, 10);
+    expect(priceOf({ ...reading(600_000), tier: "batch" })).toBeNull();
     expect(levels(reading(300_000, { model: "claude-unknown-9" })).lines[0]).toMatch(/^meter: context 300K on claude-unknown-9\. At the next milestone/);
   });
 });
@@ -232,6 +248,12 @@ describe("the hook", () => {
     const added = JSON.parse(out).hookSpecificOutput;
     expect(added.hookEventName).toBe("UserPromptSubmit");
     expect(added.additionalContext).toMatch(/^meter: cold resume\. The last request was 3 hours ago/);
+  });
+
+  it("says nothing when a message arrives after a compaction, before the new context's first request", async () => {
+    // Idle compaction runs shortly before the cache expires, so the next message comes after it.
+    const compacted = transcript("compacted", [line("r1", 0, { read: 520_000, w1h: 1_000 }), { type: "system", subtype: "compact_boundary", timestamp: at(55) }]);
+    expect(await run({ session_id: "s-compacted", transcript_path: compacted, hook_event_name: "UserPromptSubmit", prompt: "back" }, T0 + 3 * 3_600_000)).toEqual({ code: 0, out: "" });
   });
 
   it("says nothing inside a subagent, whose context is not the session's", async () => {

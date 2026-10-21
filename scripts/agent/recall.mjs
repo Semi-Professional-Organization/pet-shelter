@@ -7,8 +7,8 @@
  * session's context. Claude Code deletes transcripts after 30 days by default, so the hand-off and
  * the rest of the ledger are the durable record, and this is for the days after a hand-off.
  *
- * Read-only. The session is `--session`, or else the one the newest hand-off in this checkout
- * records, other than the current session.
+ * Read-only. The session is `--session`, or else the one the hand-offs in this checkout record,
+ * other than the current session, when they name only one.
  */
 
 import { createHash } from "node:crypto";
@@ -115,8 +115,8 @@ and prints the matching messages, tool calls and tool results, trimmed: the last
 of them in the log. Read-only.
 
   --session <id>  the session to search; a prefix of 8 or more characters will do. Default: the
-                  session recorded by the newest hand-off in tasks/open/HANDOFF-*.md that is not
-                  this one
+                  session the hand-offs in tasks/open/HANDOFF-*.md record, other than this one,
+                  when they name only one
 
 Exit codes: 0 found, 1 no match, 2 could not run.`;
 
@@ -159,10 +159,17 @@ export async function main(argv, io = {}) {
 
   let id = opts.session;
   if (!id) {
+    // Threads share a checkout, so with more than one session's hand-off here the newest is not
+    // necessarily the one being continued.
     const top = git(cwd, ["rev-parse", "--show-toplevel"]);
-    const handoff = top ? readHandoffs(top).find((h) => h.session && h.session !== env.CLAUDE_CODE_SESSION_ID) : undefined;
-    if (!handoff) return fail(2, "ERROR", "no hand-off from another session in tasks/open/ names a session", "pass --session <id>");
-    id = handoff.session;
+    const others = top ? readHandoffs(top).filter((h) => h.session && h.session !== env.CLAUDE_CODE_SESSION_ID) : [];
+    const sessions = new Set(others.map((h) => h.session));
+    if (!sessions.size) return fail(2, "ERROR", "no hand-off from another session in tasks/open/ names a session", "pass --session <id>");
+    if (sessions.size > 1) {
+      const listed = others.map((h) => `${h.file} (${h.session.slice(0, 8)})`).join(", ");
+      return fail(2, "ERROR", `hand-offs from ${sessions.size} other sessions are waiting here: ${listed}`, "pass --session <id> from the hand-off you are continuing");
+    }
+    [id] = sessions;
   }
   let found;
   try {

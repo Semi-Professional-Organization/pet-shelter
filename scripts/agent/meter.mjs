@@ -41,6 +41,11 @@ import { findTranscript, projectsDir, readTail } from "./transcript.mjs";
  * re-reading. Haiku 5.5 charges five times as much for everything in a request whose prompt passes
  * 100K, so it warns at 80K and hands off at 90K, leaving room for the turn that writes the
  * hand-off.
+ *
+ * ceiling: Haiku's 90K level leaves 10K below its 100K step. How far the next request outgrows the
+ * reading was measured on Opus sessions only (`readingOf`); none here ran on Haiku. Its 99th
+ * percentile, 6.5K, fits in that room and its largest, 90K, does not, so a request carrying a big
+ * tool result can pass 100K before the line arrives.
  */
 export const RULES = {
   default: {
@@ -79,6 +84,7 @@ const HANDOFF = "node scripts/agent.mjs ledger handoff --help";
 const requestKey = (record) => record.requestId || record.message?.id || record.uuid;
 const isRequest = (record) =>
   record?.type === "assistant" && record.message?.usage && typeof record.message.usage === "object" && record.message.model !== "<synthetic>";
+const isBoundary = (record) => record?.type === "system" && record.subtype === "compact_boundary";
 
 /**
  * The meter's reading from a transcript's records, oldest first: the last model request that has
@@ -91,6 +97,12 @@ const isRequest = (record) =>
  * - `ttl`: in minutes, the cache lifetime that holds most of what the requests in view wrote since
  *   the last compaction, which decides whether the whole context expires, as in `usage`'s
  *   `coldResumes`; 60 when nothing written is in view.
+ * - `speed`, `geo`, `tier`: what the request was served at, which its price depends on.
+ *
+ * Null when no request is in view, or none since the last compaction: Claude Code writes no
+ * request for the compaction itself, so the one before the boundary measured the context the
+ * compaction replaced, and the first one after it writes the new, smaller context whatever the
+ * cache did, which is why `coldResumes` leaves it out too.
  *
  * ceiling: the reading is a floor, not the size of the next request: it leaves out the tool
  * results and messages that request will add. The transcript "is written asynchronously and may
@@ -101,11 +113,13 @@ const isRequest = (record) =>
  * with `usage`'s extraction on the last request of all 18 (size, model and start), and the next
  * request's prompt was larger than the reading by a median of 280 tokens, 1.5K at the 90th
  * percentile, 6.5K at the 99th and 90K at most (13.8K at the 99th when the reading is a request
- * behind). Against levels of 250K and up, a line can come a call late, not a level late.
+ * behind). Against levels of 250K and up, a line can come a call late, not a level late; against
+ * Haiku's, see `RULES`.
  */
 export function readingOf(records) {
   let last = -1;
   for (let i = records.length - 1; i >= 0; i--) {
+    if (isBoundary(records[i])) return null;
     if (isRequest(records[i])) {
       last = i;
       break;
@@ -114,11 +128,15 @@ export function readingOf(records) {
   if (last < 0) return null;
   const key = requestKey(records[last]);
   const usage = Object.fromEntries(USAGE_FIELDS.map((field) => [field, 0]));
+  const served = {};
   let start = Date.parse(records[last].timestamp);
   for (const record of records) {
     if (!isRequest(record) || requestKey(record) !== key) continue;
     const u = record.message.usage;
     for (const field of USAGE_FIELDS) usage[field] = Math.max(usage[field], Number(u[field]) || 0);
+    if (u.speed != null) served.speed = u.speed;
+    if (u.inference_geo != null) served.geo = u.inference_geo;
+    if (u.service_tier != null) served.tier = u.service_tier;
     const at = Date.parse(record.timestamp);
     if (at < start) start = at;
   }
@@ -126,7 +144,7 @@ export function readingOf(records) {
   const writes = new Map();
   for (let i = last; i >= 0; i--) {
     const record = records[i];
-    if (record?.type === "system" && record.subtype === "compact_boundary") break;
+    if (isBoundary(record)) break;
     if (!isRequest(record)) continue;
     const c = record.message.usage.cache_creation || {};
     const [five, hour] = writes.get(requestKey(record)) ?? [0, 0];
@@ -143,16 +161,18 @@ export function readingOf(records) {
     ctx: usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens,
     start,
     ttl: held5 > held1h ? CACHE_TTL_MINUTES["5m"] : CACHE_TTL_MINUTES["1h"],
+    ...served,
   };
 }
 
 /**
  * What one call costs at this size, priced by the context it re-reads rather than by what it
- * prints, and what a cold turn costs over a warm one. Null for a model with no price.
+ * prints, and what a cold turn costs over a warm one. Null for a model, speed, region or service
+ * tier with no price.
  */
 export function priceOf(reading) {
   try {
-    const rates = ratesFor({ model: reading.model, prompt: reading.ctx });
+    const rates = ratesFor({ model: reading.model, prompt: reading.ctx, speed: reading.speed, geo: reading.geo, tier: reading.tier });
     const write = reading.ttl === CACHE_TTL_MINUTES["5m"] ? rates.write5m : rates.write1h;
     return { read: (reading.ctx * rates.cacheRead) / 1e6, rewrite: (reading.ctx * (write - rates.cacheRead)) / 1e6 };
   } catch {
@@ -267,12 +287,15 @@ ${levels.join("\n")}
 Exit codes: 0 reading printed (and always, as a hook), 2 could not run.`;
 }
 
-/** Grows the tail read until it holds a request, or is the whole file. */
+/**
+ * Grows the tail read until it holds a request or a compaction, or is the whole file. Reading
+ * further back past a compaction cannot find a request after it.
+ */
 export function readLatest(path, first = 256 * 1024) {
   for (let bytes = first; ; bytes *= 8) {
     const { records, whole } = readTail(path, bytes);
     const reading = readingOf(records);
-    if (reading || whole) return reading;
+    if (reading || whole || records.some(isBoundary)) return reading;
   }
 }
 
@@ -328,7 +351,7 @@ function manual({ session, json, env, now, out }) {
   const found = findTranscript(projectsDir(env), id);
   if (!found) return fail(`no transcript for session ${id} in ${projectsDir(env)}`);
   const reading = readLatest(found.path);
-  if (!reading) return fail(`no model request in ${found.path} yet`);
+  if (!reading) return fail(`no model request in ${found.path} yet, or none since its last compaction`);
   const price = priceOf(reading);
   const idleMinutes = (now - reading.start) / 60_000;
   const warm = idleMinutes <= reading.ttl;

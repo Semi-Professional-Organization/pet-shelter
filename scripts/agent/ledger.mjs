@@ -29,7 +29,8 @@ ${SECTIONS.map(([name, what]) => `  ## ${name.padEnd(22)}${what}`).join("\n")}
 
 The command adds the title, the session id (which recall searches), the branch, HEAD and
 uncommitted work, and the context size. It never replaces a hand-off another session wrote;
-running it again replaces your own.
+running it again replaces your own. A session that continues another's hand-off and hands off
+again under the same title deletes that file first.
 
 From Git Bash:     node scripts/agent.mjs ledger handoff "<title>" <<'EOF'
                    ## Decided
@@ -153,7 +154,7 @@ export async function main(argv, io = {}) {
   if (existsSync(path)) {
     const owner = sessionOf(readFileSync(path, "utf8"));
     if (owner !== session) {
-      say("FAIL", `${file} was written by session ${owner ?? "unknown"}, not this one`, "choose another title");
+      say("FAIL", `${file} was written by session ${owner ?? "unknown"}, not this one`, `if you are continuing its work, delete ${file} and run this again; if not, choose another title`);
       return 1;
     }
   }
