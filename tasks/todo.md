@@ -104,6 +104,15 @@ now follows sub-issues all the way down, so heights are counted; unknowable dept
 with a note; numbers are recorded before verifying; the oracle checks the fake's truth and every
 rule; the generator builds deep chains. The first ceiling above is gone. 30,000 seeds held once.
 
+Rebuild round 3 found that "not read" and "cannot be seen" were one guess in the planner: an issue
+first read as an ancestor was never descended, so a visible sub-issue looked hidden and a legal link
+was skipped. The reader now reports hidden sub-issues explicitly and descends independently of the
+ancestor read; depth is judged on bounds, so a link too deep even at the least is refused and only
+a truly unknowable one is skipped; a skipped issue under another group's parent is taken out (and
+the note says so); a skipped link fails the verify step; the room-making unlink only takes an issue
+whose own link can then run; one predicate decides what looks like a parent. A 30,000-seed run
+found seed 15244 (a set-aside link that became legal); fixed and kept as a regression seed.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

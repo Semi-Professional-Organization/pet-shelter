@@ -228,9 +228,11 @@ async function main(argv) {
   recordInWorkingCopy(record);
   // Proof that it finished: read GitHub again, with every parent recorded, and plan again.
   const after = planGroups(recordParents(config, record), readSnapshot(graphql, { repo, numbers: [...numbers, ...record.values()], parents: [...parents, ...record.values()] }), target);
-  if (after.actions.length > 0) {
-    write(`\nGitHub still differs from the file after applying; ${after.actions.length} actions remain:`);
-    write(after.actions.map(formatAction).join("\n"));
+  // A link skipped because its depth cannot be known is not done either, whatever the plan's length.
+  if (after.actions.length > 0 || after.skipped.length > 0) {
+    write(`\nGitHub still differs from the file after applying:`);
+    if (after.actions.length > 0) write(after.actions.map(formatAction).join("\n"));
+    for (const { child, key, reason } of after.skipped) write(`  #${child} is not under ${key}: ${reason}`);
     process.exitCode = 1;
     return;
   }

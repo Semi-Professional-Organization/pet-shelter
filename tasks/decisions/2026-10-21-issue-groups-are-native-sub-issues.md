@@ -52,9 +52,11 @@ it, the reader follows sub-issues all the way down below every member and parent
 ancestor above each parent. Where an issue this account cannot see makes a depth unknowable (above
 the parent, or below the issue), that link is skipped with a note instead of risked; an issue under
 a parent this account cannot see is likewise left alone. A refusal at apply is then run-wide
-(access, network, rate limit), which is why apply stops at the first one. One assumption remains,
-marked `ceiling:` in the code: an unreadable parent comes back as an error at its path, which was
-not observed (an unresolvable node id was: NOT_FOUND at its path). Rate limits are waited out (60s,
+(access, network, rate limit), which is why apply stops at the first one. Two assumptions remain,
+marked `ceiling:` in the code: an unreadable parent comes back as an error at its path, and an
+unreadable sub-issue as null in its list while still counted. Neither was observed (an unresolvable
+node id was: NOT_FOUND at its path). A link the depth of which cannot be known is left undone, and
+`--apply` then reports GitHub as still different rather than verified. Rate limits are waited out (60s,
 120s, 180s; `gh` hides Retry-After).
 
 **Dry run from the working copy; `--apply` from the default branch, and it must finish.** A dry run
@@ -68,14 +70,16 @@ master, which would make every merged edit a change to a public repository with 
 
 **Tested as one rule over many states.** `tests/unit/issueGroupsConverge.test.ts` runs the reader and
 the planner against a fake GitHub that answers the reader's GraphQL and enforces GitHub's documented
-rules, over 3,000 generated states (missing,
+rules, over 5,000 generated states (missing,
 closed, duplicate, unlabelled, recased and edited parents; departed groups; foreign, hidden and
 hand-made links). Every state converges in one apply, without a refused write, a second parent, or
 a touched link the file does not own, or is refused for a reason the test confirms (a real loop, an
 emptied file). The oracle judges a refusal from the fake's whole truth: a loop, more than eight
 levels, more than 100 sub-issues. A second check reads the fake's truth, not the reader, to confirm
-every sub-issue of a managed parent belongs there. Measured 2026-10-21: 2,607 converged, 253 refused
-an impossible tree, 140 an emptied file; a one-off run of 30,000 seeds held every check.
+every sub-issue of a managed parent belongs there, and that each link skipped for want of sight has
+something hidden in its way. Measured 2026-10-21: 4,327 converged, 450 refused an impossible tree,
+224 an emptied file. A one-off run of 30,000 seeds found one more case (seed 15244), now fixed and
+run every time, and then held every check.
 The first version planned from the fake's whole state and so missed a gap in the reader; review
 caught it, and every plan in the tests now comes through the reader.
 

@@ -31,8 +31,13 @@ export function keyFromMarker(body) {
 
 const normalise = (text) => String(text ?? "").replace(/\r\n/g, "\n").trim();
 const isClosed = (issue) => issue.state === "CLOSED";
-// GitHub compares label names ignoring case, so this does too.
-const hasLabel = (issue) => (issue.labels ?? []).some((name) => name.toLowerCase() === LABEL);
+/** Whether labels include `group`. GitHub compares label names ignoring case, so this does too. */
+export const hasGroupLabel = (labels) => (labels ?? []).some((name) => name.toLowerCase() === LABEL);
+const hasLabel = (issue) => hasGroupLabel(issue.labels);
+
+/** An issue here that carries the label and a marker: one this script may manage as a parent. */
+export const looksLikeParent = (issue, repo) =>
+  issue.repo.toLowerCase() === repo.toLowerCase() && hasLabel(issue) && keyFromMarker(issue.body) !== null;
 
 /** An issue as people write it: `#12` here, `owner/repo#12` elsewhere. */
 export const refOf = (issue, repo) =>
@@ -135,20 +140,20 @@ export function renderParent(group, { repo, branch }) {
  * would refuse.
  *
  * `snapshot` is `{ repo, issues }`. Each issue is `{ id, number, repo, title, body, state, labels,
- * parentId, parentRef, parentHidden, childCount, height }`: `labels` are names, `parentId` is a node
- * id or null and `parentRef` how people write that parent,
- * `parentHidden` means its parent exists but this account cannot see it, `childCount` is GitHub's own
- * count of its sub-issues where read (hidden ones included), and `height` is how many levels of
- * sub-issues sit below it as far as was read. The snapshot holds every open issue here, every
- * issue that looks like a parent, every issue the file names, every sub-issue of those parents, and
- * the ancestors of those parents.
+ * parentId, parentRef, parentHidden, childCount, childrenRead, hiddenChildren }`: `labels` are
+ * names; `parentId` is a node id or null, and `parentRef` how people write that parent;
+ * `parentHidden` means its parent exists but this account cannot see it; `childCount` is GitHub's
+ * count of its sub-issues, hidden ones included; `childrenRead` says they were listed, and
+ * `hiddenChildren` how many of those this account cannot see. The snapshot holds every open issue
+ * here, every issue that looks like a parent, every issue the file names, every sub-issue below those
+ * all the way down, and the ancestors of those parents.
  */
 export function planGroups(config, snapshot, target) {
   const { repo } = snapshot;
   const local = (issue) => issue.repo.toLowerCase() === repo.toLowerCase();
   const byId = new Map(snapshot.issues.map((issue) => [issue.id, issue]));
   const byNumber = new Map(snapshot.issues.filter(local).map((issue) => [issue.number, issue]));
-  const looksLikeParent = (issue) => local(issue) && hasLabel(issue) && keyFromMarker(issue.body) !== null;
+  const parentLike = (issue) => looksLikeParent(issue, repo);
   const memberOf = new Map();
   for (const group of config.groups) for (const number of group.issues) memberOf.set(number, group.key);
 
@@ -166,7 +171,7 @@ export function planGroups(config, snapshot, target) {
   }
   const claimants = new Map(); // key -> labelled issues whose marker names it, not recorded elsewhere
   for (const issue of snapshot.issues) {
-    if (!looksLikeParent(issue) || recordedIds.has(issue.id)) continue;
+    if (!parentLike(issue) || recordedIds.has(issue.id)) continue;
     const key = keyFromMarker(issue.body);
     claimants.set(key, [...(claimants.get(key) ?? []), issue]);
   }
@@ -187,7 +192,7 @@ export function planGroups(config, snapshot, target) {
   }
   const resolvedIds = new Set([...parentOf.values()].filter((p) => p.issue).map((p) => p.issue.id));
   // Every other issue that looks like a parent is retired: it lets go of its sub-issues and closes.
-  const retired = snapshot.issues.filter((issue) => looksLikeParent(issue) && !resolvedIds.has(issue.id));
+  const retired = snapshot.issues.filter((issue) => parentLike(issue) && !resolvedIds.has(issue.id));
   const managed = new Set([...resolvedIds, ...retired.map((issue) => issue.id)]);
 
   // 2. Members must be issues here, and none may be a parent this script manages.
@@ -230,6 +235,7 @@ export function planGroups(config, snapshot, target) {
   for (const [number, key] of memberOf) wanted.set(byNumber.get(number).id, node(key));
   const unlinks = [];
   const links = [];
+  const unseen = [];
   for (const issue of snapshot.issues) {
     if (issue.parentId && managed.has(issue.parentId) && !wanted.has(issue.id)) {
       unlinks.push({ type: "unlink", parentId: issue.parentId, parent: byId.get(issue.parentId).number, childId: issue.id, child: refOf(issue, repo) });
@@ -241,7 +247,7 @@ export function planGroups(config, snapshot, target) {
     if (isClosed(issue)) notes.push(`#${number} (in ${key}) is closed. If its ledger entry was renamed, put the new issue in its place.`);
     if (issue.parentId === target) continue;
     if (issue.parentHidden) {
-      notes.push(`#${number} (in ${key}) is under an issue this account cannot see; left alone. Someone with access must unlink it.`);
+      unseen.push({ child: number, key, reason: "it is under an issue this account cannot see", removedFrom: null });
       continue;
     }
     const from = issue.parentId ? parentRefOf(issue, byId, repo) : null;
@@ -252,8 +258,14 @@ export function planGroups(config, snapshot, target) {
   }
 
   // 5. Simulate the links against GitHub's rules, in an order that keeps every step legal.
-  const { ordered: orderedLinks, skipped } = orderLinks({ byId, unlinks, links, hiddenChildren: hiddenChildrenOf(snapshot) });
-  for (const { action, reason } of skipped) notes.push(`#${action.child} (in ${action.key}) is left where it is: ${reason}. Someone who can see it must sort it out.`);
+  const { ordered: orderedLinks, skipped: unknowable } = orderLinks({ byId, unlinks, links, absent: absentChildrenOf(snapshot), managed });
+  // Links left undone because this account cannot see enough to make them safely. The plan is not
+  // finished while any remain, and `--apply` says so rather than claiming GitHub matches the file.
+  const skipped = [...unseen, ...unknowable];
+  for (const { child, key, reason, removedFrom } of skipped) {
+    const where = removedFrom ? `is taken out of #${removedFrom} but not linked` : "is left where it is";
+    notes.push(`#${child} (in ${key}) ${where}: ${reason}. Someone who can see it must sort it out.`);
+  }
 
   for (const number of config.standalone ?? []) {
     const issue = byNumber.get(number);
@@ -275,7 +287,7 @@ export function planGroups(config, snapshot, target) {
 
   const order = ["create", "label", "reopen", "update"];
   parentActions.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
-  return { actions: [...parentActions, ...orderedLinks, ...closes], notes, ungrouped, record };
+  return { actions: [...parentActions, ...orderedLinks, ...closes], notes, ungrouped, record, skipped };
 }
 
 /**
@@ -285,18 +297,23 @@ export function planGroups(config, snapshot, target) {
 export function suggestionCorpus(config, snapshot, plan) {
   const local = (issue) => issue.repo.toLowerCase() === snapshot.repo.toLowerCase();
   const parents = new Set([...config.groups.map((group) => group.parent), ...plan.record.values()]);
-  return snapshot.issues.filter((issue) => local(issue) && !parents.has(issue.number) && !(hasLabel(issue) && keyFromMarker(issue.body) !== null));
+  return snapshot.issues.filter((issue) => local(issue) && !parents.has(issue.number) && !looksLikeParent(issue, snapshot.repo));
 }
 
-/** Sub-issues GitHub counts on a parent but this account cannot see. */
-function hiddenChildrenOf(snapshot) {
+/**
+ * Sub-issues GitHub counts on each issue that the snapshot does not hold: ones this account cannot
+ * see, and ones below an issue whose sub-issues were not listed. They take room in their parent,
+ * and below them the height is unknown.
+ */
+function absentChildrenOf(snapshot) {
   const visible = new Map();
   for (const issue of snapshot.issues) if (issue.parentId) visible.set(issue.parentId, (visible.get(issue.parentId) ?? 0) + 1);
-  const hidden = new Map();
+  const absent = new Map();
   for (const issue of snapshot.issues) {
-    if (issue.childCount !== undefined) hidden.set(issue.id, Math.max(0, issue.childCount - (visible.get(issue.id) ?? 0)));
+    const missing = issue.childrenRead ? issue.hiddenChildren ?? 0 : Math.max(0, (issue.childCount ?? 0) - (visible.get(issue.id) ?? 0));
+    if (missing > 0) absent.set(issue.id, missing);
   }
-  return hidden;
+  return absent;
 }
 
 /**
@@ -304,21 +321,21 @@ function hiddenChildrenOf(snapshot) {
  * loop, and nesting stays within GitHub's depth. The simulation moves links, counts and heights as
  * it goes, so every check sees the tree as it will be at that step. Unlinks run first and free
  * slots, and each link frees one in the parent it leaves. When only a full parent blocks progress
- * and another link is due to take one of its issues elsewhere, that issue is unlinked first to make
- * room.
+ * and another link, legal but for room, is due to take one of its issues elsewhere, that issue is
+ * unlinked first to make room.
  *
- * Two outcomes for a link no order makes legal. If a rule is broken whatever is unknown, it is a
- * problem, reported before anything is written. If the depth cannot be known, because an issue this
- * account cannot see sits above the parent or below the issue, the link is skipped with a note:
- * nothing can prove it legal, and GitHub might refuse it.
+ * Depth is judged on bounds. What cannot be seen or was not read counts as at least one level, above
+ * the parent or below the issue. A link too deep even at the least is a problem, like a loop or a
+ * full parent nothing can empty: reported before anything is written. A link that is legal at the
+ * least but whose true depth is unknown is skipped with a note, since nothing can prove it legal.
  *
  * Returns `{ ordered, skipped }`.
  */
-function orderLinks({ byId, unlinks, links, hiddenChildren }) {
+function orderLinks({ byId, unlinks, links, absent, managed }) {
   const parent = new Map([...byId.values()].map((issue) => [issue.id, issue.parentId ?? null]));
   const kids = new Map();
   const count = new Map();
-  const current = (id) => count.get(id) ?? hiddenChildren.get(id) ?? 0;
+  const current = (id) => count.get(id) ?? absent.get(id) ?? 0;
   const move = (child, to) => {
     const from = parent.get(child);
     if (from) {
@@ -339,41 +356,56 @@ function orderLinks({ byId, unlinks, links, hiddenChildren }) {
   const ordered = [...unlinks];
   for (const action of unlinks) move(action.childId, null);
 
-  const ancestors = (id) => {
-    const seen = [];
-    for (let at = parent.get(id); at && !seen.includes(at); at = parent.get(at)) seen.push(at);
-    return seen;
-  };
-  // The reader follows sub-issues all the way down, so a sub-issue GitHub counts but the snapshot
-  // lacks is one this account cannot see: below it, the height is unknown.
-  const height = (id, seen = new Set()) => {
-    if (seen.has(id)) return 0;
-    seen.add(id);
-    if ((hiddenChildren.get(id) ?? 0) > 0) return Infinity;
-    let levels = 0;
-    for (const child of kids.get(id) ?? []) levels = Math.max(levels, 1 + height(child, seen));
-    return levels;
-  };
-  // Likewise above: a chain that reaches an issue this account cannot see, or one not read.
-  const chainKnown = (id) => {
-    for (const at of [id, ...ancestors(id)]) {
-      if (at.startsWith("new:")) return true; // a parent this run creates is top-level
+  /**
+   * Issues above `id` as far as known, whether that is all of them, and how many more there are at
+   * least: one past a parent this account cannot see, none past one simply not read (it is in the
+   * chain already, and what is above it is unknown).
+   */
+  const above = (id) => {
+    const chain = [];
+    for (let at = id; ; ) {
+      if (at.startsWith("new:")) return { chain, exact: true, extra: 0 }; // a parent this run creates is top-level
       const issue = byId.get(at);
-      if (!issue || issue.parentHidden) return false;
+      if (!issue) return { chain, exact: false, extra: 0 };
+      if (issue.parentHidden) return { chain, exact: false, extra: 1 };
+      const next = parent.get(at);
+      if (!next) return { chain, exact: true, extra: 0 };
+      if (chain.includes(next)) return { chain, exact: true, extra: 0 };
+      chain.push(next);
+      at = next;
     }
-    return true;
+  };
+  /** Levels below `id`, at least, and whether that is exact. */
+  const below = (id, seen = new Set()) => {
+    if (seen.has(id)) return { levels: 0, exact: true };
+    seen.add(id);
+    let levels = 0;
+    let exact = true;
+    if ((absent.get(id) ?? 0) > 0) {
+      levels = 1;
+      exact = false;
+    }
+    for (const child of kids.get(id) ?? []) {
+      const sub = below(child, seen);
+      levels = Math.max(levels, 1 + sub.levels);
+      exact = exact && sub.exact;
+    }
+    return { levels, exact };
   };
   const full = (action) => current(action.parentId) >= LIMITS.children;
-  const loops = (action) => action.parentId === action.childId || ancestors(action.parentId).includes(action.childId);
-  const unknowable = (action) => !chainKnown(action.parentId) || height(action.childId) === Infinity;
-  const why = (action) => {
-    if (full(action)) return `its parent already has ${LIMITS.children} sub-issues`;
-    if (loops(action)) return "it would make a loop";
-    if (!chainKnown(action.parentId)) return "its parent sits below an issue this account cannot see, so the depth cannot be checked";
-    if (height(action.childId) === Infinity) return "it has sub-issues this account cannot see, so the depth cannot be checked";
-    if (ancestors(action.parentId).length + 2 + height(action.childId) > LIMITS.depth + 1) return `it would nest deeper than ${LIMITS.depth} levels`;
+  const loops = (action) => action.parentId === action.childId || above(action.parentId).chain.includes(action.childId);
+  /** Why the link cannot run now, ignoring room, or null; `unknown` when only knowledge is missing. */
+  const blockedBesidesRoom = (action) => {
+    if (loops(action)) return { reason: "it would make a loop" };
+    const up = above(action.parentId);
+    const down = below(action.childId);
+    const least = up.chain.length + up.extra + 2 + down.levels;
+    if (least > LIMITS.depth + 1) return { reason: `it would nest deeper than ${LIMITS.depth} levels` };
+    if (!up.exact) return { reason: "its parent sits below an issue this account cannot see, so the depth cannot be checked", unknown: true };
+    if (!down.exact) return { reason: "it has sub-issues this account cannot see, so the depth cannot be checked", unknown: true };
     return null;
   };
+  const why = (action) => (full(action) ? { reason: `its parent already has ${LIMITS.children} sub-issues` } : blockedBesidesRoom(action));
 
   const skipped = [];
   const pending = [...links];
@@ -385,25 +417,38 @@ function orderLinks({ byId, unlinks, links, hiddenChildren }) {
       ordered.push(action);
       continue;
     }
-    // Stuck on a full parent: unlink an issue another link will take out of it anyway.
+    // Stuck on a full parent: unlink an issue that another link, legal but for room, will take out.
     const blocked = pending.find(full);
-    const leaving = blocked && pending.find((action) => parent.get(action.childId) === blocked.parentId);
+    const leaving = blocked && pending.find((action) => parent.get(action.childId) === blocked.parentId && blockedBesidesRoom(action) === null);
     if (leaving) {
       ordered.push({ type: "unlink", parentId: blocked.parentId, parent: byId.get(blocked.parentId)?.number, childId: leaving.childId, child: `#${leaving.child}` });
       move(leaving.childId, null);
       leaving.from = null;
       continue;
     }
-    // Stuck on what cannot be seen: set those aside, and see whether the rest can go.
-    const unknown = pending.filter((action) => !full(action) && !loops(action) && unknowable(action));
+    // Stuck on what cannot be known: set those aside, and see whether the rest can go. An issue set
+    // aside while under another group's parent still does not belong there, and taking it out is
+    // always legal, so it comes out; that may also make the room something else was waiting for.
+    const unknown = pending.filter((action) => !full(action) && why(action)?.unknown);
     if (unknown.length > 0) {
       for (const action of unknown) {
-        skipped.push({ action, reason: why(action) });
+        // An earlier one coming out may have cleared this one's path: re-ask before setting it aside.
+        if (!why(action)?.unknown) continue;
+        const from = parent.get(action.childId);
+        const removed = Boolean(from && managed.has(from));
+        if (removed) {
+          ordered.push({ type: "unlink", parentId: from, parent: byId.get(from)?.number, childId: action.childId, child: `#${action.child}` });
+          move(action.childId, null);
+          action.from = null;
+          // Out of the way, the unknown part may no longer be in its path: then it simply links.
+          if (why(action) === null) continue;
+        }
+        skipped.push({ child: action.child, key: action.key, reason: why(action).reason, removedFrom: removed ? byId.get(from)?.number ?? null : null });
         pending.splice(pending.indexOf(action), 1);
       }
       continue;
     }
-    throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action)}`).join("\n"));
+    throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action).reason}`).join("\n"));
   }
   return { ordered, skipped };
 }
@@ -428,7 +473,7 @@ export function applyPlan(plan, port, log = () => {}) {
         created.set(action.key, issue);
         log(`  created #${issue.number} for ${action.key}`);
         // GitHub drops a new issue's labels silently for a caller without push access.
-        if (!issue.labels.some((name) => name.toLowerCase() === LABEL) && !port.addLabel(issue.number).some((name) => name.toLowerCase() === LABEL)) {
+        if (!hasGroupLabel(issue.labels) && !hasGroupLabel(port.addLabel(issue.number))) {
           throw new Error("GitHub kept no label on the new issue");
         }
       } else if (action.type === "label") {

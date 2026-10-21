@@ -16,7 +16,10 @@ import { FakeGitHub, readFrom, type FakeIssue } from "./support/fakeGitHub";
 
 const REPO = "o/r";
 const TARGET = { repo: REPO, branch: "master" };
-const SEEDS = 3000;
+const SEEDS = 5000;
+// Seeds past SEEDS that once broke the planner, kept so they run every time. 15244: a link set aside
+// as unknowable became legal once another came out of the way (found in a one-off 30,000-seed run).
+const REGRESSIONS = [15244];
 
 function random(seed: number) {
   let state = seed >>> 0;
@@ -154,7 +157,7 @@ function whyImpossible(github: FakeGitHub, config: { groups: Group[] }, parentOf
 describe("one apply makes GitHub match the file, from any state", () => {
   it(`converges across ${SEEDS} generated states`, () => {
     const outcomes = { converged: 0, refusedImpossible: 0, refusedEmpty: 0 };
-    for (let seed = 1; seed <= SEEDS; seed += 1) {
+    for (const seed of [...Array.from({ length: SEEDS }, (_, i) => i + 1), ...REGRESSIONS]) {
       const { github, config } = world(seed);
       const where = `seed ${seed}`;
       const before = new Map([...github.issues.values()].map((issue) => [issue.id, issue.parentId]));
@@ -206,21 +209,29 @@ describe("one apply makes GitHub match the file, from any state", () => {
         const claiming = [...github.issues.values()].filter((issue) => looksLikeParent(issue) && keyFromMarker(issue.body) === group.key && issue.state === "OPEN");
         expect(claiming.map((issue) => issue.number), where).toEqual([group.parent]);
       }
-      // 3. Each member sits under its group's parent, unless the plan said it could not see enough
-      // to link it safely; then it has not moved.
-      const leftAlone = new Set(
-        plan.notes
-          .map((note: string) => /^#(\d+) \(in [^)]+\) (?:is under an issue this account cannot see|is left where it is)/.exec(note)?.[1])
-          .filter(Boolean)
-          .map(Number),
-      );
+      // 3. Each member sits under its group's parent, unless the plan skipped it for want of sight.
+      // A skip must be earned in the fake's truth: something hidden above its parent, below it, or
+      // as its own parent. A skipped member stays where it was, or, if that was a parent this script
+      // manages, comes out of it.
+      const skippedBy = new Map<number, { removedFrom: number | null }>(plan.skipped.map((s: { child: number; removedFrom: number | null }) => [s.child, s]));
+      const truthAbove = (id: string) => github.ancestors(id).map((at) => github.issues.get(at)!);
+      const truthBelow = (id: string): FakeIssue[] => github.children(id).flatMap((child) => [child, ...truthBelow(child.id)]);
       for (const group of settled.groups) {
+        const target = github.byNumber(group.parent!)!;
         for (const number of group.issues) {
           const member = github.byNumber(number)!;
-          if (leftAlone.has(number)) expect(member.parentId, where).toBe(before.get(member.id));
-          else expect(member.parentId, where).toBe(github.byNumber(group.parent!)!.id);
+          const skip = skippedBy.get(number);
+          if (!skip) {
+            expect(member.parentId, where).toBe(target.id);
+            continue;
+          }
+          const unseen = [github.issues.get(before.get(member.id) ?? ""), ...truthAbove(target.id), ...truthBelow(member.id)].some((issue) => issue?.hidden);
+          expect(unseen, `${where}: #${number} skipped with nothing hidden`).toBe(true);
+          if (skip.removedFrom) expect(member.parentId, where).toBeNull();
+          else expect(member.parentId, where).toBe(before.get(member.id));
         }
       }
+      const leftAlone = new Set(skippedBy.keys());
       // 4. No link the file does not own was touched.
       for (const issue of github.issues.values()) {
         const was = before.get(issue.id);
@@ -242,7 +253,7 @@ describe("one apply makes GitHub match the file, from any state", () => {
       expect(created.size, where).toBeLessThanOrEqual(config.groups.filter((group) => !group.parent).length);
       outcomes.converged += 1;
     }
-    // Measured 2026-10-21: 2,607 converged, 253 refused an impossible tree, 140 an emptied file. Most
+    // Measured 2026-10-21: 4,327 converged, 450 refused an impossible tree, 224 an emptied file. Most
     // must converge, or the generator is only producing refusals; both refusals must occur, or
     // the oracle above was never consulted.
     expect(outcomes.converged).toBeGreaterThan(SEEDS * 0.8);

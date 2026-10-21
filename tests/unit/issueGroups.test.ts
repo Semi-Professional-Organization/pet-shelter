@@ -226,7 +226,8 @@ describe("planning: two whole states compared by node id", () => {
     hidden.hidden = true;
     const result = plan(fake, { groups: [group("a", [1])] });
     expect(types(result.actions)).toEqual(["create"]);
-    expect(result.notes).toEqual([expect.stringMatching(/#1 \(in a\) is under an issue this account cannot see/)]);
+    expect(result.notes).toEqual([expect.stringMatching(/#1 \(in a\) is left where it is: it is under an issue this account cannot see/)]);
+    expect(result.skipped).toEqual([expect.objectContaining({ child: 1, key: "a" })]);
   });
 
   it("lists open issues in no group, without the parents, the standalone ones or a link the plan removes", () => {
@@ -325,6 +326,62 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     const result = plan(fake, { groups: [group("a", [1])] });
     expect(types(result.actions)).toEqual(["create"]);
     expect(result.notes).toEqual([expect.stringMatching(/#1 \(in a\) is left where it is: it has sub-issues this account cannot see/)]);
+  });
+
+  it("reads below an issue first met as an ancestor, so nothing visible is mistaken for hidden", () => {
+    // Review round 3: #2 was read as b's parent's ancestor (no sub-issues listed), so its closed
+    // sub-issue #3 was never read, and #1 above it was skipped as if something were hidden.
+    const fake = github(3);
+    const a = group("a", [1]);
+    const b = group("b", [5]);
+    fake.add({ number: 5 });
+    const parentB = parentOn(fake, b);
+    fake.link(fake.byNumber(1)!.id, fake.byNumber(2)!.id);
+    fake.link(fake.byNumber(2)!.id, parentB.id);
+    fake.link(fake.byNumber(2)!.id, fake.byNumber(3)!.id);
+    fake.byNumber(2)!.state = "CLOSED";
+    fake.byNumber(3)!.state = "CLOSED";
+    const result = plan(fake, { groups: [a, { ...b, parent: parentB.number }] });
+    expect(result.skipped).toEqual([]);
+    expect(types(result.actions)).toEqual(["create", "link", "link"]);
+  });
+
+  it("refuses a link too deep even at the least, rather than skipping it as unknowable", () => {
+    const fake = github(1);
+    const chain = Array.from({ length: 7 }, () => fake.add());
+    for (let i = 1; i < chain.length; i += 1) fake.link(chain[i - 1].id, chain[i].id);
+    const g = group("a", [1]);
+    const parent = parentOn(fake, g);
+    fake.link(chain[chain.length - 1].id, parent.id);
+    const hidden = fake.add();
+    fake.link(fake.byNumber(1)!.id, hidden.id);
+    hidden.hidden = true;
+    expect(() => plan(fake, { groups: [{ ...g, parent: parent.number }] })).toThrow(/nest deeper than 8 levels/);
+  });
+
+  it("takes an unknowable issue out of a parent that is not its own, and says so, rather than claim it stayed", () => {
+    // Review round 3: the room-making unlink took out an issue whose own link was then skipped, and
+    // the note still said it was left where it was. It does not belong under group one's parent
+    // either way, so it comes out, the note says so, and that makes the room #100 needs.
+    const fake = github(101);
+    const one = group("one", Array.from({ length: 100 }, (_, i) => i + 1));
+    const two = group("two", [101]);
+    const parentOne = parentOn(fake, one);
+    const parentTwo = parentOn(fake, two);
+    for (let n = 1; n <= 99; n += 1) fake.link(parentOne.id, fake.byNumber(n)!.id);
+    fake.link(parentOne.id, fake.byNumber(101)!.id);
+    const hidden = fake.add();
+    fake.link(fake.byNumber(101)!.id, hidden.id);
+    hidden.hidden = true;
+    const config = { groups: [{ ...one, parent: parentOne.number }, { ...two, parent: parentTwo.number }] };
+    const result = plan(fake, config);
+    expect(result.actions.map((a: { type: string; child?: unknown }) => [a.type, a.child])).toEqual([
+      ["unlink", "#101"],
+      ["link", 100],
+    ]);
+    expect(result.notes).toEqual([expect.stringMatching(/#101 \(in two\) is taken out of #\d+ but not linked: it has sub-issues this account cannot see/)]);
+    applyPlan(result, fake.port());
+    expect(fake.byNumber(101)!.parentId).toBeNull();
   });
 
   it("reads a member's sub-issues all the way down, so a deep one is counted, not guessed", () => {
@@ -427,7 +484,7 @@ describe("reading GitHub", () => {
     const byId = new Map(snapshot.issues.map((issue: { id: string }) => [issue.id, issue]));
     expect(byId.get("N1")).toMatchObject({ parentId: "N10", parentRef: "#10" });
     expect(byId.get("N2")).toMatchObject({ parentId: "N10", repo: "o/x", state: "CLOSED" });
-    expect(byId.get("N10")).toMatchObject({ childCount: 2, height: 1, labels: ["group"] });
+    expect(byId.get("N10")).toMatchObject({ childCount: 2, childrenRead: true, hiddenChildren: 0, labels: ["group"] });
   });
 
   it("marks an issue whose parent this account cannot see, instead of failing the read", () => {

@@ -5,7 +5,7 @@
  * tests can drive them with recorded answers and the CLI with `gh`.
  */
 
-import { LABEL, LIMITS, keyFromMarker } from "./plan.mjs";
+import { LABEL, LIMITS, looksLikeParent } from "./plan.mjs";
 
 // No labels below the top level of a nested read: GitHub caps one query at 500,000 nodes, and page
 // sizes multiply (100 parents x 100 children x 50 labels broke it once). A child's labels decide
@@ -100,16 +100,13 @@ export function readSnapshot(graphql, { repo, numbers, parents = [] }) {
       parentRef: !parentId && node.parent ? ref(repo, node.parent) : known?.parentRef ?? null,
       parentHidden: hiddenParent.has(node.id) || known?.parentHidden || false,
       childCount: node.subIssues?.totalCount ?? known?.childCount ?? node.subIssuesSummary?.total ?? 0,
-      // Whether every sub-issue it has was read, so the planner can count its height from them.
+      // Whether its sub-issues were listed. Of those listed, the ones that came back null are ones
+      // this account cannot see; the planner tells them apart from ones simply not read.
       childrenRead: Boolean(node.subIssues) || known?.childrenRead || false,
-      height: Math.max(known?.height ?? 0, node.subIssuesSummary?.total > 0 ? 1 : 0),
+      hiddenChildren: node.subIssues ? node.subIssues.nodes.filter((child) => !child).length : known?.hiddenChildren ?? 0,
     };
     issues.set(node.id, next);
-    for (const child of node.subIssues?.nodes ?? []) {
-      if (!child) continue;
-      add(child, node.id);
-      next.height = Math.max(next.height, 1 + (issues.get(child.id).height ?? 0));
-    }
+    for (const child of node.subIssues?.nodes ?? []) add(child, node.id);
   };
   const markHidden = (nodes) => {
     for (const node of nodes) {
@@ -151,8 +148,7 @@ export function readSnapshot(graphql, { repo, numbers, parents = [] }) {
 
   // Ancestors of every possible parent, so loops and depth are checked on the whole chain. An
   // ancestor that cannot be read is asked for once; its chain stays unknown to the planner.
-  const labelled = (issue) => issue.labels.some((label) => label.toLowerCase() === LABEL);
-  const isParentish = (issue) => local(issue) && ((labelled(issue) && keyFromMarker(issue.body)) || parents.includes(issue.number));
+  const isParentish = (issue) => looksLikeParent(issue, repo) || (local(issue) && parents.includes(issue.number));
   const tried = new Set();
   for (let level = 0; level < LIMITS.depth; level += 1) {
     const top = (issue, seen = new Set()) => {
@@ -169,8 +165,11 @@ export function readSnapshot(graphql, { repo, numbers, parents = [] }) {
   }
 
   // Sub-issues below every issue the file names and every possible parent, all the way down, so the
-  // planner counts heights instead of guessing them. What still cannot be read stays counted by
-  // GitHub and missing here, which the planner treats as an unknown depth.
+  // planner counts heights instead of guessing them. A sub-issue this account cannot see comes back
+  // null in its list, and the reader counts it as hidden.
+  // ceiling: that GitHub lists an unreadable sub-issue as null and still counts it, rather than
+  // leaving it out of both, is assumed and not observed. If it leaves it out, the planner cannot
+  // know it is there and may approve a link GitHub then refuses for depth or room.
   const roots = new Set([...issues.values()].filter((issue) => local(issue) && (numbers.includes(issue.number) || isParentish(issue))).map((issue) => issue.id));
   const underRoot = (issue, seen = new Set()) => {
     if (roots.has(issue.id)) return true;
@@ -178,10 +177,13 @@ export function readSnapshot(graphql, { repo, numbers, parents = [] }) {
     seen.add(issue.id);
     return underRoot(issues.get(issue.parentId), seen);
   };
+  // Its own record of what was descended: an issue first read as an ancestor still needs its
+  // sub-issues read when it turns out to sit below a member.
+  const descended = new Set();
   for (let level = 0; level <= LIMITS.depth; level += 1) {
-    const wanted = [...issues.values()].filter((issue) => issue.childCount > 0 && !issue.childrenRead && !tried.has(issue.id) && underRoot(issue)).map((issue) => issue.id);
+    const wanted = [...issues.values()].filter((issue) => issue.childCount > 0 && !issue.childrenRead && !descended.has(issue.id) && underRoot(issue)).map((issue) => issue.id);
     if (wanted.length === 0) break;
-    for (const id of wanted) tried.add(id);
+    for (const id of wanted) descended.add(id);
     for (let i = 0; i < wanted.length; i += 50) {
       const result = partial(graphql(DESCEND_QUERY, { ids: wanted.slice(i, i + 50) }));
       markHidden(result.hiddenParents);
