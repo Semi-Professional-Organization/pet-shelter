@@ -56,15 +56,20 @@ Built by two sessions: the first ran out of room at 449K and handed off with thi
 enough to pick up without asking anything.
 
 **Review tally** (findings: fixed / ceiling stated / declined): round 1, 10: 10/0/0 · round 2, 10:
-6/1/2, plus the hand-off file, deleted at close · round 3, 6: 1/0/5. Round 2's in-scope
-correctness bugs: after a compaction the meter read the context the compaction replaced (Claude
-Code writes no request for the compaction itself), so idle compaction would have produced a false
-cold-resume line; it priced fast mode and US-only inference at standard rates; `orient`'s hook
-took its session only from the environment; `recall` picked the newest of several sessions'
-hand-offs in a shared checkout. Round 3's: the hand-off said "no transcript was found" when the transcript was there but
-ended in a compaction, a message round 2's compaction fix made false. Its five declined findings
-are new behaviour, recorded in the cost entry, or the `postTokens` choice below. Later rounds are
-tallied in the pull request's body.
+6/1/2, plus the hand-off file, deleted at close · round 3, 6: 1/0/5 · round 4, 7: 5/0/2. Round
+2's in-scope correctness bugs: after a compaction the meter read the context the compaction
+replaced (Claude Code writes no request for the compaction itself), so idle compaction would have
+produced a false cold-resume line; it priced fast mode and US-only inference at standard rates;
+`orient`'s hook took its session only from the environment; `recall` picked the newest of several
+sessions' hand-offs in a shared checkout. Round 3's: the hand-off said "no transcript was found"
+when the transcript was there but ended in a compaction, a message round 2's compaction fix made
+false; its five declined findings are new behaviour, recorded in the cost entry, or the
+`postTokens` choice below. Round 4's: two tests read the developer's own transcripts, and
+`recall`'s log of transcript excerpts was readable by anyone sharing the temp folder; also fixed,
+an event with no session shared one marker folder, and two lines here. Declined: a kept message
+re-written after a compaction (none in the 7 compactions on the owner's machine), and the
+hand-off's "unknown" line, which is true of the transcript when a request is still being written.
+Later rounds are tallied in the pull request's body.
 
 **Deliberately not done:**
 
@@ -73,8 +78,9 @@ tallied in the pull request's body.
 - The price table stays in `usage.mjs`. Importing it is 0.02 s of the hook's 0.34 s on Windows;
   recorded in the same entry.
 - After a compaction the meter says nothing until the next request, rather than reading
-  `compactMetadata.postTokens`: nothing needs a number in that gap, and older transcripts lack
-  the field.
+  `compactMetadata.postTokens`: no level can be crossed in that gap, so the hooks need no number,
+  and a hand-off written in it says the size is unknown, which was accepted over trusting a field
+  older transcripts lack.
 - Haiku's 90K level is unmeasured on Haiku: no session here ran on it. Stated as a `ceiling:` in
   `RULES`.
 - The hooks were observed in a headless CLI session, not in the desktop app, and a real cold

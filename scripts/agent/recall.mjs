@@ -191,9 +191,12 @@ export async function main(argv, io = {}) {
   const log = join(tmp, `agent-recall-${short}-${key}.txt`);
   let logged = true;
   try {
+    // Transcript text can hold anything a tool printed, and the temp folder may be shared, so the
+    // log is readable by its owner only.
     writeFileSync(
       log,
       hits.map((h) => `${h.at} ${h.kind}: ${snippet(h.text, h.match, h.length, { before: 400, after: 800 })}`).join("\n\n") + "\n",
+      { mode: 0o600 },
     );
   } catch {
     logged = false;

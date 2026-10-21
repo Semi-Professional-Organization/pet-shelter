@@ -102,7 +102,9 @@ const isBoundary = (record) => record?.type === "system" && record.subtype === "
  * Null when no request is in view, or none since the last compaction: Claude Code writes no
  * request for the compaction itself, so the one before the boundary measured the context the
  * compaction replaced, and the first one after it writes the new, smaller context whatever the
- * cache did, which is why `coldResumes` leaves it out too.
+ * cache did, which is why `coldResumes` leaves it out too. Checked on 2026-10-21 against the 7
+ * compactions in the 341 transcripts on the owner's machine: in none was a request made before
+ * the boundary, such as a kept message, written again after it.
  *
  * ceiling: the reading is a floor, not the size of the next request: it leaves out the tool
  * results and messages that request will add. The transcript "is written asynchronously and may
@@ -310,13 +312,14 @@ function claim(path) {
   }
 }
 
-const safeName = (id) => String(id ?? "").replace(/[^A-Za-z0-9-]/g, "_") || "nosession";
+const safeName = (id) => String(id).replace(/[^A-Za-z0-9-]/g, "_");
 
 function hook({ stdin, env, tmp, now, out }) {
   const input = JSON.parse(stdin);
   // A subagent's tool call carries `agent_id`; its context is not the session's, and a line about
-  // the session's size would land in the wrong agent.
-  if (input.agent_id) return;
+  // the session's size would land in the wrong agent. Without a session there is nowhere to keep
+  // which levels it was told, and a shared folder would silence one session's levels for another.
+  if (input.agent_id || typeof input.session_id !== "string" || !input.session_id) return;
   const event = input.hook_event_name;
   if (event !== "PostToolUse" && event !== "UserPromptSubmit") return;
   const path = input.transcript_path || findTranscript(projectsDir(env), input.session_id)?.path;

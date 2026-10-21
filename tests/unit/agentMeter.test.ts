@@ -256,6 +256,11 @@ describe("the hook", () => {
     expect(await run({ session_id: "s-compacted", transcript_path: compacted, hook_event_name: "UserPromptSubmit", prompt: "back" }, T0 + 3 * 3_600_000)).toEqual({ code: 0, out: "" });
   });
 
+  it("says nothing for an event with no session, which has nowhere of its own to keep its levels", async () => {
+    expect(await run({ transcript_path: big, hook_event_name: "PostToolUse", tool_name: "Read" })).toEqual({ code: 0, out: "" });
+    expect(existsSync(join(tmp, "claude-meter", "nosession"))).toBe(false);
+  });
+
   it("says nothing inside a subagent, whose context is not the session's", async () => {
     expect(await run({ session_id: "s-sub", agent_id: "a1", agent_type: "Explore", transcript_path: big, hook_event_name: "PostToolUse" })).toEqual({ code: 0, out: "" });
     expect(existsSync(join(tmp, "claude-meter", "s-sub"))).toBe(false);

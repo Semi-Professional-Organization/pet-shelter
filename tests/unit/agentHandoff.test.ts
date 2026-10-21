@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
@@ -132,7 +132,7 @@ describe("ledger handoff", () => {
 
   it("refuses a body missing a section, and writes nothing", async () => {
     const top = repo();
-    const result = await run(["handoff", "Short"], { cwd: top, stdin: "## Decided\n\nyes\n", env: { CLAUDE_CODE_SESSION_ID: SESSION } });
+    const result = await run(["handoff", "Short"], { cwd: top, stdin: "## Decided\n\nyes\n", env: { CLAUDE_CODE_SESSION_ID: SESSION, CLAUDE_CONFIG_DIR: join(scratch, "nowhere") } });
     expect(result.code).toBe(1);
     expect(result.out).toMatch(/^ledger: FAIL not written: it has no "## Open" section;/);
     expect(readHandoffs(top)).toEqual([]);
@@ -165,7 +165,8 @@ describe("ledger handoff", () => {
 
   it("could not run without a session, a body, a usable title or a known subcommand", async () => {
     const top = repo();
-    const env = { CLAUDE_CODE_SESSION_ID: SESSION };
+    // Never the developer's own transcripts: the session is looked up before the body is read.
+    const env = { CLAUDE_CODE_SESSION_ID: SESSION, CLAUDE_CONFIG_DIR: join(scratch, "nowhere") };
     expect((await run(["handoff", "x"], { cwd: top, stdin: BODY, env: {} })).code).toBe(2);
     expect((await run(["handoff", "x"], { cwd: top, stdin: "  \n", env })).code).toBe(2);
     expect((await run(["handoff", "名前"], { cwd: top, stdin: BODY, env })).code).toBe(2);
@@ -339,6 +340,8 @@ describe("recall", () => {
     expect(lines[1]).toContain("match 5");
     const log = lines.at(-1)!.replace(/^log: /, "");
     expect(readFileSync(log, "utf8")).toContain("match 0");
+    // Windows keeps no owner-only mode bits; elsewhere the temp folder may be shared.
+    if (process.platform !== "win32") expect(statSync(log).mode & 0o777).toBe(0o600);
     const none = io({ env: { CLAUDE_CONFIG_DIR: dir }, tmp: scratch });
     expect(await recall(["absent", "--session", OTHER], none.io)).toBe(1);
     expect(await recall(["x", "--session", "short"], io({ env: { CLAUDE_CONFIG_DIR: dir } }).io)).toBe(2);
