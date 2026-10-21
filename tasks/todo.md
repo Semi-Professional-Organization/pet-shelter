@@ -41,13 +41,41 @@ call by the context it re-reads, not by the tokens it prints.
 - The CLAUDE.md step 6 scope rule the brief assigned here is already on `master` (#143): nothing
   to copy.
 
-- [ ] Register what success looks like for the new commands in `tasks/open/`, before building.
-- [ ] `meter`: thresholds once each, cold resumes, model-aware, silent inside subagents, never
+- [x] Register what success looks like for the new commands in `tasks/open/`, before building.
+- [x] `meter`: thresholds once each, cold resumes, model-aware, silent inside subagents, never
       blocks a prompt.
-- [ ] `ledger handoff`, `recall`, `orient --brief`.
-- [ ] Wiring, AGENTS.md, `tasks/README.md`, the mirror exclusion.
-- [ ] Accuracy replay; hooks observed firing in a headless session.
-- [ ] `/code-review` rounds under the scope rule.
+- [x] `ledger handoff`, `recall`, `orient --brief`.
+- [x] Wiring, AGENTS.md, `tasks/README.md`, the mirror exclusion.
+- [x] Accuracy replay; hooks observed firing in a headless session.
+- [x] `/code-review` rounds under the scope rule.
+
+## Review
+
+Built by two sessions: the first ran out of room at 449K and handed off with this branch's own
+`ledger handoff`; the second continued from that file and deleted it at close. The hand-off was
+enough to pick up without asking anything.
+
+**Review tally** (findings: fixed / ceiling stated / declined): round 1, 10: 10/0/0 · round 2, 10:
+6/1/2, plus the hand-off file, deleted at close. Round 2's in-scope correctness bugs: after a
+compaction the meter read the context the compaction replaced (Claude Code writes no request for
+the compaction itself), so idle compaction would have produced a false cold-resume line; it
+priced fast mode and US-only inference at standard rates; `orient`'s hook took its session only
+from the environment; `recall` picked the newest of several sessions' hand-offs in a shared
+checkout. Later rounds are tallied in the pull request's body.
+
+**Deliberately not done:**
+
+- No Stop hook: the hand-off is asked for, not enforced. Kill condition 3 in
+  `tasks/open/agent-scripts-must-cut-what-a-session-costs.md` decides whether it must be.
+- The price table stays in `usage.mjs`. Importing it is 0.02 s of the hook's 0.34 s on Windows;
+  recorded in the same entry.
+- After a compaction the meter says nothing until the next request, rather than reading
+  `compactMetadata.postTokens`: nothing needs a number in that gap, and older transcripts lack
+  the field.
+- Haiku's 90K level is unmeasured on Haiku: no session here ran on it. Stated as a `ceiling:` in
+  `RULES`.
+- The hooks were observed in a headless CLI session, not in the desktop app, and a real cold
+  resume was not run end to end; the replay fed old transcripts to the hook's code instead.
 
 # Every role lands on, is shown and is offered only what it can use
 

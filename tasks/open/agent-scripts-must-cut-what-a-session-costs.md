@@ -101,3 +101,9 @@ these two are registered before either is built, and are as immutable as the two
    hand-offs.
 
 Both are counted from transcripts, by the commands' names in tool calls.
+
+The meter's `PostToolUse` hook runs after every tool call, so it adds wall time to each. Measured
+on 2026-10-21 on the owner's Windows machine: 0.34 s a call, of which starting node is 0.22 s and
+importing `usage.mjs` for its price table 0.02 s. Moving the table into a module of its own would
+save those 0.02 s and was declined in review; if the delay is ever felt, starting node is where it
+is.
