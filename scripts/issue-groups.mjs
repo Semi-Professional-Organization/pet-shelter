@@ -92,7 +92,7 @@ export function validateConfig(config) {
     else for (const number of group.issues) claim(number, where);
   }
   if (config.standalone !== undefined && !Array.isArray(config.standalone)) errors.push(`"standalone" must be an array`);
-  for (const number of config.standalone ?? []) claim(number, "standalone");
+  else for (const number of config.standalone ?? []) claim(number, "standalone");
   if (errors.length > 0) throw new Error(`${CONFIG_PATH} is invalid:\n  ${errors.join("\n  ")}`);
   return config;
 }
@@ -153,6 +153,14 @@ export function planGroups(config, issues, target) {
 
   const actions = [];
   const notes = [];
+  // A child another group wants is moved by that group's `move`, which detaches it from here.
+  const removeUnwanted = (key, parent) => {
+    for (const child of parent.children ?? []) {
+      if (!wantedBy.has(child.number)) {
+        actions.push({ type: "remove", key, parent: parent.number, parentId: parent.id, child: child.number, childId: child.id });
+      }
+    }
+  };
   for (const group of config.groups) {
     const rendered = renderParent(group, target);
     const parent = parentByKey.get(group.key);
@@ -163,12 +171,7 @@ export function planGroups(config, issues, target) {
       if (normalise(parent.title) !== rendered.title || normalise(parent.body) !== normalise(rendered.body)) {
         actions.push({ type: "update", key: group.key, number: parent.number, ...rendered });
       }
-      for (const child of parent.children ?? []) {
-        // A child another group wants is moved by that group's `move`, which detaches it from here.
-        if (!wantedBy.has(child.number)) {
-          actions.push({ type: "remove", key: group.key, parent: parent.number, parentId: parent.id, child: child.number, childId: child.id });
-        }
-      }
+      removeUnwanted(group.key, parent);
     }
     for (const number of group.issues) {
       const child = byNumber.get(number);
@@ -177,11 +180,22 @@ export function planGroups(config, issues, target) {
       }
       if (parent && child.parent === parent.number) continue;
       const link = { key: group.key, parent: parent?.number ?? null, parentId: parent?.id ?? null, child: number, childId: child.id };
-      actions.push(child.parent == null ? { type: "add", ...link } : { type: "move", ...link, from: child.parent });
+      if (child.parent == null) {
+        actions.push({ type: "add", ...link });
+        continue;
+      }
+      actions.push({ type: "move", ...link, from: child.parent });
+      if (!parentNumbers.has(child.parent)) {
+        notes.push(`#${number} is under #${child.parent}, which this script does not manage; the move drops that link.`);
+      }
     }
   }
-  for (const [key, issue] of orphans.sort(([a], [b]) => a.localeCompare(b))) {
-    actions.push({ type: "close", key, number: issue.number });
+  // A group that left the file: its parent lets go of its sub-issues, so none stays linked to a
+  // group nobody lists, and closes. Already closed, it still lets go.
+  for (const [key, parent] of [...parentByKey].sort(([a], [b]) => a.localeCompare(b))) {
+    if (liveKeys.has(key)) continue;
+    removeUnwanted(key, parent);
+    if (!isClosed(parent)) actions.push({ type: "close", key, number: parent.number });
   }
 
   const listed = new Set([...wantedBy.keys(), ...(config.standalone ?? [])]);
@@ -220,11 +234,13 @@ export function features(issue) {
   const text = `${issue.title ?? ""}\n${stripMirrorHeader(issue.body)}`;
   const counts = new Map();
   const add = (feature, weight = 1) => counts.set(feature, (counts.get(feature) ?? 0) + weight);
-  const paths = text.match(/(?:src|tests|scripts|prisma|docs|\.claude|\.github|\.codex)\/[\w.@[\]/-]+/g) ?? [];
+  // A repo-root directory only: not the `prisma/` in `@prisma/client` or the `docs/` deep in a path.
+  const paths = text.match(/(?<![\w@/.-])(?:src|tests|scripts|prisma|docs|\.claude|\.github|\.codex)\/[\w.@[\]/-]+/g) ?? [];
   for (const raw of paths) {
     const path = raw.replace(/[.:]+$/, "");
     add(`path:${path.toLowerCase()}`, 2);
-    const base = path.slice(path.lastIndexOf("/") + 1).replace(/\.[a-z]+$/i, "");
+    // Every extension goes, so `issueGroups.test.ts` meets a backticked `issueGroups`.
+    const base = path.slice(path.lastIndexOf("/") + 1).replace(/\..*$/, "");
     if (base) add(`id:${base.toLowerCase()}`, 2);
   }
   for (const match of text.matchAll(/`([A-Za-z_$][\w$]*)(?:\(\))?`/g)) add(`id:${match[1].toLowerCase()}`, 2);
@@ -498,8 +514,10 @@ async function main(argv) {
     graphql(PARENTS_QUERY, [`owner=${owner}`, `name=${name}`, `label=${LABEL}`]),
   );
 
-  // A closed issue the file names is in neither read; fetch each one. A pull request is refused by
-  // GitHub here and stays missing, which `planGroups` then reports.
+  // A closed issue the file names is in neither read; fetch each one. A pull request or an unused
+  // number is refused as NOT_FOUND and stays missing, which `planGroups` then reports; any other
+  // failure (auth, network, a rate limit) stops the run rather than blaming the file.
+  // ceiling: one call per closed issue named, which is a handful; alias them into one query if not.
   const known = new Set(issues.map((issue) => issue.number));
   for (const number of config.groups.flatMap((group) => group.issues).filter((n) => !known.has(n))) {
     try {
@@ -507,8 +525,8 @@ async function main(argv) {
         run("gh", ["api", "graphql", "-f", `query=${ISSUE_QUERY}`, "-f", `owner=${owner}`, "-f", `name=${name}`, "-F", `number=${number}`]),
       ).data.repository.issue;
       if (node) issues = [...issues, toIssue(node)];
-    } catch {
-      // not an issue
+    } catch (error) {
+      if (!/Could not resolve to an Issue/.test(String(error?.message ?? error))) throw error;
     }
   }
 

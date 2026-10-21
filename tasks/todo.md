@@ -26,7 +26,7 @@ the eleven groups were approved in the project thread before anything was built.
 - [x] Survey: native sub-issues answer on this repo; `gh` 2.98 has no command for them
 - [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
 - [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
-- [x] `tests/unit/issueGroups.test.ts`: 27 tests; six planner mutations each fail one or more
+- [x] `tests/unit/issueGroups.test.ts`: 31 tests; six planner mutations each fail one or more
 - [ ] Owner approves the PR, then `npm run issues:groups -- --apply` and a second run that plans nothing
 
 ## Review
@@ -39,7 +39,14 @@ Deliberately not done: closing #130 and #131 (fixed by #144, the owner's call), 
 ruleset is active, but it is a ledger issue and closes only by moving its file), and fixing any of
 the grouped bugs themselves, which go to their own threads. No workflow runs the script: grouping is
 a judgement, so it stays a dry run a person reads. Links surviving a ledger body rewrite is read
-from `ledger-issues.mjs`, not yet observed; the first apply is where to observe it.
+from `ledger-issues.mjs`, not yet observed: `tasks/open/issue-group-links-through-ledger-sync-unobserved.md`.
+
+Review round 1 found three bugs, all fixed: a departed group's parent closed but kept its links, a
+bare `catch` turned any `gh` failure into "not an issue", and a non-array `standalone` crashed.
+Declined, with reasons in the PR: a guard against a file that drops most groups (the dry run is the
+guard, and a wrongly closed parent reopens on the next run), batching the closed-issue reads and the
+leave-one-out centroids (a handful of calls, 69 x 11 sums), and sharing `run`/`normalise` with
+`ledger-issues.mjs` (two identical one-liners; the repo waits for a third copy).
 
 # Every role lands on, is shown and is offered only what it can use
 

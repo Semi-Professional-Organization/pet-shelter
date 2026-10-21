@@ -16,6 +16,7 @@ import {
   applyActions,
   suggest,
   evaluate,
+  features,
 } from "../../scripts/issue-groups.mjs";
 
 /**
@@ -96,6 +97,11 @@ describe("the grouping file", () => {
     expect(error).toMatch(/c: needs a title/);
   });
 
+  it("refuses a standalone list that is not an array with the collected message, not a crash", () => {
+    expect(() => validateConfig({ groups: [group("a", [1])], standalone: {} })).toThrow(/is invalid:\n {2}"standalone" must be an array$/);
+    expect(() => validateConfig({ groups: [group("a", [1])], standalone: "12" })).toThrow(/is invalid:\n {2}"standalone" must be an array$/);
+  });
+
   it("reads a parent's key only from a marker at the top of its body", () => {
     expect(keyFromMarker(`${markerFor("test-suite")}\nrest`)).toBe("test-suite");
     expect(keyFromMarker(`quoting it: ${markerFor("test-suite")}`)).toBeNull();
@@ -162,8 +168,24 @@ describe("planning", () => {
     const { actions } = planGroups({ groups: [a] }, issues, TARGET);
     expect(actions).toEqual([
       expect.objectContaining({ type: "reopen", number: 10 }),
+      expect.objectContaining({ type: "remove", parent: 11, child: 2 }),
       expect.objectContaining({ type: "close", number: 11, key: "gone" }),
     ]);
+  });
+
+  it("lets a closed parent of a departed group go of its sub-issues, and leaves it closed", () => {
+    const gone = group("gone", [2]);
+    const issues = [parentFor(11, gone, [2], { state: "CLOSED" }), issue(2, { parent: 11 }), issue(3)];
+    const { actions } = planGroups({ groups: [group("a", [3])] }, issues, TARGET);
+    expect(actions.filter((a) => "parent" in a && a.parent === 11)).toEqual([
+      expect.objectContaining({ type: "remove", child: 2 }),
+    ]);
+    expect(types(actions)).not.toContain("close");
+  });
+
+  it("says so when a move drops a link a person made under a parent the script does not manage", () => {
+    const { notes } = planGroups({ groups: [group("a", [1])] }, [issue(1, { parent: 99 }), issue(99)], TARGET);
+    expect(notes).toEqual([expect.stringMatching(/#1 is under #99, which this script does not manage/)]);
   });
 
   it("does not trust a marker without the label: anyone can open an issue on a public repository", () => {
@@ -293,6 +315,12 @@ describe("suggestions", () => {
     const [proposal] = suggest(config, corpus, [corpus[4]]);
     expect(proposal).toMatchObject({ number: 5, clear: true, best: { key: "pet-form" } });
     expect(proposal.best.evidence).toContain("petformdialog");
+  });
+
+  it("reads repo-root paths only, and meets a test file at its bare name", () => {
+    const found = [...features(issue(9, { body: "`@prisma/client` and node_modules/next/dist/docs/x; see tests/unit/issueGroups.test.ts" })).keys()];
+    expect(found.filter((f) => f.startsWith("path:"))).toEqual(["path:tests/unit/issuegroups.test.ts"]);
+    expect(found).toContain("id:issuegroups");
   });
 
   it("measures itself by hiding each grouped issue in turn", () => {
