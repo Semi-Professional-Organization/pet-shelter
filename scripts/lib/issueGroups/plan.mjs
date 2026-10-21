@@ -56,8 +56,15 @@ export function validateConfig(config) {
     else if (owner.has(number)) errors.push(`#${number} is in both ${owner.get(number)} and ${where}; an issue can have only one parent`);
     else owner.set(number, where);
   };
+  // Only fields this script reads: `--apply` rewrites the file to record parents, and a field it did
+  // not know would be lost silently.
+  const unknownFields = (object, allowed, where) => {
+    for (const name of Object.keys(object ?? {})) if (!allowed.includes(name)) errors.push(`${where}: unknown field "${name}"`);
+  };
+  unknownFields(config, ["$comment", "groups", "standalone"], CONFIG_PATH);
   for (const [index, group] of config.groups.entries()) {
     const where = typeof group?.key === "string" && group.key ? group.key : `groups[${index}]`;
+    unknownFields(group, ["key", "title", "summary", "parent", "issues"], where);
     if (typeof group?.key !== "string" || !KEY.test(group.key)) errors.push(`${where}: key must be lowercase letters and digits joined by single hyphens`);
     else if (keys.has(group.key)) errors.push(`${where}: key is used twice`);
     else keys.add(group.key);
@@ -267,7 +274,7 @@ export function planGroups(config, snapshot, target) {
 
   const order = ["create", "label", "reopen", "update"];
   parentActions.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
-  return { actions: [...parentActions, ...unlinks, ...orderedLinks, ...closes], notes, ungrouped, record };
+  return { actions: [...parentActions, ...orderedLinks, ...closes], notes, ungrouped, record };
 }
 
 /**
@@ -293,48 +300,77 @@ function hiddenChildrenOf(snapshot) {
 
 /**
  * Orders the links so each is legal when it runs: the parent has a free slot, the link makes no
- * loop, and nesting stays within GitHub's depth. Unlinks run first and free slots; each link frees
- * one in the parent it leaves. A link that no order can make legal is a problem, reported before
- * anything is written.
+ * loop, and nesting stays within GitHub's depth. The simulation moves links, counts and heights as
+ * it goes, so every check sees the tree as it will be at that step. Unlinks run first and free
+ * slots, and each link frees one in the parent it leaves. When only a full parent blocks progress
+ * and another link is due to take one of its issues elsewhere, that issue is unlinked first to make
+ * room. A link that no order can make legal is a problem, reported before anything is written.
  *
- * ceiling: an issue's height counts only the levels of sub-issues that were read (one below each
- * member, all below each parent), so a member with sub-issues nested deeper could still pass here
- * and be refused for depth. Nothing in this repository nests below one level.
+ * ceiling: below an issue whose sub-issues were not read (a member's own sub-issues), its height
+ * counts one level if it has any. A member with sub-issues nested deeper could still pass here and
+ * be refused for depth. Nothing in this repository nests below one level.
  */
 function orderLinks({ byId, unlinks, links, hiddenChildren }) {
   const parent = new Map([...byId.values()].map((issue) => [issue.id, issue.parentId ?? null]));
+  const kids = new Map();
   const count = new Map();
   const current = (id) => count.get(id) ?? hiddenChildren.get(id) ?? 0;
-  const bump = (id, by) => id && count.set(id, current(id) + by);
-  for (const of of parent.values()) if (of) bump(of, 1);
-  for (const action of unlinks) {
-    parent.set(action.childId, null);
-    bump(action.parentId, -1);
+  const move = (child, to) => {
+    const from = parent.get(child);
+    if (from) {
+      kids.get(from)?.delete(child);
+      count.set(from, current(from) - 1);
+    }
+    parent.set(child, to);
+    if (to) {
+      if (!kids.has(to)) kids.set(to, new Set());
+      kids.get(to).add(child);
+      count.set(to, current(to) + 1);
+    }
+  };
+  for (const [child, of] of [...parent]) {
+    parent.set(child, null);
+    if (of) move(child, of);
   }
+  const ordered = [...unlinks];
+  for (const action of unlinks) move(action.childId, null);
+
   const ancestors = (id) => {
     const seen = [];
     for (let at = parent.get(id); at && !seen.includes(at); at = parent.get(at)) seen.push(at);
     return seen;
   };
-  const height = (id) => byId.get(id)?.height ?? 0;
+  const height = (id, seen = new Set()) => {
+    if (seen.has(id)) return 0;
+    seen.add(id);
+    const issue = byId.get(id);
+    let levels = issue && !issue.childrenRead ? issue.height ?? 0 : 0;
+    for (const child of kids.get(id) ?? []) levels = Math.max(levels, 1 + height(child, seen));
+    return levels;
+  };
+  const full = (action) => current(action.parentId) >= LIMITS.children;
   const why = (action) => {
-    if (current(action.parentId) >= LIMITS.children) return `its parent already has ${LIMITS.children} sub-issues`;
+    if (full(action)) return `its parent already has ${LIMITS.children} sub-issues`;
     if (action.parentId === action.childId || ancestors(action.parentId).includes(action.childId)) return "it would make a loop";
     if (ancestors(action.parentId).length + 2 + height(action.childId) > LIMITS.depth + 1) return `it would nest deeper than ${LIMITS.depth} levels`;
     return null;
   };
-  const ordered = [];
   const pending = [...links];
   while (pending.length > 0) {
     const index = pending.findIndex((action) => why(action) === null);
-    if (index === -1) {
-      throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action)}`).join("\n"));
+    if (index !== -1) {
+      const [action] = pending.splice(index, 1);
+      move(action.childId, action.parentId);
+      ordered.push(action);
+      continue;
     }
-    const [action] = pending.splice(index, 1);
-    bump(parent.get(action.childId), -1);
-    parent.set(action.childId, action.parentId);
-    bump(action.parentId, 1);
-    ordered.push(action);
+    // Stuck on a full parent: unlink an issue another link will take out of it anyway.
+    const blocked = pending.find(full);
+    const leaving = blocked && pending.find((action) => parent.get(action.childId) === blocked.parentId);
+    if (!leaving) throw new Error(pending.map((action) => `#${action.child} cannot be linked to ${action.key}: ${why(action)}`).join("\n"));
+    ordered.push({ type: "unlink", parentId: blocked.parentId, parent: byId.get(blocked.parentId)?.number, childId: leaving.childId, child: `#${leaving.child}` });
+    move(leaving.childId, null);
+    leaving.from = null;
   }
   return ordered;
 }

@@ -50,6 +50,9 @@ const ref = (repo, { number, repository }) =>
 /**
  * Errors GitHub returns alongside data for something this account cannot see, or a number that is
  * no issue. Each is scoped to a path; anything else stops the read.
+ * ceiling: an unreadable parent is taken to come back as an error at its path. If GitHub returns a
+ * silent null instead, the issue reads as unparented and the plan's link moves it away from that
+ * parent. Not observed either way: no private repository was at hand to try it.
  */
 function partial({ data, errors = [] }, { allowMissingAlias = false } = {}) {
   const hidden = [];
@@ -66,8 +69,16 @@ function partial({ data, errors = [] }, { allowMissingAlias = false } = {}) {
   return { data, hiddenParents: hidden.map(at).filter(Boolean) };
 }
 
-/** Reads everything `planGroups` needs, as one snapshot. `numbers` are issues the file names. */
-export function readSnapshot(graphql, { repo, numbers }) {
+/**
+ * Reads everything `planGroups` needs, as one snapshot. `numbers` are the issues the file names;
+ * `parents` are the recorded parents among them, which are always read with their sub-issues: a
+ * recorded parent that lost its label is missed by the label read, and its sub-issues are exactly
+ * the links the plan has to see.
+ *
+ * @param {(query: string, variables: Record<string, unknown>) => any} graphql
+ * @param {{ repo: string, numbers: number[], parents?: number[] }} options
+ */
+export function readSnapshot(graphql, { repo, numbers, parents = [] }) {
   const [owner, name] = repo.split("/");
   const issues = new Map();
   const hiddenParent = new Set();
@@ -87,6 +98,8 @@ export function readSnapshot(graphql, { repo, numbers }) {
       parentRef: !parentId && node.parent ? ref(repo, node.parent) : known?.parentRef ?? null,
       parentHidden: hiddenParent.has(node.id) || known?.parentHidden || false,
       childCount: node.subIssues?.totalCount ?? known?.childCount ?? node.subIssuesSummary?.total ?? 0,
+      // Whether every sub-issue it has was read, so the planner can count its height from them.
+      childrenRead: Boolean(node.subIssues) || known?.childrenRead || false,
       height: Math.max(known?.height ?? 0, node.subIssuesSummary?.total > 0 ? 1 : 0),
     };
     issues.set(node.id, next);
@@ -126,7 +139,8 @@ export function readSnapshot(graphql, { repo, numbers }) {
   // unused number comes back NOT_FOUND and stays missing, which `planGroups` reports.
   const local = (issue) => issue.repo.toLowerCase() === repo.toLowerCase();
   const seen = new Set([...issues.values()].filter(local).map((issue) => issue.number));
-  const missing = [...new Set(numbers)].filter((n) => !seen.has(n));
+  const childrenRead = new Set([...issues.values()].filter((issue) => local(issue) && issue.childrenRead).map((issue) => issue.number));
+  const missing = [...new Set([...numbers.filter((n) => !seen.has(n)), ...parents.filter((n) => !childrenRead.has(n))])];
   for (let i = 0; i < missing.length; i += 25) {
     const result = partial(graphql(byNumbersQuery(missing.slice(i, i + 25)), { owner, name }), { allowMissingAlias: true });
     markHidden(result.hiddenParents);
@@ -135,7 +149,7 @@ export function readSnapshot(graphql, { repo, numbers }) {
 
   // Ancestors of every possible parent, so loops and depth are checked on the whole chain.
   const labelled = (issue) => issue.labels.some((label) => label.toLowerCase() === LABEL);
-  const isParentish = (issue) => local(issue) && ((labelled(issue) && keyFromMarker(issue.body)) || numbers.includes(issue.number));
+  const isParentish = (issue) => local(issue) && ((labelled(issue) && keyFromMarker(issue.body)) || parents.includes(issue.number));
   for (let level = 0; level < LIMITS.depth; level += 1) {
     const wanted = [...new Set([...issues.values()].filter(isParentish).flatMap(function chain(issue) {
       return issue.parentId && !issues.has(issue.parentId) ? [issue.parentId] : issue.parentId ? chain(issues.get(issue.parentId)) : [];

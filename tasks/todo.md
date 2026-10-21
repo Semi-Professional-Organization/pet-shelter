@@ -26,8 +26,11 @@ the eleven groups were approved in the project thread before anything was built.
 - [x] Survey: native sub-issues answer on this repo; `gh` 2.98 has no command for them
 - [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
 - [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
-- [x] `tests/unit/issueGroups.test.ts`: 50 tests; six planner mutations each fail one or more
-- [ ] Owner approves the PR, then `npm run issues:groups -- --apply` and a second run that plans nothing
+- [x] Rebuilt after an owner-requested audit: `scripts/lib/issueGroups/{plan,github,suggest}.mjs`
+- [x] Tests: `issueGroups.test.ts` (examples), `issueGroupsConverge.test.ts` (3,000 states through
+      the real reader against `tests/unit/support/fakeGitHub.ts`), `issueGroupsSuggest.test.ts`
+- [ ] Owner approves the PR, then `npm run issues:groups -- --apply`, which must print "Verified";
+      commit the `parent` numbers it records
 
 ## Review
 
@@ -69,10 +72,29 @@ Round 5 found that a caller without triage access would still leave an unlabelle
 The suggester now uses true cosine (unit-length centroids no longer favour small groups), counts a
 tie against the real group, keeps `Pet.age` whole, and drops Next.js route-file names like `page`.
 
-Rounds 6 and 7 found no correctness bug, which ends the loop under the owner's rule. Their wording
+Rounds 6 and 7 found no correctness bug, which ended that loop under the owner's rule. Their wording
 fixes: `--apply` now asks for write access, since creating the `group` label needs it and nothing
 shows triage is enough for sub-issue links; a stale ceiling comment now describes the gated
 measurement; an unlabelled-parent message is said once.
+
+## Rebuild (owner asked for root causes, not patches)
+
+A fresh read-only audit found 8 more cases (stale-checkout apply, duplicate parents after a label or
+marker edit, deep loops and over-long bodies wedging every run, two concurrent applies, hidden
+parents, rate limits). All 23 bugs traced to four choices: identity from label and marker, a plan
+walked case by case, GitHub's rules found one refusal at a time, unchecked writes. The rebuild
+answers each (recorded parents, a two-state diff by node id, rules checked on the finished tree by
+simulation, `--apply` from origin/master that re-reads and must plan nothing). The owner approved
+the plan, recording parents in the grouping file, master-only apply, and including rate limits and
+hidden parents. Review of the rebuild runs as a new loop from round 1.
+
+Rebuild round 1 found that the convergence test planned from the fake's whole state, bypassing the
+reader, which hid a real reader gap (a recorded parent without its label was read without its
+sub-issues); that heights were static in the simulation; that two full parents could not swap; and
+that a failed working-copy write could lose created parent numbers. All fixed; every test plan now
+comes through `readSnapshot`, and mutations reintroducing the gap or the swap deadlock fail.
+Recorded as ceilings, not fixed: a member's sub-issues read one level deep, and the shape of
+GitHub's answer for an unreadable parent (assumed an error, not observed).
 
 # Every role lands on, is shown and is offered only what it can use
 

@@ -19,7 +19,7 @@ import {
 } from "../../scripts/lib/issueGroups/plan.mjs";
 import { githubPort, readSnapshot } from "../../scripts/lib/issueGroups/github.mjs";
 import { canApply } from "../../scripts/issue-groups.mjs";
-import { FakeGitHub } from "./support/fakeGitHub";
+import { FakeGitHub, readFrom } from "./support/fakeGitHub";
 
 /**
  * Tests for `scripts/issue-groups.mjs`. The guarantee that one apply converges from any state is
@@ -42,7 +42,7 @@ const github = (count: number) => {
   return fake;
 };
 const parentOn = (fake: FakeGitHub, g: Group, fields: Record<string, unknown> = {}) => fake.add({ ...renderParent(g, TARGET), labels: [LABEL], ...fields });
-const plan = (fake: FakeGitHub, config: { groups: Group[]; standalone?: number[] }) => planGroups(config, fake.snapshot(), TARGET);
+const plan = (fake: FakeGitHub, config: { groups: Group[]; standalone?: number[] }) => planGroups(config, readFrom(fake, config), TARGET);
 const types = (actions: { type: string }[]) => actions.map((action) => action.type);
 
 /** Applies, records, and returns the next plan, which must be empty for the run to count as done. */
@@ -267,6 +267,49 @@ describe("planning: GitHub's rules are checked on the finished tree, before any 
     const config = { groups: [{ ...a, parent: parentA.number }, { ...b, parent: parentB.number }] };
     const { next } = converge(fake, config);
     expect(fake.children(parentA.id)).toHaveLength(100);
+    expect(next.actions).toEqual([]);
+  });
+
+  it("sees the sub-issues of a recorded parent that lost its label, so one apply still finishes", () => {
+    // Review of the rebuild: the label read misses an unlabelled parent, and the open-issues read
+    // carries no sub-issues, so its closed hand-linked #2 went unseen until after the apply.
+    const fake = github(2);
+    const g = group("a", [1]);
+    const parent = parentOn(fake, g, { labels: [] });
+    fake.link(parent.id, fake.byNumber(1)!.id);
+    fake.link(parent.id, fake.byNumber(2)!.id);
+    fake.byNumber(2)!.state = "CLOSED";
+    const { first, next } = converge(fake, { groups: [{ ...g, parent: parent.number }] });
+    expect(types(first.actions)).toEqual(["label", "unlink"]);
+    expect(next.actions).toEqual([]);
+  });
+
+  it("counts nesting as the links move, not as it was read", () => {
+    // Review of the rebuild: linking #1 (with a chain of six below it) under a's parent makes that
+    // parent's subtree deep, and a's parent sits under #2, which b then takes: too deep for GitHub.
+    const fake = github(2);
+    const chain = Array.from({ length: 6 }, () => fake.add());
+    fake.link(fake.byNumber(1)!.id, chain[0].id);
+    for (let i = 1; i < chain.length; i += 1) fake.link(chain[i - 1].id, chain[i].id);
+    const a = group("a", [1]);
+    const b = group("b", [2]);
+    const parentA = parentOn(fake, a);
+    const parentB = parentOn(fake, b);
+    fake.link(fake.byNumber(2)!.id, parentA.id);
+    expect(() => plan(fake, { groups: [{ ...a, parent: parentA.number }, { ...b, parent: parentB.number }] })).toThrow(/nest deeper than 8 levels/);
+  });
+
+  it("lets two full parents swap an issue, unlinking one first to make room", () => {
+    const fake = github(200);
+    const a = group("a", [...Array.from({ length: 99 }, (_, i) => i + 1), 200]);
+    const b = group("b", [100, ...Array.from({ length: 99 }, (_, i) => i + 101)]);
+    const parentA = parentOn(fake, a);
+    const parentB = parentOn(fake, b);
+    for (let n = 1; n <= 100; n += 1) fake.link(parentA.id, fake.byNumber(n)!.id);
+    for (let n = 101; n <= 200; n += 1) fake.link(parentB.id, fake.byNumber(n)!.id);
+    const config = { groups: [{ ...a, parent: parentA.number }, { ...b, parent: parentB.number }] };
+    const { first, next } = converge(fake, config);
+    expect(types(first.actions)).toEqual(["unlink", "link", "link"]);
     expect(next.actions).toEqual([]);
   });
 

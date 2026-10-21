@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { applyPlan, keyFromMarker, planGroups, recordParents, renderParent } from "../../scripts/lib/issueGroups/plan.mjs";
-import { FakeGitHub, type FakeIssue } from "./support/fakeGitHub";
+import { FakeGitHub, readFrom, type FakeIssue } from "./support/fakeGitHub";
 
 /**
  * One rule over many states, rather than one test per bug: from any state GitHub can be in, one
@@ -8,7 +8,9 @@ import { FakeGitHub, type FakeIssue } from "./support/fakeGitHub";
  * link the file does not own, and never sends a write GitHub refuses. When the planner refuses a
  * state instead, the state must really be impossible: the links the file asks for would make a loop.
  *
- * The states are generated from a seed, so a failure names the seed that reproduces it.
+ * Every plan is made from what the real reader (`readSnapshot`) returns through the fake's GraphQL,
+ * not from the fake's whole state, so a gap in what is read fails here too. The states are generated
+ * from a seed, so a failure names the seed that reproduces it.
  */
 
 const REPO = "o/r";
@@ -34,6 +36,7 @@ function world(seed: number) {
   const rand = random(seed);
   const pick = <T,>(list: readonly T[]): T => list[Math.floor(rand() * list.length)];
   const github = new FakeGitHub(REPO);
+  github.pushAccess = rand() < 0.8;
   const issues = Array.from({ length: 3 + Math.floor(rand() * 10) }, () =>
     github.add({ state: rand() < 0.15 ? "CLOSED" : "OPEN", labels: rand() < 0.3 ? ["ledger"] : [] }),
   );
@@ -128,11 +131,11 @@ describe("one apply makes GitHub match the file, from any state", () => {
       const looksLikeParent = (issue: FakeIssue) =>
         issue.repo === REPO && issue.labels.some((label) => label.toLowerCase() === "group") && keyFromMarker(issue.body) !== null;
       const recorded = new Set(config.groups.map((group) => group.parent));
-      const managedBefore = new Set([...github.issues.values()].filter((issue) => looksLikeParent(issue) || recorded.has(issue.number)).map((issue) => issue.id));
+      const managedBefore = new Set([...github.issues.values()].filter((issue) => looksLikeParent(issue) || (issue.repo === REPO && recorded.has(issue.number))).map((issue) => issue.id));
 
       let plan;
       try {
-        plan = planGroups(config, github.snapshot(), TARGET);
+        plan = planGroups(config, readFrom(github, config), TARGET);
       } catch (error) {
         // An emptied file with open parents is refused on purpose: likelier a bad edit than intent.
         if (config.groups.length === 0) {
@@ -159,13 +162,14 @@ describe("one apply makes GitHub match the file, from any state", () => {
 
       const writes = github.writes;
       const created = applyPlan(plan, github.port());
-      expect(github.writes - writes, where).toBe(plan.actions.length + 0 * created.size);
+      // One write per action, plus one label per parent GitHub created without it.
+      expect(github.writes - writes, where).toBe(plan.actions.length + (github.pushAccess ? 0 : created.size));
       const record = new Map(plan.record);
       for (const [key, issue] of created) record.set(key, issue.number);
       const settled = recordParents(config, record);
 
       // 1. The next plan is empty.
-      expect(planGroups(settled, github.snapshot(), TARGET).actions, where).toEqual([]);
+      expect(planGroups(settled, readFrom(github, settled), TARGET).actions, where).toEqual([]);
       // 2. Each group has exactly one open parent, the recorded one, labelled and marked.
       for (const group of settled.groups) {
         const claiming = [...github.issues.values()].filter((issue) => looksLikeParent(issue) && keyFromMarker(issue.body) === group.key && issue.state === "OPEN");
@@ -189,7 +193,7 @@ describe("one apply makes GitHub match the file, from any state", () => {
       expect(created.size, where).toBeLessThanOrEqual(config.groups.filter((group) => !group.parent).length);
       outcomes.converged += 1;
     }
-    // Measured 2026-10-21: 2,685 converged, the rest refused as an emptied file or a real loop. Most
+    // Measured 2026-10-21: 2,667 converged, the rest refused as an emptied file or a real loop. Most
     // must converge, or the generator is only producing refusals; both refusals must occur, or the
     // oracle above was never consulted.
     expect(outcomes.converged).toBeGreaterThan(SEEDS * 0.85);
@@ -210,8 +214,8 @@ describe("one apply makes GitHub match the file, from any state", () => {
     github.link(one.id, three.id);
     github.link(three.id, parentA.id);
     const config = { groups: [{ ...a, parent: parentA.number }, { ...b, parent: parentB.number }] };
-    const plan = planGroups(config, github.snapshot(), TARGET);
+    const plan = planGroups(config, readFrom(github, config), TARGET);
     applyPlan(plan, github.port());
-    expect(planGroups(config, github.snapshot(), TARGET).actions).toEqual([]);
+    expect(planGroups(config, readFrom(github, config), TARGET).actions).toEqual([]);
   });
 });

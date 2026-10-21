@@ -42,12 +42,17 @@ cross repositories. *Rejected:* walking the file group by group, which needed a 
 every state found and missed the rest (departed groups, closed duplicates, foreign children).
 
 **GitHub's rules are checked on the finished tree, before any write.** One parent per issue, 100
-sub-issues, no loops at any depth, eight levels of nesting, title and body limits. The links are
-ordered by simulating them against those rules, so no link is refused for a slot or a loop another
-link would have cleared. What no order can make legal (a parent nested under its own member) is
-refused by the dry run. A refusal at apply is then run-wide (access, network, rate limit), which is
-why apply stops at the first one. Rate limits are waited out (60s, 120s, 180s; `gh` hides
-Retry-After). An issue under a parent this account cannot see is left alone with a note.
+sub-issues, no loops at any depth, eight levels of nesting, title and body limits, and the fields
+the file may hold (an unknown one is refused, since `--apply` rewrites the file). The links are
+ordered by simulating them against those rules, with counts and heights moving as they would, so
+no link is refused for a slot, a loop or a depth that another link would have cleared; two full
+parents swapping an issue get one unlinked first to make room. What no order can make legal (a
+parent nested under its own member) is refused by the dry run. A refusal at apply is then
+run-wide (access, network, rate limit), which is why apply stops at the first one. Two limits
+remain, each marked `ceiling:` in the code: a member's own sub-issues are read one level deep, so
+deeper nesting below a member could still be refused for depth; and an unreadable parent is
+assumed to come back as an error, which was not observed. Rate limits are waited out (60s, 120s,
+180s; `gh` hides Retry-After). An issue under a parent this account cannot see is left alone.
 
 **Dry run from the working copy; `--apply` from the default branch, and it must finish.** A dry run
 plans the working copy, so an edit shows before it is committed, and says when it differs from
@@ -58,12 +63,15 @@ every parent recorded: that plan must be empty, or it prints what is left and ex
 Nothing publishes on push: grouping is a judgement a person makes. *Rejected:* a workflow on push to
 master, which would make every merged edit a change to a public repository with no dry run between.
 
-**Tested as one rule over many states.** `tests/unit/issueGroupsConverge.test.ts` runs the planner
-against a fake GitHub that enforces GitHub's documented rules, over 3,000 generated states (missing,
+**Tested as one rule over many states.** `tests/unit/issueGroupsConverge.test.ts` runs the reader and
+the planner against a fake GitHub that answers the reader's GraphQL and enforces GitHub's documented
+rules, over 3,000 generated states (missing,
 closed, duplicate, unlabelled, recased and edited parents; departed groups; foreign, hidden and
 hand-made links). Every state converges in one apply, without a refused write, a second parent, or
 a touched link the file does not own, or is refused for a reason the test confirms (a real loop, an
-emptied file). Measured 2026-10-21: 2,685 converged, 203 refused a real loop, 112 an emptied file.
+emptied file). Measured 2026-10-21: 2,667 converged, 193 refused a real loop, 140 an emptied file.
+The first version planned from the fake's whole state and so missed a gap in the reader; review
+caught it, and every plan in the tests now comes through the reader.
 
 **By design, and stated here so nobody files them:** nesting a person adds among a group's own
 issues is flattened; hand edits to links the file owns are reverted; renaming a group key retires

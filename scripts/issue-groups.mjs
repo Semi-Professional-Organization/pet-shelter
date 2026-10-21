@@ -110,14 +110,23 @@ function report(plan) {
   }
 }
 
-/** Writes parent numbers into the working copy's file, touching nothing else. */
+/**
+ * Writes parent numbers into the working copy's file. The numbers are printed first, so a working
+ * copy that cannot be read or written (mid-edit, invalid) costs the convenience and never the
+ * numbers: without them the next run cannot repair a parent that lost its label.
+ */
 function recordInWorkingCopy(numbers) {
   if (numbers.size === 0) return;
-  const config = parse(readFileSync(CONFIG_PATH, "utf8"));
-  const known = new Set(config.groups.map((group) => group.key));
-  writeFileSync(CONFIG_PATH, formatConfig(recordParents(config, numbers)));
-  write(`\nRecorded ${[...numbers].filter(([key]) => known.has(key)).map(([key, n]) => `${key} #${n}`).join(", ")} in ${CONFIG_PATH}. Commit it through a pull request.`);
-  for (const [key, number] of numbers) if (!known.has(key)) write(`  ${key} is not in your working copy; record "parent": ${number} for it by hand.`);
+  write(`\nParents: ${[...numbers].map(([key, n]) => `${key} #${n}`).join(", ")}.`);
+  try {
+    const config = parse(readFileSync(CONFIG_PATH, "utf8"));
+    const known = new Set(config.groups.map((group) => group.key));
+    writeFileSync(CONFIG_PATH, formatConfig(recordParents(config, numbers)));
+    write(`Recorded them in ${CONFIG_PATH}. Commit it through a pull request.`);
+    for (const [key, number] of numbers) if (!known.has(key)) write(`  ${key} is not in your working copy; record "parent": ${number} for it by hand.`);
+  } catch (error) {
+    write(`Could not record them in your working copy (${String(error.message).split("\n")[0]}); add each as "parent" by hand.`);
+  }
 }
 
 async function main(argv) {
@@ -154,9 +163,10 @@ async function main(argv) {
     write(`issue-groups: planning your working copy of ${CONFIG_PATH}, which differs from origin/${branch}; --apply uses origin/${branch}.`);
   }
 
-  const numbers = [...config.groups.flatMap((group) => [...group.issues, ...(group.parent ? [group.parent] : [])]), ...(config.standalone ?? [])];
+  const parents = config.groups.flatMap((group) => (group.parent ? [group.parent] : []));
+  const numbers = [...config.groups.flatMap((group) => group.issues), ...parents, ...(config.standalone ?? [])];
   const target = { repo, branch };
-  const snapshot = readSnapshot(graphql, { repo, numbers });
+  const snapshot = readSnapshot(graphql, { repo, numbers, parents });
   const plan = planGroups(config, snapshot, target);
 
   if (suggesting) {
@@ -215,7 +225,7 @@ async function main(argv) {
   }
 
   // Proof that it finished: read GitHub again, with every parent recorded, and plan again.
-  const after = planGroups(recordParents(config, record), readSnapshot(graphql, { repo, numbers: [...numbers, ...record.values()] }), target);
+  const after = planGroups(recordParents(config, record), readSnapshot(graphql, { repo, numbers: [...numbers, ...record.values()], parents: [...parents, ...record.values()] }), target);
   recordInWorkingCopy(record);
   if (after.actions.length > 0) {
     write(`\nGitHub still differs from the file after applying; ${after.actions.length} actions remain:`);

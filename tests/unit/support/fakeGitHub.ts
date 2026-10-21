@@ -11,6 +11,8 @@
  *   - an issue the account cannot see cannot be read, linked or unlinked.
  */
 
+import { readSnapshot } from "../../../scripts/lib/issueGroups/github.mjs";
+
 export type FakeIssue = {
   id: string;
   number: number;
@@ -83,30 +85,78 @@ export class FakeGitHub {
     if ([...body].length > LIMIT.body) throw new Error("refused: body too long");
   }
 
-  /** What `readSnapshot` would return: every issue this account can see. */
-  snapshot() {
-    const visible = [...this.issues.values()].filter((issue) => !issue.hidden);
-    return {
-      repo: this.repo,
-      issues: visible.map((issue) => {
-        const parent = issue.parentId ? this.issues.get(issue.parentId)! : null;
-        return {
-          id: issue.id,
-          number: issue.number,
-          repo: issue.repo,
-          title: issue.title,
-          body: issue.body,
-          state: issue.state,
-          labels: [...issue.labels],
-          parentId: parent && !parent.hidden ? parent.id : null,
-          parentRef: parent && !parent.hidden ? (parent.repo === this.repo ? `#${parent.number}` : `${parent.repo}#${parent.number}`) : null,
-          parentHidden: Boolean(parent?.hidden),
-          childCount: this.children(issue.id).length,
-          height: this.height(issue.id),
-        };
-      }),
+  /**
+   * GitHub's GraphQL API for the four reads `readSnapshot` makes, answered from this state, so the
+   * tests plan from what the real reader would see and not from the whole truth. As GitHub does:
+   * the open-issues read carries no sub-issues; the label filter ignores case; a nested child carries
+   * no labels or parent; an unreadable parent comes back null with an error at its path, and an
+   * unreadable child null in its list while the count still holds it; a number that is no issue
+   * comes back null with NOT_FOUND.
+   * ceiling: whether GitHub reports an unreadable parent as an error, rather than a silent null, is
+   * assumed and not observed (no private repository was at hand to try it).
+   */
+  graphql = (query: string, variables: Record<string, unknown>) => {
+    const errors: { type: string; path: (string | number)[]; message: string }[] = [];
+    const hide = (path: (string | number)[]) => errors.push({ type: "FORBIDDEN", path, message: "cannot see" });
+    const fields = (issue: FakeIssue, path: (string | number)[]) => {
+      const parent = issue.parentId ? this.issues.get(issue.parentId)! : null;
+      if (parent?.hidden) hide([...path, "parent"]);
+      return {
+        id: issue.id,
+        number: issue.number,
+        title: issue.title,
+        body: issue.body,
+        state: issue.state,
+        repository: { nameWithOwner: issue.repo },
+        labels: { nodes: issue.labels.map((name) => ({ name })) },
+        parent: parent && !parent.hidden ? { id: parent.id, number: parent.number, repository: { nameWithOwner: parent.repo } } : null,
+        subIssuesSummary: { total: this.children(issue.id).length },
+      };
     };
-  }
+    const withChildren = (issue: FakeIssue, path: (string | number)[]) => {
+      const children = this.children(issue.id);
+      return {
+        ...fields(issue, path),
+        subIssues: {
+          totalCount: children.length,
+          nodes: children.map((child, index) => {
+            if (child.hidden) {
+              hide([...path, "subIssues", "nodes", index]);
+              return null;
+            }
+            const { id, number, title, body, state } = child;
+            return { id, number, title, body, state, repository: { nameWithOwner: child.repo }, subIssuesSummary: { total: this.children(child.id).length } };
+          }),
+        },
+      };
+    };
+    const local = [...this.issues.values()].filter((issue) => issue.repo === this.repo && !issue.hidden);
+    const page = (nodes: unknown[]) => ({ issues: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } });
+    const base = ["repository", "issues", "nodes"];
+    if (query.includes("filterBy")) {
+      const label = String(variables.label).toLowerCase();
+      const nodes = local.filter((issue) => issue.labels.some((name) => name.toLowerCase() === label));
+      return { data: { repository: page(nodes.map((issue, i) => withChildren(issue, [...base, i]))) }, errors };
+    }
+    if (query.includes("states: [OPEN])")) {
+      const nodes = local.filter((issue) => issue.state === "OPEN");
+      return { data: { repository: page(nodes.map((issue, i) => fields(issue, [...base, i]))) }, errors };
+    }
+    if (query.includes("nodes(ids")) {
+      const ids = variables.ids as string[];
+      return { data: { nodes: ids.map((id, i) => (this.issues.get(id) && !this.issues.get(id)!.hidden ? fields(this.issues.get(id)!, ["nodes", i]) : null)) }, errors };
+    }
+    const repository: Record<string, unknown> = {};
+    for (const [, alias, number] of query.matchAll(/(i\d+): issue\(number: (\d+)\)/g)) {
+      const issue = local.find((candidate) => candidate.number === Number(number));
+      if (issue) repository[alias] = withChildren(issue, ["repository", alias]);
+      else {
+        repository[alias] = null;
+        errors.push({ type: "NOT_FOUND", path: ["repository", alias], message: `Could not resolve to an Issue with the number of ${number}.` });
+      }
+    }
+    return { data: { repository }, errors };
+  };
 
   /** Links as GitHub's addSubIssue with replaceParent does, refusing what GitHub refuses. */
   link(parentId: string, childId: string) {
@@ -161,4 +211,13 @@ export class FakeGitHub {
         }),
     };
   }
+}
+
+type FileShape = { groups: { issues: number[]; parent?: number }[]; standalone?: number[] };
+
+/** The snapshot the CLI would read from this fake for `config`, through the real reader. */
+export function readFrom(fake: FakeGitHub, config: FileShape) {
+  const parents = config.groups.flatMap((group) => (group.parent ? [group.parent] : []));
+  const numbers = [...config.groups.flatMap((group) => group.issues), ...parents, ...(config.standalone ?? [])];
+  return readSnapshot(fake.graphql, { repo: fake.repo, numbers, parents });
 }
