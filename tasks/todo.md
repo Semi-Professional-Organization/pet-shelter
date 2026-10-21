@@ -26,14 +26,14 @@ the eleven groups were approved in the project thread before anything was built.
 - [x] Survey: native sub-issues answer on this repo; `gh` 2.98 has no command for them
 - [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
 - [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
-- [x] `tests/unit/issueGroups.test.ts`: 47 tests; six planner mutations each fail one or more
+- [x] `tests/unit/issueGroups.test.ts`: 50 tests; six planner mutations each fail one or more
 - [ ] Owner approves the PR, then `npm run issues:groups -- --apply` and a second run that plans nothing
 
 ## Review
 
 Dry run against the live repository: 11 parents to create, 69 sub-issues to add, nothing else, with
-#130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69 as it prints them: 78.3%
-right, 14.5% wrong, 7.2% no clear group, real group in the top two for 94.2%.
+#130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69 as it prints them: 79.7%
+right, 11.6% wrong, 8.7% no clear group, real group in the top two for 95.7%.
 
 Deliberately not done: closing #130 and #131 (fixed by #144, the owner's call), settling #157 (its
 ruleset is active, but it is a ledger issue and closes only by moving its file), and fixing any of
@@ -63,6 +63,11 @@ Round 4 found a new parent created by someone without push access silently losin
 every run would make another, and a parent nested under its own member, which GitHub refuses as a
 loop at apply though the dry run showed it fine. Both fixed, plus kebab-case and `./` paths in the
 suggester (top two now 94.2%).
+
+Round 5 found that a caller without triage access would still leave an unlabelled parent per run;
+`--apply` now checks `viewerPermission` before any write and names a parent a failed create left.
+The suggester now uses true cosine (unit-length centroids no longer favour small groups), counts a
+tie against the real group, keeps `Pet.age` whole, and drops Next.js route-file names like `page`.
 
 # Every role lands on, is shown and is offered only what it can use
 

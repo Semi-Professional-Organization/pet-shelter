@@ -18,6 +18,7 @@ import {
   evaluate,
   features,
   isMissingIssueError,
+  canApply,
 } from "../../scripts/issue-groups.mjs";
 
 /**
@@ -389,6 +390,21 @@ describe("applying", () => {
     expect(queries[0]).toMatch(/addSubIssue\(input: \{[^}]*replaceParent: true/);
   });
 
+  it("names the parent a failed create left behind, rather than saying nothing was applied", () => {
+    const exec = (_command: string, args: string[]) => {
+      if (args.includes("repos/owner/repo/issues")) return JSON.stringify({ number: 50, node_id: "I_50", labels: [] });
+      throw new Error(["gh api -X failed", "HTTP 403: Must have triage access"].join("\n"));
+    };
+    const { actions } = planGroups({ groups: [group("a", [1])] }, [issue(1)], TARGET);
+    expect(() => applyActions(actions, { repo: "owner/repo", exec, log: () => {} })).toThrow(
+      /after 0 of 2 actions applied: HTTP 403: Must have triage access #50 was created without the group label/,
+    );
+  });
+
+  it("applies only for an account that can label issues", () => {
+    expect(["READ", "TRIAGE", "WRITE", "MAINTAIN", "ADMIN", null].map(canApply)).toEqual([false, true, true, true, true, false]);
+  });
+
   it("stops at the first refusal and says how many actions landed", () => {
     const exec = (_command: string, args: string[]) => {
       if (args.includes("subIssueId=I_2")) throw new Error("gh api graphql\nGraphQL: refused");
@@ -435,6 +451,12 @@ describe("suggestions", () => {
     expect(ids("`PetFormDialog.tsx` and `verifyAdminSession(req)`")).toEqual(["id:petformdialog", "id:verifyadminsession"]);
   });
 
+  it("keeps a backticked property whole, and gives Next.js route files no shared name", () => {
+    const ids = (body: string) => [...features(issue(9, { body })).keys()].filter((f) => f.startsWith("id:"));
+    expect(ids("`Pet.age` and `prisma.pet.findUnique()`")).toEqual(["id:pet.age", "id:prisma.pet.findunique"]);
+    expect(ids("src/app/pets/page.tsx and src/app/donate/page.tsx")).toEqual([]);
+  });
+
   it("reads a path inside a markdown link as the same path written bare", () => {
     const found = [...features(issue(9, { body: "see [src/lib/a.ts](src/lib/a.ts)" })).keys()];
     expect(found.filter((f) => f.startsWith("path:"))).toEqual(["path:src/lib/a.ts"]);
@@ -449,7 +471,8 @@ describe("suggestions", () => {
   it("counts an issue that shares nothing as no clear group, not as a hit for the first group by name", () => {
     const lonely = issue(6, { title: "zebra quokka" });
     const { results, right, unclear } = evaluate({ groups: [group("aaa", [6, 1, 2]), group("agent-tooling", [3, 4])] }, [...corpus, lonely]);
-    expect(results.find((r: { number: number }) => r.number === 6)).toMatchObject({ rank: 1, clear: false });
+    // Every group scores zero, so the real group ties for last rather than winning by name.
+    expect(results.find((r: { number: number }) => r.number === 6)).toMatchObject({ rank: 2, clear: false });
     expect(right).toBeLessThan(1);
     expect(unclear).toBeGreaterThan(0);
   });

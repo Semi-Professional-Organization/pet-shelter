@@ -35,9 +35,9 @@ change to a public repository with no dry run in between.
 **`--suggest` only proposes.** For each ungrouped issue it ranks the groups by TF-IDF similarity to
 each group's members (named files, identifiers and words) and prints the overlap as evidence. A
 person adds the issue to the file. Measured on 2026-10-21 by `--suggest --evaluate`, leave-one-out
-over the first grouping's 69 issues and judged as `--suggest` prints them: **78.3%** got a clear
-proposal of their real group, **14.5%** a clear proposal of another, and **7.2%** "no clear group";
-the real group ranked in the top two for **94.2%**. Group parents are left out of the weights, so
+over the first grouping's 69 issues and judged as `--suggest` prints them: **79.7%** got a clear
+proposal of their real group, **11.6%** a clear proposal of another, and **8.7%** "no clear group";
+the real group ranked in the top two for **95.7%**, with a tie counted against it. Group parents are left out of the weights, so
 applying the grouping does not move these figures. Misses cluster where a group is about a subject
-rather than about files: #64 and #121 ranked their real group 10th and 6th. An earlier
+rather than about files: #64 and #121 ranked their real group 10th and 7th. An earlier
 count of 81.2% scored the raw top guess, including ones `--suggest` prints as no clear group.

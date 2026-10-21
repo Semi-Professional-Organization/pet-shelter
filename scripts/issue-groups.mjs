@@ -266,22 +266,25 @@ export function features(issue) {
   // A repo-root directory only: not the `prisma/` in `@prisma/client` or the `docs/` deep in a path.
   // A leading `./` is the same path.
   const paths = text.match(/(?<![\w@/.-])(?:\.\/)?(?:src|tests|scripts|prisma|docs|\.claude|\.github|\.codex)\/[\w.@[\]/-]+/g) ?? [];
-  // Every extension goes, so `issueGroups.test.ts` meets a backticked `issueGroups`.
-  const bare = (name) => name.replace(/\..*$/, "").toLowerCase();
+  // A file's extensions go, so `issueGroups.test.ts` meets a backticked `issueGroups`. Only file
+  // extensions: `Pet.age` is a property, not a file called Pet, and stays whole.
+  const bare = (name) => name.replace(/(?:\.(?:test|spec|d))?\.(?:tsx?|[cm]?js|json|md|sql|css|prisma|ya?ml|http)$/i, "").toLowerCase();
+  // Next.js names every route's files alike; `page` in two issues is rarely the same file.
+  const generic = new Set(["page", "route", "layout", "loading", "error", "not-found", "template", "default", "index"]);
+  const addId = (name) => {
+    const base = bare(name);
+    if (base && !generic.has(base)) add(`id:${base}`, 2);
+  };
   for (const raw of paths) {
     // Trailing punctuation, and the `]` of a markdown link around the path, are not part of it; the
     // `]` closing a dynamic segment such as `[id]` is.
     let path = raw.replace(/^\.\//, "").replace(/[.:]+$/, "");
     while (path.endsWith("]") && path.split("]").length > path.split("[").length) path = path.slice(0, -1).replace(/[.:]+$/, "");
     add(`path:${path.toLowerCase()}`, 2);
-    const base = bare(path.slice(path.lastIndexOf("/") + 1));
-    if (base) add(`id:${base}`, 2);
+    addId(path.slice(path.lastIndexOf("/") + 1));
   }
   // A backticked name meets a path by its bare name: `agent-guard`, `PetFormDialog.tsx`, `fn(x)`.
-  for (const match of text.matchAll(/`([A-Za-z_$][\w$.-]*)(?:\([^`]*\))?`/g)) {
-    const base = bare(match[1]);
-    if (base) add(`id:${base}`, 2);
-  }
+  for (const match of text.matchAll(/`([A-Za-z_$][\w$.-]*)(?:\([^`]*\))?`/g)) addId(match[1]);
   for (const word of text.toLowerCase().match(/[a-z][a-z0-9]{2,}/g) ?? []) {
     if (!STOPWORDS.has(word)) add(`w:${stem(word)}`);
   }
@@ -318,18 +321,22 @@ const dot = (a, b) => {
   return sum;
 };
 
-/** Mean of member vectors. */
+/**
+ * Sum of member vectors, scaled to unit length: a plain mean of many members pointing different ways
+ * is shorter than a mean of two, which would favour small groups for being small.
+ */
 function centroid(vectors, members) {
   const sum = new Map();
   for (const number of members) {
     for (const [feature, value] of vectors.get(number) ?? []) sum.set(feature, (sum.get(feature) ?? 0) + value);
   }
-  for (const [feature, value] of sum) sum.set(feature, value / members.length);
+  const length = Math.hypot(...sum.values()) || 1;
+  for (const [feature, value] of sum) sum.set(feature, value / length);
   return sum;
 }
 
 /**
- * Ranks the groups for one issue by cosine-like similarity to each group's centroid, with the
+ * Ranks the groups for one issue by cosine similarity to each group's centroid, with the
  * features that contributed most. `exclude` leaves an issue out of the centroids (leave-one-out).
  *
  * ceiling: bag of words plus named files, compared with each group's mean. It cannot read meaning,
@@ -390,7 +397,10 @@ export function evaluate(config, issues) {
     for (const number of group.issues) {
       if (!vectors.has(number)) continue;
       const ranked = rankGroups(number, vectors, config.groups, { exclude: number });
-      const rank = ranked.findIndex((entry) => entry.key === group.key) + 1;
+      // Ties count against the real group: it ranks after every group scoring as high, so a
+      // zero shared with many groups is never a hit for whichever key sorts first.
+      const own = ranked.find((entry) => entry.key === group.key).score;
+      const rank = ranked.filter((entry) => entry.score >= own).length;
       results.push({ number, actual: group.key, guess: ranked[0].key, rank, clear: judge(ranked).clear });
     }
   }
@@ -538,10 +548,19 @@ export function applyActions(actions, { repo, exec, log }) {
     } catch (error) {
       const [command, ...reason] = String(error?.message ?? error).split("\n");
       const why = reason.map((line) => line.trim()).filter(Boolean).join(" ") || command;
-      throw new Error(`${action.type} for ${action.key} was refused after ${index} of ${actions.length} actions applied: ${why}`);
+      // A create that stopped after the issue existed has left something behind; say what.
+      const made = action.type === "create" ? created.get(action.key) : null;
+      const left = made ? ` #${made.number} was created without the ${LABEL} label: label or close it by hand before re-running.` : "";
+      throw new Error(`${action.type} for ${action.key} was refused after ${index} of ${actions.length} actions applied: ${why}${left}`);
     }
   }
 }
+
+/**
+ * Who may apply. Setting a new issue's labels needs push access, labelling an existing one needs
+ * triage, and without either every run would leave an unlabelled parent behind, so check first.
+ */
+export const canApply = (permission) => ["TRIAGE", "WRITE", "MAINTAIN", "ADMIN"].includes(permission);
 
 export function formatAction(action) {
   const parent = action.parent ? `#${action.parent}` : `new ${action.key} parent`;
@@ -670,6 +689,10 @@ async function main(argv) {
     return;
   }
 
+  const permission = JSON.parse(
+    run("gh", ["api", "graphql", "-f", "query=query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { viewerPermission } }", "-f", `owner=${owner}`, "-f", `name=${name}`]),
+  ).data.repository.viewerPermission;
+  if (!canApply(permission)) throw new Error(`--apply needs triage access or more to ${repo}, and this account has ${permission}; nothing was changed`);
   const labels = JSON.parse(run("gh", ["label", "list", "--repo", repo, "--limit", "1000", "--json", "name"]));
   if (!labels.some((label) => label.name === LABEL)) {
     run("gh", ["label", "create", LABEL, "--repo", repo, "--color", "0e8a16", "--description", `Parent issue managed from ${CONFIG_PATH}`]);
