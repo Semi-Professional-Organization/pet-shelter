@@ -10,11 +10,11 @@ Relationships are stored apart from the body, so a rewrite should leave them alo
 seen a mirror keep its parent through a sync that edited it, because no links existed before this
 script.
 
-The grouping has not been applied either. Until it is, nothing shows that a second run plans no
-actions against the real repository, which the tests show only against a recorded state.
+The grouping has not been applied either. `--apply` now ends by reading GitHub again and planning
+again, and prints "Verified" only when that plan is empty, so the first apply shows that much; the
+tests show it only against a fake GitHub.
 
-**Settles when:** after `npm run issues:groups -- --apply`, a second dry run prints "in sync", and a
-ledger sync that updates a linked mirror's body leaves `parent` set on it (read with
+**Settles when:** `npm run issues:groups -- --apply` prints "Verified", and a ledger sync that updates a linked mirror's body leaves `parent` set on it (read with
 `gh api graphql` on `issue(number: N) { parent { number } }`). If the link is gone, the grouping
 script has to re-link after every sync, and the decision in
 `tasks/decisions/2026-10-21-issue-groups-are-native-sub-issues.md` is wrong on that point.
