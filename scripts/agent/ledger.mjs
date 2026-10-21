@@ -15,7 +15,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { HANDOFF_DIR, HANDOFF_PREFIX, SECTIONS, checkBody, readHeader, renderHandoff, slugOf } from "./handoff.mjs";
-import { readLatest } from "./meter.mjs";
+import { readLatest, tokens } from "./meter.mjs";
 import { describeWhere, whereAmI } from "./orient.mjs";
 import { SESSION_ID, findTranscript, projectsDir } from "./transcript.mjs";
 
@@ -170,12 +170,14 @@ export async function main(argv, io = {}) {
     }
   }
 
-  let context = found ? "unknown: no model request in its transcript yet, or none since its last compaction." : "unknown: no transcript of this session was found.";
-  try {
-    const reading = found && readLatest(found.path);
-    if (reading) context = `${Math.round(reading.ctx / 1000)}K tokens on ${reading.model}.`;
-  } catch (error) {
-    context = `unknown: ${error.message}.`;
+  let context = "unknown: no transcript of this session was found.";
+  if (found) {
+    try {
+      const { reading, why } = readLatest(found.path);
+      context = reading ? `${tokens(reading.size)} tokens on ${reading.model}.` : `unknown: no model request in its transcript ${why}.`;
+    } catch (error) {
+      context = `unknown: ${error.message}.`;
+    }
   }
   writeFileSync(
     path,

@@ -143,7 +143,7 @@ describe("ledger handoff", () => {
     ]);
     expect((await run(["handoff", "Compacted"], { cwd: top, stdin: BODY, env: { CLAUDE_CODE_SESSION_ID: SESSION, CLAUDE_CONFIG_DIR: dir } })).code).toBe(0);
     expect(readFileSync(join(top, "tasks", "open", "HANDOFF-compacted.md"), "utf8")).toContain(
-      "- **Context at hand-off:** unknown: no model request in its transcript yet, or none since its last compaction.",
+      "- **Context at hand-off:** unknown: no model request in its transcript since its last compaction.",
     );
   });
 

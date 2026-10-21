@@ -6,8 +6,7 @@ import { join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 import { COMMANDS, cli } from "../../scripts/agent.mjs";
-import { REARM, RULES, assess, helpText, main, priceOf, readLatest, readingOf, settle } from "../../scripts/agent/meter.mjs";
-import { createExtractor } from "../../scripts/agent/usage.mjs";
+import { REARM, RULES, assess, helpText, main, readLatest, readingOf, settle } from "../../scripts/agent/meter.mjs";
 
 /**
  * The context meter tells an agent its real context size and when to hand off, from the session's
@@ -49,8 +48,8 @@ const toolResult = (minutes: number) => ({
   message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] },
 });
 
-/** A reading at `ctx` tokens whose last request started `idle` minutes before T0. */
-const reading = (ctx: number, { idle = 1, ttl = 60, model = "claude-opus-5-5" } = {}) => ({ model, ctx, start: T0 - idle * 60_000, ttl });
+/** A reading of `size` tokens whose last request started `idle` minutes before T0. */
+const reading = (size: number, { idle = 1, ttl = 60, model = "claude-opus-5-5" } = {}) => ({ model, size, start: T0 - idle * 60_000, ttl });
 
 const levels = (r: ReturnType<typeof reading>, fired: string[] = [], event = "PostToolUse") => assess({ event, reading: r, fired: new Set(fired), now: T0 });
 
@@ -64,12 +63,12 @@ describe("the reading", () => {
       line("r2", 3, { input: 3, read: 102_000, w1h: 1_000, out: 400 }),
       toolResult(4),
     ];
-    expect(readingOf(records)).toEqual({ model: "claude-opus-5-5", ctx: 3 + 102_000 + 1_000 + 400, start: Date.parse(at(2)), ttl: 60 });
+    expect(readingOf(records)).toEqual({ model: "claude-opus-5-5", size: 3 + 102_000 + 1_000 + 400, start: Date.parse(at(2)), ttl: 60 });
   });
 
   it("skips a synthetic message and returns null when no request is in view", () => {
     const synthetic = { ...line("s", 9, { read: 1 }), message: { ...line("s", 9).message, model: "<synthetic>" } };
-    expect(readingOf([line("r1", 0, { read: 7 }), synthetic])?.ctx).toBe(7);
+    expect(readingOf([line("r1", 0, { read: 7 }), synthetic])?.size).toBe(7);
     expect(readingOf([toolResult(0)])).toBeNull();
   });
 
@@ -93,21 +92,7 @@ describe("the reading", () => {
     const summary = { type: "user", isCompactSummary: true, timestamp: at(5), message: { role: "user", content: "the summary" } };
     const compacted = [line("r1", 0, { read: 480_000 }), boundary, summary];
     expect(readingOf(compacted)).toBeNull();
-    expect(readingOf([...compacted, line("r2", 6, { w1h: 21_000 })])?.ctx).toBe(21_000);
-  });
-
-  it("reads a request as usage does: the same size, model and start", () => {
-    const records = [
-      line("r1", 0, { input: 4, read: 10_000, w1h: 500, out: 20 }),
-      toolResult(1),
-      line("r2", 2, { input: 2, read: 10_500, w5: 30, out: 5 }),
-      line("r2", 3, { input: 2, read: 10_500, w5: 30, out: 70 }),
-    ];
-    const extractor = createExtractor({ session: "s", sub: false });
-    for (const record of records) extractor.add(record);
-    const last = extractor.finish().requests.at(-1);
-    const prompt = last.input_tokens + last.cache_read_input_tokens + last.cache_creation_input_tokens;
-    expect(readingOf(records)).toMatchObject({ ctx: prompt + last.output_tokens, model: last.model, start: Date.parse(last.ts) });
+    expect(readingOf([...compacted, line("r2", 6, { w1h: 21_000 })])?.size).toBe(21_000);
   });
 
   it("finds the last request beyond a first tail read, past a tool result bigger than the read", () => {
@@ -116,7 +101,12 @@ describe("the reading", () => {
       const path = join(dir, "s.jsonl");
       const big = { ...toolResult(5), message: { role: "user", content: [{ type: "tool_result", tool_use_id: "t", content: "x".repeat(4096) }] } };
       writeFileSync(path, [line("r1", 0, { read: 1_000 }), line("r2", 4, { read: 2_000 }), big].map((r) => JSON.stringify(r)).join("\n") + "\n");
-      expect(readLatest(path, 512)?.ctx).toBe(2_000);
+      expect(readLatest(path, 512).reading?.size).toBe(2_000);
+      // With no reading, it says why: nothing asked yet, or nothing since the last compaction.
+      writeFileSync(path, JSON.stringify(toolResult(0)) + "\n");
+      expect(readLatest(path)).toEqual({ reading: null, why: "yet" });
+      writeFileSync(path, [line("r1", 0, { read: 1_000 }), { type: "system", subtype: "compact_boundary", timestamp: at(1) }, big].map((r) => JSON.stringify(r)).join("\n") + "\n");
+      expect(readLatest(path, 512)).toEqual({ reading: null, why: "since its last compaction" });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -129,9 +119,9 @@ describe("the levels", () => {
   });
 
   it("asks for the hand-off before going quiet from 250K, at the next milestone from 300K, and now from 500K", () => {
-    expect(levels(reading(260_000)).lines[0]).toMatch(/^meter: context 260K on claude-opus-5-5; every call re-reads it, about \$0\.05 each\. From now on, before you end a turn that waits on a person, write your hand-off state/);
+    expect(levels(reading(260_000)).lines[0]).toMatch(/^meter: context 260K on claude-opus-5-5\. From now on, before you end a turn that waits on a person, write your hand-off state/);
     expect(levels(reading(310_000), ["quiet-250000"]).lines[0]).toMatch(/At the next milestone, write your hand-off state .* and ask to continue in a fresh session\.$/);
-    expect(levels(reading(520_000), ["quiet-250000", "milestone-300000"]).lines[0]).toMatch(/\$0\.10 each\. Hand off now: write your hand-off state/);
+    expect(levels(reading(520_000), ["quiet-250000", "milestone-300000"]).lines[0]).toMatch(/^meter: context 520K on claude-opus-5-5\. Hand off now: write your hand-off state/);
   });
 
   it("announces each level once, and only the highest of several crossed at once", () => {
@@ -162,29 +152,13 @@ describe("the levels", () => {
     expect(help).toContain("    250K  and up: the cold-resume line");
   });
 
-  it("warns a Haiku 5.5 session at 80K and hands it off at 90K, naming the price step", () => {
+  it("warns a Haiku 5.5 session at 80K and hands it off at 90K, and holds any other model to the default", () => {
     const haiku = { model: "claude-haiku-5-5" };
     expect(levels(reading(79_000, haiku)).lines).toEqual([]);
     const warn = levels(reading(85_000, haiku));
     expect(warn.announce).toBe("milestone-80000");
-    expect(warn.lines[0]).toMatch(/At the next milestone, .* On this model a request whose prompt passes 100K costs 5 times as much\.$/);
+    expect(warn.lines[0]).toMatch(/^meter: context 85K on claude-haiku-5-5\. At the next milestone, write your hand-off state .* and ask to continue in a fresh session\.$/);
     expect(levels(reading(92_000, haiku), warn.fire).lines[0]).toContain("Hand off now");
-  });
-
-  it("prices a call by the context it re-reads, and leaves the price out for a model it cannot price", () => {
-    // Opus 5.5: cache reads $0.20 and 1-hour cache writes $8 per million tokens.
-    const opus = priceOf(reading(600_000));
-    expect(opus?.read).toBeCloseTo(0.12, 10);
-    expect(opus?.rewrite).toBeCloseTo(600_000 * (8 - 0.2) / 1e6, 10);
-    // A 5-minute lifetime re-writes at the 5-minute rate, $5.
-    expect(priceOf(reading(600_000, { ttl: 5 }))?.rewrite).toBeCloseTo(600_000 * (5 - 0.2) / 1e6, 10);
-    expect(priceOf(reading(600_000, { model: "claude-unknown-9" }))).toBeNull();
-    // Fast mode doubles Opus 5.5's rates and US-only inference adds a tenth, as usage prices them.
-    const plain = line("f", 0, { read: 600_000 });
-    const fast = readingOf([{ ...plain, message: { ...plain.message, usage: { ...plain.message.usage, speed: "fast", inference_geo: "us", service_tier: "standard" } } }]);
-    expect(fast).toMatchObject({ speed: "fast", geo: "us", tier: "standard" });
-    expect(priceOf(fast)?.read).toBeCloseTo((600_000 * 0.2 * 2 * 1.1) / 1e6, 10);
-    expect(priceOf({ ...reading(600_000), tier: "batch" })).toBeNull();
     expect(levels(reading(300_000, { model: "claude-unknown-9" })).lines[0]).toMatch(/^meter: context 300K on claude-unknown-9\. At the next milestone/);
   });
 });
@@ -192,11 +166,11 @@ describe("the levels", () => {
 describe("a cold resume", () => {
   const cold = (r: ReturnType<typeof reading>, event = "UserPromptSubmit") => levels(r, ["quiet-250000"], event);
 
-  it("is a message that arrives after the cache expired in a session of 250K or more, priced", () => {
+  it("is a message that arrives after the cache expired in a session of 250K or more", () => {
     const result = cold(reading(600_000, { idle: 22 * 60 }));
     expect(result.cold).toBe(true);
     expect(result.lines).toEqual([
-      "meter: cold resume. The last request was 22 hours ago and this session's cache lives 1 hour, so this turn re-writes the whole 600K context, about $4.68 more than a warm turn. Answer this message, then write your hand-off state (node scripts/agent.mjs ledger handoff --help) and ask to continue in a fresh session.",
+      "meter: cold resume. The last request was 22 hours ago and this session's cache lives 1 hour, so this turn re-writes the whole 600K context. Answer this message, then write your hand-off state (node scripts/agent.mjs ledger handoff --help) and ask to continue in a fresh session.",
     ]);
     // Its line stands in for the level's, and the level is still marked announced.
     expect(result.announce).toBeNull();
@@ -351,7 +325,7 @@ describe("by hand", () => {
       let out = "";
       const code = await main(["--session", "01234567"], { env: { CLAUDE_CONFIG_DIR: config }, now: T0 + 90 * 60_000, out: { write: (s: string) => (out += s) } });
       expect(code).toBe(0);
-      expect(out.split("\n")[0]).toBe("meter: PASS context 310K on claude-opus-5-5; every call re-reads it, about $0.06 each");
+      expect(out.split("\n")[0]).toBe("meter: PASS context 310K on claude-opus-5-5");
       expect(out).toContain("cache: last request 90 minutes ago; it lives 1 hour, so it is cold");
       expect(out).toContain("next: At the next milestone, write your hand-off state");
       out = "";

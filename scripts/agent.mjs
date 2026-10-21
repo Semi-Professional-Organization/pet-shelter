@@ -22,7 +22,7 @@ export const COMMANDS = {
   },
   meter: {
     effect: "hook",
-    summary: "this session's context size, what a call costs at it, and when to hand off",
+    summary: "this session's context size and when to hand off",
     load: () => import("./agent/meter.mjs"),
   },
   orient: {

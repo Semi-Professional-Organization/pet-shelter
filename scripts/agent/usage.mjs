@@ -857,6 +857,13 @@ export function carriedOutput(file, breaks = segmentBreaks(file)) {
 export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 
 /**
+ * The lifetime, in minutes, that holds most of a context written as `w5` tokens with the 5-minute
+ * lifetime and `w1h` with the hour's: its expiry is the one that forces the whole context to be
+ * re-written, and a small write in the other lifetime does not change it. An hour when the two tie.
+ */
+export const lifetimeHolding = (w5, w1h) => CACHE_TTL_MINUTES[w5 > w1h ? "5m" : "1h"];
+
+/**
  * Main-session requests that came after the cache expired and re-wrote the whole context: idle
  * longer than the lifetime the context was last written with (1 hour, or 5 minutes),
  * and not the first request after a compaction, which re-writes a new, smaller context anyway.
@@ -872,14 +879,13 @@ export const CACHE_TTL_MINUTES = { "5m": 5, "1h": 60 };
 export function coldResumes(file, breaks = segmentBreaks(file)) {
   if (file.sub) return [];
   const out = [];
-  // The lifetime that holds most of the context, counted since the last compaction, is the one
-  // whose expiry forces the re-write; one small write in the other lifetime does not change it.
+  // The context's lifetime is counted over what was written since the last compaction; before
+  // anything is, the request's own writes decide it.
   let held = { "5m": 0, "1h": 0 };
   let previous;
   for (const r of file.requests) {
     if (breaks.has(r.index)) held = { "5m": 0, "1h": 0 };
-    const total = held["5m"] + held["1h"];
-    const ttl = CACHE_TTL_MINUTES[total ? (held["5m"] > held["1h"] ? "5m" : "1h") : r.w5 > r.w1h ? "5m" : "1h"];
+    const ttl = held["5m"] + held["1h"] ? lifetimeHolding(held["5m"], held["1h"]) : lifetimeHolding(r.w5, r.w1h);
     held["5m"] += r.w5;
     held["1h"] += r.w1h;
     const before = previous;

@@ -4,7 +4,7 @@
  * above 400K, and 12% was big sessions re-writing their cache after more than an hour idle
  * (`tasks/open/agent-scripts-must-cut-what-a-session-costs.md`). So the meter reads the real size
  * from the session's transcript and, at the owner's hand-off levels, adds one line to the agent's
- * context saying what a call now costs and when to hand off. It never compacts anything.
+ * context saying how big it is and when to hand off. It never compacts anything.
  *
  * Run three ways:
  *   - by the PostToolUse hook in `.claude/settings.json`, after tool calls: a level's line, once
@@ -31,7 +31,7 @@ import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { CACHE_TTL_MINUTES, PRICES, USAGE_FIELDS, priceKey, ratesFor } from "./usage.mjs";
+import { CACHE_TTL_MINUTES, createExtractor, lifetimeHolding, priceKey } from "./usage.mjs";
 import { findTranscript, projectsDir, readTail } from "./transcript.mjs";
 
 // ================================ the rule ================================
@@ -86,23 +86,23 @@ const HANDOFF = "node scripts/agent.mjs ledger handoff --help";
 
 // ================================ the reading ================================
 
-const requestKey = (record) => record.requestId || record.message?.id || record.uuid;
-const isRequest = (record) =>
-  record?.type === "assistant" && record.message?.usage && typeof record.message.usage === "object" && record.message.model !== "<synthetic>";
-const isBoundary = (record) => record?.type === "system" && record.subtype === "compact_boundary";
+/** A transcript's records as `usage` extracts them, so the meter and `usage` read alike. */
+function extract(records) {
+  const extractor = createExtractor({ session: "", sub: false });
+  for (const record of records) extractor.add(record);
+  return extractor.finish();
+}
 
 /**
- * The meter's reading from a transcript's records, oldest first: the last model request that has
- * written its usage. Lines of one request share a `requestId` and repeat its usage with a growing
- * output, so each field is the maximum over the request's lines, as `usage` does.
+ * The meter's reading from an extraction: the last model request, as `usage` reads it (lines of
+ * one request merged, synthetic messages skipped).
  *
- * - `ctx`: what the next request carries at least, which is this request's prompt (fresh input,
- *   cache reads and cache writes) plus its output.
+ * - `size`: what the next request carries at least, which is this request's prompt (fresh input,
+ *   cache reads and cache writes) plus its output. `usage` calls the prompt alone `ctx`.
  * - `start`: when its first line was written, which is when it last read the cache, in ms.
- * - `ttl`: in minutes, the cache lifetime that holds most of what the requests in view wrote since
- *   the last compaction, which decides whether the whole context expires, as in `usage`'s
- *   `coldResumes`; 60 when nothing written is in view.
- * - `speed`, `geo`, `tier`: what the request was served at, which its price depends on.
+ * - `ttl`: in minutes, the cache lifetime holding most of what the requests in view wrote since
+ *   the last compaction, decided as `coldResumes` decides it (`lifetimeHolding`); 60 when nothing
+ *   written is in view.
  *
  * Null when no request is in view, or none since the last compaction: Claude Code writes no
  * request for the compaction itself, so the one before the boundary measured the context the
@@ -116,81 +116,31 @@ const isBoundary = (record) => record?.type === "system" && record.subtype === "
  * lag", so it can also be one request behind; `start` is the first line of the request in the
  * records given, so a request that began before them reads as starting later; and `ttl` counts
  * only the writes in view, where `usage` counts every write since the compaction. Replayed over
- * this repo's 18 main-session transcripts (10,562 requests) on 2026-10-21: this function agreed
- * with `usage`'s extraction on the last request of all 18 (size, model and start), and the next
- * request's prompt was larger than the reading by a median of 280 tokens, 1.5K at the 90th
- * percentile, 6.5K at the 99th and 90K at most (13.8K at the 99th when the reading is a request
- * behind). Against levels of 250K and up, a line can come a call late, not a level late; against
- * Haiku's, see `RULES`.
+ * this repo's 18 main-session transcripts (10,562 requests) on 2026-10-21, the next request's
+ * prompt was larger than the reading by a median of 280 tokens, 1.5K at the 90th percentile, 6.5K
+ * at the 99th and 90K at most (13.8K at the 99th when the reading is a request behind). Against
+ * levels of 250K and up, a line can come a call late, not a level late; against Haiku's, see
+ * `RULES`.
  */
-export function readingOf(records) {
-  let last = -1;
-  for (let i = records.length - 1; i >= 0; i--) {
-    if (isBoundary(records[i])) return null;
-    if (isRequest(records[i])) {
-      last = i;
-      break;
-    }
-  }
-  if (last < 0) return null;
-  const key = requestKey(records[last]);
-  const usage = Object.fromEntries(USAGE_FIELDS.map((field) => [field, 0]));
-  const served = {};
-  let start = Date.parse(records[last].timestamp);
-  for (const record of records) {
-    if (!isRequest(record) || requestKey(record) !== key) continue;
-    const u = record.message.usage;
-    for (const field of USAGE_FIELDS) usage[field] = Math.max(usage[field], Number(u[field]) || 0);
-    if (u.speed != null) served.speed = u.speed;
-    if (u.inference_geo != null) served.geo = u.inference_geo;
-    if (u.service_tier != null) served.tier = u.service_tier;
-    const at = Date.parse(record.timestamp);
-    if (at < start) start = at;
-  }
-  // Each request's writes, merged over its lines, back to the last compaction in view.
-  const writes = new Map();
-  for (let i = last; i >= 0; i--) {
-    const record = records[i];
-    if (isBoundary(record)) break;
-    if (!isRequest(record)) continue;
-    const c = record.message.usage.cache_creation || {};
-    const [five, hour] = writes.get(requestKey(record)) ?? [0, 0];
-    writes.set(requestKey(record), [Math.max(five, Number(c.ephemeral_5m_input_tokens) || 0), Math.max(hour, Number(c.ephemeral_1h_input_tokens) || 0)]);
-  }
-  let held5 = 0;
-  let held1h = 0;
-  for (const [five, hour] of writes.values()) {
-    held5 += five;
-    held1h += hour;
-  }
+function readingFrom({ requests, compactions }) {
+  const from = compactions.at(-1) ?? 0;
+  if (from >= requests.length) return null;
+  const last = requests.at(-1);
+  const since = requests.slice(from);
   return {
-    model: String(records[last].message.model),
-    ctx: usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens,
-    start,
-    ttl: held5 > held1h ? CACHE_TTL_MINUTES["5m"] : CACHE_TTL_MINUTES["1h"],
-    ...served,
+    model: String(last.model),
+    size: last.input_tokens + last.cache_read_input_tokens + last.cache_creation_input_tokens + last.output_tokens,
+    start: Date.parse(last.ts),
+    ttl: lifetimeHolding(since.reduce((n, r) => n + r.w5, 0), since.reduce((n, r) => n + r.w1h, 0)),
   };
 }
 
-/**
- * What one call costs at this size, priced by the context it re-reads rather than by what it
- * prints, and what a cold turn costs over a warm one. Null for a model, speed, region or service
- * tier with no price.
- */
-export function priceOf(reading) {
-  try {
-    const rates = ratesFor({ model: reading.model, prompt: reading.ctx, speed: reading.speed, geo: reading.geo, tier: reading.tier });
-    const write = reading.ttl === CACHE_TTL_MINUTES["5m"] ? rates.write5m : rates.write1h;
-    return { read: (reading.ctx * rates.cacheRead) / 1e6, rewrite: (reading.ctx * (write - rates.cacheRead)) / 1e6 };
-  } catch {
-    return null;
-  }
-}
+/** The reading from a transcript's records, oldest first (`readingFrom`), or null. */
+export const readingOf = (records) => readingFrom(extract(records));
 
 // ================================ what it says ================================
 
-const tokens = (n) => `${Math.round(n / 1000)}K`;
-const dollars = (x) => (x >= 0.01 ? `$${x.toFixed(2)}` : "under $0.01");
+export const tokens = (n) => `${Math.round(n / 1000)}K`;
 
 export function ago(minutes) {
   if (minutes < 1) return "under a minute";
@@ -199,31 +149,22 @@ export function ago(minutes) {
   return `${Math.round(minutes / 1440)} days`;
 }
 
-/** The price step a model's requests pay past some prompt size, as "past 100K ... 5x". */
-function stepNote(model) {
-  const table = Object.hasOwn(PRICES, priceKey(model)) ? PRICES[priceKey(model)] : undefined;
-  if (!table?.over) return "";
-  return ` On this model a request whose prompt passes ${tokens(table.over.prompt)} costs ${table.over.input / table.input} times as much.`;
-}
-
 /** What a level asks the agent to do. */
-export function advice(kind, model) {
+export function advice(kind) {
   if (kind === "quiet") return `From now on, before you end a turn that waits on a person, write your hand-off state (${HANDOFF}).`;
-  const then = `write your hand-off state (${HANDOFF}) and ask to continue in a fresh session.${stepNote(model)}`;
+  const then = `write your hand-off state (${HANDOFF}) and ask to continue in a fresh session.`;
   return kind === "milestone" ? `At the next milestone, ${then}` : `Hand off now: ${then}`;
 }
 
-const sizeLine = (reading, price) =>
-  `context ${tokens(reading.ctx)} on ${reading.model}${price ? `; every call re-reads it, about ${dollars(price.read)} each` : ""}`;
+const sizeLine = (reading) => `context ${tokens(reading.size)} on ${reading.model}`;
 
-const levelLine = (kind, reading, price) => `meter: ${sizeLine(reading, price)}. ${advice(kind, reading.model)}`;
+const levelLine = (kind, reading) => `meter: ${sizeLine(reading)}. ${advice(kind)}`;
 
-function coldLine(reading, idleMinutes, price) {
+function coldLine(reading, idleMinutes) {
   const life = reading.ttl === CACHE_TTL_MINUTES["5m"] ? "5 minutes" : "1 hour";
   return (
     `meter: cold resume. The last request was ${ago(idleMinutes)} ago and this session's cache lives ${life}, ` +
-    `so this turn re-writes the whole ${tokens(reading.ctx)} context` +
-    `${price ? `, about ${dollars(price.rewrite)} more than a warm turn` : ""}. ` +
+    `so this turn re-writes the whole ${tokens(reading.size)} context. ` +
     `Answer this message, then write your hand-off state (${HANDOFF}) and ask to continue in a fresh session.`
   );
 }
@@ -246,15 +187,14 @@ function coldLine(reading, idleMinutes, price) {
  */
 export function assess({ event, reading, fired = new Set(), now }) {
   const rule = ruleFor(reading.model);
-  const rearm = [...fired].filter((key) => reading.ctx < REARM * levelSize(key));
+  const rearm = [...fired].filter((key) => reading.size < REARM * levelSize(key));
   const live = new Set([...fired].filter((key) => !rearm.includes(key)));
-  const fresh = rule.levels.filter(([kind, at]) => reading.ctx >= at && !live.has(levelKey(kind, at)));
-  const price = priceOf(reading);
+  const fresh = rule.levels.filter(([kind, at]) => reading.size >= at && !live.has(levelKey(kind, at)));
   const idleMinutes = (now - reading.start) / 60_000;
-  const cold = event === "UserPromptSubmit" && idleMinutes > reading.ttl && reading.ctx >= rule.cold;
+  const cold = event === "UserPromptSubmit" && idleMinutes > reading.ttl && reading.size >= rule.cold;
   const top = fresh.at(-1);
   return {
-    lines: cold ? [coldLine(reading, idleMinutes, price)] : top ? [levelLine(top[0], reading, price)] : [],
+    lines: cold ? [coldLine(reading, idleMinutes)] : top ? [levelLine(top[0], reading)] : [],
     fire: fresh.map(([kind, at]) => levelKey(kind, at)),
     announce: !cold && top ? levelKey(top[0], top[1]) : null,
     rearm,
@@ -278,8 +218,8 @@ export function helpText() {
   return `usage: node scripts/agent.mjs meter [--session <id>] [--json]
        node scripts/agent.mjs meter --hook   (reads a hook event on stdin; .claude/settings.json runs it)
 
-The context meter: this session's real context size, what each call costs at that size, and
-whether its cache is still warm, read from the session's transcript. Read-only, except that the
+The context meter: this session's real context size and whether its cache is still warm, read
+from the session's transcript. Read-only, except that the
 hook keeps which levels it has announced in <tmp>/claude-meter/<session>/.
 
 As a hook it adds one line to the agent's context at each level of the hand-off rule, once per
@@ -295,14 +235,19 @@ Exit codes: 0 reading printed (and always, as a hook), 2 could not run.`;
 }
 
 /**
- * Grows the tail read until it holds a request or a compaction, or is the whole file. Reading
- * further back past a compaction cannot find a request after it.
+ * The latest reading in a transcript, as `{ reading }`, or `{ reading: null, why }`, where `why`
+ * finishes "no model request": "yet", or "since its last compaction". Grows the tail read until
+ * it holds a request or a compaction, or is the whole file: reading further back past a compaction
+ * cannot find a request after it.
  */
 export function readLatest(path, first = 256 * 1024) {
   for (let bytes = first; ; bytes *= 8) {
     const { records, whole } = readTail(path, bytes);
-    const reading = readingOf(records);
-    if (reading || whole || records.some(isBoundary)) return reading;
+    const extraction = extract(records);
+    const reading = readingFrom(extraction);
+    if (reading) return { reading };
+    if (extraction.compactions.length) return { reading: null, why: "since its last compaction" };
+    if (whole) return { reading: null, why: "yet" };
   }
 }
 
@@ -329,7 +274,7 @@ function hook({ stdin, env, tmp, now, out }) {
   if (event !== "PostToolUse" && event !== "UserPromptSubmit") return;
   const path = input.transcript_path || findTranscript(projectsDir(env), input.session_id)?.path;
   if (!path || !existsSync(path)) return;
-  const reading = readLatest(path);
+  const { reading } = readLatest(path);
   if (!reading) return;
   const dir = join(tmp, "claude-meter", safeName(input.session_id));
   mkdirSync(dir, { recursive: true });
@@ -358,21 +303,20 @@ function manual({ session, json, env, now, out }) {
   if (!id) return fail("no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
   const found = findTranscript(projectsDir(env), id);
   if (!found) return fail(`no transcript for session ${id} in ${projectsDir(env)}`);
-  const reading = readLatest(found.path);
-  if (!reading) return fail(`no model request in ${found.path} yet, or none since its last compaction`);
-  const price = priceOf(reading);
+  const { reading, why } = readLatest(found.path);
+  if (!reading) return fail(`no model request in ${found.path} ${why}`);
   const idleMinutes = (now - reading.start) / 60_000;
   const warm = idleMinutes <= reading.ttl;
-  const crossed = ruleFor(reading.model).levels.filter(([, at]) => reading.ctx >= at).at(-1);
+  const crossed = ruleFor(reading.model).levels.filter(([, at]) => reading.size >= at).at(-1);
   if (json) {
-    out.write(`${JSON.stringify({ session: found.session, transcript: found.path, ...reading, idleMinutes, warm, price, level: crossed?.[0] ?? null }, null, 2)}\n`);
+    out.write(`${JSON.stringify({ session: found.session, transcript: found.path, ...reading, idleMinutes, warm, level: crossed?.[0] ?? null }, null, 2)}\n`);
     return 0;
   }
   const lines = [
-    `meter: PASS ${sizeLine(reading, price)}`,
+    `meter: PASS ${sizeLine(reading)}`,
     `cache: last request ${ago(idleMinutes)} ago; it lives ${reading.ttl === CACHE_TTL_MINUTES["5m"] ? "5 minutes" : "1 hour"}, so it is ${warm ? "warm" : "cold"}`,
   ];
-  if (crossed) lines.push(`next: ${advice(crossed[0], reading.model)}`);
+  if (crossed) lines.push(`next: ${advice(crossed[0])}`);
   lines.push(`transcript: ${found.path}`);
   out.write(`${lines.join("\n")}\n`);
   return 0;
