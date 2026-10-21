@@ -37,57 +37,61 @@ export function slugOf(title) {
     .replace(/-+$/, "");
 }
 
-const FIELD = /^\s*(?:- )?\*\*(?:Status|Settles when|From session):\*\*/;
+/**
+ * The header, line by line: written by filling each line in, read back by matching each line
+ * against its own pattern and nothing else, so no title or body can be taken for a field. A line
+ * that does not match, as in a file edited by hand, reads as unknown.
+ */
+const HEADER = [
+  { field: "title", write: (h) => `# Hand-off: ${h.title}`, read: /^# (?:Hand-off: )?(.+)$/ },
+  { write: () => "" },
+  { field: "opened", write: (h) => `**Status:** open · opened ${h.date}`, read: /^\*\*Status:\*\* open · opened (\d{4}-\d{2}-\d{2})$/ },
+  { write: () => "" },
+  {
+    field: "session",
+    write: (h) => `- **From session:** \`${h.session}\`, whose transcript \`node scripts/agent.mjs recall <term>\` searches.`,
+    read: /^- \*\*From session:\*\* `([^`]+)`/,
+  },
+  { write: (h) => `- **Where:** ${h.where}` },
+  { write: (h) => `- **Context at hand-off:** ${h.context}` },
+  { write: () => "" },
+];
 
 /**
- * What is wrong with a body, as sentences; empty when nothing is. Inside a fenced code block, a
- * heading is not a section and a field is pasted output, not the body repeating the header.
+ * What is wrong with a body, as sentences; empty when nothing is. Each section is a "## " heading
+ * at the start of a line with something under it. Nothing else in a body matters, since the header
+ * is read by position (`readHeader`).
  *
- * ceiling: fences follow CommonMark's own rules (up to three spaces of indent; a backtick fence's
- * info string holds no backtick; it closes on the same character, at least as long, with nothing
- * after it), so pasted output holding "~~~" or "```js" stays inside one. Other block structure,
- * such as fences inside lists or block quotes and indented code, is not modelled.
+ * ceiling: a code block is read like any other text, so a "## Paths" line pasted inside one counts
+ * as that section. That can let a body through, never refuse one.
  */
 export function checkBody(body) {
-  const problems = [];
   const counts = new Map();
   let section = null;
-  let fence = "";
-  for (const line of String(body).replace(/\r\n/g, "\n").split("\n")) {
-    const [, marker = "", rest = ""] = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line) ?? [];
-    if (marker && !fence && !(marker[0] === "`" && rest.includes("`"))) fence = marker;
-    else if (marker && fence && marker[0] === fence[0] && marker.length >= fence.length && !rest.trim()) fence = "";
-    const fenced = Boolean(fence);
-    if (!fenced && /^# /.test(line)) problems.push("the body has its own H1, but the title is the H1");
-    if (!fenced && FIELD.test(line)) problems.push("the body repeats a field the command writes (Status, Settles when, From session)");
-    const heading = fenced ? null : /^##\s+(.+?)\s*#*\s*$/.exec(line);
+  for (const line of String(body).split(/\r?\n/)) {
+    const heading = /^##\s+(.+?)\s*#*\s*$/.exec(line);
     if (heading) {
       section = heading[1].toLowerCase();
       if (!counts.has(section)) counts.set(section, 0);
     } else if (section && line.trim()) counts.set(section, counts.get(section) + 1);
   }
+  const problems = [];
   for (const [name] of SECTIONS) {
     const n = counts.get(name.toLowerCase());
     if (n === undefined) problems.push(`it has no "## ${name}" section`);
     else if (!n) problems.push(`its "## ${name}" section is empty`);
   }
-  return [...new Set(problems)];
+  return problems;
 }
 
 /**
- * The file, from the facts the command gathered and the agent's body. `where` is a sentence about
- * the checkout; `context` one about the session's size; both may say they are unknown.
+ * The file, from the facts the command gathered and the agent's body. `title` is one line; `where`
+ * is a sentence about the checkout and `context` one about the session's size, and both may say
+ * they are unknown.
  */
 export function renderHandoff({ title, date, session, where, context, body, eol = "\n" }) {
   const text = [
-    `# Hand-off: ${title}`,
-    "",
-    `**Status:** open · opened ${date}`,
-    "",
-    `- **From session:** \`${session}\`, whose transcript \`node scripts/agent.mjs recall <term>\` searches.`,
-    `- **Where:** ${where}`,
-    `- **Context at hand-off:** ${context}`,
-    "",
+    ...HEADER.map((line) => line.write({ title, date, session, where, context })),
     String(body).replace(/\r\n/g, "\n").trim(),
     "",
     "**Settles when:** the session that continues this work closes it and deletes this file.",
@@ -96,10 +100,15 @@ export function renderHandoff({ title, date, session, where, context, body, eol 
   return eol === "\n" ? text : text.replace(/\n/g, eol);
 }
 
-const FROM = /^- \*\*From session:\*\* `([^`]+)`/m;
-
-/** The session a hand-off file records in its own field line, or null. */
-export const sessionOf = (text) => FROM.exec(text)?.[1] ?? null;
+/** The header's fields (`title`, `opened`, `session`), each null where its line does not match. */
+export function readHeader(text) {
+  const lines = String(text).split(/\r?\n/);
+  const fields = {};
+  HEADER.forEach((line, i) => {
+    if (line.field) fields[line.field] = line.read.exec(lines[i] ?? "")?.[1] ?? null;
+  });
+  return fields;
+}
 
 /** The hand-offs in a checkout, newest first. */
 export function readHandoffs(top) {
@@ -109,15 +118,8 @@ export function readHandoffs(top) {
     .filter((name) => name.startsWith(HANDOFF_PREFIX) && name.endsWith(".md"))
     .map((name) => {
       const path = join(dir, name);
-      const text = readFileSync(path, "utf8");
-      return {
-        file: `${HANDOFF_DIR}/${name}`,
-        path,
-        title: /^# (?:Hand-off: )?(.+?)\s*$/m.exec(text)?.[1] ?? name,
-        session: sessionOf(text),
-        opened: /opened (\d{4}-\d{2}-\d{2})/.exec(text)?.[1] ?? null,
-        mtime: statSync(path).mtimeMs,
-      };
+      const header = readHeader(readFileSync(path, "utf8"));
+      return { file: `${HANDOFF_DIR}/${name}`, path, ...header, title: header.title ?? name, mtime: statSync(path).mtimeMs };
     })
     .sort((a, b) => b.mtime - a.mtime || (a.file < b.file ? -1 : 1));
 }

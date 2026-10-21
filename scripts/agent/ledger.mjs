@@ -14,7 +14,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { HANDOFF_DIR, HANDOFF_PREFIX, SECTIONS, checkBody, renderHandoff, sessionOf, slugOf } from "./handoff.mjs";
+import { HANDOFF_DIR, HANDOFF_PREFIX, SECTIONS, checkBody, readHeader, renderHandoff, slugOf } from "./handoff.mjs";
 import { readLatest } from "./meter.mjs";
 import { describeWhere, whereAmI } from "./orient.mjs";
 import { SESSION_ID, findTranscript, projectsDir } from "./transcript.mjs";
@@ -163,7 +163,7 @@ export async function main(argv, io = {}) {
   // ceiling: the check and the write below are not one step, so two sessions writing the same
   // title in the same instant could both pass it; titles name each session's own work.
   if (existsSync(path)) {
-    const owner = sessionOf(readFileSync(path, "utf8"));
+    const owner = readHeader(readFileSync(path, "utf8")).session;
     if (owner !== session) {
       say("FAIL", `${file} was written by session ${owner ?? "unknown"}, not this one`, `if you are continuing its work, delete ${file} and run this again; if not, choose another title`);
       return 1;

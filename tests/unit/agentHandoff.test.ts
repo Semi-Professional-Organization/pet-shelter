@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { SECTIONS, checkBody, readHandoffs, renderHandoff, sessionOf, slugOf } from "../../scripts/agent/handoff.mjs";
+import { SECTIONS, checkBody, readHandoffs, readHeader, renderHandoff, slugOf } from "../../scripts/agent/handoff.mjs";
 import { main as ledger } from "../../scripts/agent/ledger.mjs";
 import { main as orient, orientLines, whereAmI } from "../../scripts/agent/orient.mjs";
 import { SHOWN, main as recall, piecesOf, search, snippet } from "../../scripts/agent/recall.mjs";
@@ -65,23 +65,28 @@ describe("the hand-off file", () => {
     expect(checkBody(BODY.replace("## Next step", "## next STEP ##"))).toEqual([]);
   });
 
-  it("does not count a heading inside a code block, or let the body set the title or the fields", () => {
-    const fenced = BODY.replace("## Open\n\nOpen goes here.\n", "```\n## Open\nnot a section\n```\n");
-    expect(checkBody(fenced)).toContain('it has no "## Open" section');
-    // A fence closes only on its own kind, at least as long and with nothing after it, as in
-    // CommonMark: pasted output holding "~~~" or "```js" does not end a block opened by "```" or "````".
-    const pasted = (block: string) => BODY.replace("Commands and results goes here.\n", `${block}\n`);
-    expect(checkBody(pasted("```\noutput\n~~~\nmore\n```"))).toEqual([]);
-    expect(checkBody(pasted("````\n```js\n## Verified\n```\n````"))).toEqual([]);
-    expect(checkBody(pasted("```\n```js\n## Open\n```"))).toEqual([]);
-    // Inline code is not a fence, nor is a line indented four spaces or a tab; and inside a fence,
-    // a ledger entry's own fields are pasted output, not the body repeating the header.
-    expect(checkBody(pasted("```npm test``` returned 0"))).toEqual([]);
-    expect(checkBody(pasted("```\n    ```\n## Open\n```"))).toEqual([]);
-    expect(checkBody(pasted("\t```\nindented"))).toEqual([]);
-    expect(checkBody(pasted("```\n$ cat tasks/open/x.md\n**Status:** open\n```"))).toEqual([]);
-    expect(checkBody(`# My own title\n\n${BODY}`)).toEqual(["the body has its own H1, but the title is the H1"]);
-    expect(checkBody(`${BODY}\n**Settles when:** never\n`)).toHaveLength(1);
+  it("reads the header by position, so no title or body can pose as a field", () => {
+    const top = repo();
+    // Each title quotes a field's words, and the body repeats the whole header: none of it is read.
+    const body = `# Its own title\n\n**Status:** open · opened 1999-01-01\n\n- **From session:** \`${OTHER}\`\n\n${BODY}`;
+    const titles = ["Migration opened 2020-01-01 by mistake", "Fix **From session:** `other`", "Hand-off: nested", "`code`, ~~~ and ```"];
+    titles.forEach((title, i) => {
+      const text = renderHandoff({ title, date: "2026-10-21", session: SESSION, where: "w.", context: "c.", body });
+      expect(readHeader(text)).toEqual({ title, opened: "2026-10-21", session: SESSION });
+      writeFileSync(join(top, "tasks", "open", `HANDOFF-${i}.md`), text);
+    });
+    expect(readHandoffs(top).map((h) => [h.title, h.opened, h.session]).sort()).toEqual(titles.map((title) => [title, "2026-10-21", SESSION]).sort());
+    // Lines that are not the header's read as unknown, never as something found further down.
+    expect(readHeader(`Notes\n\n${body}`)).toEqual({ title: null, opened: null, session: null });
+  });
+
+  it("checks only that each section is a heading with something under it", () => {
+    // An H1, the header's fields and fenced blocks are only text in a body.
+    const pasted = BODY.replace("Commands and results goes here.\n", "```\n$ cat x.md\n# Title\n**Status:** open\n~~~\n```\n");
+    expect(checkBody(`# My own title\n\n${pasted}\n**Settles when:** never\n`)).toEqual([]);
+    // ceiling: a heading inside a code block counts as its section, which lets a body through and
+    // never refuses one.
+    expect(checkBody(BODY.replace("## Open\n\nOpen goes here.\n", "```\n## Open\nnot a section\n```\n"))).toEqual([]);
   });
 
   it("reads back what it was written with, in the checkout's line endings", () => {
@@ -90,7 +95,7 @@ describe("the hand-off file", () => {
     expect(text.startsWith("# Hand-off: The meter\r\n\r\n**Status:** open · opened 2026-10-21\r\n")).toBe(true);
     expect(text.replace(/\r\n/g, "")).not.toContain("\n");
     expect(text).toContain("**Settles when:** the session that continues this work closes it and deletes this file.");
-    expect(sessionOf(text)).toBe(SESSION);
+    expect(readHeader(text)).toEqual({ title: "The meter", opened: "2026-10-21", session: SESSION });
     writeFileSync(join(top, "tasks", "open", "HANDOFF-the-meter.md"), text);
     writeFileSync(join(top, "tasks", "open", "not-a-handoff.md"), "# Something open\n");
     expect(readHandoffs(top)).toEqual([
@@ -170,7 +175,7 @@ describe("ledger handoff", () => {
     const { dir } = config(SESSION, [{ type: "user", uuid: "u", timestamp: "2026-10-21T09:00:00Z", message: { content: "hi" } }]);
     const env = { CLAUDE_CONFIG_DIR: dir };
     expect((await run(["handoff", "Prefixed", "--session", SESSION.slice(0, 8)], { cwd: top, stdin: BODY, env })).code).toBe(0);
-    expect(sessionOf(readFileSync(join(top, "tasks", "open", "HANDOFF-prefixed.md"), "utf8"))).toBe(SESSION);
+    expect(readHeader(readFileSync(join(top, "tasks", "open", "HANDOFF-prefixed.md"), "utf8")).session).toBe(SESSION);
     expect((await run(["handoff", "Prefixed"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
     expect((await run(["handoff", "Prefixed", "--session", "short"], { cwd: top, stdin: BODY, env })).code).toBe(2);
     // With no transcript to expand it, a prefix would be recorded as the session and lock it out
@@ -196,7 +201,7 @@ describe("ledger handoff", () => {
     expect(readFileSync(join(top, "tasks", "open", "HANDOFF-line-one-injected.md"), "utf8")).toMatch(/^# Hand-off: Line one # Injected\n\n\*\*Status:\*\*/);
     // The session is read from its own field, not from a title that quotes one.
     expect((await run(["handoff", "Fix **From session:** `other`"], { cwd: top, stdin: BODY, env: { ...env, CLAUDE_CODE_SESSION_ID: SESSION } })).code).toBe(0);
-    expect(sessionOf(readFileSync(join(top, "tasks", "open", "HANDOFF-fix-from-session-other.md"), "utf8"))).toBe(SESSION);
+    expect(readHeader(readFileSync(join(top, "tasks", "open", "HANDOFF-fix-from-session-other.md"), "utf8")).session).toBe(SESSION);
   });
 
   it("could not run without a session, a body, a usable title or a known subcommand", async () => {
