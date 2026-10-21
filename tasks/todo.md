@@ -15,6 +15,58 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# The context meter's root-cause pass
+
+**Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `caa7fce`
+
+The owner held the meter's pull request after seven review rounds and asked for the problems to be
+found again by class and fixed at their roots, with a plan discussed first. The plan is the Claude
+Doc "Context meter: root-cause plan": 17 of the 27 in-scope findings came from three design choices.
+
+- **Done when:** the meter reads transcripts through `usage`'s extractor; one resolver names a
+  session for every command; the hand-off header is written and read from one line list and the
+  body check is headings only; the meter's behaviour is unchanged by replay; every gate is green.
+- **In scope:** the six `scripts/agent/` files this pull request adds, the `usage.mjs` exports they
+  need, their tests, ceilings and ledger entries. The owner added: no dollar figures in the meter's
+  lines.
+- **Not in scope:** new behaviour; `usage`'s analyses; one parser for the command lines; the
+  temp-folder layout.
+
+- [x] Plan by class, discussed with the owner (answers: always ask before a hand-off; review at
+      high; drop the dollar figures).
+- [x] Root 3 `995691b`, root 1 `1c83777`, root 2 `e02881c`, each with a `tasks/decisions/` entry.
+- [x] Review rounds until two in a row found no core-logic bug.
+
+## Review
+
+`/code-review high` on the whole diff. Findings per round, with the in-scope correctness bugs: round
+1, 9 (orient hid an unreadable hand-off when its own session was unknown; a line with no usage read
+as a 0-token context; the meter ignored `usage`'s unmarked compactions), fixed in `cd88332`; round 2,
+7 (both bugs in round 1's own fixes: the extractor change moved `usage`'s report, and ledger
+stopped refusing a missing session before reading stdin), fixed in `c018db4`; round 3, 6 (the
+meter-only guard disagreed with `segmentBreaks`; an invalid id still read stdin first; the writer
+did not keep a title to one line), fixed in `9be01a0`; round 4, 9, no core-logic bug, small fixes in
+`81d5f93`; round 5, 6, no core-logic bug. The loop stopped there. Each fix round's new cases were
+shown failing without the fix, and the meter's reading was replayed against the old reader over this
+machine's transcripts after every round: 0 of 4,597 points differ at the end.
+
+The thread ran past the owner's 500K level, to 514K, before it noticed: its hooks are on this
+branch, and threads start in the main checkout. The owner then asked for one thread per pull request;
+the coordinator cannot restart a thread with a fresh session, and a Remote Control session cannot
+clear itself, so the choice between 500K and a 750K level is the owner's (see the thread).
+
+**Deliberately not done:**
+
+- Round 5's six points, none in core logic: transcript file names in upper case (Claude Code writes
+  lower-case UUIDs), a subagent event with a malformed session_id being logged, a request continued
+  after a compaction (none in the 7 compactions here), `findTranscript`'s callers validating its
+  input, which environment value a refusal blames, and the K-token formatter that `usage` also has.
+- A line with no usage counts as a 0-token request, and a header edited by hand so its lines move
+  reads as unknown: both are `ceiling:` comments, recorded in the cost entry.
+- One parser for the four command lines: recorded in the cost entry, out of scope.
+- The meter still re-runs the extractor when its tail read grows: 141 ms on the whole 124 MB
+  transcript.
+
 # The context meter: `meter`, `ledger handoff`, `recall`, `orient --brief`
 
 **Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `9c79a8e`
