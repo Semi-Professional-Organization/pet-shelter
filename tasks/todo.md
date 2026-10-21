@@ -26,14 +26,14 @@ the eleven groups were approved in the project thread before anything was built.
 - [x] Survey: native sub-issues answer on this repo; `gh` 2.98 has no command for them
 - [x] `.github/issue-groups.json`: 11 groups, 69 issues, #138 standalone
 - [x] `scripts/issue-groups.mjs`: dry run, `--apply`, `--suggest`, `--suggest --evaluate`
-- [x] `tests/unit/issueGroups.test.ts`: 31 tests; six planner mutations each fail one or more
+- [x] `tests/unit/issueGroups.test.ts`: 47 tests; six planner mutations each fail one or more
 - [ ] Owner approves the PR, then `npm run issues:groups -- --apply` and a second run that plans nothing
 
 ## Review
 
 Dry run against the live repository: 11 parents to create, 69 sub-issues to add, nothing else, with
 #130 and #131 listed as ungrouped. Suggest mode, leave-one-out on the 69 as it prints them: 78.3%
-right, 14.5% wrong, 7.2% no clear group, real group in the top two for 92.8%.
+right, 14.5% wrong, 7.2% no clear group, real group in the top two for 94.2%.
 
 Deliberately not done: closing #130 and #131 (fixed by #144, the owner's call), settling #157 (its
 ruleset is active, but it is a ledger issue and closes only by moving its file), and fixing any of
@@ -58,6 +58,11 @@ Round 3 found `--evaluate` scoring raw top guesses that `--suggest` prints as no
 became 78.3%), group parents counted in the suggester's weights, standalone numbers never checked,
 and refusal messages that quoted the whole GraphQL query. Fixed. Declined: more spellings in the
 ask-first rule (the ledger rule has the same two, by the decision that set it).
+
+Round 4 found a new parent created by someone without push access silently losing its label, so
+every run would make another, and a parent nested under its own member, which GitHub refuses as a
+loop at apply though the dry run showed it fine. Both fixed, plus kebab-case and `./` paths in the
+suggester (top two now 94.2%).
 
 # Every role lands on, is shown and is offered only what it can use
 

@@ -210,6 +210,13 @@ describe("planning", () => {
     expect(() => planGroups({ groups: [] }, [parentFor(10, group("a", [1]), [])], TARGET)).toThrow(/has no groups/);
   });
 
+  it("refuses a plan GitHub would reject as a loop: a parent under one of its own members", () => {
+    const g = group("a", [1]);
+    expect(() => planGroups({ groups: [g] }, [parentFor(10, g, [], { parent: 1 }), issue(1)], TARGET)).toThrow(
+      /group parent #10 \(a\) is a sub-issue of #1, which the file puts under it/,
+    );
+  });
+
   it("refuses a number that is not an issue here, or that is itself a parent", () => {
     expect(() => planGroups({ groups: [group("a", [5])] }, [], TARGET)).toThrow(/#5 \(in a\) is not an issue/);
     const b = group("b", [1]);
@@ -328,13 +335,39 @@ describe("planning across repositories and limits", () => {
 });
 
 describe("applying", () => {
+  // GitHub drops a new issue's labels silently when the caller lacks push access.
+  const createDropsLabel = (labelAnswer: { name: string }[]) => {
+    const calls: string[][] = [];
+    const exec = (_command: string, args: string[]) => {
+      calls.push(args);
+      if (args.includes("repos/owner/repo/issues")) return JSON.stringify({ number: 50, node_id: "I_50", labels: [] });
+      if (args.includes("repos/owner/repo/issues/50/labels")) return JSON.stringify(labelAnswer);
+      return "{}";
+    };
+    return { calls, exec };
+  };
+
+  it("labels a new parent afterwards when GitHub dropped the label on create", () => {
+    const { calls, exec } = createDropsLabel([{ name: LABEL }]);
+    const { actions } = planGroups({ groups: [group("a", [1])] }, [issue(1)], TARGET);
+    applyActions(actions, { repo: "owner/repo", exec, log: () => {} });
+    expect(calls.map((args) => (args[1] === "graphql" ? "graphql" : args[3]))).toEqual(["repos/owner/repo/issues", "repos/owner/repo/issues/50/labels", "graphql"]);
+  });
+
+  it("stops before linking anything when a new parent cannot be labelled, since the next run would make another", () => {
+    const { calls, exec } = createDropsLabel([]);
+    const { actions } = planGroups({ groups: [group("a", [1])] }, [issue(1)], TARGET);
+    expect(() => applyActions(actions, { repo: "owner/repo", exec, log: () => {} })).toThrow(/#50 was created without the group label/);
+    expect(calls).toHaveLength(2);
+  });
+
   it("links a new parent's issues by the node id GitHub returned when it was created", () => {
     const calls: string[][] = [];
     const exec = (_command: string, args: string[], input?: string) => {
       calls.push(args);
       if (args.includes("POST")) {
         expect(JSON.parse(input ?? "{}").labels).toEqual([LABEL]);
-        return JSON.stringify({ number: 50, node_id: "I_50" });
+        return JSON.stringify({ number: 50, node_id: "I_50", labels: [{ name: LABEL }] });
       }
       return "{}";
     };
@@ -387,6 +420,19 @@ describe("suggestions", () => {
     const found = [...features(issue(9, { body: "`@prisma/client` and node_modules/next/dist/docs/x; see tests/unit/issueGroups.test.ts" })).keys()];
     expect(found.filter((f) => f.startsWith("path:"))).toEqual(["path:tests/unit/issuegroups.test.ts"]);
     expect(found).toContain("id:issuegroups");
+  });
+
+  it("keeps a dynamic segment's bracket and drops a leading ./", () => {
+    const paths = (body: string) => [...features(issue(9, { body })).keys()].filter((f) => f.startsWith("path:"));
+    expect(paths("(src/app/[id])")).toEqual(["path:src/app/[id]"]);
+    expect(paths("see ./src/lib/b.ts")).toEqual(["path:src/lib/b.ts"]);
+  });
+
+  it("meets a kebab-case file, a file name and a call at their bare names", () => {
+    const ids = (body: string) => [...features(issue(9, { body })).keys()].filter((f) => f.startsWith("id:"));
+    expect(ids("see .claude/hooks/agent-guard.mjs")).toEqual(["id:agent-guard"]);
+    expect(ids("the `agent-guard` hook")).toEqual(["id:agent-guard"]);
+    expect(ids("`PetFormDialog.tsx` and `verifyAdminSession(req)`")).toEqual(["id:petformdialog", "id:verifyadminsession"]);
   });
 
   it("reads a path inside a markdown link as the same path written bare", () => {

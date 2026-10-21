@@ -143,6 +143,14 @@ export function planGroups(config, issues, target) {
     if (!byNumber.has(number)) problems.push(`#${number} (in ${key}) is not an issue in this repository`);
     else if (parentNumbers.has(number)) problems.push(`#${number} (in ${key}) is itself a group parent`);
   }
+  // GitHub refuses a link that would make a loop, so a dry run must not show one as fine.
+  // ceiling: one level only; a parent nested deeper under its own member is refused at apply.
+  for (const group of config.groups) {
+    const parent = parentByKey.get(group.key);
+    if (parent && group.issues.includes(parent.parent)) {
+      problems.push(`group parent #${parent.number} (${group.key}) is a sub-issue of #${parent.parent}, which the file puts under it; unlink #${parent.number} first`);
+    }
+  }
   if (problems.length > 0) throw new Error(problems.join("\n"));
 
   const liveKeys = new Set(config.groups.map((group) => group.key));
@@ -256,16 +264,24 @@ export function features(issue) {
   const counts = new Map();
   const add = (feature, weight = 1) => counts.set(feature, (counts.get(feature) ?? 0) + weight);
   // A repo-root directory only: not the `prisma/` in `@prisma/client` or the `docs/` deep in a path.
-  const paths = text.match(/(?<![\w@/.-])(?:src|tests|scripts|prisma|docs|\.claude|\.github|\.codex)\/[\w.@[\]/-]+/g) ?? [];
+  // A leading `./` is the same path.
+  const paths = text.match(/(?<![\w@/.-])(?:\.\/)?(?:src|tests|scripts|prisma|docs|\.claude|\.github|\.codex)\/[\w.@[\]/-]+/g) ?? [];
+  // Every extension goes, so `issueGroups.test.ts` meets a backticked `issueGroups`.
+  const bare = (name) => name.replace(/\..*$/, "").toLowerCase();
   for (const raw of paths) {
-    // Trailing punctuation, and the `]` of a markdown link around the path, are not part of it.
-    const path = raw.replace(/[.:\]]+$/, "");
+    // Trailing punctuation, and the `]` of a markdown link around the path, are not part of it; the
+    // `]` closing a dynamic segment such as `[id]` is.
+    let path = raw.replace(/^\.\//, "").replace(/[.:]+$/, "");
+    while (path.endsWith("]") && path.split("]").length > path.split("[").length) path = path.slice(0, -1).replace(/[.:]+$/, "");
     add(`path:${path.toLowerCase()}`, 2);
-    // Every extension goes, so `issueGroups.test.ts` meets a backticked `issueGroups`.
-    const base = path.slice(path.lastIndexOf("/") + 1).replace(/\..*$/, "");
-    if (base) add(`id:${base.toLowerCase()}`, 2);
+    const base = bare(path.slice(path.lastIndexOf("/") + 1));
+    if (base) add(`id:${base}`, 2);
   }
-  for (const match of text.matchAll(/`([A-Za-z_$][\w$]*)(?:\(\))?`/g)) add(`id:${match[1].toLowerCase()}`, 2);
+  // A backticked name meets a path by its bare name: `agent-guard`, `PetFormDialog.tsx`, `fn(x)`.
+  for (const match of text.matchAll(/`([A-Za-z_$][\w$.-]*)(?:\([^`]*\))?`/g)) {
+    const base = bare(match[1]);
+    if (base) add(`id:${base}`, 2);
+  }
   for (const word of text.toLowerCase().match(/[a-z][a-z0-9]{2,}/g) ?? []) {
     if (!STOPWORDS.has(word)) add(`w:${stem(word)}`);
   }
@@ -492,6 +508,17 @@ export function applyActions(actions, { repo, exec, log }) {
         );
         created.set(action.key, { number: issue.number, id: issue.node_id });
         log(`  created #${issue.number} for ${action.key}`);
+        // GitHub drops a new issue's labels silently for a caller without push access, and an
+        // unlabelled parent is not a parent: the next run would create another. Triagers can label
+        // an existing issue, so try that; if the label still is not there, stop.
+        if (!(issue.labels ?? []).some((label) => label.name === LABEL)) {
+          const labels = JSON.parse(
+            exec("gh", ["api", "-X", "POST", `repos/${repo}/issues/${issue.number}/labels`, "--input", "-"], JSON.stringify({ labels: [LABEL] })),
+          );
+          if (!labels.some((label) => label.name === LABEL)) {
+            throw new Error(`#${issue.number} was created without the ${LABEL} label and could not be given it; label it by hand before re-running`);
+          }
+        }
       } else if (action.type === "update") {
         patch(action.number, { title: action.title, body: action.body });
         log(`  updated #${action.number}`);

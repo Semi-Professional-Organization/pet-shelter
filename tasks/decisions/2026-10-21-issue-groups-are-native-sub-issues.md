@@ -37,7 +37,7 @@ each group's members (named files, identifiers and words) and prints the overlap
 person adds the issue to the file. Measured on 2026-10-21 by `--suggest --evaluate`, leave-one-out
 over the first grouping's 69 issues and judged as `--suggest` prints them: **78.3%** got a clear
 proposal of their real group, **14.5%** a clear proposal of another, and **7.2%** "no clear group";
-the real group ranked in the top two for **92.8%**. Group parents are left out of the weights, so
+the real group ranked in the top two for **94.2%**. Group parents are left out of the weights, so
 applying the grouping does not move these figures. Misses cluster where a group is about a subject
-rather than about files: #62, #64 and #121 ranked their real group 5th, 10th and 6th. An earlier
+rather than about files: #64 and #121 ranked their real group 10th and 6th. An earlier
 count of 81.2% scored the raw top guess, including ones `--suggest` prints as no clear group.
