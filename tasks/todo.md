@@ -48,6 +48,12 @@ guard, and a wrongly closed parent reopens on the next run), batching the closed
 leave-one-out centroids (a handful of calls, 69 x 11 sums), and sharing `run`/`normalise` with
 `ledger-issues.mjs` (two identical one-liners; the repo waits for a third copy).
 
+Round 2 found the round-1 class again for a closed duplicate parent, plus sub-issues from another
+repository matched by number alone, a linked closed issue read without its body, no ask-first rule
+for `--apply`, and a parent at GitHub's 100 limit refusing an add the plan's own moves would have
+made room for. All fixed. Re-running live then hit GitHub's 500,000-node query cap (child labels),
+which no unit test could have shown; the child read no longer asks for labels.
+
 # Every role lands on, is shown and is offered only what it can use
 
 **Branch:** `claude/project-thread-fdaf2l` · opened 2026-10-19 · base `4396078`

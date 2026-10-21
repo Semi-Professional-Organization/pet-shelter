@@ -114,8 +114,9 @@ export function renderParent(group, { repo, branch }) {
  * policy is testable without touching GitHub.
  *
  * `issues` is every open issue, every `group`-labelled issue (open or closed), and every issue the
- * file names, each as `{ number, id, title, state, body, labels, parent, children }`, where `parent`
- * is a number or null and `children` is filled in for labelled issues only.
+ * file names, each as `{ number, id, title, state, body, labels, parent, children }`. `parent` is a
+ * number, an `owner/repo#n` string for a parent in another repository, or null. `children` is filled
+ * in for labelled issues only, and a child from another repository carries `foreign: "owner/repo#n"`.
  */
 export function planGroups(config, issues, target) {
   const byNumber = new Map(issues.map((issue) => [issue.number, issue]));
@@ -145,19 +146,23 @@ export function planGroups(config, issues, target) {
   if (problems.length > 0) throw new Error(problems.join("\n"));
 
   const liveKeys = new Set(config.groups.map((group) => group.key));
-  const orphans = [...parentByKey].filter(([key, issue]) => !liveKeys.has(key) && !isClosed(issue));
-  if (config.groups.length === 0 && orphans.length > 0) {
+  // Every parent that is not the one a listed group uses: a departed group's, open or closed, and a
+  // closed duplicate of a listed group's. Each lets go of what no group wants, and closes if open.
+  const retired = parents.filter((issue) => parentByKey.get(keyFromMarker(issue.body)) !== issue || !liveKeys.has(keyFromMarker(issue.body)));
+  const closing = retired.filter((issue) => !isClosed(issue));
+  if (config.groups.length === 0 && closing.length > 0) {
     // An emptied file is likelier to be a bad edit than a decision to ungroup everything.
-    throw new Error(`${CONFIG_PATH} has no groups but ${orphans.length} group parents are open; close them by hand if that is meant`);
+    throw new Error(`${CONFIG_PATH} has no groups but ${closing.length} group parents are open; close them by hand if that is meant`);
   }
 
   const actions = [];
   const notes = [];
-  // A child another group wants is moved by that group's `move`, which detaches it from here.
+  // A child another group wants is moved by that group's `move`, which detaches it from here. A
+  // child from another repository is never in the file, so it always goes.
   const removeUnwanted = (key, parent) => {
     for (const child of parent.children ?? []) {
-      if (!wantedBy.has(child.number)) {
-        actions.push({ type: "remove", key, parent: parent.number, parentId: parent.id, child: child.number, childId: child.id });
+      if (child.foreign || !wantedBy.has(child.number)) {
+        actions.push({ type: "remove", key, parent: parent.number, parentId: parent.id, child: child.foreign ?? child.number, childId: child.id });
       }
     }
   };
@@ -186,24 +191,31 @@ export function planGroups(config, issues, target) {
       }
       actions.push({ type: "move", ...link, from: child.parent });
       if (!parentNumbers.has(child.parent)) {
-        notes.push(`#${number} is under #${child.parent}, which this script does not manage; the move drops that link.`);
+        notes.push(`#${number} is under ${ref(child.parent)}, which this script does not manage; the move drops that link.`);
       }
     }
   }
-  // A group that left the file: its parent lets go of its sub-issues, so none stays linked to a
-  // group nobody lists, and closes. Already closed, it still lets go.
-  for (const [key, parent] of [...parentByKey].sort(([a], [b]) => a.localeCompare(b))) {
-    if (liveKeys.has(key)) continue;
+  for (const parent of retired) {
+    const key = keyFromMarker(parent.body);
     removeUnwanted(key, parent);
     if (!isClosed(parent)) actions.push({ type: "close", key, number: parent.number });
   }
+  // Links out before links in, so a parent at GitHub's limit has room for what it gains; creates
+  // first, because a new parent's links need its id.
+  const phase = ["create", "reopen", "update", "remove", "move", "add", "close"];
+  actions.sort((a, b) => phase.indexOf(a.type) - phase.indexOf(b.type));
 
   const listed = new Set([...wantedBy.keys(), ...(config.standalone ?? [])]);
+  const unlinked = new Set(actions.filter((action) => action.type === "remove").map((action) => action.child));
   const ungrouped = issues
     .filter((issue) => !isClosed(issue) && !listed.has(issue.number) && !parentNumbers.has(issue.number))
+    .map((issue) => (unlinked.has(issue.number) ? { ...issue, parent: null } : issue))
     .sort((a, b) => a.number - b.number);
   return { actions, notes, ungrouped };
 }
+
+/** A parent as people write it: `#12` here, `owner/repo#12` in another repository. */
+export const ref = (parent) => (typeof parent === "number" ? `#${parent}` : String(parent));
 
 // --- Suggestions --------------------------------------------------------------------------------
 
@@ -350,7 +362,12 @@ export function evaluate(config, issues) {
 
 // --- GitHub -------------------------------------------------------------------------------------
 
-const FIELDS = "number id title body state labels(first: 50) { nodes { name } } parent { number }";
+// Sub-issues may cross repositories, so a parent is read with its repository and a number alone is
+// never taken to mean an issue here.
+const FIELDS = "number id title body state labels(first: 50) { nodes { name } } parent { number repository { nameWithOwner } }";
+// No labels on a child: 100 parents x 100 children x 50 labels is over GitHub's 500,000-node cap
+// for one query (observed), and a child's labels decide nothing. Its parent is the node it sits in.
+const CHILD_FIELDS = "number id title body state repository { nameWithOwner }";
 
 const OPEN_QUERY = `query($owner: String!, $name: String!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
@@ -366,7 +383,7 @@ const OPEN_QUERY = `query($owner: String!, $name: String!, $endCursor: String) {
 const PARENTS_QUERY = `query($owner: String!, $name: String!, $label: String!, $endCursor: String) {
   repository(owner: $owner, name: $name) {
     issues(first: 100, after: $endCursor, filterBy: {labels: [$label]}, states: [OPEN, CLOSED]) {
-      nodes { ${FIELDS} subIssues(first: ${MAX_CHILDREN}) { totalCount nodes { number id title state } } }
+      nodes { ${FIELDS} subIssues(first: ${MAX_CHILDREN}) { totalCount nodes { ${CHILD_FIELDS} } } }
       pageInfo { hasNextPage endCursor }
     }
   }
@@ -384,30 +401,42 @@ const REMOVE_MUTATION = `mutation($issueId: ID!, $subIssueId: ID!) {
   removeSubIssue(input: {issueId: $issueId, subIssueId: $subIssueId}) { issue { number } }
 }`;
 
-const toIssue = ({ number, id, title, body, state, labels, parent }) => ({
+const sameRepo = (repo, other) => other.toLowerCase() === repo.toLowerCase();
+
+const toIssue = ({ number, id, title, body, state, labels, parent }, repo) => ({
   number,
   id,
   title,
   body,
   state,
   labels: (labels?.nodes ?? []).map(({ name }) => ({ name })),
-  parent: parent?.number ?? null,
+  parent: !parent
+    ? null
+    : sameRepo(repo, parent.repository.nameWithOwner)
+      ? parent.number
+      : `${parent.repository.nameWithOwner}#${parent.number}`,
 });
 
 /** Merges the open issues, the labelled parents and their children into the shape `planGroups` reads. */
-export function issuesFromPages(openPages, parentPages) {
+export function issuesFromPages(openPages, parentPages, repo) {
   const byNumber = new Map();
-  for (const node of openPages.flatMap((page) => page.data.repository.issues.nodes)) byNumber.set(node.number, toIssue(node));
+  for (const node of openPages.flatMap((page) => page.data.repository.issues.nodes)) byNumber.set(node.number, toIssue(node, repo));
   for (const node of parentPages.flatMap((page) => page.data.repository.issues.nodes)) {
     if (node.subIssues.totalCount > MAX_CHILDREN) {
       throw new Error(`#${node.number} has ${node.subIssues.totalCount} sub-issues; this script reads at most ${MAX_CHILDREN}`);
     }
-    const children = node.subIssues.nodes.map(({ number, id, state }) => ({ number, id, state }));
-    byNumber.set(node.number, { ...toIssue(node), children });
+    const children = node.subIssues.nodes.map((child) =>
+      sameRepo(repo, child.repository.nameWithOwner)
+        ? { number: child.number, id: child.id, state: child.state }
+        : { number: child.number, id: child.id, state: child.state, foreign: `${child.repository.nameWithOwner}#${child.number}` },
+    );
+    byNumber.set(node.number, { ...byNumber.get(node.number), ...toIssue(node, repo), children });
     for (const child of node.subIssues.nodes) {
-      const known = byNumber.get(child.number);
-      if (known) known.parent = node.number;
-      else byNumber.set(child.number, { ...child, body: "", labels: [], parent: node.number });
+      // A closed child is in no other read; it keeps its body so `--suggest` sees the same text
+      // before and after it was linked.
+      if (sameRepo(repo, child.repository.nameWithOwner) && !byNumber.has(child.number)) {
+        byNumber.set(child.number, { ...toIssue(child, repo), parent: node.number });
+      }
     }
   }
   return [...byNumber.values()];
@@ -446,10 +475,10 @@ export function applyActions(actions, { repo, exec, log }) {
         log(`  closed #${action.number}`);
       } else if (action.type === "add" || action.type === "move") {
         link(ADD_MUTATION, action);
-        log(`  ${action.type === "move" ? `moved #${action.child} from #${action.from} to` : `added #${action.child} to`} #${parentNumber(action)}`);
+        log(`  ${action.type === "move" ? `moved #${action.child} from ${ref(action.from)} to` : `added #${action.child} to`} #${parentNumber(action)}`);
       } else if (action.type === "remove") {
         link(REMOVE_MUTATION, action);
-        log(`  removed #${action.child} from #${action.parent}`);
+        log(`  removed ${ref(action.child)} from #${action.parent}`);
       }
     } catch (error) {
       const [command, ...reason] = String(error?.message ?? error).split("\n");
@@ -471,16 +500,21 @@ export function formatAction(action) {
     case "add":
       return `  add     #${action.child} to ${parent}`;
     case "move":
-      return `  move    #${action.child} from #${action.from} to ${parent}`;
+      return `  move    #${action.child} from ${ref(action.from)} to ${parent}`;
     case "remove":
-      return `  remove  #${action.child} from #${action.parent} (${action.key})`;
+      return `  remove  ${ref(action.child)} from #${action.parent} (${action.key})`;
     default:
       return `  ${action.type}`;
   }
 }
 
+// stderr is piped, not inherited: a refusal reaches the person once, in the error that stops the
+// run, and an expected NOT_FOUND prints nothing at all.
 const run = (command, args, input) =>
-  execFileSync(command, args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024 }).trim();
+  execFileSync(command, args, { encoding: "utf8", input, maxBuffer: 64 * 1024 * 1024, stdio: ["pipe", "pipe", "pipe"] }).trim();
+
+/** GitHub's answer for a number that is a pull request or no issue at all, as `gh` relays it. */
+export const isMissingIssueError = (error) => /Could not resolve to an Issue with the number of/.test(String(error?.message ?? error));
 
 const USAGE =
   "usage: node scripts/issue-groups.mjs [--apply | --suggest [--evaluate]]\n" +
@@ -512,6 +546,7 @@ async function main(argv) {
   let issues = issuesFromPages(
     graphql(OPEN_QUERY, [`owner=${owner}`, `name=${name}`]),
     graphql(PARENTS_QUERY, [`owner=${owner}`, `name=${name}`, `label=${LABEL}`]),
+    repo,
   );
 
   // A closed issue the file names is in neither read; fetch each one. A pull request or an unused
@@ -524,9 +559,9 @@ async function main(argv) {
       const node = JSON.parse(
         run("gh", ["api", "graphql", "-f", `query=${ISSUE_QUERY}`, "-f", `owner=${owner}`, "-f", `name=${name}`, "-F", `number=${number}`]),
       ).data.repository.issue;
-      if (node) issues = [...issues, toIssue(node)];
+      if (node) issues = [...issues, toIssue(node, repo)];
     } catch (error) {
-      if (!/Could not resolve to an Issue/.test(String(error?.message ?? error))) throw error;
+      if (!isMissingIssueError(error)) throw error;
     }
   }
 
@@ -562,7 +597,7 @@ async function main(argv) {
   if (ungrouped.length > 0) {
     process.stdout.write(`\n${ungrouped.length} open issues are in no group (try --suggest):\n`);
     for (const issue of ungrouped) {
-      process.stdout.write(`  #${issue.number} ${issue.title}${issue.parent ? ` (sub-issue of #${issue.parent}, not in the file)` : ""}\n`);
+      process.stdout.write(`  #${issue.number} ${issue.title}${issue.parent ? ` (sub-issue of ${ref(issue.parent)}, not in the file)` : ""}\n`);
     }
   }
   if (actions.length === 0) return;

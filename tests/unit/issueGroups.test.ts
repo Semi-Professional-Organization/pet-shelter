@@ -17,6 +17,7 @@ import {
   suggest,
   evaluate,
   features,
+  isMissingIssueError,
 } from "../../scripts/issue-groups.mjs";
 
 /**
@@ -38,8 +39,8 @@ type Issue = {
   state: "OPEN" | "CLOSED";
   body: string;
   labels: { name: string }[];
-  parent: number | null;
-  children?: { number: number; id: string; state: string }[];
+  parent: number | string | null;
+  children?: { number: number; id: string; state: string; foreign?: string }[];
 };
 
 const issue = (number: number, extra: Partial<Issue> = {}): Issue => ({
@@ -232,6 +233,8 @@ describe("planning", () => {
 
 describe("reading GitHub", () => {
   const page = (nodes: unknown[]) => ({ data: { repository: { issues: { nodes } } } });
+  const here = { nameWithOwner: "owner/repo" };
+  const elsewhere = { nameWithOwner: "other/repo" };
   const node = (number: number, extra: Record<string, unknown> = {}) => ({
     number,
     id: `I_${number}`,
@@ -240,24 +243,87 @@ describe("reading GitHub", () => {
     state: "OPEN",
     labels: { nodes: [] },
     parent: null,
+    repository: here,
     ...extra,
   });
+  const under = (number: number, repository = here) => ({ parent: { number, repository } });
 
-  it("merges parents and their children, including closed children the open read cannot see", () => {
+  it("merges parents and their children, keeping a closed child's body for --suggest", () => {
     const parent = node(10, {
       labels: { nodes: [{ name: LABEL }] },
-      subIssues: { totalCount: 2, nodes: [{ number: 1, id: "I_1", title: "one", state: "OPEN" }, { number: 2, id: "I_2", title: "two", state: "CLOSED" }] },
+      subIssues: { totalCount: 2, nodes: [node(1, under(10)), node(2, { ...under(10), state: "CLOSED", body: "names src/a.ts" })] },
     });
-    const issues = issuesFromPages([page([node(1, { parent: { number: 10 } }), node(10)])], [page([parent])]);
+    const issues = issuesFromPages([page([node(1, under(10)), node(10)])], [page([parent])], "owner/repo");
     const byNumber = new Map(issues.map((i: Issue) => [i.number, i]));
     expect(byNumber.get(10)?.children?.map((c) => c.number)).toEqual([1, 2]);
     expect(byNumber.get(1)?.parent).toBe(10);
-    expect(byNumber.get(2)).toMatchObject({ state: "CLOSED", parent: 10 });
+    expect(byNumber.get(2)).toMatchObject({ state: "CLOSED", parent: 10, body: "names src/a.ts" });
+  });
+
+  it("never takes another repository's issue for the one here with the same number", () => {
+    const parent = node(10, {
+      labels: { nodes: [{ name: LABEL }] },
+      subIssues: { totalCount: 1, nodes: [node(7, { ...under(10), repository: elsewhere })] },
+    });
+    const issues = issuesFromPages([page([node(7), node(8, under(10, elsewhere)), node(10)])], [page([parent])], "owner/repo");
+    const byNumber = new Map(issues.map((i: Issue) => [i.number, i]));
+    expect(byNumber.get(7)?.parent).toBeNull();
+    expect(byNumber.get(8)?.parent).toBe("other/repo#10");
+    expect(byNumber.get(10)?.children).toEqual([expect.objectContaining({ number: 7, foreign: "other/repo#7" })]);
   });
 
   it("refuses a parent with more sub-issues than one page reads", () => {
     const parent = node(10, { subIssues: { totalCount: 101, nodes: [] } });
-    expect(() => issuesFromPages([], [page([parent])])).toThrow(/101 sub-issues/);
+    expect(() => issuesFromPages([], [page([parent])], "owner/repo")).toThrow(/101 sub-issues/);
+  });
+
+  it("tells a number that is no issue from any other gh failure", () => {
+    // Observed 2026-10-21 for #144, a pull request: `gh: Could not resolve to an Issue with the number of 144.`
+    expect(isMissingIssueError(new Error("Command failed: gh api graphql\ngh: Could not resolve to an Issue with the number of 144."))).toBe(true);
+    expect(isMissingIssueError(new Error("Command failed: gh api graphql\nHTTP 401: Bad credentials"))).toBe(false);
+  });
+});
+
+describe("planning across repositories and limits", () => {
+  it("removes a sub-issue from another repository and links the issue here that shares its number", () => {
+    const g = group("a", [7]);
+    const parent = parentFor(10, g, []);
+    parent.children = [{ number: 7, id: "X_7", state: "OPEN", foreign: "other/repo#7" }];
+    const { actions } = planGroups({ groups: [g] }, [parent, issue(7)], TARGET);
+    expect(actions).toEqual([
+      expect.objectContaining({ type: "remove", child: "other/repo#7", childId: "X_7" }),
+      expect.objectContaining({ type: "add", child: 7, childId: "I_7" }),
+    ]);
+  });
+
+  it("moves an issue out from under a parent in another repository that shares a number with ours", () => {
+    const g = group("a", [1]);
+    const { actions, notes } = planGroups({ groups: [g] }, [parentFor(10, g, []), issue(1, { parent: "other/repo#10" })], TARGET);
+    expect(actions).toEqual([expect.objectContaining({ type: "move", child: 1, from: "other/repo#10" })]);
+    expect(notes).toEqual([expect.stringMatching(/under other\/repo#10, which this script does not manage/)]);
+  });
+
+  it("lets a closed duplicate parent go of what no group wants, and moves what a group does", () => {
+    const g = group("a", [6]);
+    const issues = [parentFor(10, g, []), parentFor(11, g, [5, 6], { state: "CLOSED" }), issue(5, { parent: 11 }), issue(6, { parent: 11 })];
+    const { actions } = planGroups({ groups: [g] }, issues, TARGET);
+    expect(actions).toEqual([
+      expect.objectContaining({ type: "remove", parent: 11, child: 5 }),
+      expect.objectContaining({ type: "move", parent: 10, child: 6, from: 11 }),
+    ]);
+  });
+
+  it("orders links out before links in, so a parent at GitHub's limit has room for what it gains", () => {
+    const a = group("a", [3]);
+    const b = group("b", [2]);
+    const issues = [parentFor(10, a, [2]), parentFor(11, b, []), issue(2, { parent: 10 }), issue(3)];
+    expect(types(planGroups({ groups: [a, b] }, issues, TARGET).actions)).toEqual(["move", "add"]);
+  });
+
+  it("does not list a link the plan already removes as one a person made", () => {
+    const gone = group("gone", [2]);
+    const { ungrouped } = planGroups({ groups: [group("a", [1])] }, [parentFor(11, gone, [2]), issue(1), issue(2, { parent: 11 })], TARGET);
+    expect(ungrouped).toEqual([expect.objectContaining({ number: 2, parent: null })]);
   });
 });
 
