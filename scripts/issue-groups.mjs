@@ -95,13 +95,17 @@ const USAGE =
   "  --suggest proposes a group for each ungrouped open issue; --evaluate measures those proposals.\n";
 
 const write = (line = "") => process.stdout.write(`${line}\n`);
+// The file is found from the repository root, so the script runs from any directory in it.
+let workingPath = CONFIG_PATH;
 const parse = (text, where) => validateConfig(JSON.parse(text), where);
 
 /** Who may apply: write or more. Below it GitHub drops a new issue's labels and refuses new labels. */
 export const canApply = (permission) => ["WRITE", "MAINTAIN", "ADMIN"].includes(permission);
 
 function report(plan) {
-  write(plan.actions.length === 0 ? "  in sync, nothing to do" : plan.actions.map(formatAction).join("\n"));
+  if (plan.actions.length > 0) write(plan.actions.map(formatAction).join("\n"));
+  else if (plan.skipped.length > 0) write(`  nothing it can change, but ${plan.skipped.length} links cannot be made safely (see the notes): not in sync`);
+  else write("  in sync, nothing to do");
   for (const [key, number] of plan.record) write(`  note: #${number} is the parent of ${key}; --apply records it in ${CONFIG_PATH}.`);
   for (const note of plan.notes) write(`  note: ${note}`);
   if (plan.ungrouped.length > 0) {
@@ -119,9 +123,9 @@ function recordInWorkingCopy(numbers) {
   if (numbers.size === 0) return;
   write(`\nParents: ${[...numbers].map(([key, n]) => `${key} #${n}`).join(", ")}.`);
   try {
-    const config = parse(readFileSync(CONFIG_PATH, "utf8"));
+    const config = parse(readFileSync(workingPath, "utf8"));
     const known = new Set(config.groups.map((group) => group.key));
-    writeFileSync(CONFIG_PATH, formatConfig(recordParents(config, numbers)));
+    writeFileSync(workingPath, formatConfig(recordParents(config, numbers)));
     write(`Recorded them in ${CONFIG_PATH}. Commit it through a pull request.`);
     for (const [key, number] of numbers) if (!known.has(key)) write(`  ${key} is not in your working copy; record "parent": ${number} for it by hand.`);
   } catch (error) {
@@ -144,6 +148,7 @@ async function main(argv) {
     return;
   }
 
+  workingPath = `${run("git", ["rev-parse", "--show-toplevel"])}/${CONFIG_PATH}`;
   const repoInfo = JSON.parse(run("gh", ["repo", "view", "--json", "nameWithOwner,defaultBranchRef"]));
   const repo = repoInfo.nameWithOwner;
   const branch = repoInfo.defaultBranchRef.name;
@@ -157,7 +162,8 @@ async function main(argv) {
     // not merged yet
   }
   if (apply && published === null) throw new Error(`${CONFIG_PATH} is not on origin/${branch} yet; merge it before --apply`);
-  const working = readFileSync(CONFIG_PATH, "utf8");
+  // --apply never needs the working copy; only the dry run plans it.
+  const working = apply ? null : readFileSync(workingPath, "utf8");
   const config = parse(apply ? published : working);
   if (!apply && working.trim() !== (published ?? "").trim()) {
     write(`issue-groups: planning your working copy of ${CONFIG_PATH}, which differs from origin/${branch}; --apply uses origin/${branch}.`);

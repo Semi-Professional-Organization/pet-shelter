@@ -10,7 +10,7 @@ import { LABEL, LIMITS, looksLikeParent } from "./plan.mjs";
 // No labels below the top level of a nested read: GitHub caps one query at 500,000 nodes, and page
 // sizes multiply (100 parents x 100 children x 50 labels broke it once). A child's labels decide
 // nothing; any issue that looks like a parent is read again, labels and all, by the label query.
-const FIELDS = `id number title body state repository { nameWithOwner } labels(first: 20) { nodes { name } }
+const FIELDS = `id number title body state repository { nameWithOwner } labels(first: 100) { nodes { name } }
   parent { id number repository { nameWithOwner } } subIssuesSummary { total }`;
 const CHILD_FIELDS = "id number title body state repository { nameWithOwner } subIssuesSummary { total }";
 const WITH_CHILDREN = `${FIELDS} subIssues(first: ${LIMITS.children}) { totalCount nodes { ${CHILD_FIELDS} } }`;
