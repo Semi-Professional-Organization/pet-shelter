@@ -69,7 +69,11 @@ false; its five declined findings are new behaviour, recorded in the cost entry,
 an event with no session shared one marker folder, and two lines here. Declined: a kept message
 re-written after a compaction (none in the 7 compactions on the owner's machine), and the
 hand-off's "unknown" line, which is true of the transcript when a request is still being written.
-Later rounds are tallied in the pull request's body.
+Round 5, 7: 2/2/3, and no in-scope correctness bug: a weak test assertion and the order of
+`ledger handoff`'s transcript lookup fixed; one user per temp folder stated as a ceiling; declined
+a fallback for events with no session (every hook event has one), name collisions between session
+ids (they are UUIDs), and calling `recall` read-only while it logs to the temp folder, as `usage`
+does. Later rounds are tallied in the pull request's body.
 
 **Deliberately not done:**
 

@@ -112,17 +112,6 @@ export async function main(argv, io = {}) {
     say("ERROR", "no session: CLAUDE_CODE_SESSION_ID is not set", "pass --session <id>");
     return 2;
   }
-  // A prefix stands for the session it starts. The file records the full id, which is what
-  // `recall`, `orient` and a later run of this command compare against.
-  let found;
-  try {
-    found = findTranscript(projectsDir(env), given);
-  } catch (error) {
-    say("ERROR", error.message);
-    return 2;
-  }
-  const session = found?.session ?? given;
-
   let body;
   try {
     body = opts.from !== undefined ? readFileSync(resolve(cwd, opts.from), "utf8") : (io.stdin ?? (process.stdin.isTTY ? "" : readFileSync(0, "utf8")));
@@ -139,6 +128,18 @@ export async function main(argv, io = {}) {
     say("FAIL", `not written: ${problems.join("; ")}`, "node scripts/agent.mjs ledger --help");
     return 1;
   }
+
+  // A prefix stands for the session it starts. The file records the full id, which is what
+  // `recall`, `orient` and a later run of this command compare against. Looked up only once the
+  // body passes, since it walks every transcript folder.
+  let found;
+  try {
+    found = findTranscript(projectsDir(env), given);
+  } catch (error) {
+    say("ERROR", error.message);
+    return 2;
+  }
+  const session = found?.session ?? given;
 
   const w = whereAmI(cwd, { now });
   if (!w) {

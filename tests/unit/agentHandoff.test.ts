@@ -165,7 +165,7 @@ describe("ledger handoff", () => {
 
   it("could not run without a session, a body, a usable title or a known subcommand", async () => {
     const top = repo();
-    // Never the developer's own transcripts: the session is looked up before the body is read.
+    // Never the developer's own transcripts, should a run get as far as looking up the session.
     const env = { CLAUDE_CODE_SESSION_ID: SESSION, CLAUDE_CONFIG_DIR: join(scratch, "nowhere") };
     expect((await run(["handoff", "x"], { cwd: top, stdin: BODY, env: {} })).code).toBe(2);
     expect((await run(["handoff", "x"], { cwd: top, stdin: "  \n", env })).code).toBe(2);

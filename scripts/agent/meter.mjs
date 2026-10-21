@@ -20,6 +20,11 @@
  * The core (`readingOf`, `assess`) does no I/O; `main` is the shell. Which levels this session has
  * announced is kept as one marker file per level in `<tmp>/claude-meter/<session>/`, created
  * exclusively, so tool calls that finish together still announce a level once.
+ *
+ * ceiling: one user per temp folder, as on Windows, where `TEMP` is per user and these scripts
+ * run. Where users share `/tmp`, the first user's `claude-meter` folder would shut the others'
+ * meters off and let them read or pre-create its markers; a per-user folder is the upgrade
+ * (`tasks/open/agent-scripts-must-cut-what-a-session-costs.md`).
  */
 
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync } from "node:fs";
