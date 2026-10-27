@@ -832,26 +832,27 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       expect(stored?.updates ?? []).toEqual([]);
     });
 
-    it("should clear history even when the payload omits the keys entirely", async () => {
+    it("should keep history when the payload omits the keys entirely", async () => {
       const created = await createPet({ ...baseForm, name: "Tuah Omitted" });
       const petId = created.data!.id;
       expect((await getPetById(petId))?.medicalTimeline?.length).toBe(2);
       expect((await getPetById(petId))?.updates?.length).toBe(2);
 
-      // Zod omits absent optional keys from its output, so `{...existing, ...validated}`
-      // would silently preserve the old rows. The submitted payload must win.
+      // This is the shape the admin edit dialog submits: it manages neither collection, so it
+      // sends neither key. Omission means "not touched"; only an explicit `[]` clears (test above).
+      // Issue #107: treating omission as clearing deleted every clinical event on any edit.
       const omittedForm: Record<string, unknown> = { ...baseForm, name: "Tuah Omitted" };
       delete omittedForm.medicalTimeline;
       delete omittedForm.updates;
       expect("medicalTimeline" in omittedForm).toBe(false);
       expect("updates" in omittedForm).toBe(false);
 
-      const cleared = await updatePet(petId, omittedForm as typeof baseForm);
-      expect(cleared.success).toBe(true);
+      const saved = await updatePet(petId, omittedForm as typeof baseForm);
+      expect(saved.success).toBe(true);
 
       const stored = await getPetById(petId);
-      expect(stored?.medicalTimeline ?? []).toEqual([]);
-      expect(stored?.updates ?? []).toEqual([]);
+      expect(stored?.medicalTimeline?.map((e) => e.id).sort()).toEqual(["tl-hist-1", "tl-hist-2"]);
+      expect(stored?.updates?.map((u) => u.id).sort()).toEqual(["up-hist-1", "up-hist-2"]);
     });
 
     it("should reject a create whose history carries a duplicate event id", async () => {

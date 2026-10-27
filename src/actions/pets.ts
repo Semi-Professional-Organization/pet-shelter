@@ -313,12 +313,16 @@ export async function updatePet(
       rehabStage: validated.rehabStage,
       rehabStageMs: validated.rehabStageMs,
       rehabProgressPercent: validated.rehabProgressPercent,
-      // Same rule for nested history, and the same reason. Zod drops absent
-      // optional keys, so `{...existing, ...validated}` would silently keep an
-      // event the submitter deleted. Assigning unconditionally makes removal by
-      // omission — not just by an explicit empty array — actually delete rows.
-      updates: sortHistoryByDate(validated.updates),
-      medicalTimeline: sortHistoryByDate(validated.medicalTimeline),
+      // Nested history follows the opposite rule: an absent key means "not touched", and only a
+      // submitted list (an explicit `[]` included) replaces the stored rows. The admin edit dialog
+      // manages neither collection and sends neither key, so treating omission as "clear" deleted
+      // every clinical event and progress update on any ordinary edit (issue #107).
+      updates:
+        validated.updates !== undefined ? sortHistoryByDate(validated.updates) : existing.updates,
+      medicalTimeline:
+        validated.medicalTimeline !== undefined
+          ? sortHistoryByDate(validated.medicalTimeline)
+          : existing.medicalTimeline,
       galleryImages: validated.galleryImages || existing.galleryImages || [],
       isArchived: validated.isArchived ?? existing.isArchived ?? false,
       deletedAt: validated.deletedAt !== undefined ? validated.deletedAt : existing.deletedAt,

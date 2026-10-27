@@ -131,10 +131,14 @@ export function usePetStore() {
         rehabStage: input.rehabStage,
         rehabStageMs: input.rehabStageMs,
         rehabProgressPercent: input.rehabProgressPercent,
-        // The submitted form is authoritative for history, matching the server
-        // action: an event left out of the payload is removed, not preserved.
-        updates: sortHistoryByDate(input.updates),
-        medicalTimeline: sortHistoryByDate(input.medicalTimeline),
+        // Matches the server action: an absent collection keeps what is stored, and only a
+        // submitted list (an explicit `[]` included) replaces it — issue #107.
+        updates:
+          input.updates !== undefined ? sortHistoryByDate(input.updates) : pets[index].updates,
+        medicalTimeline:
+          input.medicalTimeline !== undefined
+            ? sortHistoryByDate(input.medicalTimeline)
+            : pets[index].medicalTimeline,
         isArchived: input.isArchived ?? pets[index].isArchived ?? false,
         deletedAt: input.deletedAt !== undefined ? input.deletedAt : pets[index].deletedAt,
         medical: {
