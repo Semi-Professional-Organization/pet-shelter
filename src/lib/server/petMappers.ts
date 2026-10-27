@@ -1,6 +1,10 @@
 import { MedicalTimelineEvent, Pet, PetUpdate } from "@/types/pet";
 import { PetStatus as PrismaPetStatus } from "@prisma/client";
-import { normalizePetStatus } from "@/lib/domain/stateMachine";
+import {
+  DomainValidationError,
+  isKnownPetStatus,
+  normalizePetStatus,
+} from "@/lib/domain/stateMachine";
 import {
   computeAgeCategory,
   formatAgeString,
@@ -12,6 +16,13 @@ import {
  * Normalizes legacy aliases (e.g. "Rehabilitation" -> In_Rehabilitation).
  */
 export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
+  // Refused rather than defaulted. The default used to be Available, so saving an animal that was
+  // read with an unrecognised status wrote it back as adoptable.
+  if (!isKnownPetStatus(status)) {
+    throw new DomainValidationError(
+      `'${status}' is not a recognised pet status. Choose Available, Pending, Adopted or In Rehabilitation.`
+    );
+  }
   const norm = normalizePetStatus(status);
   if (norm === "In Rehabilitation") return PrismaPetStatus.In_Rehabilitation;
   if (norm === "Pending") return PrismaPetStatus.Pending;
@@ -19,16 +30,29 @@ export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
   return PrismaPetStatus.Available;
 }
 
+/** Known spellings, keyed case-, space- and underscore-insensitively. */
+const DB_STATUS_SPELLINGS: Record<string, Pet["status"]> = {
+  available: "Available",
+  pending: "Pending",
+  adopted: "Adopted",
+  "in rehabilitation": "In Rehabilitation",
+  rehabilitation: "In Rehabilitation",
+};
+
 /**
  * Maps a persisted PetStatus database enum or legacy string to domain PetStatus.
+ *
+ * The production column has held text rather than the enum, so drift in case or separator
+ * (`adopted`, `IN_REHABILITATION`) is matched to the status it spells. Anything else is passed
+ * through unchanged instead of becoming Available, which used to make an adopted animal with a
+ * miscased status adoptable again. `isKnownPetStatus` is false for it, `getPetStatusPresentation`
+ * presents it as not adoptable, and `submitApplication` refuses it by name.
+ * `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-available.md`.
  */
 export function fromDbPetStatus(status: PrismaPetStatus | string): Pet["status"] {
-  if (status === "In_Rehabilitation" || status === "In Rehabilitation" || status === "Rehabilitation") {
-    return "In Rehabilitation";
-  }
-  if (status === "Pending") return "Pending";
-  if (status === "Adopted") return "Adopted";
-  return "Available";
+  const key = status.trim().toLowerCase().replace(/[\s_]+/g, " ");
+  // The cast is the honest gap: the domain type has no member for a value nobody anticipated.
+  return DB_STATUS_SPELLINGS[key] ?? (status as Pet["status"]);
 }
 
 /**

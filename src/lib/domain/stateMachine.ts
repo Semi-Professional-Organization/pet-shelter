@@ -39,6 +39,26 @@ export function normalizePetStatus(status: PetStatus): PetStatus {
   return PET_STATUS_ALIASES[status] ?? status;
 }
 
+/**
+ * True for the five spellings the domain knows. A persisted status outside them reaches the
+ * domain unchanged (see `fromDbPetStatus`), and every check that grants something must treat it
+ * as refused, never as Available.
+ */
+export function isKnownPetStatus(status: string): status is PetStatus {
+  return Object.hasOwn(PET_STATUS_ALIASES, status);
+}
+
+const CANONICAL_PET_STATUSES: PetStatus[] = ["Available", "Pending", "Adopted", "In Rehabilitation"];
+
+/**
+ * Legal moves out of a status. An unrecognised status may move to any canonical one: that is how
+ * staff correct a corrupt row, and with no way out the animal would be stuck refused forever.
+ */
+function transitionsFrom(from: PetStatus): PetStatus[] {
+  if (!isKnownPetStatus(from)) return CANONICAL_PET_STATUSES;
+  return PET_TRANSITION_GRAPH[from].map(normalizePetStatus);
+}
+
 // Rehabilitating animals leave care only via veterinary clearance back to Available.
 const REHAB_TRANSITIONS: PetStatus[] = ["Available"];
 
@@ -77,7 +97,7 @@ export function validatePetTransition(current: PetStatus, next: PetStatus): void
   const to = normalizePetStatus(next);
   if (from === to) return;
 
-  const allowedNext = (PET_TRANSITION_GRAPH[from] || []).map(normalizePetStatus);
+  const allowedNext = transitionsFrom(from);
   if (!allowedNext.includes(to)) {
     throw new DomainValidationError(
       `Illegal pet status transition: Cannot change pet from '${current}' to '${next}'. Allowed: [${allowedNext.join(", ")}]`
@@ -98,6 +118,5 @@ export function validatePetTransition(current: PetStatus, next: PetStatus): void
  */
 export function getAllowedPetStatusTransitions(current: PetStatus): PetStatus[] {
   const from = normalizePetStatus(current);
-  const next = (PET_TRANSITION_GRAPH[from] || []).map(normalizePetStatus);
-  return [...new Set<PetStatus>([from, ...next])];
+  return [...new Set<PetStatus>([from, ...transitionsFrom(from)])];
 }

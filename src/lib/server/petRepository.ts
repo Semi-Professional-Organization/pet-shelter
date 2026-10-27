@@ -228,11 +228,12 @@ export function markCachedPetAdopted(petId: string, petName: string): Pet | null
 }
 
 export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<void> {
+  // Built outside the `try`: `toDbPetStatus` refuses an unrecognised status, and
+  // `handlePersistenceError` would swallow that refusal and mirror the pet anyway.
+  const data = buildPetCreatePayload(newPet);
   // DB first: a refused write must not leave the mirror ahead of the database.
   try {
-    await prisma.pet.create({
-      data: buildPetCreatePayload(newPet),
-    });
+    await prisma.pet.create({ data });
   } catch (err) {
     handlePersistenceError("Prisma pet creation", err, "write");
     // Unique violations rethrow (see persistenceMode) — never mirror a conflicted id.
@@ -263,14 +264,13 @@ export async function updateServerPet(id: string, updated: Pet, actor: SessionUs
     validatePetTransition(previous.status, updated.status);
   }
 
+  // Outside the `try` for the same reason as in `insertServerPet`.
+  const data = buildPetUpdatePayload(updated);
   try {
     await prisma.$transaction([
       prisma.petUpdate.deleteMany({ where: { petId: id } }),
       prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } }),
-      prisma.pet.update({
-        where: { id },
-        data: buildPetUpdatePayload(updated),
-      }),
+      prisma.pet.update({ where: { id }, data }),
     ]);
   } catch (err) {
     handlePersistenceError("Prisma pet update", err, "write");

@@ -74,10 +74,11 @@ export interface AdoptionWizardProps extends UseAdoptionFormControllerProps {
 }
 
 export function AdoptionWizard({ standalone = false, ...controllerProps }: AdoptionWizardProps) {
-  const { allPets } = controllerProps;
   const { t, isMs } = useLanguage();
   const { state, form, handlers } = useAdoptionFormController(controllerProps);
   const {
+    petOptions,
+    unavailableSelection,
     isSubmitted,
     submittedData,
     submissionError,
@@ -210,19 +211,36 @@ export function AdoptionWizard({ standalone = false, ...controllerProps }: Adopt
               error={errors.petId?.message}
               className="bg-muted/40 border border-border p-4 rounded-xl"
             >
+              {unavailableSelection && (
+                <p role="status" className="mb-2 text-sm text-muted-foreground">
+                  {isMs
+                    ? `${unavailableSelection.name} tidak menerima permohonan adopsi buat masa ini. Sila pilih haiwan lain.`
+                    : `${unavailableSelection.name} is not currently accepting adoption applications. Please choose another animal.`}
+                </p>
+              )}
+              {/* Adoptable animals only (`petOptions`), the ones `submitApplication` accepts. The
+                  empty option keeps the control and the field agreeing when the form opens on
+                  nobody. */}
               <select
                 id="petId"
                 {...register("petId")}
                 onChange={(e) => {
-                  const pet = allPets.find((p: Pet) => p.id === e.target.value);
-                  if (pet) {
-                    setValue("petId", pet.id);
-                    setValue("petName", pet.name);
-                  }
+                  const pet = petOptions.find((p: Pet) => p.id === e.target.value);
+                  setValue("petId", pet?.id ?? "");
+                  setValue("petName", pet?.name ?? "");
                 }}
                 className={SELECT_CLASS}
               >
-                {allPets.map((p: Pet) => (
+                <option value="">
+                  {petOptions.length > 0
+                    ? isMs
+                      ? "Pilih haiwan"
+                      : "Choose an animal"
+                    : isMs
+                      ? "Tiada haiwan menerima permohonan buat masa ini"
+                      : "No animals are accepting applications right now"}
+                </option>
+                {petOptions.map((p: Pet) => (
                   <option key={p.id} value={p.id}>
                     {p.name} — {p.breed} ({p.status} •{" "}
                     {p.adoptionFee.toLowerCase().includes("free")

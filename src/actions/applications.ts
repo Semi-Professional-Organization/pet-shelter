@@ -42,6 +42,7 @@ import {
 } from "@/lib/domain/applicationWorkflow";
 import { findServerPetById, findServerPetByIdAsync } from "@/lib/server/petRepository";
 import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
+import { isKnownPetStatus } from "@/lib/domain/stateMachine";
 import {
   sendApplicationConfirmationEmail,
   sendStaffApplicationAlert,
@@ -178,6 +179,15 @@ export async function submitApplication(
         error: "This animal is currently archived and is no longer accepting new adoption applications.",
       };
     }
+    if (!isKnownPetStatus(pet.status)) {
+      // A stored status the mapper did not recognise. It reaches here unchanged rather than as
+      // Available, and gets its own message: the presentation fallback would label it "Pending",
+      // which is not what the row says.
+      return {
+        success: false,
+        error: `We cannot confirm ${pet.name}'s adoption status right now, so we cannot accept an application for them. Please contact the shelter.`,
+      };
+    }
     const presentation = getPetStatusPresentation(pet.status);
     if (!presentation.isAdoptable) {
       // `isAdoptable` rather than a status comparison here, so this agrees with the gallery's
@@ -185,17 +195,6 @@ export async function submitApplication(
       // alone: `Pending` is a stage of the adoption track whose button already renders
       // disabled, and that is the product call recorded in
       // `tasks/decisions/2026-09-10-pending-is-a-stage-of-adoption-not-a-track.md`.
-      //
-      // This check is only as good as the status it is handed, and on the database route that is
-      // **fail-open, not fail-closed**. `getPetStatusPresentation` does fall back to the `pending`
-      // presentation for a value it does not know, but nothing unknown reaches it from a database
-      // read: `fromDbPetStatus` matches four exact, case-sensitive spellings and returns
-      // `"Available"` for everything else, so a column holding `adopted` or `ADOPTED` arrives here
-      // as Available and this guard lets it through — the animal it was written to refuse. That
-      // matters because the production branch has held `Pet.status` as text rather than the
-      // `PetStatus` enum. Not fixed here: the default lives in a mapper every pet read goes
-      // through, so changing it is a catalogue-wide behaviour change, not a line in this action.
-      // `tasks/open/an-unknown-pet-status-reads-as-available.md`.
       return {
         success: false,
         error: `${pet.name} is not currently accepting adoption applications (${presentation.labelFallback}).`,

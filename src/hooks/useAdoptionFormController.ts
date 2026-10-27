@@ -69,14 +69,24 @@ export const ADOPTION_STEP_COUNT = ADOPTION_STEPS.length;
  * render and this already returned `null` there, so both consumers — the dialog title in
  * `AdoptionForm` and `defaultPet` in the controller below — have always handled it.
  *
- * ceiling: the form copies a selection into its fields only when it receives a real pet
- * (`if (selectedPet && open)` below). Handed `null` it keeps whatever `petId` the previous
- * opening left, and dropping the last resort makes `null` reachable in one more case — every
- * animal non-adoptable. `submitApplication` is the boundary that now refuses the result; the
- * stale field itself is `tasks/open/adoption-form-keeps-a-stale-pet-id-when-it-opens-on-nobody.md`.
+ * A selected animal is returned even when it is not adoptable, so the title names the page that
+ * opened the form. The form's pet *field* does not follow it there: see `fieldPetFor`.
  */
 export function resolveDefaultPet(selectedPet: Pet | null, allPets: Pet[]): Pet | null {
   return selectedPet || allPets.find((p) => getPetStatusPresentation(p.status).isAdoptable) || null;
+}
+
+function isAdoptable(pet: Pet): boolean {
+  return getPetStatusPresentation(pet.status).isAdoptable;
+}
+
+/**
+ * The animal the pet field holds when the form opens: the default animal if it can be applied
+ * for, otherwise nobody. The select offers adoptable animals only, so a non-adoptable default in
+ * the field would leave the value and the control disagreeing.
+ */
+function fieldPetFor(defaultPet: Pet | null): Pet | null {
+  return defaultPet && isAdoptable(defaultPet) ? defaultPet : null;
 }
 
 export interface UseAdoptionFormControllerProps {
@@ -100,14 +110,20 @@ export function useAdoptionFormController({
   const [referenceCode, setReferenceCode] = useState<string | null>(null);
 
   // Same predicate as `resolveDefaultPet`, so the two cannot disagree about what "adoptable"
-  // means. That is the only claim made here: **nothing consumes this list today.** It is returned
-  // in `state` and never destructured, and `AdoptionWizard`'s pet `<select>` renders `allPets`,
-  // so the form still offers animals the server now refuses — see
-  // `tasks/open/the-adoption-form-offers-animals-the-server-will-refuse.md`. Kept rather than
-  // deleted because a reviewer calling this dead once cost this file a real defect; see
-  // `tasks/lessons/2026-09-16-a-review-calling-code-dead-is-a-claim-to-check-against-its-consumers.md`.
-  const availablePets = allPets.filter((p) => getPetStatusPresentation(p.status).isAdoptable);
+  // means.
+  const availablePets = allPets.filter(isAdoptable);
   const defaultPet = resolveDefaultPet(selectedPet, allPets);
+  const fieldPet = fieldPetFor(defaultPet);
+  // What `AdoptionWizard`'s pet `<select>` offers: the adoptable animals, plus the field's own
+  // animal when a caller passed one that `allPets` does not list, so the control can always show
+  // the value the field holds.
+  const petOptions =
+    fieldPet && !availablePets.some((p) => p.id === fieldPet.id)
+      ? [fieldPet, ...availablePets]
+      : availablePets;
+  // Opened from an animal that cannot be applied for (`/adopt?petId=` names any public animal):
+  // the wizard says so at the point of choice instead of at the end of four steps.
+  const unavailableSelection = selectedPet && !isAdoptable(selectedPet) ? selectedPet : null;
 
   const form = useForm<AdoptionFormValues>({
     resolver: zodResolver(adoptionFormSchema),
@@ -115,8 +131,8 @@ export function useAdoptionFormController({
     // when they press Next a second time.
     mode: "onTouched",
     defaultValues: {
-      petId: defaultPet?.id || "",
-      petName: defaultPet?.name || "",
+      petId: fieldPet?.id || "",
+      petName: fieldPet?.name || "",
       applicantName: "",
       email: "",
       phone: "",
@@ -140,12 +156,19 @@ export function useAdoptionFormController({
 
   const { setValue, control, reset, trigger } = form;
 
+  // Every opening sets the pet field from the animal the title names, including nobody. It used to
+  // run only when handed a real pet, so an opening with `selectedPet = null` kept whatever the
+  // previous one left (the dialog resets on a 200ms timer after close, and only after a
+  // submission) and the form could name one animal while submitting for another. Only the pet
+  // fields are touched, so the applicant's other answers survive a reopen.
+  const fieldPetId = fieldPet?.id ?? "";
+  const fieldPetName = fieldPet?.name ?? "";
   useEffect(() => {
-    if (selectedPet && open) {
-      setValue("petId", selectedPet.id);
-      setValue("petName", selectedPet.name);
+    if (open) {
+      setValue("petId", fieldPetId);
+      setValue("petName", fieldPetName);
     }
-  }, [selectedPet, open, setValue]);
+  }, [open, fieldPetId, fieldPetName, setValue]);
 
   const activePetId = useWatch({ control, name: "petId" }) || defaultPet?.id;
   const activePet = allPets.find((p) => p.id === activePetId) || selectedPet;
@@ -170,6 +193,7 @@ export function useAdoptionFormController({
     setSubmissionError(null);
     const input = toApplicationInput(data);
 
+    let written: Awaited<ReturnType<typeof submitApplication>>["data"];
     try {
       const res = await submitApplication(input);
 
@@ -177,15 +201,23 @@ export function useAdoptionFormController({
         setSubmissionError(res.error || "Failed to submit adoption application. Please try again.");
         return;
       }
-      setReferenceCode(res.data?.referenceCode ?? null);
+      written = res.data;
+      setReferenceCode(written?.referenceCode ?? null);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Connection error while submitting application.";
       setSubmissionError(msg);
       return;
     }
 
-    addApplication(input);
-    setSubmittedData(data);
+    // The animal the server verified and recorded, not the one posted: they differ when the posted
+    // id carried whitespace or staff renamed the animal since the page rendered, and the
+    // reference code points at the written record.
+    const recordedPet = {
+      petId: written?.petId ?? input.petId,
+      petName: written?.petName ?? input.petName,
+    };
+    addApplication({ ...input, ...recordedPet });
+    setSubmittedData({ ...data, ...recordedPet });
     setIsSubmitted(true);
   };
 
@@ -220,7 +252,9 @@ export function useAdoptionFormController({
   return {
     state: {
       availablePets,
+      petOptions,
       defaultPet,
+      unavailableSelection,
       activePet,
       isSubmitted,
       submittedData,

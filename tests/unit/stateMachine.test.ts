@@ -202,14 +202,28 @@ describe("State Machine Domain Logic", () => {
     });
 
     describe("Edge Cases & Unknown Statuses", () => {
-      it("should throw DomainValidationError for unknown pet status values", () => {
-        expect(() =>
-          validatePetTransition("Fostered" as PetStatus, "Adopted")
-        ).toThrow(DomainValidationError);
-
+      it("should throw DomainValidationError when moving to an unknown pet status", () => {
         expect(() =>
           validatePetTransition("Available", "Lost" as PetStatus)
         ).toThrow(DomainValidationError);
+        expect(() =>
+          validatePetTransition("Fostered" as PetStatus, "Lost" as PetStatus)
+        ).toThrow(DomainValidationError);
+      });
+
+      it("lets staff correct an unknown stored status to any canonical one", () => {
+        // A row read with a status the domain does not know is refused for adoption. Without a
+        // way out it would stay refused for good, so every canonical status is a legal move.
+        for (const to of ["Available", "Pending", "Adopted", "In Rehabilitation"] as PetStatus[]) {
+          expect(() => validatePetTransition("Fostered" as PetStatus, to)).not.toThrow();
+        }
+        expect(getAllowedPetStatusTransitions("Fostered" as PetStatus)).toEqual([
+          "Fostered",
+          "Available",
+          "Pending",
+          "Adopted",
+          "In Rehabilitation",
+        ]);
       });
     });
   });

@@ -358,6 +358,11 @@ export async function atomicUpdateApplicationStatus(
   // returned since and rejected whoever had applied for it in the meantime. Decided from
   // the database's pre-state when there is a database, as the transition guard is.
   let becomesApproved = targetStatus === "APPROVED" && inMemoryApp?.status !== "APPROVED";
+  // The `pets` row this approval actually moved to Adopted, set only from the transaction's own
+  // update count. The audit row is keyed on this, not on what the mirror happens to hold: the
+  // mirror is per-process, so deriving it from the cache wrote a transition Postgres never made
+  // for a legacy application with no `petId`, and none at all for one the mirror was cold on.
+  let adoptedPetId: string | null = null;
 
   if (isDatabasePersistent()) {
     try {
@@ -388,10 +393,11 @@ export async function atomicUpdateApplicationStatus(
 
         becomesApproved = targetStatus === "APPROVED" && oldStatus !== "APPROVED";
         if (becomesApproved && current.petId) {
-          await tx.pet.updateMany({
+          const adopted = await tx.pet.updateMany({
             where: { id: current.petId },
             data: { status: "Adopted" },
           });
+          if (adopted.count > 0) adoptedPetId = current.petId;
 
           await tx.adoptionApplication.updateMany({
             where: {
@@ -431,15 +437,22 @@ export async function atomicUpdateApplicationStatus(
   const oldStatus = currentApp.status;
 
   if (becomesApproved) {
-    const adoptedPet = markCachedPetAdopted(currentApp.petId ?? "", currentApp.petName);
-    if (adoptedPet) {
+    if (isDatabasePersistent()) {
+      // Mirror follows the database: marked only when a row was, and by that row's id, so the
+      // name fallback cannot mark an animal the transaction never touched.
+      if (adoptedPetId) markCachedPetAdopted(adoptedPetId, currentApp.petName);
+    } else {
+      // No database: the mirror is the store, so what it marks is the transition.
+      adoptedPetId = markCachedPetAdopted(currentApp.petId ?? "", currentApp.petName)?.id ?? null;
+    }
+    if (adoptedPetId) {
       recordAuditLog({
         actorId: actor.id,
         actorEmail: actor.email,
         actorRole: actor.role,
         action: "PET_STATUS_TRANSITION_ADOPTED",
         entity: "Pet",
-        entityId: adoptedPet.id,
+        entityId: adoptedPetId,
         details: { adoptionApplicationId: applicationId, applicant: currentApp.applicantName },
       });
     }

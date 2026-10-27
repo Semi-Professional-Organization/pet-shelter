@@ -15,6 +15,24 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Pet status and adoption guards
+
+**Branch:** `fix/pet-status-and-adoption-guards` · opened 2026-10-27 · base `91205dd`
+
+Issues #98, #99, #96 and #101 in one pull request, as the owner asked. Rules and rejected options
+are in `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-available.md`.
+
+- [x] Unknown persisted status passes through as not adoptable; drift in case or separator is read
+      as the status it spells; writes refuse an unknown status.
+- [x] Adoption audit row keyed on the `pets` row the transaction updated.
+- [x] Form offers adoptable animals only and sets its pet field on every opening.
+
+## Review
+
+Not done, on purpose: a fifth `Unknown` status; backfilling `petId` on legacy applications (needs
+the production database); the mirror's name-keyed auto-reject of other applications, which is a
+separate defect from #101.
+
 # The context meter's root-cause pass
 
 **Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `caa7fce`

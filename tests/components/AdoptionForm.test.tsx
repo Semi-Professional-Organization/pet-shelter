@@ -14,6 +14,7 @@ const submitApplication = vi.hoisted(() => vi.fn());
 vi.mock("@/actions/applications", () => ({ submitApplication }));
 
 import { AdoptionForm } from "@/components/features/adoptions/AdoptionForm";
+import { AdoptionWizard } from "@/components/features/adoptions/AdoptionWizard";
 import { adoptionFormSchema } from "@/hooks/useAdoptionFormController";
 import { renderWithLanguage, setupUser, makePet } from "./support/render";
 
@@ -66,6 +67,19 @@ async function completeContactStep(user: User) {
 
   await user.click(nextButton());
   await screen.findByLabelText(/housing & accommodation type/i);
+}
+
+/** Fills the contact step with no animal chosen; Next must stop on the pet field. */
+async function completeContactStepExpectingRefusal(user: User) {
+  await user.type(screen.getByLabelText(/full name/i), VALID.name);
+  await user.type(screen.getByLabelText(/email address/i), VALID.email);
+  await user.type(screen.getByLabelText(/contact phone number/i), VALID.phone);
+  await user.type(screen.getByLabelText(/nric or passport number/i), VALID.identification);
+  await user.type(screen.getByLabelText(/residential address/i), VALID.address);
+
+  await user.click(nextButton());
+  expect(await screen.findByText(/please select an adoptable pet/i)).toBeInTheDocument();
+  expect(screen.queryByLabelText(/housing & accommodation type/i)).not.toBeInTheDocument();
 }
 
 /** Every control on this step has a schema-valid default; `housingType` is the one tests vary. */
@@ -312,6 +326,20 @@ describe("AdoptionForm", () => {
       expect(screen.queryByLabelText(/shelter adoption terms/i)).not.toBeInTheDocument();
     });
 
+    it("names the animal the server recorded, not the one posted", async () => {
+      // Staff renamed the animal between the page render and the submission; the reference code
+      // points at the written record, so the confirmation must name what it holds.
+      submitApplication.mockImplementation(async (input: { petId: string }) => ({
+        success: true,
+        data: { id: "app-1", petId: input.petId, petName: "Bella Rose" },
+      }));
+      const { user } = renderForm();
+
+      await submitCompletedApplication(user);
+
+      expect(await screen.findByText(new RegExp(`${VALID.name}[\\s\\S]*Bella Rose`, "i"))).toBeInTheDocument();
+    });
+
     it("shows the reference code the action returns so the applicant can track it", async () => {
       submitApplication.mockResolvedValue({
         success: true,
@@ -374,6 +402,64 @@ describe("AdoptionForm", () => {
 
       release({ success: true });
       await waitFor(() => expect(screen.getByText(/application submitted/i)).toBeInTheDocument());
+    });
+  });
+
+  describe("which animals the form offers", () => {
+    // Issues #99 and #96; the rules are in
+    // `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-available.md`.
+    const petSelect = () => screen.getByLabelText(/selected rescue animal/i) as HTMLSelectElement;
+    const offeredIds = () => Array.from(petSelect().options).map((o) => o.value);
+
+    it("offers only adoptable animals", () => {
+      const bella = makePet({ name: "Bella", status: "Available" });
+      const max = makePet({ name: "Max", status: "Adopted" });
+      const kiki = makePet({ name: "Kiki", status: "Pending" });
+      renderForm({ selectedPet: bella, allPets: [bella, max, kiki] });
+
+      expect(offeredIds()).toEqual(["", bella.id]);
+      expect(petSelect().value).toBe(bella.id);
+    });
+
+    it("keeps the field and the control agreeing on nobody when no animal is adoptable", () => {
+      const max = makePet({ name: "Max", status: "Adopted" });
+      renderForm({ selectedPet: null, allPets: [max] });
+
+      expect(offeredIds()).toEqual([""]);
+      expect(petSelect().value).toBe("");
+      expect(screen.getByRole("option", { name: /no animals are accepting applications/i })).toBeInTheDocument();
+    });
+
+    it("says at the point of choice that a non-adoptable selected animal cannot be applied for", async () => {
+      // `/adopt?petId=` opens on any public animal, adopted ones included.
+      const max = makePet({ name: "Max", status: "Adopted" });
+      const bella = makePet({ name: "Bella", status: "Available" });
+      const { user } = renderForm({ selectedPet: max, allPets: [max, bella] });
+
+      expect(screen.getByRole("status")).toHaveTextContent(/max is not currently accepting adoption applications/i);
+      expect(offeredIds()).toEqual(["", bella.id]);
+      expect(petSelect().value).toBe("");
+
+      await completeContactStepExpectingRefusal(user);
+    });
+
+    it("reopened on nobody within the close animation, submits for the animal its title names", async () => {
+      // The wizard stays mounted while the dialog animates closed, so this drives it directly
+      // through close and reopen. The second opening passes `selectedPet = null`, and the old
+      // effect, which ran only for a real pet, left Max's id in the field under Bella's title.
+      const bella = makePet({ name: "Bella", status: "Available" });
+      const max = makePet({ name: "Max", status: "Available" });
+      const props = { allPets: [bella, max], onOpenChange: vi.fn() };
+      const { rerender } = renderWithLanguage(<AdoptionWizard {...props} selectedPet={max} open />);
+      expect(petSelect().value).toBe(max.id);
+
+      rerender(<AdoptionWizard {...props} selectedPet={max} open={false} />);
+      rerender(<AdoptionWizard {...props} selectedPet={null} open />);
+
+      expect(petSelect().value).toBe(bella.id);
+      await submitCompletedApplication(setupUser());
+      await waitFor(() => expect(submitApplication).toHaveBeenCalledTimes(1));
+      expect(submitApplication.mock.calls[0][0]).toMatchObject({ petId: bella.id, petName: "Bella" });
     });
   });
 

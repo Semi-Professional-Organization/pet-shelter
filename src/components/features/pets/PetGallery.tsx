@@ -370,22 +370,9 @@ export function PetGallery({
                   // tabs make non-adoptable by construction — open the Adopted tab, click here, and
                   // the form came up pre-filled for an animal who had already gone home.
                   //
-                  // The second fallback looks redundant with `resolveDefaultPet`, which also picks
-                  // the first Available animal when handed `null`. **It is not; do not remove it.**
-                  // The form copies the selection into its fields only when it receives an actual
-                  // pet (`if (selectedPet && open)` in `useAdoptionFormController`). Handed `null`,
-                  // its title follows `resolveDefaultPet` while `petId` keeps whatever the last
-                  // opening left there — reopen within the close animation and the form names one
-                  // animal and would submit for another. It was removed once as dead code, on a
-                  // review's word, and the next review found this.
-                  //
-                  // ceiling: still `null` when *no* animal in the shelter is adoptable, which
-                  // reopens that stale-field path. `resolveDefaultPet` no longer papers over it
-                  // with `allPets[0]` whatever its status, and `submitApplication` now refuses a
-                  // pet it cannot find, one that is archived, and one whose status is not
-                  // adoptable — so the worst outcome is a rejected submission rather than an
-                  // application against an animal who has gone home. The stale field itself is
-                  // `tasks/open/adoption-form-keeps-a-stale-pet-id-when-it-opens-on-nobody.md`.
+                  // The second fallback matches what `resolveDefaultPet` picks when handed `null`;
+                  // the form now sets its pet field from that same animal on every opening, so
+                  // passing `null` is safe, and the explicit pick only keeps the intent visible here.
                   const isAdoptable = (pet: (typeof pets)[number]) =>
                     getPetStatusPresentation(pet.status).isAdoptable;
                   setActivePetForAdoption(
