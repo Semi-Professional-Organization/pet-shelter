@@ -14,7 +14,7 @@ the feature behind it stays off until the secret is fixed:
 
 - `STAFF_INVITE_SECRET`: `registerAction` catches the throw and refuses staff sign-up with
   "Staff registration is unavailable right now". Nothing is created.
-- `ADMIN_SECRET_KEY`: `getAdminPrincipal` already caught it and grants nothing to the legacy
+- `ADMIN_SECRET_KEY`: `verifyAdminSession` (`src/lib/security/adminSession.ts`) already caught it and grants nothing to the legacy
   `admin_session` cookie. Signed staff sessions are unaffected.
 
 This is option 2 of `2026-10-17-the-staff-invite-code-length-is-the-operators-call.md`, added on

@@ -43,11 +43,18 @@ const SOPS_BIN = findSopsBinary();
  * it is ciphertext, and the git blob is the copy to restore from.
  */
 function lineEndingProblem(file) {
-  const bytes = fs.readFileSync(file);
+  let bytes;
+  try {
+    bytes = fs.readFileSync(file);
+  } catch (e) {
+    return `${file} cannot be read: ${e.code ?? e.message}`;
+  }
   if (!bytes.includes(0x0d)) return null;
   return (
     `${file} has Windows (CRLF) line endings in this working copy, which SOPS cannot parse.\n` +
-    `       If git tracks it, the committed copy is fine; restore it (keep a copy first if you edited it):\n` +
+    `       If git tracks it, the committed copy is fine; restore it (keep a copy first if you edited it),\n` +
+    `       running each command on its own (git skips the file without the first):\n` +
+    `         git rm --cached -q ${file}\n` +
     `         git checkout HEAD -- ${file}`
   );
 }
@@ -175,6 +182,7 @@ switch (command) {
     console.log(`Opening ${fileToEdit} with SOPS editor...`);
     const proc = spawnSync(SOPS_BIN, [fileToEdit], { stdio: "inherit" });
     if (proc.error) console.error(proc.error.message);
+    if (proc.signal) console.error(`Stopped by ${proc.signal}.`);
     process.exit(proc.status ?? 1);
     break;
   }
@@ -249,6 +257,7 @@ switch (command) {
       env: injectedEnv,
     });
     if (proc.error) console.error(proc.error.message);
+    if (proc.signal) console.error(`Stopped by ${proc.signal}.`);
     process.exit(proc.status ?? 1);
     break;
   }

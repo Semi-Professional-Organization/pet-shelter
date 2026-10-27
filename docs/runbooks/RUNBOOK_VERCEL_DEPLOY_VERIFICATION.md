@@ -47,7 +47,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 Minimums enforced by `src/lib/security/secrets.ts`: `SESSION_SECRET` 32 characters,
 `ADMIN_SECRET_KEY` 16. `STAFF_INVITE_SECRET` has a *recommended* 16: a shorter value boots with a
 warning in the logs, so check the logs, not the boot, for it. These invite codes are refused at
-any length, and refusing them fails the boot: `HOPE2026`, `1234`, the seeded staff passwords
+any length (staff registration is disabled and the boot log says why; the site still serves):
+`HOPE2026`, `1234`, the seeded staff passwords
 (`admin123` and the rest), and any value this repository has published for a secret (a
 development default, an old `.env.example` placeholder, a former hardcoded fallback), in any
 letter case and with or without surrounding quotes. A value made only of quote marks,
@@ -87,7 +88,7 @@ Preview URLs are per-deployment, so no fixed `NEXT_PUBLIC_APP_URL` is correct th
 It does **not** carry `EMAIL_FROM`, `SHELTER_NOTIFICATION_EMAIL` or `NEXT_PUBLIC_APP_URL`, so it is
 not a complete production config on its own.
 
-> **Do not run `npm run secrets:decrypt:local`** to read them. `scripts/secrets.mjs:153` is a bare
+> **Do not run `npm run secrets:decrypt:local`** to read them. The `decrypt-to-local` case in `scripts/secrets.mjs` is a bare
 > `fs.writeFileSync` — it overwrites `.env.local` wholesale with no merge and no backup, destroying
 > any key the encrypted file lacks.
 

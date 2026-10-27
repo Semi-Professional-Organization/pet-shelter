@@ -30,7 +30,8 @@ so `sops_lastmodified` keeps its `\r`. Nothing needs re-encrypting; the git copy
 - `tests/unit/sopsConfig.test.ts` covers both with a fake `sops`, no key and no secret.
 
 **Still open:** decrypting the real file with the configured age key. That needs the owner's key,
-on the owner's machine: `git checkout HEAD -- .env.production.enc`, then `npm run secrets:check`
-(it prints only a key count). Delete this entry when that passes.
+on the owner's machine: `git rm --cached -q .env.production.enc`, then
+`git checkout HEAD -- .env.production.enc` (the first is needed, or git skips the file), then
+`npm run secrets:check` (it prints only a key count). Delete this entry when that passes.
 
 **Settles when:** the existing production environment can be decrypted with the configured age key, `npm run secrets:check` exits nonzero on a decryption failure, and a secret-free regression test covers the relevant CRLF/timestamp case.

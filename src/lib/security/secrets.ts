@@ -395,7 +395,7 @@ export function getStaffInviteSecret(): string {
  * encryption, so `crypto.ts` resolves it at module load and nothing that reads
  * a session can run without it. The other two each gate one feature, and their
  * accessors throw on every call in production, so a bad one disables only that
- * feature: `registerAction` refuses staff sign-up, and `getAdminPrincipal`
+ * feature: `registerAction` refuses staff sign-up, and `verifyAdminSession`
  * catches the throw and grants nothing to the legacy `admin_session` cookie.
  * Failing the boot for them took every public page down
  * (`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`).

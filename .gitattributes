@@ -27,4 +27,5 @@
 # `eol=lf`, not `-text`: `-text` would also stop `git add` normalising an
 # existing CRLF copy, so a CRLF blob could be committed. The blob has no CR, so
 # git never rewrites the ciphertext itself.
-.env.production.enc text eol=lf
+# Every *.enc, not only this one: `.sops.yaml` encrypts any of them.
+*.enc text eol=lf

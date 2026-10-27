@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loginAction, registerAction, logoutAction, getCurrentUserAction } from "@/actions/auth";
-import { resetUserStore } from "@/lib/server/userStore";
+import { findUserByEmail, resetUserStore } from "@/lib/server/userStore";
 import { ROLES } from "@/lib/security/rbac";
 
 // The configured invite secret for this suite. Deliberately not "1234" or
@@ -313,6 +313,26 @@ describe("Authentication Server Actions (Native Register & Login)", () => {
 
       expect(res.success).toBe(false);
       expect(res.error).toMatch(/Staff registration is unavailable/);
+      expect(cookieStore.get("hope_shelter_session")).toBeUndefined();
+    });
+
+    // The site now boots with a published invite secret, so the action is the
+    // only guard: submitting that same published code must create nothing.
+    it("creates no account in production when the invite secret is published and matched", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("STAFF_INVITE_SECRET", "HOPE2026");
+
+      const res = await registerAction({
+        name: "Published Code",
+        email: "published-code@test.com",
+        password: "ValidPassword123!",
+        role: ROLES.STAFF,
+        staffInviteCode: "HOPE2026",
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/Staff registration is unavailable/);
+      expect(await findUserByEmail("published-code@test.com")).toBeFalsy();
       expect(cookieStore.get("hope_shelter_session")).toBeUndefined();
     });
 
