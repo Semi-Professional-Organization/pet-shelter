@@ -10,19 +10,29 @@ import type { Pet } from "@/types/pet";
  * (`tests/unit/petHistory.test.ts`). Only a submitted list, `[]` included, replaces it.
  */
 function formFrom(pet: Pet): PetFormInput {
+  // The fields the dialog's edit `reset()` carries, and neither history collection.
   return {
     name: pet.name,
     species: pet.species,
     breed: pet.breed,
-    birthDate: pet.birthDate,
+    birthDate: pet.birthDate ?? "",
+    birthDateIsEstimate: pet.birthDateIsEstimate,
     gender: pet.gender,
     size: pet.size,
     weight: pet.weight,
     status: pet.status,
+    adoptionFee: pet.adoptionFee,
     description: pet.description,
+    rescueStory: pet.rescueStory,
     image: pet.image,
+    galleryImages: pet.galleryImages ?? [],
     tags: pet.tags,
-  } as PetFormInput;
+    featured: pet.featured,
+    intakeDate: pet.intakeDate,
+    isArchived: pet.isArchived ?? false,
+    ...pet.medical,
+    ...pet.compatibility,
+  };
 }
 
 describe("usePetStore.updatePet history", () => {

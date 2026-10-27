@@ -11,6 +11,7 @@ import {
   buildPetCreatePayload,
   buildPetUpdatePayload,
   mapDbPetToPet,
+  type PetHistoryReplacement,
 } from "./petMappers";
 import { registerStateReset } from "@/lib/stateResets";
 
@@ -251,7 +252,12 @@ export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<
   });
 }
 
-export async function updateServerPet(id: string, updated: Pet, actor: SessionUser): Promise<boolean> {
+export async function updateServerPet(
+  id: string,
+  updated: Pet,
+  actor: SessionUser,
+  replaceHistory: PetHistoryReplacement = {}
+): Promise<boolean> {
   let previous = serverPets.find((p) => p.id === id);
   if (!previous && isDatabasePersistent()) {
     const fromDb = await findServerPetByIdAsync(id);
@@ -264,12 +270,17 @@ export async function updateServerPet(id: string, updated: Pet, actor: SessionUs
   }
 
   try {
+    // A collection is cleared and rewritten only when the caller says it is replacing it. The rows
+    // carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is never a
+    // no-op, and the caller's copy may be an in-memory mirror older than the database.
     await prisma.$transaction([
-      prisma.petUpdate.deleteMany({ where: { petId: id } }),
-      prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } }),
+      ...(replaceHistory.updates ? [prisma.petUpdate.deleteMany({ where: { petId: id } })] : []),
+      ...(replaceHistory.medicalTimeline
+        ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } })]
+        : []),
       prisma.pet.update({
         where: { id },
-        data: buildPetUpdatePayload(updated),
+        data: buildPetUpdatePayload(updated, replaceHistory),
       }),
     ]);
   } catch (err) {

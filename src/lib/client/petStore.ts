@@ -133,12 +133,8 @@ export function usePetStore() {
         rehabProgressPercent: input.rehabProgressPercent,
         // Matches the server action: an absent collection keeps what is stored, and only a
         // submitted list (an explicit `[]` included) replaces it — issue #107.
-        updates:
-          input.updates !== undefined ? sortHistoryByDate(input.updates) : pets[index].updates,
-        medicalTimeline:
-          input.medicalTimeline !== undefined
-            ? sortHistoryByDate(input.medicalTimeline)
-            : pets[index].medicalTimeline,
+        updates: sortHistoryByDate(input.updates) ?? pets[index].updates,
+        medicalTimeline: sortHistoryByDate(input.medicalTimeline) ?? pets[index].medicalTimeline,
         isArchived: input.isArchived ?? pets[index].isArchived ?? false,
         deletedAt: input.deletedAt !== undefined ? input.deletedAt : pets[index].deletedAt,
         medical: {

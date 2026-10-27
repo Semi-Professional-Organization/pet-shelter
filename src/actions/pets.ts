@@ -317,12 +317,10 @@ export async function updatePet(
       // submitted list (an explicit `[]` included) replaces the stored rows. The admin edit dialog
       // manages neither collection and sends neither key, so treating omission as "clear" deleted
       // every clinical event and progress update on any ordinary edit (issue #107).
-      updates:
-        validated.updates !== undefined ? sortHistoryByDate(validated.updates) : existing.updates,
-      medicalTimeline:
-        validated.medicalTimeline !== undefined
-          ? sortHistoryByDate(validated.medicalTimeline)
-          : existing.medicalTimeline,
+      // The mirror's copy is kept for the returned pet only; `updateServerPet` below is told not to
+      // touch the stored rows at all.
+      updates: sortHistoryByDate(validated.updates) ?? existing.updates,
+      medicalTimeline: sortHistoryByDate(validated.medicalTimeline) ?? existing.medicalTimeline,
       galleryImages: validated.galleryImages || existing.galleryImages || [],
       isArchived: validated.isArchived ?? existing.isArchived ?? false,
       deletedAt: validated.deletedAt !== undefined ? validated.deletedAt : existing.deletedAt,
@@ -340,7 +338,10 @@ export async function updatePet(
       },
     });
 
-    await updateServerPet(id, updated, actor);
+    await updateServerPet(id, updated, actor, {
+      updates: validated.updates !== undefined,
+      medicalTimeline: validated.medicalTimeline !== undefined,
+    });
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
     // after editing a description, or reordering the existing gallery, notifies
