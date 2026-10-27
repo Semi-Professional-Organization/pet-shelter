@@ -9,9 +9,8 @@ issue to put in its place, and the note offers no settled reading. Removing #157
 silence it would plan an unlink from #191 and lose its completed-progress link, so the note has no
 clean answer today.
 
-Declined in #197 as a behaviour change beyond that PR. Telling the two apart needs the history, not
-the titles (a rename usually rewords the title too): git rename detection on the commit that removed
-the entry, or the close comment the ledger sync posts, which names that commit.
+Declined in #197 as a behaviour change beyond that PR. No way to tell a settle from a rename has
+been designed or tested yet.
 
 **Settles when:** a closed member whose entry was settled reads as done, not as a rename to fix, in
 the dry run.

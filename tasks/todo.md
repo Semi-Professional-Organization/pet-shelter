@@ -25,23 +25,26 @@ Record active multi-step work streams below.
 
 ## Review
 
-`/code-review xhigh` on #197, at the owner's request. Fixed: the squash body is drafted in the PR
-description and used at merge, since the repo's default would carry the already-shipped #195
-commit and two superseded messages into it; the stale open entry is
-updated; the group summary now covers the issue and ledger scripts. 77c2960's message says #182
-appeared after the grouping ran; it came from the ledger sync that ran alongside the first
-`--apply`, nine seconds before #183, and the drafted squash body says so. Round 2 found the entry
-crediting the sync with closing #157: #195's body ("the ledger sync closes #157") was a closing
-keyword, so GitHub closed it. Fixed; any PR body naming an issue after "closes" does the same.
+`/code-review xhigh` on #197, at the owner's request, six rounds. No code bug was found; every
+finding was a claim. Fixed:
 
-Deliberately not done, each a behaviour change beyond this PR: letting a new `tasks/open` entry
-name its group, since its issue exists only after merge and so cannot be grouped in its own PR
-(`tasks/open/new-ledger-entries-land-in-no-issue-group.md`); an
-automatic `--apply` on push to master (already rejected in the issue-groups decision); and a
-clearer note for a closed member whose entry was settled rather than renamed
-(`tasks/open/issue-groups-calls-a-settled-member-renamed.md`). Both new entries will themselves
-land ungrouped, which is the first entry's point. The branch carries a merge of its own already-squashed history,
-so `git cherry` will keep showing e58836b as unshipped; its tree equals 5aea5bb.
+- The stale open entry now records what was observed, and that #195's closing keyword, not the
+  sync, closed #157: any PR body that names an issue after "closes" does the same.
+- The group summary covers the issue and ledger scripts.
+- The squash message is drafted in the PR description and used at merge. The repo's default would
+  carry every branch commit's message, including the already-shipped #195 one and 0bb9aaf's
+  claim later shown false. 77c2960 also says #182 appeared after the grouping ran; the real cause
+  is that the grouping file was written before #182 existed.
+- Rounds 4 to 6 kept finding untested designs in the two new follow-up entries, so the entries now
+  state only the problem and what settles it.
+
+Deliberately not done, each a behaviour change beyond this PR: grouping a new entry's issue without
+a second pull request (`tasks/open/new-ledger-entries-land-in-no-issue-group.md`); an automatic
+`--apply` on push to master (already rejected in the issue-groups decision); and a settled reading
+for a closed member (`tasks/open/issue-groups-has-no-settled-reading-for-a-closed-member.md`). Both
+new entries will themselves land ungrouped, which is the first entry's point. The branch carries a
+merge of its own already-squashed history, so `git cherry` will keep showing e58836b as unshipped;
+its tree equals 5aea5bb.
 
 # The context meter's root-cause pass
 
