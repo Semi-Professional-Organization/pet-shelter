@@ -5,6 +5,7 @@ import {
 } from "@/lib/security/adminSession";
 import { sealSession, SESSION_COOKIE_NAME } from "@/lib/security/session";
 import { getAuditLogs } from "@/lib/domain/auditLog";
+import { DEV_SECRET_DEFAULTS } from "@/lib/security/secrets";
 import {
   getPublicPets,
   getAdminPets,
@@ -150,6 +151,18 @@ describe("Security & Route Protection (verifyAdminSession)", () => {
     const principal = await verifyAdminSession();
     expect(principal?.id).toBe(LEGACY_ADMIN_TOKEN_PRINCIPAL.id);
     expect(principal?.email).not.toBe(VOLUNTEER.email);
+  });
+
+  // Production now boots with a refused admin key (only SESSION_SECRET stops
+  // the boot), so this is the guard: a cookie carrying the published default
+  // must authorize nothing.
+  it("grants nothing in production when the admin key is the published default", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("ADMIN_SECRET_KEY", DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY);
+    mockCookieMap.set("admin_session", { value: DEV_SECRET_DEFAULTS.ADMIN_SECRET_KEY });
+
+    const principal = await verifyAdminSession();
+    expect(principal).toBeNull();
   });
 
   it("returns null when no session and invalid secret cookie", async () => {

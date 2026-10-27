@@ -52,6 +52,14 @@ function lineEndingProblem(file) {
   );
 }
 
+/** Exits 1 with the line-ending diagnosis before a CRLF file reaches `sops`. */
+function refuseCrlf(file) {
+  const problem = lineEndingProblem(file);
+  if (!problem) return;
+  console.error(problem);
+  process.exit(1);
+}
+
 function parseDotenv(content) {
   const env = {};
   const lines = content.split(/\r?\n/);
@@ -122,9 +130,14 @@ switch (command) {
       failed = true;
     }
 
-    // 4. Test decrypting target file if it exists
-    const crlf = fs.existsSync(targetFile) && lineEndingProblem(targetFile);
-    if (!fs.existsSync(targetFile)) {
+    // 4. Test decrypting target file if it exists. Missing is a failure only
+    // when a file was named: the default may not exist yet on a first setup.
+    const exists = fs.existsSync(targetFile);
+    const crlf = exists && lineEndingProblem(targetFile);
+    if (!exists && process.argv[3]) {
+      console.error(`[FAIL] ${targetFile} does not exist.`);
+      failed = true;
+    } else if (!exists) {
       console.log(`[INFO] Target file ${targetFile} does not exist yet.`);
     } else if (crlf) {
       console.error(`[FAIL] ${crlf}`);
@@ -147,7 +160,8 @@ switch (command) {
         failed = true;
       }
     }
-    process.exit(failed ? 1 : 0);
+    // exitCode, not exit(): lets Node flush piped stdout/stderr first.
+    process.exitCode = failed ? 1 : 0;
     break;
   }
 
@@ -157,11 +171,7 @@ switch (command) {
       console.error(`File ${fileToEdit} does not exist. Create or encrypt it first.`);
       process.exit(1);
     }
-    const crlf = lineEndingProblem(fileToEdit);
-    if (crlf) {
-      console.error(crlf);
-      process.exit(1);
-    }
+    refuseCrlf(fileToEdit);
     console.log(`Opening ${fileToEdit} with SOPS editor...`);
     const proc = spawnSync(SOPS_BIN, [fileToEdit], { stdio: "inherit" });
     if (proc.error) console.error(proc.error.message);
@@ -176,11 +186,7 @@ switch (command) {
       console.error(`Encrypted source file ${sourceEncFile} not found.`);
       process.exit(1);
     }
-    const crlf = lineEndingProblem(sourceEncFile);
-    if (crlf) {
-      console.error(crlf);
-      process.exit(1);
-    }
+    refuseCrlf(sourceEncFile);
     console.log(`Decrypting ${sourceEncFile} -> ${destFile}...`);
     const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", sourceEncFile], {
       encoding: "utf-8",
@@ -217,11 +223,7 @@ switch (command) {
       console.error(`Encrypted file ${encFile} not found.`);
       process.exit(1);
     }
-    const crlf = lineEndingProblem(encFile);
-    if (crlf) {
-      console.error(crlf);
-      process.exit(1);
-    }
+    refuseCrlf(encFile);
 
     const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", encFile], {
       encoding: "utf-8",

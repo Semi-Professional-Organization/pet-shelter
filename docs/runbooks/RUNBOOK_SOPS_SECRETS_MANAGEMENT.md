@@ -187,7 +187,7 @@ To enable GitHub Actions to decrypt secrets during testing or deployment:
 
 The working copy of `.env.production.enc` has Windows (CRLF) line endings. SOPS's dotenv parser
 splits on LF only, so every value keeps a carriage return and the timestamp fails first. The
-committed file is LF, and `.gitattributes` marks it `-text` so `core.autocrlf` leaves it alone.
+committed file is LF, and `.gitattributes` marks it `text eol=lf` so it is always checked out LF.
 A copy checked out before that rule is restored with:
 
 ```bash

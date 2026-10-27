@@ -246,6 +246,14 @@ describe("assertSecretsConfigured", () => {
       expect(error).not.toHaveBeenCalled();
     });
 
+    it("names only the fatal secret as the reason the boot is refused", () => {
+      vi.stubEnv("SESSION_SECRET", undefined);
+      vi.stubEnv("ADMIN_SECRET_KEY", undefined);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+
+      expect(() => assertSecretsConfigured()).toThrow(/^Refusing to start: SESSION_SECRET unsafe for production\. 2 /);
+    });
+
     it("still refuses to boot when only the session secret is unsafe", () => {
       vi.stubEnv("SESSION_SECRET", undefined);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
@@ -612,7 +620,8 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
       vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      expect(() => assertSecretsConfigured()).not.toThrow();
+      // The accessor, not the boot: a refused admin key no longer throws there.
+      expect(getAdminSecretKey()).toBe("7d3e1a95c4820bf'");
     });
 
     it("keeps the length minimum for every other secret", () => {
@@ -772,7 +781,7 @@ describe(".env.example authentication secrets", () => {
     expect(documented[name]).toBe(devDefault);
   });
 
-  it.each(SECRETS)("refuses to boot production with the documented %s", (name, _devDefault, accessor) => {
+  it.each(SECRETS)("refuses the documented %s in production", (name, _devDefault, accessor) => {
     expect(documented[name], `${name} is not documented in .env.example`).toBeDefined();
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv(name, documented[name]);

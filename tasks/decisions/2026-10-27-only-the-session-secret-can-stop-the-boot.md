@@ -30,8 +30,8 @@ public site either; it would be a site that fails later and less clearly.
 ## Reversible, and why someone might
 
 If a disabled feature is judged worse than an outage (for example, staff cannot sign up for days
-because nobody reads the logs), the throw can return for that secret by setting `fatal: true` in
-`BOOT_CHECKS` in `src/lib/security/secrets.ts`. The cost is the 2026-10-17 outage shape again.
+because nobody reads the logs), the throw can return for that secret by deleting its `disables`
+from its `BOOT_CHECKS` entry in `src/lib/security/secrets.ts`; the boot error then names it. The cost is the 2026-10-17 outage shape again.
 
 ## Not done here
 

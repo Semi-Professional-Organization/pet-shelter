@@ -24,10 +24,10 @@
  * `minLength`" alone into a warning. Only `STAFF_INVITE_SECRET` does. The other
  * three cases are refused regardless.
  *
- * This module imports nothing from the project except `./publishedPasswords`,
- * which itself imports nothing (layer L-B5): it sits below the rest of
- * `src/lib/security/` and must stay importable from any layer, server or
- * client-adjacent, without dragging dependencies in.
+ * This module imports nothing from the project except `./publishedPasswords`
+ * and `@/lib/stateResets`, neither of which imports anything (layer L-B5): it
+ * sits below the rest of `src/lib/security/` and must stay importable from any
+ * layer, server or client-adjacent, without dragging dependencies in.
  */
 
 import { PUBLISHED_STAFF_PASSWORDS } from "./publishedPasswords";
@@ -400,11 +400,12 @@ export function getStaffInviteSecret(): string {
  * Failing the boot for them took every public page down
  * (`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`).
  */
-const BOOT_CHECKS: readonly { accessor: () => string; disables?: string }[] = [
-  // No `disables`: a bad session secret stops the boot.
-  { accessor: getSessionSecret },
-  { accessor: getAdminSecretKey, disables: "the legacy admin_session cookie" },
-  { accessor: getStaffInviteSecret, disables: "staff registration" },
+const BOOT_CHECKS: readonly { name: string; accessor: () => string; disables?: string }[] = [
+  // No `disables`: a bad session secret stops the boot. Deleting an entry's
+  // `disables` is how a secret is made fatal again.
+  { name: "SESSION_SECRET", accessor: getSessionSecret },
+  { name: "ADMIN_SECRET_KEY", accessor: getAdminSecretKey, disables: "the legacy admin_session cookie" },
+  { name: "STAFF_INVITE_SECRET", accessor: getStaffInviteSecret, disables: "staff registration" },
 ];
 
 /**
@@ -426,7 +427,7 @@ const BOOT_CHECKS: readonly { accessor: () => string; disables?: string }[] = [
 export function assertSecretsConfigured(): void {
   const failures: string[] = [];
   const disabled: string[] = [];
-  let fatal = false;
+  const fatal: string[] = [];
 
   for (const check of BOOT_CHECKS) {
     try {
@@ -437,12 +438,12 @@ export function assertSecretsConfigured(): void {
       if (check.disables) {
         disabled.push(`${error.message} Until it is fixed, ${check.disables} is disabled.`);
       } else {
-        fatal = true;
+        fatal.push(check.name);
       }
     }
   }
 
-  if (!fatal) {
+  if (fatal.length === 0) {
     // Only once the boot is known to go ahead, so "serving" is never said of a refused boot.
     for (const line of disabled) {
       console.error(`[security/secrets] ${line} The rest of the site is serving.`);
@@ -451,7 +452,7 @@ export function assertSecretsConfigured(): void {
   }
 
   throw new SecretConfigurationError(
-    `Refusing to start: SESSION_SECRET is unsafe for production. ` +
+    `Refusing to start: ${fatal.join(", ")} unsafe for production. ` +
       `${failures.length} authentication secret(s) need fixing:\n` +
       failures.map((failure) => `  - ${failure}`).join("\n")
   );

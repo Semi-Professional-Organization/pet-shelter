@@ -56,11 +56,27 @@ describe("SOPS & age Configuration Guards", () => {
     expect(fs.existsSync(scriptPath)).toBe(true);
   });
 });
+// #69, on every platform: Windows with core.autocrlf=true is where it happens.
+describe("the committed encrypted environment file", () => {
+  const rootDir = path.resolve(__dirname, "../../");
+  const ENC = ".env.production.enc";
+
+  it("is LF in git and checked out as LF everywhere", () => {
+    const blob = execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir });
+    expect(blob.includes(0x0d)).toBe(false);
+    const attr = execFileSync("git", ["check-attr", "eol", "--", ENC], { cwd: rootDir, encoding: "utf-8" });
+    expect(attr.trim()).toBe(`${ENC}: eol: lf`);
+  });
+});
+
 /**
  * #69: `npm run secrets:check` printed `parsing time "...Z\x0d"` and exited 0.
  * The `\r` came from a CRLF working copy (`core.autocrlf=true`); SOPS's dotenv
  * parser splits on LF only. A fake `sops` stands in for the real one, so these
- * need no key and no secret. POSIX only: the fake is a shell script.
+ * need no key and no secret.
+ *
+ * ceiling: POSIX only, because the fake is a shell script; Windows runs the
+ * git-level test above but not these. Upgrade path: a `sops.cmd` fake.
  */
 describe.skipIf(process.platform === "win32")("secrets:check", () => {
   const rootDir = path.resolve(__dirname, "../../");
@@ -78,6 +94,7 @@ describe.skipIf(process.platform === "win32")("secrets:check", () => {
         "#!/bin/sh",
         `echo "$@" >> "${calls}"`,
         'if [ "$1" = "--version" ]; then echo "sops 3.9.4"; exit 0; fi',
+        'if [ -n "$FAKE_SOPS_OK" ]; then printf "A=1\\nB=2\\n"; exit 0; fi',
         `echo 'parsing time "2026-08-27T16:18:08Z\\x0d": extra text: "\\x0d"' >&2`,
         "exit 1",
       ].join("\n"),
@@ -89,27 +106,38 @@ describe.skipIf(process.platform === "win32")("secrets:check", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  function check(file: string) {
+  function check(file: string, extraEnv: Record<string, string> = {}) {
     return spawnSync(process.execPath, [path.join(rootDir, "scripts", "secrets.mjs"), "check", file], {
       cwd: rootDir,
       encoding: "utf-8",
-      env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, SOPS_AGE_KEY: "unused" },
+      env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, SOPS_AGE_KEY: "unused", ...extraEnv },
     });
   }
 
-  it("keeps the committed encrypted file LF and out of line-ending conversion", () => {
-    const blob = execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir });
-    expect(blob.includes(0x0d)).toBe(false);
-    const attr = execFileSync("git", ["check-attr", "text", "--", ENC], { cwd: rootDir, encoding: "utf-8" });
-    expect(attr.trim()).toBe(`${ENC}: text: unset`);
+  function committedCopy() {
+    // The committed blob, not the working copy, which may predate the eol rule.
+    const committed = path.join(dir, "committed.enc");
+    fs.writeFileSync(committed, execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir }));
+    return committed;
+  }
+
+  it("exits zero and prints only a key count when decryption works", () => {
+    const result = check(committedCopy(), { FAKE_SOPS_OK: "1" });
+
+    expect(result.stdout).toMatch(/\[OK\] Successfully decrypted .* \(2 keys configured\)/);
+    expect(result.stdout).not.toMatch(/A=1/);
+    expect(result.status).toBe(0);
+  });
+
+  it("exits nonzero when a named file does not exist", () => {
+    const result = check(path.join(dir, "missing.enc"));
+
+    expect(result.stderr).toMatch(/\[FAIL\] .*missing\.enc does not exist/);
+    expect(result.status).toBe(1);
   });
 
   it("exits nonzero when decryption fails", () => {
-    // The committed blob, not the working copy, which may predate `-text`.
-    const committed = path.join(dir, "committed.enc");
-    fs.writeFileSync(committed, execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir }));
-
-    const result = check(committed);
+    const result = check(committedCopy());
 
     expect(result.stderr).toMatch(/\[FAIL\] Decrypting/);
     expect(result.status).toBe(1);

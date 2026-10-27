@@ -24,5 +24,7 @@
 # return on every line and decryption fails on `sops_lastmodified`
 # ("parsing time ...\x0d", tasks/open history, #69). The committed blob is LF;
 # this keeps `core.autocrlf=true` from converting it in the working tree.
-# `-text` rather than `eol=lf`: the file is ciphertext, never to be rewritten.
-.env.production.enc -text
+# `eol=lf`, not `-text`: `-text` would also stop `git add` normalising an
+# existing CRLF copy, so a CRLF blob could be committed. The blob has no CR, so
+# git never rewrites the ciphertext itself.
+.env.production.enc text eol=lf

@@ -22,7 +22,9 @@ Measured, not asserted: the committed blob of `.env.production.enc` holds **no**
 owner's Windows checkout converts the file to CRLF, and SOPS's dotenv parser splits on LF only,
 so `sops_lastmodified` keeps its `\r`. Nothing needs re-encrypting; the git copy is intact.
 
-- `.gitattributes` now marks the file `-text`, so git never converts it again.
+- `.gitattributes` now marks the file `text eol=lf`, so it is always checked out LF and a CRLF
+  copy is normalised on `git add`. (`-text` was tried first; review found it let `git add` commit
+  the CRLF bytes.)
 - `scripts/secrets.mjs` refuses a CRLF copy by name in `check`, `decrypt-to-local` and `run`,
   with the restore command, and `check` exits 1 on any `[FAIL]`.
 - `tests/unit/sopsConfig.test.ts` covers both with a fake `sops`, no key and no secret.

@@ -8,9 +8,10 @@ import { assertSecretsConfigured } from "@/lib/security/secrets";
  * site (`BOOT_CHECKS` in `secrets.ts`).
  *
  * Deliberately not guarded on `NEXT_RUNTIME`: `secrets.ts` imports only
- * `publishedPasswords.ts` (which imports nothing) and only reads `process.env`,
- * so it is safe on both the Node.js and Edge runtimes, and a bad session
- * secret should fail the boot on either. Keep both files free of Node-only imports.
+ * `publishedPasswords.ts` and `stateResets.ts` (which import nothing) and only
+ * reads `process.env`, so it is safe on both the Node.js and Edge runtimes, and
+ * a bad session secret should fail the boot on either. Keep all three free of
+ * Node-only imports.
  *
  * In development and test this throws nothing; it surfaces the one-time warning
  * for each weak secret at startup instead of on the first request that needs one.

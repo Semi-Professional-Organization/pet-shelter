@@ -31,7 +31,7 @@ Record active multi-step work streams below.
 
 - [x] Only `SESSION_SECRET` is fatal at boot; the other two are logged with the feature they
       disable (`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`).
-- [x] `.env.production.enc` is `-text`; `secrets.mjs` refuses CRLF and `check` exits 1 on `[FAIL]`.
+- [x] `.env.production.enc` is `text eol=lf`; `secrets.mjs` refuses CRLF and `check` exits 1 on `[FAIL]`.
 - [ ] Decrypting the real file with the owner's age key: owner's machine only, kept open in
       `tasks/open/sops-encrypted-env-timestamp-crlf-breaks-decryption.md`.
 - Deliberately not done: catching the CRLF case by stripping `\r` in memory before calling
