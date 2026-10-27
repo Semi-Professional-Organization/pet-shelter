@@ -28,6 +28,12 @@ When a database is configured and a pet read fails outside strict mode,
   missing settings row returns the shipped defaults, because the row is created by the first
   admin save. Both written down at the reader.
 
+This narrows `tasks/lessons/2026-09-04-a-dual-layer-fallback-must-never-let-a-swallowed-database-error-fail.md`
+for one write. That lesson is about the fallback mode, where no database is configured and a
+Prisma call is expected to throw; the application insert only runs when a database *is*
+configured, and there a swallowed failure is a lost application. Do not "restore" the swallow
+on the strength of the lesson.
+
 With **no database configured** the mirror is the whole store and the ledgers are in memory too,
 so these paths still answer from it. That mode is for development and tests.
 

@@ -40,6 +40,11 @@ The owner decided `src/data/pets.json` must not be used on a write or payment pa
 - [x] typecheck, lint (0 errors), docs:check, test:all, build: green locally.
 - [x] New tests fail against master (8 of 11 in the outage file); the #65 file pins existing
   behaviour, so it passes on both, as its settle condition asks.
+- [x] Three `/code-review` rounds. Fixed: a double log, copy that claimed an unconfirmed insert
+  saved nothing, two stale comments. Declined with reasons in the PR: strict-mode wrapping of
+  the pet read, raw P2002 text on an `id` collision (pre-existing), status guards on checkout
+  (the status-guards pull request), a shared error base class. Recorded:
+  `tasks/open/a-failed-settings-save-is-served-as-saved.md`.
 
 # The context meter's root-cause pass
 

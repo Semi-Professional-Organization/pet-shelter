@@ -77,7 +77,7 @@ const APPLICATION_STORE_UNAVAILABLE_MESSAGE =
  * also lands here, so this cannot claim nothing was saved; it says what is known instead.
  */
 const APPLICATION_WRITE_UNCONFIRMED_MESSAGE =
-  "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes; if it turns out both attempts were saved, the shelter will treat them as one application.";
+  "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes.";
 
 /**
  * True for a unique violation that names the `referenceCode` index.
@@ -234,7 +234,8 @@ export async function submitApplication(
         // `handlePersistenceError(…, "write")`, and outside strict mode that swallows anything
         // but P2002 — so the row never reached the database, survived only in the in-memory
         // mirror until the next restart, and the applicant was still told `success: true` and
-        // given a reference code.
+        // given a reference code. (A refused insert now fails the submission instead; see
+        // `insertServerApplication`.)
         //
         // `petName` — it was taken from the request while the resolved animal sat in scope, and
         // two places downstream treat that name as identifying. `atomicUpdateApplicationStatus`
