@@ -4,7 +4,7 @@ import { validatePetTransition } from "@/lib/domain/stateMachine";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
-import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
+import { handlePersistenceError, isDatabasePersistent, isStrictPersistence } from "@/lib/persistenceMode";
 import { withDerivedAge } from "@/lib/domain/petAge";
 import {
   DbPetRecord,
@@ -106,8 +106,22 @@ export async function getStoredGalleryImages(id: string): Promise<string[] | nul
 }
 
 /**
- * Reads one animal from PostgreSQL with full relations, syncing it to the
- * in-memory mirror cache on the way back.
+ * The database could not be asked about an animal, on a path that must not
+ * answer from the mirror. Carries the underlying error as `cause`.
+ */
+export class PetStoreUnavailableError extends Error {
+  readonly cause?: unknown;
+  constructor(id: string, cause?: unknown) {
+    // JSON-quoted: the id is caller-supplied, so a newline in it cannot forge a log line.
+    super(`Could not read pet ${JSON.stringify(id)} from the database`);
+    this.name = "PetStoreUnavailableError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Reads one animal for **display**, falling back to the mirror when the
+ * database cannot answer.
  *
  * **"No such row" is an answer, not an outage.** A successful query that found
  * nothing returns `null`; the mirror is reached only when the query *threw*, or
@@ -121,26 +135,19 @@ export async function getStoredGalleryImages(id: string): Promise<string[] | nul
  * a third case they do not: no database configured at all, where there is
  * nothing to ask and the mirror is the whole store.
  *
- * **What this does not close: the `catch` path still serves fixtures.** A
- * transient read failure in non-strict mode — which is every deployed
- * environment; `STRICT_PERSISTENCE` is set only by `vitest.config.mts` and the
- * `test:integration` script — falls
- * back to the mirror, and for an id that really is in `pets.json` that means
- * the demo animal, at its exact URL, with `getPetById`'s exact-id guard
- * satisfied. Deliberate, because serving a stale read beats serving an error,
- * and recorded in `tasks/open/an-outage-serves-and-bills-fixture-animals.md`
- * because on this path it is also what a sponsorship pledge gets billed to.
+ * **Display only.** On a non-strict outage the `catch` serves the mirror, which
+ * is seeded from `src/data/pets.json`, so for a fixture id this returns the
+ * demo animal. A profile page may show that for the length of an outage; a path
+ * that writes a record or takes a pledge may not, and uses
+ * {@link findPetForWriteAsync} instead
+ * (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`).
  *
  * It used to fall through to the mirror on both exits, which published demo
  * data: an id present in `src/data/pets.json` but absent from a populated
- * database was served at its exact URL — `/pets` omitted it, because the
- * catalogue returns whatever the database returned, so the animal was
- * unreachable from the grid and reachable by direct link — and sponsorship
- * checkout recorded pledges against the fixture's name. A hard-deleted row, or
- * a fixture id production was never seeded with, was enough. Pinned by
+ * database was served at its exact URL. Pinned by
  * `tests/integration/petMissingRowIsAnAnswer.test.ts`;
  * `tasks/decisions/2026-09-22-a-pet-the-database-lacks-is-a-missing-pet.md`
- * carries the reasoning and the one case this deliberately stops serving.
+ * carries the reasoning.
  */
 export async function findServerPetByIdAsync(id: string): Promise<Pet | null> {
   const norm = id.trim().toLowerCase();
@@ -162,6 +169,42 @@ export async function findServerPetByIdAsync(id: string): Promise<Pet | null> {
   return findServerPetById(id);
 }
 
+/**
+ * Reads one animal for a path that **writes a record or takes a pledge**.
+ *
+ * The same row as {@link findServerPetByIdAsync}, without its outage fallback:
+ * when a database is configured and the query throws, this throws
+ * {@link PetStoreUnavailableError} rather than answering from the mirror, so
+ * the caller refuses instead of acknowledging an application or a pledge
+ * against a `src/data/pets.json` demo animal. Under strict persistence the
+ * query's own error is rethrown verbatim, as `handlePersistenceError` does
+ * everywhere else, so a broken query is not mistaken for an outage in tests.
+ *
+ * **The `pets` row only, and the mirror is left alone.** The callers read the
+ * id, name, breed, status and archive flag, so the returned pet carries no
+ * `updates` or `medicalTimeline`. Without the joins, a fault in those tables
+ * cannot refuse an adoption or a pledge, and an anonymous POST no longer
+ * reorders the mirror that `markCachedPetAdopted` searches.
+ *
+ * With no database configured the mirror is the whole store, the ledgers it
+ * would be written to are in memory as well, and it is answered from there.
+ */
+export async function findPetForWriteAsync(id: string): Promise<Pet | null> {
+  if (!isDatabasePersistent()) return findServerPetById(id);
+  let row;
+  try {
+    row = await prisma.pet.findUnique({ where: { id: id.trim() } });
+  } catch (err) {
+    if (isStrictPersistence()) throw err;
+    console.error(
+      `[Database Store] Pet read for a write path failed for ${JSON.stringify(id.trim())}:`,
+      err instanceof Error ? err.message : err
+    );
+    throw new PetStoreUnavailableError(id.trim(), err);
+  }
+  return row ? mapDbPetToPet(row as unknown as DbPetRecord) : null;
+}
+
 export function findServerPetById(id: string): Pet | null {
   const norm = id.trim().toLowerCase();
   return serverPets.find((p) => p.id.toLowerCase() === norm) || null;
@@ -177,8 +220,9 @@ export function findServerPetById(id: string): Pet | null {
  *
  * That mattered because the order is publicly influenceable:
  * `findServerPetByIdAsync` moves every animal it reads to the head of this
- * array, and that read sits behind an anonymous profile GET and an
- * unauthenticated adoption POST. So a visitor could choose which of two
+ * array, and that read sits behind an anonymous profile GET (and, until
+ * 2026-10-27, an unauthenticated adoption POST, which now reads with
+ * `findPetForWriteAsync` and leaves the array alone). So a visitor could choose which of two
  * same-named animals `atomicUpdateApplicationStatus` marks on approval — and,
  * with no database, the caller writes the returned id into the
  * `PET_STATUS_TRANSITION_ADOPTED` audit row (with one, the row comes from the

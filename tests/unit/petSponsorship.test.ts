@@ -312,7 +312,7 @@ describe("createPetSponsorshipAction", () => {
     expect(result.error).not.toMatch(/[{}\[\]"]/);
   });
 
-  it("stores the authoritative fixture name even when the animal has no database row", async () => {
+  it("stores the store's name, not the submitted one, with no database configured", async () => {
     const result = await createPetSponsorshipAction(
       input({ petId: "pet-001", petName: "Forged or stale name" })
     );
@@ -329,7 +329,7 @@ describe("createPetSponsorshipAction", () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/could not confirm that a pledge was recorded/i);
+    expect(result.error).toMatch(/could not find that animal/i);
   });
 
   it("never attaches a caller-supplied supporter account id", async () => {

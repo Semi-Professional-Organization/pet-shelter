@@ -25,6 +25,7 @@ import { checkAddressRateLimit } from "@/lib/security/clientAddress";
 import { withIdempotency } from "@/lib/security/idempotency";
 import {
   getServerApplicationsAsync,
+  ApplicationWriteError,
   insertServerApplication,
   atomicUpdateApplicationStatus,
   deleteServerApplication,
@@ -40,7 +41,11 @@ import {
   combineInterviewDateTime,
   splitInterviewDateTime,
 } from "@/lib/domain/applicationWorkflow";
-import { findServerPetById, findServerPetByIdAsync } from "@/lib/server/petRepository";
+import {
+  PetStoreUnavailableError,
+  findPetForWriteAsync,
+  findServerPetById,
+} from "@/lib/server/petRepository";
 import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
 import {
   sendApplicationConfirmationEmail,
@@ -59,6 +64,20 @@ export async function getApplications(): Promise<AdoptionApplicationRecord[]> {
 }
 
 const MAX_REFERENCE_CODE_ATTEMPTS = 5;
+
+/**
+ * What an applicant is told when the animal could not be read. Nothing was written, so it
+ * says so and asks for a retry.
+ */
+const APPLICATION_STORE_UNAVAILABLE_MESSAGE =
+  "We could not submit your application because our adoption records are unavailable right now. Nothing was submitted; please try again in a few minutes.";
+
+/**
+ * What an applicant is told when the insert failed. A connection lost after Postgres committed
+ * also lands here, so this cannot claim nothing was saved; it says what is known instead.
+ */
+const APPLICATION_WRITE_UNCONFIRMED_MESSAGE =
+  "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes.";
 
 /**
  * True for a unique violation that names the `referenceCode` index.
@@ -133,36 +152,36 @@ export async function submitApplication(
 
     // 2. The target animal: it must exist, not be archived, and be adoptable.
     //
-    // The first two lines are `getPetById`'s guard in `src/actions/pets.ts`, deliberately
-    // identical, and **that comment is the long form of both** — not restated here, so the two
-    // copies cannot drift into disagreeing explanations of the same three lines. This is the
-    // second site carrying it; a third wants `findVisiblePetById` in the repository instead.
+    // The first two lines are the same checks as `getPetById`'s guard in `src/actions/pets.ts`,
+    // whose comment explains them, but over a different reader: that page uses the display reader,
+    // which may answer from the mirror during an outage, and this uses `findPetForWriteAsync`,
+    // which may not. Sponsorship checkout is the third site carrying the exact-id and archive checks
+    // (not the status check: whether an adopted animal may still be sponsored is the status-guards
+    // work's call), so the extraction into the repository is now due —
+    // `tasks/open/three-copies-of-the-pet-visibility-guard.md`.
     //
     // Placed after the rate limits on purpose. This is a database query on an unauthenticated
     // POST; the mirror read it replaces was free, so leaving it above the budgets would hand
     // an anonymous caller one `findUnique` per request with nothing bounding it.
     //
-    // The exact-id comparison is **not** redundant, though what it covers narrowed when
-    // `findServerPetByIdAsync` began returning null after a successful empty read (#89). Where the
-    // database answers, a case-variant is now simply not found. Where it does not — no database
-    // configured, or a read that threw and was swallowed — the mirror still answers, and its
-    // lookup lowercases while Postgres does not, so `PET-001` resolves to fixture `pet-001`,
-    // Available and unarchived there. That is the one route left to this comparison, and it is
-    // load-bearing on it: deleting the comparison leaves the strict-mode suite entirely green.
-    // `tests/integration/adoptionSubmissionGuards.test.ts` covers it on the mirror route for
-    // exactly that reason.
+    // Read with `findPetForWriteAsync`, not the display reader: when the database is configured
+    // and cannot answer, it throws rather than handing back the `src/data/pets.json` mirror, so an
+    // outage refuses the application instead of accepting one against a demo animal
+    // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`).
     //
-    // What none of this closes: on those same mirror routes the fixture answers under the very id
-    // posted, so the comparison cannot fire and `isArchived`/`status` are read off `pets.json`.
-    // The application is then written against an id the `Pet` table does not hold, the insert
-    // raises P2003, `insertServerApplication` swallows it, and the applicant is returned
-    // `success: true` with a reference code for a row that reached no database. So: checked
-    // against the database whenever the database answers, and silently fixture-backed when it
-    // cannot — `tasks/open/an-application-can-succeed-against-no-database-row.md`, alongside
-    // `tasks/open/an-outage-serves-and-bills-fixture-animals.md`, which is the same route costing
-    // the sponsorship path money.
+    // The exact-id comparison is **not** redundant. Where the database answers, a case-variant is
+    // simply not found. With no database configured the mirror is the store, and its lookup
+    // lowercases while Postgres does not, so `PET-001` resolves to fixture `pet-001`. That is the
+    // one route left to this comparison, and `tests/integration/adoptionSubmissionGuards.test.ts`
+    // covers it there for exactly that reason.
     const requestedPetId = validated.petId.trim();
-    const pet = await findServerPetByIdAsync(requestedPetId);
+    let pet;
+    try {
+      pet = await findPetForWriteAsync(requestedPetId);
+    } catch (err) {
+      if (!(err instanceof PetStoreUnavailableError)) throw err;
+      return { success: false, error: APPLICATION_STORE_UNAVAILABLE_MESSAGE };
+    }
     if (!pet || pet.id !== requestedPetId) {
       // The comment above the old check said "verify target pet exists"; the code read
       // `pet && pet.isArchived`, which skipped the check entirely when nothing matched, so any
@@ -210,7 +229,8 @@ export async function submitApplication(
         // `handlePersistenceError(…, "write")`, and outside strict mode that swallows anything
         // but P2002 — so the row never reached the database, survived only in the in-memory
         // mirror until the next restart, and the applicant was still told `success: true` and
-        // given a reference code.
+        // given a reference code. (A refused insert now fails the submission instead; see
+        // `insertServerApplication`.)
         //
         // `petName` — it was taken from the request while the resolved animal sat in scope, and
         // two places downstream treat that name as identifying. `atomicUpdateApplicationStatus`
@@ -267,6 +287,12 @@ export async function submitApplication(
       return { success: true, data: newApp };
     });
   } catch (err: unknown) {
+    // Thrown, not returned, from inside `withIdempotency`, so a retry with the same key runs again
+    // instead of replaying this failure.
+    // The repository has already logged the cause.
+    if (err instanceof ApplicationWriteError) {
+      return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
+    }
     const msg = err instanceof Error ? err.message : "Failed to submit adoption application";
     return { success: false, error: msg };
   }

@@ -35,8 +35,6 @@ import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
 import { getPublicPets } from "@/actions/pets";
 import { SponsorshipTier } from "@/types/sponsorship";
 import { Pet } from "@/types/pet";
-import initialPetsData from "@/data/pets.json";
-import { withDerivedAge } from "@/lib/domain/petAge";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { PetChooserCarousel } from "./PetChooserCarousel";
 
@@ -53,14 +51,11 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const urlTier = searchParams.get("tier");
   const urlFreq = searchParams.get("freq");
 
-  const basePets: Pet[] =
-    initialPets.length > 0
-      ? initialPets
-      : (initialPetsData as unknown as Pet[])
-          .map((p) => withDerivedAge(p))
-          .filter((p) => !p.isArchived);
-
-  const [pets, setPets] = useState<Pet[]>(basePets);
+  // No `src/data/pets.json` fallback here: it offered the bundled demo animals on every visit,
+  // including ones production does not hold. With no `initialPets`, the effect below loads the
+  // catalogue from the server
+  // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`).
+  const [pets, setPets] = useState<Pet[]>(initialPets);
 
   const [frequency, setFrequency] = useState<"one_time" | "monthly">(() => {
     return urlFreq === "monthly" || urlFreq === "one_time" ? urlFreq : "one_time";
@@ -79,7 +74,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const [selectedPet, setSelectedPet] = useState<Pet | null>(() => {
     if (urlSponsorPetId || urlPetName) {
       return (
-        basePets.find(
+        initialPets.find(
           (p) =>
             (urlSponsorPetId && p.id === urlSponsorPetId) ||
             (urlPetName && p.name.toLowerCase() === urlPetName.toLowerCase())
@@ -92,7 +87,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const [targetPetName, setTargetPetName] = useState(() => {
     if (urlPetName) return urlPetName;
     if (urlSponsorPetId) {
-      const p = basePets.find((pet) => pet.id === urlSponsorPetId);
+      const p = initialPets.find((pet) => pet.id === urlSponsorPetId);
       if (p) return p.name;
     }
     return "";
@@ -150,6 +145,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
             }
           }
         }
+      }).catch((err) => {
+        // The chooser stays empty and the gift goes to general care; not worth an error banner.
+        console.error("[Donation Widget] Could not load the animals to choose from:", err);
       });
     }
   }, [pets.length, selectedPet, urlPetName, urlSponsorPetId]);

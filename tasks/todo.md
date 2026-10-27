@@ -36,6 +36,63 @@ six in-scope defects (fixed), that one (logged), and two declined: dangling link
 `open/` entries inside older decisions (decisions are never rewritten) and a third copy of the
 adoptable predicate in `PetGallery.tsx` (outside the change).
 
+# Outage fallback off the write and payment paths
+
+**Branch:** `claude/outage-refuses-writes-on-fixture-animals` · opened 2026-10-27 · base `91205dd`
+
+The owner decided `src/data/pets.json` must not be used on a write or payment path. Settles #90,
+#97, #91 and #65 in one pull request.
+
+- **Done when:** adoption submission and sponsorship checkout refuse during a pet-read outage; a
+  refused application insert is not acknowledged; checkout refuses an archived animal with its
+  own copy; the applications and settings readers' empty answers are written down and pinned;
+  every gate is green.
+- **In scope:** `petRepository` (new `findPetForWriteAsync`), `applicationRepository`'s insert,
+  the two public actions, their copy, the two readers' comments, tests, ledger.
+- **Not done, on purpose:** the admin pet edit and archive paths (same shape, but the pet form is
+  being reworked in another pull request; recorded in
+  `tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md`); no-database mode,
+  which still answers from the mirror because it is the whole store there; no
+  P2003 retry with `petId: null` (refused instead, per the owner's "refuse rare edge states").
+
+## Review
+
+- [x] typecheck, lint (0 errors), docs:check, test:all, build: green locally.
+- [x] New tests fail against master (8 of 11 in the outage file); the #65 file pins existing
+  behaviour, so it passes on both, as its settle condition asks.
+- [x] Three `/code-review` rounds. Fixed: a double log, copy that claimed an unconfirmed insert
+  saved nothing, two stale comments. Declined with reasons in the PR: strict-mode wrapping of
+  the pet read, raw P2002 text on an `id` collision (pre-existing), status guards on checkout
+  (the status-guards pull request), a shared error base class. Recorded:
+  `tasks/open/a-failed-settings-save-is-served-as-saved.md`.
+- [x] Owner asked for an xhigh `/code-review` before merge: 12 findings. Fixed: the donation
+  page seeded its chooser from `pets.json` in every mode (now loads from the server, with a
+  component test); the write-path read now selects the `pets` row alone and leaves the mirror
+  untouched; strict mode rethrows the query's own error; the log line quotes the caller's id;
+  checkout logs a pet outage once; stale comments and the settings wording; console spies
+  restored; the refused-insert test asserts no confirmation emails. Declined: moving the write
+  rule into `handlePersistenceError` for every repository (a cross-repository change, recorded
+  in the two open entries this PR adds). Side effect worth knowing: a submission no longer
+  refreshes the mirror, which `markCachedPetAdopted` reads on approval; the admin catalogue read
+  refreshes it anyway.
+- [x] Second xhigh round: 15 findings. Fixed: the chooser fetch had no rejection handler; the
+  sponsorship exact-id check (the two write paths now accept the same ids); stale schema, test
+  and comment wording; a missing mock export; the repository log line now names the id.
+  Recorded, not fixed: the donation earmark is free text (`donation-earmarks-are-free-text.md`),
+  the three guard copies (`three-copies-of-the-pet-visibility-guard.md`), the raw P2002 text
+  (`a-colliding-application-id-shows-prisma-text-to-the-public.md`), and the colder mirror on
+  approval (noted in the existing audit-row entry). Declined: caller-triggered query errors
+  (a NUL byte) logging as an outage, since they still refuse safely; rendering the chooser on
+  the server, which would let a database-less build bake fixtures into a revalidated page.
+- [x] Third xhigh round: 9 findings. Fixed: a test for the sponsorship exact-id check (probed:
+  red without it), the archived refusal no longer names the animal, the refused insert's log
+  line no longer says "fallback", a stale test header. Recorded: the profile page can cache a
+  fixture render (`a-profile-rendered-in-an-outage-can-stay-cached.md`), the single-application
+  readers' empty-read fallback (`single-application-readers-serve-fixtures-after-an-empty-read.md`).
+  Declined: the chooser's extra catalogue request per visit, a `sponsorPetId` link submitted
+  before the catalogue loads going to general care, and the reader duplication. Review stopped
+  here and the owner was asked, per the scope rule: findings were not falling to zero.
+
 # The context meter's root-cause pass
 
 **Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `caa7fce`

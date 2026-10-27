@@ -16,8 +16,9 @@ import { formatMYR, senFromRinggit } from "@/lib/domain/money";
  * not have to remember which one takes sen.
  */
 export const petSponsorshipSchema = z.object({
-  // Fixture animals still have stable ids even when they have no database row.
-  // Requiring one lets the server bind the submitted name to an authoritative pet.
+  // Requiring an id lets the server bind the submitted name to an authoritative pet: the
+  // database row when one is configured (a fixture id without a row is refused), the in-memory
+  // store when none is.
   petId: z
     .string()
     .trim()

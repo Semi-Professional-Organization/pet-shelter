@@ -66,7 +66,7 @@ function applicationFor(petId: string, petName = "Bella") {
   };
 }
 
-/** Arranges the single row `findServerPetByIdAsync` will read, for the exact id only. */
+/** Arranges the single row `findPetForWriteAsync` will read, for the exact id only. */
 function givenPersistedPet(row: ReturnType<typeof makeDbPet> | null) {
   if (row === null) {
     prismaDouble.pet.findUnique.mockResolvedValue(null);
@@ -105,8 +105,8 @@ describe("submitApplication under strict persistence", () => {
 
     it("rejects a case-variant when the database is authoritative", async () => {
       // Scope stated honestly, because it changed under this test's feet. `findUnique` is
-      // case-sensitive and finds no `PET-001`; since `findServerPetByIdAsync` began returning
-      // null after a successful empty read, that is the whole story and this is refused by the
+      // case-sensitive and finds no `PET-001`; since the pet readers began returning null after
+      // a successful empty read, that is the whole story and this is refused by the
       // `!pet` branch. It no longer reaches the exact-id comparison at all — deleting
       // `pet.id !== requestedPetId` leaves this test green. The test below is the one that
       // covers the comparison.
@@ -123,8 +123,9 @@ describe("submitApplication under strict persistence", () => {
     it("rejects a case-variant on the mirror route, where the fixture still answers", async () => {
       // The route the exact-id comparison exists for, and the only one that still reaches it.
       //
-      // With no database configured — every offline deployment, and the shape an outage falls
-      // back to — `findServerPetByIdAsync` never queries and hands straight to the mirror, whose
+      // With no database configured — every offline deployment; an outage no longer falls back
+      // here, it refuses (`outageRefusesWritesOnFixtureAnimals.test.ts`) — `findPetForWriteAsync`
+      // never queries and hands straight to the mirror, whose
       // lookup lowercases. `src/data/pets.json` holds `pet-001` as Available and unarchived, so a
       // posted `PET-001` resolves to fixture Bella under an id that is *not* the one requested.
       // Without the comparison the submission is accepted against her.
