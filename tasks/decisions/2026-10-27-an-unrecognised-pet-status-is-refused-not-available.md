@@ -28,7 +28,8 @@ own-key checks (`isKnownPetStatus`), so `constructor` or `__proto__` cannot pass
 `toDbPetStatus` refuses an unknown status instead of writing it back as `Available` (the
 repository checks it before the persistence `try`, which would otherwise swallow the
 refusal), and an unknown status may move to any canonical one, so staff can correct the row. The status filter matches by
-tone, so an unrecognised status is found under the Pending bucket that counts it.
+tone, in the gallery and in `getPublicPets` alike, so an unrecognised status is found under the
+Pending bucket that counts it.
 
 Whether a drifted value can reach the mapper through Prisma's typed reads is open: the schema
 declares the enum, and Prisma may fail the whole query instead.
@@ -49,5 +50,7 @@ Backfilling `petId` for legacy applications was not done: it needs the productio
   require, but the field starts empty and the wizard says the animal is not accepting applications.
 - Every opening sets the pet field from the animal the title names, including nobody. Only the pet
   fields are touched, so other answers survive a reopen, and a refresh of the animal list while
-  the form is open does not overwrite the applicant's pick.
+  the form is open does not overwrite the applicant's pick. The field is not re-checked while the
+  form is open: an animal adopted mid-application is refused by `submitApplication` at the end
+  (a `ceiling:` in the controller says why and what would upgrade it).
 - On success the local list and the confirmation use the animal the server recorded.

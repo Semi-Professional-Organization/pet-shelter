@@ -183,19 +183,12 @@ export function useAdoptionFormController({
     if (open) applyFieldPet();
   }, [open, selectedPetId]);
 
-  // An animal can stop being adoptable while the form is open (the list refreshes after an
-  // approval). The field then holds an id the select no longer offers, so it is cleared and the
-  // step's validation asks for a choice, rather than the server refusing it after four steps.
-  const watchedPetId = useWatch({ control, name: "petId" });
-  const watchedPetOffered = !watchedPetId || petOptions.some((p) => p.id === watchedPetId);
-  useEffect(() => {
-    if (!watchedPetOffered) {
-      setValue("petId", "");
-      setValue("petName", "");
-    }
-  }, [watchedPetOffered, setValue]);
-
-  const activePetId = watchedPetId || fieldPet?.id;
+  // ceiling: the field is set per opening, not re-checked while the form is open. An animal adopted
+  // mid-application stays in the field after a list refresh drops it from the select, and
+  // `submitApplication` refuses it by name at the end. Re-syncing on refresh was tried and spawned
+  // its own cases (a stale `selectedPet` snapshot, a transient empty list); upgrade path is to
+  // re-check `petId` against the server when the applicant leaves the first step.
+  const activePetId = useWatch({ control, name: "petId" }) || fieldPet?.id;
   const activePet = allPets.find((p) => p.id === activePetId) || selectedPet;
 
   const isFirstStep = stepIndex === 0;

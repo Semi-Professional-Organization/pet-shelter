@@ -8,7 +8,7 @@ import {
   sortHistoryByDate,
 } from "@/lib/validations/pet";
 import { Pet } from "@/types/pet";
-import { normalizePetStatus } from "@/lib/domain/stateMachine";
+import { matchesStatusFilter } from "@/lib/presentation/petStatusPresentation";
 import { withDerivedAge } from "@/lib/domain/petAge";
 import { matchesPetSearch } from "@/lib/domain/petSearch";
 import { getVerifiedSession } from "@/lib/security/dal";
@@ -47,9 +47,10 @@ export async function getPublicPets(filters?: PetFilterInput): Promise<Pet[]> {
   }
 
   if (filters?.status && filters.status !== "all") {
-    // Compare canonically so "Rehabilitation" and "In Rehabilitation" match each other.
-    const wantedStatus = normalizePetStatus(filters.status);
-    filtered = filtered.filter((p) => normalizePetStatus(p.status) === wantedStatus);
+    // The gallery's own rule, so both alias spellings match each other and an unrecognised
+    // stored status lands under Pending here exactly as it does in the gallery's filter.
+    const wantedStatus = filters.status;
+    filtered = filtered.filter((p) => matchesStatusFilter(p.status, wantedStatus));
   }
 
   if (filters?.ageCategory && filters.ageCategory !== "all") {

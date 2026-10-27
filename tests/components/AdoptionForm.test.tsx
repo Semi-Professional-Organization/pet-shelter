@@ -457,19 +457,6 @@ describe("AdoptionForm", () => {
       expect(petSelect().value).toBe(coco.id);
     });
 
-    it("clears the pick when that animal stops being adoptable while the form is open", async () => {
-      const bella = makePet({ name: "Bella", status: "Available" });
-      const coco = makePet({ name: "Coco", status: "Available" });
-      const props = { selectedPet: null, onOpenChange: vi.fn(), open: true };
-      const { rerender } = renderWithLanguage(<AdoptionWizard {...props} allPets={[bella, coco]} />);
-      await setupUser().selectOptions(petSelect(), coco.id);
-
-      rerender(<AdoptionWizard {...props} allPets={[bella, { ...coco, status: "Adopted" }]} />);
-
-      await waitFor(() => expect(petSelect().value).toBe(""));
-      expect(offeredIds()).toEqual(["", bella.id]);
-    });
-
     it("reopened for another animal after a submission, starts a fresh form for that animal", async () => {
       // The confirmation used to be cleared by a `reset()` on a timer after close, which a quick
       // reopen could beat (and an Escape close, which bypasses the wizard's own close, never ran).

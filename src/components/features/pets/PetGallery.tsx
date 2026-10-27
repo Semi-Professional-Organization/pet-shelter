@@ -370,9 +370,9 @@ export function PetGallery({
                   // tabs make non-adoptable by construction — open the Adopted tab, click here, and
                   // the form came up pre-filled for an animal who had already gone home.
                   //
-                  // The second fallback matches what `resolveDefaultPet` picks when handed `null`;
-                  // the form now sets its pet field from that same animal on every opening, so
-                  // passing `null` is safe, and the explicit pick only keeps the intent visible here.
+                  // Preferring the animals on screen is the point: `resolveDefaultPet`, handed
+                  // `null`, would pick the first adoptable animal in the whole shelter, which a
+                  // filtered tab may not show.
                   setActivePetForAdoption(
                     filteredPets.find(isPetAdoptable) ?? pets.find(isPetAdoptable) ?? null
                   );

@@ -153,8 +153,8 @@ export function getPetStatusPresentation(status: PetStatus): PetStatusPresentati
   return { ...PRESENTATIONS.pending, labelKey: "petStatus.unrecognised", labelFallback: String(status) };
 }
 
-/** Whether an animal accepts adoption applications. The one predicate the form, gallery and
- * server share. */
+/** Whether an animal accepts adoption applications, as the adoption form and gallery ask it.
+ * `submitApplication` reads the same `isAdoptable` flag for its label alongside. */
 export function isPetAdoptable(pet: Pick<Pet, "status">): boolean {
   return getPetStatusPresentation(pet.status).isAdoptable;
 }
