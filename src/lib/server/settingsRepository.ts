@@ -62,7 +62,16 @@ export function getServerSettings(): ShelterSettingsOutput {
 }
 
 /**
- * Asynchronous read with database query or fallback to test fixture.
+ * Reads the shelter settings, falling back to the shipped defaults.
+ *
+ * **A missing settings row is answered with the defaults, on purpose.** This is
+ * the opposite of the pet and application readers, and the reason is what an
+ * empty result means here: the row is created by the first save in admin
+ * settings, so "no row" is a shelter that has not saved settings yet, and the
+ * defaults are exactly what it should see. A thrown query also serves the
+ * defaults; `getServerSettingsWithSource` reports both as `fromDatabase: false`
+ * so the admin form never treats them as saved values. Pinned by
+ * `tests/integration/emptyReadersAreAnswers.test.ts` (#65).
  */
 export async function getServerSettingsAsync(): Promise<ShelterSettingsOutput> {
   if (isDatabasePersistent()) {

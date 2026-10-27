@@ -43,7 +43,7 @@ The pets and applications pages no longer catch their read's failure, but in a d
 failed query with its in-memory mirror, and the pet reads fall back the same way. So during an
 outage the boards show whatever the mirror holds — the bundled demo records on a fresh instance —
 with nothing to say they are not the shelter's. Same family as
-`tasks/open/an-outage-serves-and-bills-fixture-animals.md`.
+`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`, which settled the public write and payment paths and left display as it is.
 
 ## 7. The settings form starts from a personal email address
 

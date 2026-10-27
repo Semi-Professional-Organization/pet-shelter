@@ -108,7 +108,7 @@ vi.mock("@/lib/security/sponsorSession", () => ({
 }));
 
 vi.mock("@/lib/server/petRepository", () => ({
-  findServerPetByIdAsync: vi.fn(async (id: string) => ({
+  findPetForWriteAsync: vi.fn(async (id: string) => ({
     id,
     name: "Submitted Bella",
   })),

@@ -329,7 +329,7 @@ describe("createPetSponsorshipAction", () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/could not confirm that a pledge was recorded/i);
+    expect(result.error).toMatch(/could not find that animal/i);
   });
 
   it("never attaches a caller-supplied supporter account id", async () => {
