@@ -16,6 +16,20 @@ import { registerStateReset } from "@/lib/stateResets";
 class TransitionError extends Error {}
 
 /**
+ * A configured database refused or could not take a new application. Thrown
+ * instead of mirroring the record, because the applicant would otherwise be
+ * given a reference code for a row that no database holds.
+ */
+export class ApplicationWriteError extends Error {
+  readonly cause?: unknown;
+  constructor(cause?: unknown) {
+    super("Could not save the adoption application");
+    this.name = "ApplicationWriteError";
+    this.cause = cause;
+  }
+}
+
+/**
  * Adoption-application reads and writes over the repository layer.
  *
  * Ordering invariant (mirrors ./petRepository): **database first, mirror
@@ -121,6 +135,15 @@ function mapDbApplicationToRecord(a: DbApplicationRecord): AdoptionApplicationRe
   };
 }
 
+/**
+ * Lists every application, newest first.
+ *
+ * **An empty table is an answer, not an outage.** A shelter with no applications
+ * yet, or one that has deleted them all, gets `[]`; the `applications.json`
+ * fixtures are reached only when the query throws or no database is configured.
+ * Serving them after an empty read would put demo applicants on the staff
+ * board. Pinned by `tests/integration/emptyReadersAreAnswers.test.ts` (#65).
+ */
 export async function getServerApplicationsAsync(): Promise<AdoptionApplicationRecord[]> {
   if (isDatabasePersistent()) {
     try {
@@ -202,6 +225,26 @@ export async function findServerApplicationByReferenceAsync(
   return findServerApplicationByReference(trimmed);
 }
 
+/**
+ * Saves a new application: to the database when one is configured, then to the mirror.
+ *
+ * **A configured database that fails the insert fails the submission.** This used
+ * to swallow the error outside strict mode and mirror the record anyway, so the
+ * applicant was told `success: true` and given a reference code for a row that
+ * existed only in this process's memory and was gone at the next restart. That
+ * was #97: an outage, or a foreign-key miss (P2003) on a `petId` the `Pet` table
+ * does not hold, both ended there. An application is a record someone is told
+ * we have, so this throws {@link ApplicationWriteError} instead and the caller
+ * asks them to try again. Unique violations and strict mode still rethrow the
+ * raw error through `handlePersistenceError`, as before.
+ *
+ * P2003 is not retried with `petId: null` the way `recordSponsorshipPledge`
+ * does. The caller has just read the animal from the database, so the miss
+ * needs a hard delete inside that window; refusing it is clearer than an
+ * application quietly detached from its animal.
+ *
+ * With no database configured the mirror is the whole store, as it was.
+ */
 export async function insertServerApplication(newApp: AdoptionApplicationRecord): Promise<void> {
   if (isDatabasePersistent()) {
     try {
@@ -231,8 +274,10 @@ export async function insertServerApplication(newApp: AdoptionApplicationRecord)
         },
       });
     } catch (err) {
-      handlePersistenceError("Prisma application creation", err, "write");
-      // Unique violations rethrow — a duplicate submission must reach the caller, not the mirror.
+      // Unique violations and strict mode rethrow here — a duplicate submission must reach the
+      // caller, not the mirror. Everything else is a lost application if it is swallowed.
+      handlePersistenceError("Prisma application creation (refused, not mirrored)", err, "write");
+      throw new ApplicationWriteError(err);
     }
   }
 
