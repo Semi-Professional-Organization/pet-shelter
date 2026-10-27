@@ -54,8 +54,8 @@ function lineEndingProblem(file) {
     `${file} has Windows (CRLF) line endings in this working copy, which SOPS cannot parse.\n` +
     `       If git tracks it, the committed copy is fine; restore it (keep a copy first if you edited it),\n` +
     `       running each command on its own (git skips the file without the first):\n` +
-    `         git rm --cached -q ${file}\n` +
-    `         git checkout HEAD -- ${file}`
+    `         git rm --cached -q "${file}"\n` +
+    `         git checkout HEAD -- "${file}"`
   );
 }
 
@@ -178,7 +178,8 @@ switch (command) {
       console.error(`File ${fileToEdit} does not exist. Create or encrypt it first.`);
       process.exit(1);
     }
-    refuseCrlf(fileToEdit);
+    // Dotenv only: sops reads YAML and JSON with CRLF fine.
+    if (!/\.(ya?ml|json)$/i.test(fileToEdit)) refuseCrlf(fileToEdit);
     console.log(`Opening ${fileToEdit} with SOPS editor...`);
     const proc = spawnSync(SOPS_BIN, [fileToEdit], { stdio: "inherit" });
     if (proc.error) console.error(proc.error.message);
@@ -252,9 +253,12 @@ switch (command) {
       cmd = `${cmd}.cmd`;
     }
 
+    // Node refuses to spawn a .cmd without a shell (EINVAL, CVE-2024-27980),
+    // as scripts/prisma-generate-if-stale.mjs also handles.
     const proc = spawnSync(cmd, args, {
       stdio: "inherit",
       env: injectedEnv,
+      shell: isWindows,
     });
     if (proc.error) console.error(proc.error.message);
     if (proc.signal) console.error(`Stopped by ${proc.signal}.`);

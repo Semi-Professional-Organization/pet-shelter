@@ -82,7 +82,7 @@ export const DEV_SECRET_DEFAULTS = {
  * Values this repository published for these secrets in the past: placeholders
  * from earlier versions of `.env.example`, and the hardcoded fallbacks the source
  * used before `3b43293` (still printed in `docs/tasks/TARGET_SECRET_HARDENING.md`).
- * Still in git history, so still public: a deploy must not boot on one.
+ * Still in git history, so still public: production must not use one.
  */
 const PUBLISHED_PLACEHOLDERS: readonly string[] = [
   "replace-me-with-a-random-32-plus-character-secret",
@@ -205,17 +205,17 @@ function describeWeakness(
 ): Weakness | null {
   if (value.length === 0) return { kind: "unset", description: "not set" };
   // Exact in case, as it always was: matching case variants too would be a new
-  // way to refuse the boot for every secret. But also with its outer quotes
+  // way to refuse a secret (and, for SESSION_SECRET, the boot). But also with its outer quotes
   // removed, because `.env.example` publishes the default *inside* quotes, and
   // pasting that line's value verbatim left a session or admin key that anyone
-  // can read in this repository. Refusing that boot is the point of the check.
+  // can read in this repository. Refusing that value is the point of the check.
   if (unwrapped === devDefault) {
     return { kind: "dev-default", description: "still set to the documented development default" };
   }
   // Both forms, as set and with its edge characters removed: a published value
   // that itself ended in a quote mark would otherwise never match. Letter case
   // is ignored only for a code someone types by hand (`allowShort`); for a key,
-  // a case variant must not become a new way to refuse the boot.
+  // a case variant must not become a new way to refuse it.
   // NFKC first, so fullwidth or other compatibility forms typed through an
   // input method (a fullwidth HOPE2026) fold to the published value too.
   const fold = (v: string) => (caseInsensitive ? v.normalize("NFKC").toLowerCase() : v);

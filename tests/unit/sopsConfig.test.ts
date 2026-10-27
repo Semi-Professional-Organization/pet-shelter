@@ -106,12 +106,22 @@ describe.skipIf(process.platform === "win32")("secrets:check", () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  function check(file: string, extraEnv: Record<string, string> = {}) {
-    return spawnSync(process.execPath, [path.join(rootDir, "scripts", "secrets.mjs"), "check", file], {
+  function secrets(args: string[], extraEnv: Record<string, string> = {}) {
+    return spawnSync(process.execPath, [path.join(rootDir, "scripts", "secrets.mjs"), ...args], {
       cwd: rootDir,
       encoding: "utf-8",
       env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, SOPS_AGE_KEY: "unused", ...extraEnv },
     });
+  }
+
+  function check(file: string, extraEnv: Record<string, string> = {}) {
+    return secrets(["check", file], extraEnv);
+  }
+
+  function crlfCopy() {
+    const crlf = path.join(dir, "crlf.enc");
+    fs.writeFileSync(crlf, fs.readFileSync(path.join(rootDir, ENC)).toString("latin1").replace(/\n/g, "\r\n"), "latin1");
+    return crlf;
   }
 
   function committedCopy() {
@@ -144,13 +154,30 @@ describe.skipIf(process.platform === "win32")("secrets:check", () => {
   });
 
   it("refuses a CRLF copy by name, without handing it to sops", () => {
-    const crlf = path.join(dir, "crlf.enc");
-    fs.writeFileSync(crlf, fs.readFileSync(path.join(rootDir, ENC)).toString("latin1").replace(/\n/g, "\r\n"), "latin1");
-
-    const result = check(crlf);
+    const result = check(crlfCopy());
 
     expect(result.status).toBe(1);
     expect(result.stderr).toMatch(/CRLF\) line endings/);
     expect(fs.readFileSync(calls, "utf-8")).not.toMatch(/--decrypt/);
+  });
+  // The destination sits in the temp dir, so a regressed guard cannot
+  // overwrite the checkout's .env.local.
+  it.each([
+    ["decrypt-to-local", (file: string, out: string) => ["decrypt-to-local", file, out]],
+    ["run", (file: string) => ["run", file, "--", process.execPath, "-e", ""]],
+  ])("%s refuses a CRLF copy before calling sops", (_name, argsFor) => {
+    const result = secrets(argsFor(crlfCopy(), path.join(dir, "out.env")), { FAKE_SOPS_OK: "1" });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/CRLF\) line endings/);
+    expect(fs.existsSync(calls) ? fs.readFileSync(calls, "utf-8") : "").not.toMatch(/--decrypt/);
+    expect(fs.existsSync(path.join(dir, "out.env"))).toBe(false);
+  });
+
+  it("run exits nonzero when the command cannot start", () => {
+    const result = secrets(["run", committedCopy(), "--", path.join(dir, "no-such-command")], { FAKE_SOPS_OK: "1" });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/ENOENT/);
   });
 });

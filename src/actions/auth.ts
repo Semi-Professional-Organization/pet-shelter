@@ -268,6 +268,9 @@ export async function registerAction(data: {
     inviteSecret = getStaffInviteSecret();
   } catch (error) {
     if (!(error instanceof SecretConfigurationError)) throw error;
+    // Per request, not only at boot: a cold-start line is easy to miss. The
+    // message never carries the value.
+    console.error(`[security/secrets] Staff registration refused: ${error.message}`);
     return {
       success: false,
       error: "Staff registration is unavailable right now. Please contact a shelter administrator.",

@@ -25,7 +25,7 @@ so `sops_lastmodified` keeps its `\r`. Nothing needs re-encrypting; the git copy
 - `.gitattributes` now marks the file `text eol=lf`, so it is always checked out LF and a CRLF
   copy is normalised on `git add`. (`-text` was tried first; review found it let `git add` commit
   the CRLF bytes.)
-- `scripts/secrets.mjs` refuses a CRLF copy by name in `check`, `decrypt-to-local` and `run`,
+- `scripts/secrets.mjs` refuses a CRLF copy by name in `check`, `edit`, `decrypt-to-local` and `run`,
   with the restore command, and `check` exits 1 on any `[FAIL]`.
 - `tests/unit/sopsConfig.test.ts` covers both with a fake `sops`, no key and no secret.
 

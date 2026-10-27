@@ -268,7 +268,6 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("SESSION_SECRET", undefined);
       vi.stubEnv("ADMIN_SECRET_KEY", undefined);
       vi.stubEnv("STAFF_INVITE_SECRET", undefined);
-      vi.spyOn(console, "error").mockImplementation(() => {});
 
       let message = "";
       try {
@@ -298,7 +297,6 @@ describe("assertSecretsConfigured", () => {
       // A published code in an unusual case: short codes now boot, so this is
       // what makes the invite path fail and put its own line in the message.
       vi.stubEnv("STAFF_INVITE_SECRET", "HoPe2026");
-      vi.spyOn(console, "error").mockImplementation(() => {});
 
       let message = "";
       try {
@@ -614,7 +612,7 @@ describe("assertSecretsConfigured", () => {
 
     // Length is measured on the value as set. Measuring it without edge
     // characters refused a random key that happens to end in a quote mark.
-    it("still boots a random admin key that happens to end with a quote mark", () => {
+    it("accepts a random admin key that happens to end with a quote mark", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", "7d3e1a95c4820bf'");
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
@@ -759,7 +757,7 @@ describe(".env.example authentication secrets", () => {
     }
   }
 
-  // Each with the app's own accessor, so the "refuses to boot" check below runs
+  // Each with the app's own accessor, so the "refuses ... in production" check below runs
   // the policy the app runs (including `allowShort` on the invite code) rather
   // than a second copy of it.
   const SECRETS = [
