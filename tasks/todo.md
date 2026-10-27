@@ -115,6 +115,39 @@ The owner decided `src/data/pets.json` must not be used on a write or payment pa
   before the catalogue loads going to general care, and the reader duplication. Review stopped
   here and the owner was asked, per the scope rule: findings were not falling to zero.
 
+# Issue grouping, close-out after the first apply
+
+**Branch:** `claude/project-thread-c0pu58` · 2026-10-27 · base `5aea5bb`
+
+- [x] #195 merged; its body's closing keyword closed #157 (not the sync), which kept parent #191
+- [x] #182 (the ledger-sync entry's mirror) added to `agent-tooling-and-process`; summary widened
+- [ ] After merge: `npm run issues:groups -- --apply` (plans `add #182` and `update #193`)
+
+## Review
+
+`/code-review xhigh` on #197, at the owner's request. Seven rounds by the time it went to the owner
+for the stop decision; no code bug was found, every finding was a claim, and round 7 found only
+wording. Fixed:
+
+- The stale open entry now records what was observed, and that #195's closing keyword, not the
+  sync, closed #157: any PR body that names an issue after "closes" does the same.
+- The group summary covers the issue and ledger scripts.
+- The squash message is drafted in the PR description and used at merge. The repo's default would
+  carry every branch commit's message, including the already-shipped #195 one and 0bb9aaf's
+  claim later shown false. 77c2960 also says #182 appeared after the grouping ran; in fact the
+  grouping file was written before #182 existed, and #194, which edited it after, missed it too
+  although that apply had listed #182 as in no group.
+- Rounds 4 to 6 kept finding untested designs in the two new follow-up entries, so the entries now
+  state only the problem and what settles it.
+
+Deliberately not done, each a behaviour change beyond this PR: grouping a new entry's issue without
+a second pull request (`tasks/open/new-ledger-entries-land-in-no-issue-group.md`); an automatic
+`--apply` on push to master (already rejected in the issue-groups decision); and a settled reading
+for a closed member (`tasks/open/issue-groups-has-no-settled-reading-for-a-closed-member.md`). Both
+new entries will themselves land ungrouped, which is the first entry's point. The branch carries a
+merge of its own already-squashed history, so `git cherry` will keep showing e58836b as unshipped;
+its tree equals 5aea5bb.
+
 # The context meter's root-cause pass
 
 **Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `caa7fce`

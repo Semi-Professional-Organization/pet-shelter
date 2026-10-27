@@ -74,9 +74,9 @@
     {
       "key": "agent-tooling-and-process",
       "title": "Agent tooling and session process",
-      "summary": "Agent hooks, the drift log, permission rules, the agent scripts and the session close-out.",
+      "summary": "Agent hooks, the drift log, permission rules, the agent scripts, the issue and ledger scripts, and the session close-out.",
       "parent": 193,
-      "issues": [48, 51, 52, 59, 66, 117, 127, 159, 160, 161, 162]
+      "issues": [48, 51, 52, 59, 66, 117, 127, 159, 160, 161, 162, 182]
     }
   ],
   "standalone": [138]
