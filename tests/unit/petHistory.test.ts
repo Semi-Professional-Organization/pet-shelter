@@ -16,6 +16,7 @@ import {
   insertServerPet,
   updateServerPet,
   getServerPetsAsync,
+  findServerPetById,
 } from "@/lib/server/petRepository";
 import {
   petFormSchema,
@@ -768,6 +769,31 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       const updateArgs = queued[2].__args as { data: Record<string, unknown> };
       expect(updateArgs.data.medicalTimeline).toMatchObject({ create: [{ id: "tl-hist-1" }] });
       expect(updateArgs.data.updates).toEqual({ create: [] });
+    });
+
+    it("should keep the stored copy of a collection the update does not replace", async () => {
+      const pet = makePet({ id: "pet-hist-update-02" });
+      await insertServerPet(pet, TEST_ADMIN_ACTOR);
+      // A later write trims the timeline, so `pet` is now a stale copy of the history.
+      await updateServerPet(
+        "pet-hist-update-02",
+        { ...pet, medicalTimeline: [timelineIntake] },
+        TEST_ADMIN_ACTOR,
+        { medicalTimeline: true }
+      );
+
+      const stored = await updateServerPet(
+        "pet-hist-update-02",
+        { ...pet, name: "Tuah Stale Copy" },
+        TEST_ADMIN_ACTOR,
+        {}
+      );
+
+      expect(stored?.name).toBe("Tuah Stale Copy");
+      expect(stored?.medicalTimeline?.map((e) => e.id)).toEqual(["tl-hist-1"]);
+      expect(findServerPetById("pet-hist-update-02")?.medicalTimeline?.map((e) => e.id)).toEqual([
+        "tl-hist-1",
+      ]);
     });
   });
 

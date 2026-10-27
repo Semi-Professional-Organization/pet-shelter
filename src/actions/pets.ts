@@ -322,12 +322,10 @@ export async function updatePet(
       rehabStage: validated.rehabStage,
       rehabStageMs: validated.rehabStageMs,
       rehabProgressPercent: validated.rehabProgressPercent,
-      // Nested history follows the opposite rule — see `replaceHistory` above. A collection not
-      // replaced keeps the copy already held; `updateServerPet` does not write it.
-      updates: replaceHistory.updates ? sortHistoryByDate(validated.updates) : existing.updates,
-      medicalTimeline: replaceHistory.medicalTimeline
-        ? sortHistoryByDate(validated.medicalTimeline)
-        : existing.medicalTimeline,
+      // Nested history follows the opposite rule — see `replaceHistory` above. `updateServerPet`
+      // fills in any collection it does not replace, so the pet it returns is the one to report.
+      updates: sortHistoryByDate(validated.updates),
+      medicalTimeline: sortHistoryByDate(validated.medicalTimeline),
       galleryImages: validated.galleryImages || existing.galleryImages || [],
       isArchived: validated.isArchived ?? existing.isArchived ?? false,
       deletedAt: validated.deletedAt !== undefined ? validated.deletedAt : existing.deletedAt,
@@ -345,7 +343,7 @@ export async function updatePet(
       },
     });
 
-    await updateServerPet(id, updated, actor, replaceHistory);
+    const stored = (await updateServerPet(id, updated, actor, replaceHistory)) ?? updated;
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
     // after editing a description, or reordering the existing gallery, notifies
@@ -373,7 +371,7 @@ export async function updatePet(
     revalidatePath("/admin/pets");
     revalidatePath("/");
 
-    return { success: true, data: updated };
+    return { success: true, data: stored };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update pet record";
     return { success: false, error: msg };

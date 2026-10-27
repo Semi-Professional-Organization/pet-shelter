@@ -257,13 +257,13 @@ export async function updateServerPet(
   updated: Pet,
   actor: SessionUser,
   replaceHistory: PetHistoryReplacement
-): Promise<boolean> {
+): Promise<Pet | null> {
   let previous = serverPets.find((p) => p.id === id);
   if (!previous && isDatabasePersistent()) {
     const fromDb = await findServerPetByIdAsync(id);
     if (fromDb) previous = fromDb;
   }
-  if (!previous) return false;
+  if (!previous) return null;
 
   if (previous.status !== updated.status) {
     validatePetTransition(previous.status, updated.status);
@@ -287,9 +287,10 @@ export async function updateServerPet(
     handlePersistenceError("Prisma pet update", err, "write");
   }
 
-  // The mirror and the audit row describe what was written: a collection this write did not
-  // replace keeps the copy the mirror holds *now*, not the caller's copy, and not `previous`, which
-  // was read before the await above and may predate a concurrent write.
+  // This is the one place the keep-when-not-replaced rule is applied; callers pass whatever they
+  // hold and get back the pet as stored. A collection this write did not replace keeps the copy the
+  // mirror holds *now*: not the caller's copy, and not `previous`, which was read before the await
+  // above and may predate a concurrent write.
   const keptFrom = serverPets.find((p) => p.id === id) ?? previous;
   const stored: Pet = {
     ...updated,
@@ -307,10 +308,21 @@ export async function updateServerPet(
     action: "PET_UPDATED",
     entity: "Pet",
     entityId: id,
-    details: { before: previous, after: stored },
+    // History appears only when this write replaced it. A collection it did not touch is whatever
+    // the mirror held, which can be older than the database, and the audit row is permanent.
+    details: { before: auditedHistory(previous), after: auditedHistory(stored) },
   });
 
-  return true;
+  return stored;
+
+  function auditedHistory(pet: Pet): Partial<Pet> {
+    const { updates, medicalTimeline, ...rest } = pet;
+    return {
+      ...rest,
+      ...(replaceHistory.updates ? { updates } : {}),
+      ...(replaceHistory.medicalTimeline ? { medicalTimeline } : {}),
+    };
+  }
 }
 
 export async function archiveServerPet(id: string, archive: boolean, actor: SessionUser): Promise<boolean> {

@@ -19,8 +19,11 @@ tracked in `tasks/open/pet-form-schema-defaults-defeat-the-keep-on-absent-fallba
 
 The rule is enforced in the repository, not only in the action. `updateServerPet` takes a
 `PetHistoryReplacement` naming the collections a write replaces (required, so no caller gets a
-default by accident), deletes and recreates only those, and keeps the mirror's and the audit row's
-copy of any collection it did not write. A first version kept the action's in-memory copy and let the repository rewrite every row
+default by accident), deletes and recreates only those, and is the one place the keep rule is
+applied: it fills any collection it did not replace from the mirror as it stands after the write and
+returns the pet as stored, which the action reports. The audit row records history only for the
+collections the write replaced, since the mirror's copy of the others can be older than the
+database. A first version kept the action's in-memory copy and let the repository rewrite every row
 from it; review found that this overwrites newer database rows with a stale mirror, resets each
 row's `createdAt`/`updatedAt`, and still happened on every `updatePetStatus` call. Now an edit or a
 status change that sends no history queues no history writes at all, and an explicit `[]` still
