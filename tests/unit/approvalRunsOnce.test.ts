@@ -48,7 +48,7 @@ describe("atomicUpdateApplicationStatus", () => {
 
     // The adoption falls through: the animal comes back and someone new applies for it.
     const pet = findServerPetById(PET_ID)!;
-    await updateServerPet(PET_ID, { ...pet, status: "Available" }, TEST_ADMIN_ACTOR);
+    await updateServerPet(PET_ID, { ...pet, status: "Available" }, TEST_ADMIN_ACTOR, {});
     await insertServerApplication(application("app-since", "SUBMITTED"));
 
     const resaved = await atomicUpdateApplicationStatus(

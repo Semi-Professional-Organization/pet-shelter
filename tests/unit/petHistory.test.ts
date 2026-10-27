@@ -26,7 +26,7 @@ import {
   type MedicalTimelineEventInput,
   type PetUpdateInput,
 } from "@/lib/validations/pet";
-import { createPet, updatePet, getPetById } from "@/actions/pets";
+import { createPet, updatePet, updatePetStatus, getPetById } from "@/actions/pets";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
 import { findMemberRow, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { wireTransaction } from "../integration/support/prismaDouble";
@@ -887,6 +887,47 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       const data = (queued[0].__args as { data: Record<string, unknown> }).data;
       expect("updates" in data).toBe(false);
       expect("medicalTimeline" in data).toBe(false);
+    });
+
+    it("should delete and rewrite stored history rows when an edit submits empty lists", async () => {
+      // The other half of the rule above, at the same layer: an explicit `[]` must reach Prisma as a
+      // clear, not stay in the mirror only.
+      const created = await createPet({ ...baseForm, name: "Tuah Cleared" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      const cleared = await updatePet(petId, {
+        ...baseForm,
+        name: "Tuah Cleared",
+        medicalTimeline: [],
+        updates: [],
+      });
+      expect(cleared.success).toBe(true);
+
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual([
+        "petUpdate.deleteMany",
+        "medicalTimelineEvent.deleteMany",
+        "pet.update",
+      ]);
+      const data = (queued[2].__args as { data: Record<string, unknown> }).data;
+      expect(data.updates).toEqual({ create: [] });
+      expect(data.medicalTimeline).toEqual({ create: [] });
+    });
+
+    it("should not delete or rewrite stored history rows on a status change", async () => {
+      const created = await createPet({ ...baseForm, name: "Tuah Cleared For Adoption" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      expect((await updatePetStatus(petId, "Available")).success).toBe(true);
+
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual(["pet.update"]);
+      const data = (queued[0].__args as { data: Record<string, unknown> }).data;
+      expect("updates" in data).toBe(false);
+      expect("medicalTimeline" in data).toBe(false);
+      expect((await getPetById(petId))?.medicalTimeline?.length).toBe(2);
     });
 
     it("should reject a create whose history carries a duplicate event id", async () => {

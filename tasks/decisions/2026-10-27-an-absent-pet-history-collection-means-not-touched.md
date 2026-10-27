@@ -14,15 +14,18 @@ Two fixes were open: carry both collections through the dialog, or stop treating
 as the same thing. The second was chosen because it closes the bug for every caller, not just this
 one. It is the rule `birthDateIsEstimate` and `deletedAt` already follow in the same function.
 (`galleryImages` and `isArchived` look like they follow it, but their schema defaults fill an absent
-key in, so the fallback never fires. The dialog always sends both, so nothing is lost today.)
+key in, so the fallback never fires. The dialog always sends both, so nothing is lost today; it is
+tracked in `tasks/open/pet-form-schema-defaults-defeat-the-keep-on-absent-fallback.md`.)
 
 The rule is enforced in the repository, not only in the action. `updateServerPet` takes a
-`PetHistoryReplacement` naming the collections a write replaces, and deletes and recreates only
-those. A first version kept the action's in-memory copy and let the repository rewrite every row
+`PetHistoryReplacement` naming the collections a write replaces (required, so no caller gets a
+default by accident), deletes and recreates only those, and keeps the mirror's and the audit row's
+copy of any collection it did not write. A first version kept the action's in-memory copy and let the repository rewrite every row
 from it; review found that this overwrites newer database rows with a stale mirror, resets each
 row's `createdAt`/`updatedAt`, and still happened on every `updatePetStatus` call. Now an edit or a
-status change that sends no history queues no history writes at all
-(`tests/unit/petHistory.test.ts`, "should not delete or rewrite stored history rows when an edit
-omits them"). An explicit `[]` still clears.
+status change that sends no history queues no history writes at all, and an explicit `[]` still
+reaches the database as a clear. `tests/unit/petHistory.test.ts` pins all three at the Prisma
+call, not only the mirror. The same stale-mirror overwrite still applies to the scalar columns:
+`tasks/open/pet-writes-start-from-the-in-memory-mirror.md`.
 
 Reversing this means some caller must send the full lists on every save, or history is lost again.

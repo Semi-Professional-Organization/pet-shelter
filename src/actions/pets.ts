@@ -292,6 +292,15 @@ export async function updatePet(
     const storedGallery = wantsNotification ? await getStoredGalleryImages(id) : null;
     const previousGallery = storedGallery ?? [...(existing.galleryImages || [])];
 
+    // Nested history is replaced only when the payload carries it: an absent key means "not
+    // touched", and only a submitted list (an explicit `[]` included) replaces the stored rows. The
+    // admin edit dialog manages neither collection and sends neither key, so treating omission as
+    // "clear" deleted every clinical event and progress update on any ordinary edit (issue #107).
+    const replaceHistory = {
+      updates: validated.updates !== undefined,
+      medicalTimeline: validated.medicalTimeline !== undefined,
+    };
+
     // Wrapped, not spread: `existing` still carries the `age` and `ageCategory` the previous read
     // derived, and a submitted birthday must re-derive both rather than leave last read's prose in
     // place. `withDerivedAge` recomputes them from whatever `birthDate` ends up on the object.
@@ -313,14 +322,12 @@ export async function updatePet(
       rehabStage: validated.rehabStage,
       rehabStageMs: validated.rehabStageMs,
       rehabProgressPercent: validated.rehabProgressPercent,
-      // Nested history follows the opposite rule: an absent key means "not touched", and only a
-      // submitted list (an explicit `[]` included) replaces the stored rows. The admin edit dialog
-      // manages neither collection and sends neither key, so treating omission as "clear" deleted
-      // every clinical event and progress update on any ordinary edit (issue #107).
-      // The mirror's copy is kept for the returned pet only; `updateServerPet` below is told not to
-      // touch the stored rows at all.
-      updates: sortHistoryByDate(validated.updates) ?? existing.updates,
-      medicalTimeline: sortHistoryByDate(validated.medicalTimeline) ?? existing.medicalTimeline,
+      // Nested history follows the opposite rule — see `replaceHistory` above. A collection not
+      // replaced keeps the copy already held; `updateServerPet` does not write it.
+      updates: replaceHistory.updates ? sortHistoryByDate(validated.updates) : existing.updates,
+      medicalTimeline: replaceHistory.medicalTimeline
+        ? sortHistoryByDate(validated.medicalTimeline)
+        : existing.medicalTimeline,
       galleryImages: validated.galleryImages || existing.galleryImages || [],
       isArchived: validated.isArchived ?? existing.isArchived ?? false,
       deletedAt: validated.deletedAt !== undefined ? validated.deletedAt : existing.deletedAt,
@@ -338,10 +345,7 @@ export async function updatePet(
       },
     });
 
-    await updateServerPet(id, updated, actor, {
-      updates: validated.updates !== undefined,
-      medicalTimeline: validated.medicalTimeline !== undefined,
-    });
+    await updateServerPet(id, updated, actor, replaceHistory);
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
     // after editing a description, or reordering the existing gallery, notifies
@@ -421,7 +425,8 @@ export async function updatePetStatus(
     }
 
     const updated: Pet = { ...existing, status };
-    await updateServerPet(id, updated, actor);
+    // A status change replaces no history.
+    await updateServerPet(id, updated, actor, {});
 
     revalidatePath("/pets");
     revalidatePath(`/pets/${id}`);

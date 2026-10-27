@@ -256,7 +256,7 @@ export async function updateServerPet(
   id: string,
   updated: Pet,
   actor: SessionUser,
-  replaceHistory: PetHistoryReplacement = {}
+  replaceHistory: PetHistoryReplacement
 ): Promise<boolean> {
   let previous = serverPets.find((p) => p.id === id);
   if (!previous && isDatabasePersistent()) {
@@ -287,7 +287,14 @@ export async function updateServerPet(
     handlePersistenceError("Prisma pet update", err, "write");
   }
 
-  serverPets = serverPets.map((p) => (p.id === id ? updated : p));
+  // The mirror and the audit row describe what was written: a collection this write did not
+  // replace keeps the copy already held, not whatever the caller's object carried.
+  const stored: Pet = {
+    ...updated,
+    updates: replaceHistory.updates ? updated.updates : previous.updates,
+    medicalTimeline: replaceHistory.medicalTimeline ? updated.medicalTimeline : previous.medicalTimeline,
+  };
+  serverPets = serverPets.map((p) => (p.id === id ? stored : p));
 
   recordAuditLog({
     actorId: actor.id,
@@ -296,7 +303,7 @@ export async function updateServerPet(
     action: "PET_UPDATED",
     entity: "Pet",
     entityId: id,
-    details: { before: previous, after: updated },
+    details: { before: previous, after: stored },
   });
 
   return true;

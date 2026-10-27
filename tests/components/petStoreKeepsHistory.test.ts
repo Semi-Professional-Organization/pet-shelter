@@ -29,7 +29,12 @@ function formFrom(pet: Pet): PetFormInput {
     tags: pet.tags,
     featured: pet.featured,
     intakeDate: pet.intakeDate,
+    customQrUrl: pet.customQrUrl ?? "",
+    rehabStage: pet.rehabStage,
+    rehabStageMs: pet.rehabStageMs,
+    rehabProgressPercent: pet.rehabProgressPercent,
     isArchived: pet.isArchived ?? false,
+    deletedAt: pet.deletedAt ?? null,
     ...pet.medical,
     ...pet.compatibility,
   };
