@@ -213,24 +213,32 @@ describe("submitApplication under strict persistence", () => {
       expect(prismaDouble.adoptionApplication.create).not.toHaveBeenCalled();
     });
 
-    it("does NOT yet refuse an animal whose stored status is an unrecognised spelling", async () => {
-      // Pinning a gap, not endorsing it. `fromDbPetStatus` compares four exact, case-sensitive
-      // spellings and returns "Available" for anything else, so a column holding `adopted`
-      // arrives here as Available and this guard — which refuses `Adopted` — lets it through.
-      // The fail-closed fallback in `getPetStatusPresentation` never sees it, because the mapper
-      // resolved it first.
-      //
-      // The production branch has held `Pet.status` as text rather than the `PetStatus` enum,
-      // which is where such a value survives. When the mapper is fixed this test flips, and it is
-      // written to be found at that moment: `tasks/open/an-unknown-pet-status-reads-as-available.md`.
-      // `DbPetRecord.status` is `PrismaPetStatus | string`, which is the point: the column can
-      // hold text the enum would have refused.
+    it("refuses an animal whose stored status is a miscased Adopted", async () => {
+      // `fromDbPetStatus` used to compare four exact spellings and return "Available" for anything
+      // else, so a text column holding `adopted` let this guard accept an animal who had gone home.
+      // `DbPetRecord.status` is `PrismaPetStatus | string`, which is the point: the production
+      // column has held text the enum would have refused.
       givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "adopted" }));
       const { submitApplication } = await import("@/actions/applications");
 
       const result = await submitApplication(applicationFor("pet-001"));
 
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/not currently accepting adoption applications/i);
+      expect(result.error).toContain("Adopted");
+      expect(prismaDouble.adoptionApplication.create).not.toHaveBeenCalled();
+    });
+
+    it("refuses an animal whose stored status is not a status at all, saying so", async () => {
+      givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Fostered" }));
+      const { submitApplication } = await import("@/actions/applications");
+
+      const result = await submitApplication(applicationFor("pet-001"));
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Bella is not currently accepting adoption applications/i);
+      expect(result.error).toContain("Status unknown");
+      expect(prismaDouble.adoptionApplication.create).not.toHaveBeenCalled();
     });
 
     it("rejects an application for an animal in rehabilitation", async () => {

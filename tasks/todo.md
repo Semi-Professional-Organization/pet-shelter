@@ -15,6 +15,27 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Pet status and adoption guards
+
+**Branch:** `fix/pet-status-and-adoption-guards` · opened 2026-10-27 · base `91205dd`
+
+Issues #98, #99, #96 and #101 in one pull request, as the owner asked. Rules and rejected options
+are in `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-available.md`.
+
+- [x] Unknown persisted status passes through as not adoptable; drift in case or separator is read
+      as the status it spells; writes refuse an unknown status.
+- [x] Adoption audit row keyed on the `pets` row the transaction updated.
+- [x] Form offers adoptable animals only and sets its pet field on every opening.
+
+## Review
+
+Not done, on purpose: a fifth `Unknown` status; backfilling `petId` on legacy applications (needs
+the production database); the mirror's auto-reject of other applications, logged as
+`tasks/open/an-approval-auto-rejects-applications-postgres-never-rejected.md`. Review round 1 found
+six in-scope defects (fixed), that one (logged), and two declined: dangling links to the deleted
+`open/` entries inside older decisions (decisions are never rewritten) and a third copy of the
+adoptable predicate in `PetGallery.tsx` (outside the change).
+
 # Secrets: one weak secret no longer takes the site down; SOPS CRLF
 
 **Branch:** `claude/secrets-boot-and-sops-crlf` · opened 2026-10-27 · base `91205dd` · #129, #69

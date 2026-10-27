@@ -1,6 +1,11 @@
 import { MedicalTimelineEvent, Pet, PetUpdate } from "@/types/pet";
 import { PetStatus as PrismaPetStatus } from "@prisma/client";
-import { normalizePetStatus } from "@/lib/domain/stateMachine";
+import {
+  DomainValidationError,
+  PET_STATUS_ALIASES,
+  isKnownPetStatus,
+  normalizePetStatus,
+} from "@/lib/domain/stateMachine";
 import {
   computeAgeCategory,
   formatAgeString,
@@ -8,10 +13,23 @@ import {
 } from "@/lib/domain/petAge";
 
 /**
+ * Refuses an unrecognised status before it is written. Writes used to default it to Available, so
+ * saving an animal read with an unrecognised status wrote it back as adoptable.
+ */
+export function assertKnownPetStatus(status: Pet["status"]): void {
+  if (!isKnownPetStatus(status)) {
+    throw new DomainValidationError(
+      `'${status}' is not a recognised pet status. Choose Available, Pending, Adopted or In Rehabilitation.`
+    );
+  }
+}
+
+/**
  * Converts a domain PetStatus into the Prisma database enum.
  * Normalizes legacy aliases (e.g. "Rehabilitation" -> In_Rehabilitation).
  */
 export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
+  assertKnownPetStatus(status);
   const norm = normalizePetStatus(status);
   if (norm === "In Rehabilitation") return PrismaPetStatus.In_Rehabilitation;
   if (norm === "Pending") return PrismaPetStatus.Pending;
@@ -19,16 +37,38 @@ export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
   return PrismaPetStatus.Available;
 }
 
+/** Folds case, surrounding space and `_`/space runs, the drift a text column has been seen to allow. */
+function statusKey(status: string): string {
+  return status.trim().toLowerCase().replace(/[\s_]+/g, " ");
+}
+
+/** Every known spelling, folded, to its canonical status. Built from the alias table, not listed again. */
+const DB_STATUS_SPELLINGS: Readonly<Record<string, Pet["status"]>> = Object.fromEntries(
+  (Object.keys(PET_STATUS_ALIASES) as Pet["status"][]).map((s) => [statusKey(s), PET_STATUS_ALIASES[s]])
+);
+
 /**
  * Maps a persisted PetStatus database enum or legacy string to domain PetStatus.
+ *
+ * The production column has held text rather than the enum, so drift in case or separator
+ * (`adopted`, `IN_REHABILITATION`) is matched to the status it spells. Anything else is passed
+ * through unchanged instead of becoming Available, which used to make an adopted animal with a
+ * miscased status adoptable again. `isKnownPetStatus` is false for it, `getPetStatusPresentation`
+ * presents it as not adoptable, and `submitApplication` refuses it by name.
+ * `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-available.md`.
  */
 export function fromDbPetStatus(status: PrismaPetStatus | string): Pet["status"] {
-  if (status === "In_Rehabilitation" || status === "In Rehabilitation" || status === "Rehabilitation") {
-    return "In Rehabilitation";
-  }
-  if (status === "Pending") return "Pending";
-  if (status === "Adopted") return "Adopted";
-  return "Available";
+  // ceiling: folds case, outer space and `_`; hyphens and abbreviations (`In-Rehabilitation`,
+  // `Rehab`) stay unrecognised and are refused. Not measured against production, which agents
+  // cannot read, and Prisma's enum may fail the read before this runs:
+  // `tasks/open/a-drifted-pet-status-fails-the-whole-prisma-read.md`.
+  const key = statusKey(status);
+  // `hasOwn`, not a bare index: the column is free text, and `constructor` or `toString` would
+  // otherwise return a prototype member. The cast is the honest gap: the domain type has no
+  // member for a value nobody anticipated.
+  return Object.hasOwn(DB_STATUS_SPELLINGS, key)
+    ? DB_STATUS_SPELLINGS[key]
+    : (status as Pet["status"]);
 }
 
 /**

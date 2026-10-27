@@ -494,10 +494,19 @@ export function PetFormDialog({
                         ? "Adopted (Happy Tail)"
                         : opt === "In Rehabilitation"
                         ? "In Rehabilitation (Under Care)"
-                        : "Available"}
+                        : opt === "Available"
+                        ? "Available"
+                        : // An unrecognised stored status, offered first so the row can be
+                          // corrected; named as stored so staff can see what to fix.
+                          `Unrecognised: ${opt}`}
                     </option>
                   ))}
                 </select>
+                {errors.status && (
+                  <p className="text-xs text-destructive">
+                    Choose a recognised status before saving.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">

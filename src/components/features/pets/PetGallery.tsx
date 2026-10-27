@@ -22,7 +22,7 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 import { AGE_BANDS, formatAgeBandRange } from "@/lib/domain/petAge";
 import { GENDER_VALUES } from "@/lib/validations/pet";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
-import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
+import { isPetAdoptable } from "@/lib/presentation/petStatusPresentation";
 
 /**
  * i18n keys for the lifecycle band names. The year range printed beside each name is derived
@@ -370,26 +370,11 @@ export function PetGallery({
                   // tabs make non-adoptable by construction — open the Adopted tab, click here, and
                   // the form came up pre-filled for an animal who had already gone home.
                   //
-                  // The second fallback looks redundant with `resolveDefaultPet`, which also picks
-                  // the first Available animal when handed `null`. **It is not; do not remove it.**
-                  // The form copies the selection into its fields only when it receives an actual
-                  // pet (`if (selectedPet && open)` in `useAdoptionFormController`). Handed `null`,
-                  // its title follows `resolveDefaultPet` while `petId` keeps whatever the last
-                  // opening left there — reopen within the close animation and the form names one
-                  // animal and would submit for another. It was removed once as dead code, on a
-                  // review's word, and the next review found this.
-                  //
-                  // ceiling: still `null` when *no* animal in the shelter is adoptable, which
-                  // reopens that stale-field path. `resolveDefaultPet` no longer papers over it
-                  // with `allPets[0]` whatever its status, and `submitApplication` now refuses a
-                  // pet it cannot find, one that is archived, and one whose status is not
-                  // adoptable — so the worst outcome is a rejected submission rather than an
-                  // application against an animal who has gone home. The stale field itself is
-                  // `tasks/open/adoption-form-keeps-a-stale-pet-id-when-it-opens-on-nobody.md`.
-                  const isAdoptable = (pet: (typeof pets)[number]) =>
-                    getPetStatusPresentation(pet.status).isAdoptable;
+                  // Preferring the animals on screen is the point: `resolveDefaultPet`, handed
+                  // `null`, would pick the first adoptable animal in the whole shelter, which a
+                  // filtered tab may not show.
                   setActivePetForAdoption(
-                    filteredPets.find(isAdoptable) ?? pets.find(isAdoptable) ?? null
+                    filteredPets.find(isPetAdoptable) ?? pets.find(isPetAdoptable) ?? null
                   );
                   setIsAdoptionOpen(true);
                 }}

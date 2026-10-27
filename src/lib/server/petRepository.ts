@@ -11,6 +11,7 @@ import {
   buildPetCreatePayload,
   buildPetUpdatePayload,
   mapDbPetToPet,
+  assertKnownPetStatus,
   type PetHistoryReplacement,
 } from "./petMappers";
 import { registerStateReset } from "@/lib/stateResets";
@@ -223,9 +224,11 @@ export function findServerPetById(id: string): Pet | null {
  * array, and that read sits behind an anonymous profile GET (and, until
  * 2026-10-27, an unauthenticated adoption POST, which now reads with
  * `findPetForWriteAsync` and leaves the array alone). So a visitor could choose which of two
- * same-named animals `atomicUpdateApplicationStatus` marks on approval — and
- * the caller writes the returned id into the `PET_STATUS_TRANSITION_ADOPTED`
- * audit row, making it a wrong permanent record rather than a stale cache.
+ * same-named animals `atomicUpdateApplicationStatus` marks on approval — and,
+ * with no database, the caller writes the returned id into the
+ * `PET_STATUS_TRANSITION_ADOPTED` audit row (with one, the row comes from the
+ * transaction's own update), making it a wrong permanent record rather than a
+ * stale cache.
  * Pinned by `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`;
  * settled in `tasks/decisions/2026-09-22-an-approval-marks-the-id-it-asks-for.md`.
  *
@@ -273,6 +276,9 @@ export function markCachedPetAdopted(petId: string, petName: string): Pet | null
 }
 
 export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<void> {
+  // Before the `try`: `handlePersistenceError` would swallow the refusal outside strict mode and
+  // the mirror would take the pet anyway.
+  assertKnownPetStatus(newPet.status);
   // DB first: a refused write must not leave the mirror ahead of the database.
   try {
     await prisma.pet.create({
@@ -313,6 +319,7 @@ export async function updateServerPet(
     validatePetTransition(previous.status, updated.status);
   }
 
+  assertKnownPetStatus(updated.status); // before the `try`, as in `insertServerPet`
   try {
     // A collection is cleared and rewritten only when the caller says it is replacing it. The rows
     // carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is never a

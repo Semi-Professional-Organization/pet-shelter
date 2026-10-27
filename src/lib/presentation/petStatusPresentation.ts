@@ -1,5 +1,5 @@
 import { Pet, PetStatus } from "@/types/pet";
-import { normalizePetStatus } from "@/lib/domain/stateMachine";
+import { isKnownPetStatus, normalizePetStatus } from "@/lib/domain/stateMachine";
 
 export type PetStatusTone = "available" | "rehabilitation" | "pending" | "adopted";
 
@@ -144,8 +144,19 @@ export interface PetStatusFilterOption {
  * legacy `Rehabilitation` alias and the canonical `In Rehabilitation` render identically.
  */
 export function getPetStatusPresentation(status: PetStatus): PetStatusPresentation {
-  const tone = TONE_BY_STATUS[normalizePetStatus(status)] ?? "pending";
-  return PRESENTATIONS[tone];
+  if (isKnownPetStatus(status)) return PRESENTATIONS[TONE_BY_STATUS[normalizePetStatus(status)]];
+  // A stored status the domain does not know (`fromDbPetStatus` passes it through). It fails
+  // closed with the pending tone, but is labelled "Status unknown": calling it "Pending" made the
+  // admin status control show two Pendings and hid the row staff need to correct, and the raw
+  // stored text is not for the public catalogue. `isKnownPetStatus` is an own-key check, so
+  // `constructor` cannot pass for a known tone.
+  return { ...PRESENTATIONS.pending, labelKey: "common.statusUnknown", labelFallback: "Status unknown" };
+}
+
+/** Whether an animal accepts adoption applications, as the adoption form and gallery ask it.
+ * `submitApplication` reads the same `isAdoptable` flag for its label alongside. */
+export function isPetAdoptable(pet: Pick<Pet, "status">): boolean {
+  return getPetStatusPresentation(pet.status).isAdoptable;
 }
 
 /**
@@ -173,12 +184,17 @@ export function buildPetStatusFilterOptions(
 
 /**
  * Compare a pet's status against a gallery filter value, which arrives as a raw string
- * from the URL. Both sides are normalized, so selecting "In Rehabilitation" also matches
- * animals stored under the legacy `Rehabilitation` alias, and vice versa.
+ * from the URL. Compared by tone, so selecting "In Rehabilitation" also matches animals
+ * stored under the legacy `Rehabilitation` alias, and an unrecognised stored status is found
+ * under Pending, the bucket that counts it.
  */
 export function matchesStatusFilter(status: PetStatus, selectedStatus: string): boolean {
   if (selectedStatus === "all") return true;
-  return normalizePetStatus(status) === normalizePetStatus(selectedStatus as PetStatus);
+  if (!isKnownPetStatus(selectedStatus)) return false;
+  // By tone, the way `buildPetStatusFilterOptions` counts. The same as comparing normalized
+  // statuses for every known one, and it files an unrecognised stored status under Pending, where
+  // it is counted and badged, instead of under no filter at all.
+  return getPetStatusPresentation(status).tone === getPetStatusPresentation(selectedStatus).tone;
 }
 
 /**
