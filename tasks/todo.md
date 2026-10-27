@@ -15,6 +15,29 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Issue grouping, close-out after the first apply
+
+**Branch:** `claude/project-thread-c0pu58` · 2026-10-27 · base `5aea5bb`
+
+- [x] #195 merged; the ledger sync closed #157, which kept its parent #191
+- [x] #182 (the ledger-sync entry's mirror) added to `agent-tooling-and-process`; summary widened
+- [ ] After merge: `npm run issues:groups -- --apply` (plans `add #182` and `update #193`)
+
+## Review
+
+`/code-review xhigh` on #197, at the owner's request. Fixed: the squash body is set by hand, since
+the repo's default would carry the already-shipped #195 commit into it; the stale open entry is
+updated; the group summary now covers the issue and ledger scripts; the commit's account of when
+#182 appeared is corrected (it came from the ledger sync that ran alongside the first `--apply`,
+nine seconds before #183, not after the grouping).
+
+Deliberately not done, each a behaviour change beyond this PR: a check that warns when a PR adds
+a `tasks/open` entry with no group (new entries otherwise land ungrouped until someone edits the
+file); an automatic `--apply` on push to master (it stays a manual, ask-gated step, as decided);
+and a clearer note for a closed member whose entry was settled rather than renamed (#157's note
+says "renamed" on every dry run). The branch carries a merge of its own already-squashed history,
+so `git cherry` will keep showing e58836b as unshipped; its tree equals 5aea5bb.
+
 # The context meter's root-cause pass
 
 **Branch:** `claude/project-thread-n57o1i` · opened 2026-10-21 · base `caa7fce`
