@@ -342,7 +342,17 @@ export interface PetHistoryNestedCreate {
 }
 
 export type PetCreatePayload = PetPersistencePayload & PetHistoryNestedCreate & { id: string };
-export type PetUpdatePayload = PetPersistencePayload & PetHistoryNestedCreate;
+export type PetUpdatePayload = PetPersistencePayload & Partial<PetHistoryNestedCreate>;
+
+/**
+ * Which history collections an update replaces. A collection not marked `true` is left exactly as
+ * the database holds it: no delete and no recreate. Issue #107: an edit that did not submit history
+ * used to rewrite every row, from whatever copy of it the caller had.
+ */
+export interface PetHistoryReplacement {
+  updates?: boolean;
+  medicalTimeline?: boolean;
+}
 
 /**
  * Flattens the two nested history collections into Prisma nested `create`s.
@@ -350,7 +360,8 @@ export type PetUpdatePayload = PetPersistencePayload & PetHistoryNestedCreate;
  * Shared by both write paths so the column mapping cannot drift between them,
  * exactly as `buildPetPersistencePayload` does for the scalars. What the two
  * paths genuinely differ on is *clearing*: create starts from nothing, update
- * must delete the previous rows first — see `updateServerPet`.
+ * deletes the previous rows first for each collection it replaces, and leaves
+ * the others alone — see `updateServerPet`.
  */
 export function buildPetHistoryNestedCreate(pet: Pet): PetHistoryNestedCreate {
   return {
@@ -396,13 +407,17 @@ export function buildPetCreatePayload(pet: Pet): PetCreatePayload {
 
 /**
  * Everything `prisma.pet.update` needs. The id is not written — it addresses
- * the row — and the previous history rows are removed by the surrounding
- * transaction rather than here, so this stays a pure projection of the pet.
+ * the row. Only the collections `replace` names get a nested create; their
+ * previous rows are removed by the surrounding transaction rather than here,
+ * so this stays a pure projection of the pet. A collection not named is left
+ * out entirely, so its stored rows are untouched.
  */
-export function buildPetUpdatePayload(pet: Pet): PetUpdatePayload {
+export function buildPetUpdatePayload(pet: Pet, replace: PetHistoryReplacement): PetUpdatePayload {
+  const history = buildPetHistoryNestedCreate(pet);
   return {
     ...buildPetPersistencePayload(pet),
-    ...buildPetHistoryNestedCreate(pet),
+    ...(replace.updates ? { updates: history.updates } : {}),
+    ...(replace.medicalTimeline ? { medicalTimeline: history.medicalTimeline } : {}),
   };
 }
 

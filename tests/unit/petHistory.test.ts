@@ -16,6 +16,7 @@ import {
   insertServerPet,
   updateServerPet,
   getServerPetsAsync,
+  findServerPetById,
 } from "@/lib/server/petRepository";
 import {
   petFormSchema,
@@ -26,7 +27,7 @@ import {
   type MedicalTimelineEventInput,
   type PetUpdateInput,
 } from "@/lib/validations/pet";
-import { createPet, updatePet, getPetById } from "@/actions/pets";
+import { createPet, updatePet, updatePetStatus, getPetById } from "@/actions/pets";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
 import { findMemberRow, signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { wireTransaction } from "../integration/support/prismaDouble";
@@ -682,7 +683,10 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
     it("should build an update payload that reuses the same scalars and carries no id", () => {
       const pet = makePet();
       const scalars = buildPetPersistencePayload(pet) as unknown as Record<string, unknown>;
-      const updatedPayload = buildPetUpdatePayload(pet) as unknown as Record<string, unknown>;
+      const updatedPayload = buildPetUpdatePayload(pet, {
+        updates: true,
+        medicalTimeline: true,
+      }) as unknown as Record<string, unknown>;
 
       expect(updatedPayload.id).toBeUndefined();
       for (const [key, value] of Object.entries(scalars)) {
@@ -690,6 +694,15 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       }
       expect(updatedPayload.updates).toEqual({ create: expect.any(Array) });
       expect(updatedPayload.medicalTimeline).toEqual({ create: expect.any(Array) });
+    });
+
+    it("should leave out a history collection the update does not replace", () => {
+      const payload = buildPetUpdatePayload(makePet(), {
+        medicalTimeline: true,
+      }) as unknown as Record<string, unknown>;
+
+      expect("updates" in payload).toBe(false);
+      expect(payload.medicalTimeline).toEqual({ create: expect.any(Array) });
     });
   });
 
@@ -731,7 +744,8 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       await updateServerPet(
         "pet-hist-update-01",
         { ...pet, medicalTimeline: [timelineIntake], updates: undefined },
-        TEST_ADMIN_ACTOR
+        TEST_ADMIN_ACTOR,
+        { updates: true, medicalTimeline: true }
       );
 
       // Clear-then-write must be ordered and atomic: a nested create alone would
@@ -755,6 +769,31 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       const updateArgs = queued[2].__args as { data: Record<string, unknown> };
       expect(updateArgs.data.medicalTimeline).toMatchObject({ create: [{ id: "tl-hist-1" }] });
       expect(updateArgs.data.updates).toEqual({ create: [] });
+    });
+
+    it("should keep the stored copy of a collection the update does not replace", async () => {
+      const pet = makePet({ id: "pet-hist-update-02" });
+      await insertServerPet(pet, TEST_ADMIN_ACTOR);
+      // A later write trims the timeline, so `pet` is now a stale copy of the history.
+      await updateServerPet(
+        "pet-hist-update-02",
+        { ...pet, medicalTimeline: [timelineIntake] },
+        TEST_ADMIN_ACTOR,
+        { medicalTimeline: true }
+      );
+
+      const stored = await updateServerPet(
+        "pet-hist-update-02",
+        { ...pet, name: "Tuah Stale Copy" },
+        TEST_ADMIN_ACTOR,
+        {}
+      );
+
+      expect(stored?.name).toBe("Tuah Stale Copy");
+      expect(stored?.medicalTimeline?.map((e) => e.id)).toEqual(["tl-hist-1"]);
+      expect(findServerPetById("pet-hist-update-02")?.medicalTimeline?.map((e) => e.id)).toEqual([
+        "tl-hist-1",
+      ]);
     });
   });
 
@@ -832,26 +871,115 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       expect(stored?.updates ?? []).toEqual([]);
     });
 
-    it("should clear history even when the payload omits the keys entirely", async () => {
+    it("should keep history when the payload omits the keys entirely", async () => {
       const created = await createPet({ ...baseForm, name: "Tuah Omitted" });
       const petId = created.data!.id;
       expect((await getPetById(petId))?.medicalTimeline?.length).toBe(2);
       expect((await getPetById(petId))?.updates?.length).toBe(2);
 
-      // Zod omits absent optional keys from its output, so `{...existing, ...validated}`
-      // would silently preserve the old rows. The submitted payload must win.
+      // This is the shape the admin edit dialog submits: it manages neither collection, so it
+      // sends neither key. Omission means "not touched"; only an explicit `[]` clears (test above).
+      // Issue #107: treating omission as clearing deleted every clinical event on any edit.
       const omittedForm: Record<string, unknown> = { ...baseForm, name: "Tuah Omitted" };
       delete omittedForm.medicalTimeline;
       delete omittedForm.updates;
       expect("medicalTimeline" in omittedForm).toBe(false);
       expect("updates" in omittedForm).toBe(false);
 
-      const cleared = await updatePet(petId, omittedForm as typeof baseForm);
-      expect(cleared.success).toBe(true);
+      const saved = await updatePet(petId, omittedForm as typeof baseForm);
+      expect(saved.success).toBe(true);
+      // The action reports the pet as stored, history included, not the history-less payload.
+      expect(saved.data?.medicalTimeline?.map((e) => e.id).sort()).toEqual(["tl-hist-1", "tl-hist-2"]);
 
       const stored = await getPetById(petId);
-      expect(stored?.medicalTimeline ?? []).toEqual([]);
-      expect(stored?.updates ?? []).toEqual([]);
+      expect(stored?.medicalTimeline?.map((e) => e.id).sort()).toEqual(["tl-hist-1", "tl-hist-2"]);
+      expect(stored?.updates?.map((u) => u.id).sort()).toEqual(["up-hist-1", "up-hist-2"]);
+    });
+
+    it("should not delete or rewrite stored history rows when an edit omits them", async () => {
+      // The layer that deletes rows is the repository, so this pins what reaches Prisma rather than
+      // the mirror: an edit that sends no history must queue no `deleteMany` and no nested create.
+      // Otherwise it rewrites the rows from the mirror's copy, which can be older than the database.
+      const created = await createPet({ ...baseForm, name: "Tuah Untouched" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      const omittedForm: Record<string, unknown> = { ...baseForm, name: "Tuah Untouched" };
+      delete omittedForm.medicalTimeline;
+      delete omittedForm.updates;
+      expect((await updatePet(petId, omittedForm as typeof baseForm)).success).toBe(true);
+
+      expect(prismaSpies.transaction).toHaveBeenCalledTimes(1);
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual(["pet.update"]);
+      const data = (queued[0].__args as { data: Record<string, unknown> }).data;
+      expect("updates" in data).toBe(false);
+      expect("medicalTimeline" in data).toBe(false);
+    });
+
+    it("should delete and rewrite stored history rows when an edit submits empty lists", async () => {
+      // The other half of the rule above, at the same layer: an explicit `[]` must reach Prisma as a
+      // clear, not stay in the mirror only.
+      const created = await createPet({ ...baseForm, name: "Tuah Cleared" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      const cleared = await updatePet(petId, {
+        ...baseForm,
+        name: "Tuah Cleared",
+        medicalTimeline: [],
+        updates: [],
+      });
+      expect(cleared.success).toBe(true);
+
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual([
+        "petUpdate.deleteMany",
+        "medicalTimelineEvent.deleteMany",
+        "pet.update",
+      ]);
+      const data = (queued[2].__args as { data: Record<string, unknown> }).data;
+      expect(data.updates).toEqual({ create: [] });
+      expect(data.medicalTimeline).toEqual({ create: [] });
+    });
+
+    it("should replace only the collection an edit submits", async () => {
+      const created = await createPet({ ...baseForm, name: "Tuah Partial" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      const partialForm: Record<string, unknown> = {
+        ...baseForm,
+        name: "Tuah Partial",
+        medicalTimeline: [timelineIntake],
+      };
+      delete partialForm.updates;
+      expect((await updatePet(petId, partialForm as typeof baseForm)).success).toBe(true);
+
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual(["medicalTimelineEvent.deleteMany", "pet.update"]);
+      const data = (queued[1].__args as { data: Record<string, unknown> }).data;
+      expect("updates" in data).toBe(false);
+      expect(data.medicalTimeline).toMatchObject({ create: [{ id: "tl-hist-1" }] });
+
+      const stored = await getPetById(petId);
+      expect(stored?.medicalTimeline?.map((e) => e.id)).toEqual(["tl-hist-1"]);
+      expect(stored?.updates?.map((u) => u.id).sort()).toEqual(["up-hist-1", "up-hist-2"]);
+    });
+
+    it("should not delete or rewrite stored history rows on a status change", async () => {
+      const created = await createPet({ ...baseForm, name: "Tuah Cleared For Adoption" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      expect((await updatePetStatus(petId, "Available")).success).toBe(true);
+
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual(["pet.update"]);
+      const data = (queued[0].__args as { data: Record<string, unknown> }).data;
+      expect("updates" in data).toBe(false);
+      expect("medicalTimeline" in data).toBe(false);
+      expect((await getPetById(petId))?.medicalTimeline?.length).toBe(2);
     });
 
     it("should reject a create whose history carries a duplicate event id", async () => {

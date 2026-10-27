@@ -11,6 +11,7 @@ import {
   buildPetCreatePayload,
   buildPetUpdatePayload,
   mapDbPetToPet,
+  type PetHistoryReplacement,
 } from "./petMappers";
 import { registerStateReset } from "@/lib/stateResets";
 
@@ -295,32 +296,67 @@ export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<
   });
 }
 
-export async function updateServerPet(id: string, updated: Pet, actor: SessionUser): Promise<boolean> {
+export async function updateServerPet(
+  id: string,
+  updated: Pet,
+  actor: SessionUser,
+  replaceHistory: PetHistoryReplacement
+): Promise<Pet | null> {
   let previous = serverPets.find((p) => p.id === id);
   if (!previous && isDatabasePersistent()) {
     const fromDb = await findServerPetByIdAsync(id);
     if (fromDb) previous = fromDb;
   }
-  if (!previous) return false;
+  if (!previous) return null;
 
   if (previous.status !== updated.status) {
     validatePetTransition(previous.status, updated.status);
   }
 
   try {
+    // A collection is cleared and rewritten only when the caller says it is replacing it. The rows
+    // carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is never a
+    // no-op, and the caller's copy may be an in-memory mirror older than the database.
     await prisma.$transaction([
-      prisma.petUpdate.deleteMany({ where: { petId: id } }),
-      prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } }),
+      ...(replaceHistory.updates ? [prisma.petUpdate.deleteMany({ where: { petId: id } })] : []),
+      ...(replaceHistory.medicalTimeline
+        ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } })]
+        : []),
       prisma.pet.update({
         where: { id },
-        data: buildPetUpdatePayload(updated),
+        data: buildPetUpdatePayload(updated, replaceHistory),
       }),
     ]);
   } catch (err) {
     handlePersistenceError("Prisma pet update", err, "write");
   }
 
-  serverPets = serverPets.map((p) => (p.id === id ? updated : p));
+  // The server-side home of the keep-when-not-replaced rule; callers pass whatever they hold and
+  // get back the pet as stored. A collection this write did not replace keeps the copy the mirror
+  // holds *now*: not the caller's copy, and not `previous`, which was read before the await above
+  // and may predate a concurrent write.
+  // ceiling: in database mode that copy is still this instance's mirror, which on a cold instance
+  // is the pets.json fixture. The database rows are untouched either way; only the returned pet and
+  // the mirror can show stale history. Upgrade path: read the baseline from the database, as
+  // tasks/open/pet-writes-start-from-the-in-memory-mirror.md describes.
+  const keptFrom = serverPets.find((p) => p.id === id) ?? previous;
+  const stored: Pet = {
+    ...updated,
+    updates: replaceHistory.updates ? updated.updates : keptFrom.updates,
+    medicalTimeline: replaceHistory.medicalTimeline
+      ? updated.medicalTimeline
+      : keptFrom.medicalTimeline,
+  };
+  serverPets = serverPets.map((p) => (p.id === id ? stored : p));
+
+  const auditedHistory = (pet: Pet): Partial<Pet> => {
+    const { updates, medicalTimeline, ...rest } = pet;
+    return {
+      ...rest,
+      ...(replaceHistory.updates ? { updates } : {}),
+      ...(replaceHistory.medicalTimeline ? { medicalTimeline } : {}),
+    };
+  };
 
   recordAuditLog({
     actorId: actor.id,
@@ -329,10 +365,12 @@ export async function updateServerPet(id: string, updated: Pet, actor: SessionUs
     action: "PET_UPDATED",
     entity: "Pet",
     entityId: id,
-    details: { before: previous, after: updated },
+    // History appears only when this write replaced it. A collection it did not touch is whatever
+    // the mirror held, which can be older than the database, and the audit row is permanent.
+    details: { before: auditedHistory(previous), after: auditedHistory(stored) },
   });
 
-  return true;
+  return stored;
 }
 
 export async function archiveServerPet(id: string, archive: boolean, actor: SessionUser): Promise<boolean> {

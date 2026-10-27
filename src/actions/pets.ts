@@ -295,6 +295,15 @@ export async function updatePet(
     const storedGallery = wantsNotification ? await getStoredGalleryImages(id) : null;
     const previousGallery = storedGallery ?? [...(existing.galleryImages || [])];
 
+    // Nested history is replaced only when the payload carries it: an absent key means "not
+    // touched", and only a submitted list (an explicit `[]` included) replaces the stored rows. The
+    // admin edit dialog manages neither collection and sends neither key, so treating omission as
+    // "clear" deleted every clinical event and progress update on any ordinary edit (issue #107).
+    const replaceHistory = {
+      updates: validated.updates !== undefined,
+      medicalTimeline: validated.medicalTimeline !== undefined,
+    };
+
     // Wrapped, not spread: `existing` still carries the `age` and `ageCategory` the previous read
     // derived, and a submitted birthday must re-derive both rather than leave last read's prose in
     // place. `withDerivedAge` recomputes them from whatever `birthDate` ends up on the object.
@@ -316,10 +325,8 @@ export async function updatePet(
       rehabStage: validated.rehabStage,
       rehabStageMs: validated.rehabStageMs,
       rehabProgressPercent: validated.rehabProgressPercent,
-      // Same rule for nested history, and the same reason. Zod drops absent
-      // optional keys, so `{...existing, ...validated}` would silently keep an
-      // event the submitter deleted. Assigning unconditionally makes removal by
-      // omission — not just by an explicit empty array — actually delete rows.
+      // Nested history follows the opposite rule — see `replaceHistory` above. `updateServerPet`
+      // fills in any collection it does not replace, so the pet it returns is the one to report.
       updates: sortHistoryByDate(validated.updates),
       medicalTimeline: sortHistoryByDate(validated.medicalTimeline),
       galleryImages: validated.galleryImages || existing.galleryImages || [],
@@ -339,7 +346,10 @@ export async function updatePet(
       },
     });
 
-    await updateServerPet(id, updated, actor);
+    const stored = await updateServerPet(id, updated, actor, replaceHistory);
+    if (!stored) {
+      return { success: false, error: "Pet not found" };
+    }
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
     // after editing a description, or reordering the existing gallery, notifies
@@ -367,7 +377,7 @@ export async function updatePet(
     revalidatePath("/admin/pets");
     revalidatePath("/");
 
-    return { success: true, data: updated };
+    return { success: true, data: stored };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update pet record";
     return { success: false, error: msg };
@@ -419,7 +429,8 @@ export async function updatePetStatus(
     }
 
     const updated: Pet = { ...existing, status };
-    await updateServerPet(id, updated, actor);
+    // A status change replaces no history.
+    await updateServerPet(id, updated, actor, {});
 
     revalidatePath("/pets");
     revalidatePath(`/pets/${id}`);
