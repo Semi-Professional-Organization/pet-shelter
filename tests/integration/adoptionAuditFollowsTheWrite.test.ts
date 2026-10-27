@@ -98,7 +98,7 @@ describe("the adoption audit row follows the database write", () => {
 
     expect(result).toEqual({ success: true });
     expect(double.pet.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "itest-cold-mirror-pet" } })
+      expect.objectContaining({ where: { id: "itest-cold-mirror-pet", status: { not: "Adopted" } } })
     );
     const rows = await adoptionAuditRows();
     expect(rows).toHaveLength(1);

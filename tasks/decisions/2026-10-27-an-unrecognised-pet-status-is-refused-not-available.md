@@ -16,21 +16,24 @@ listed, none was taken whole:
   real drift in a text column, and reading it correctly beats refusing it.
 - **Anything else passes through unchanged**, the way `normalizePetStatus` already treats unknown
   input. `isKnownPetStatus` is false for it, `getPetStatusPresentation` falls back to the
-  non-adoptable `pending` presentation, and `submitApplication` refuses it with its own message.
+  non-adoptable `pending` presentation, and `submitApplication` refuses it ("Status unknown").
 - **Not a fifth `Unknown` status:** it would touch every surface that switches on status, for a
   value nobody has observed in production. **Not a throw on read:** one bad row would fail a whole
   catalogue render. **Not mapped to `Pending`:** that writes a guess into the domain value.
 
 The cost: `Pet["status"]` can now hold a string outside its union, behind one cast in the mapper.
-Display surfaces show such an animal with the Pending tone, labelled "Status unknown" (the raw
-stored text is not for the public catalogue); the admin form names the stored value so staff can
-correct it. Lookups on the free-text value are
-own-key checks (`isKnownPetStatus`), so `constructor` or `__proto__` cannot pass for a status. Two consequences were closed with it:
-`toDbPetStatus` refuses an unknown status instead of writing it back as `Available` (the
-repository checks it before the persistence `try`, which would otherwise swallow the
-refusal), and an unknown status may move to any canonical one, so staff can correct the row. The status filter matches by
-tone, in the gallery and in `getPublicPets` alike, so an unrecognised status is found under the
-Pending bucket that counts it.
+Display surfaces show such an animal with the Pending presentation, track included, so it stays in
+the public Adoptable tab, not adoptable, labelled "Status unknown" (the raw stored text is not for
+the public catalogue). That is the "map to Pending" option in display only: the domain value is
+not rewritten, so the row stays findable, and the admin form names the stored value so staff can
+correct it. Lookups on the free-text value are own-key checks (`isKnownPetStatus`), so
+`constructor` or `__proto__` cannot pass for a status.
+
+Two consequences were closed with it: `toDbPetStatus` refuses an unknown status instead of writing
+it back as `Available` (the repository checks it before the persistence `try`, which would
+otherwise swallow the refusal), and an unknown status may move to any canonical one, so staff can
+correct the row. The status filter matches by tone, in the gallery and in `getPublicPets` alike, so
+an unrecognised status is found under the Pending bucket that counts it.
 
 Whether a drifted value can reach the mapper through Prisma's typed reads is open: the schema
 declares the enum, and Prisma may fail the whole query instead.
@@ -38,8 +41,8 @@ declares the enum, and Prisma may fail the whole query instead.
 
 ## The adoption audit row (#101)
 
-`PET_STATUS_TRANSITION_ADOPTED` is written when the approval's `tx.pet.updateMany` reported a row,
-and names that row. With a database the mirror is marked by that id only, never by the name
+`PET_STATUS_TRANSITION_ADOPTED` is written when the approval's `tx.pet.updateMany` moved a row
+that was not already Adopted, and names that row. With a database the mirror is marked by that id only, never by the name
 fallback. Without a database the mirror is the store, so what it marks is still the transition.
 Backfilling `petId` for legacy applications was not done: it needs the production database.
 

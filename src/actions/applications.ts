@@ -42,7 +42,6 @@ import {
 } from "@/lib/domain/applicationWorkflow";
 import { findServerPetById, findServerPetByIdAsync } from "@/lib/server/petRepository";
 import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
-import { isKnownPetStatus } from "@/lib/domain/stateMachine";
 import {
   sendApplicationConfirmationEmail,
   sendStaffApplicationAlert,
@@ -179,15 +178,6 @@ export async function submitApplication(
         error: "This animal is currently archived and is no longer accepting new adoption applications.",
       };
     }
-    if (!isKnownPetStatus(pet.status)) {
-      // A stored status the mapper did not recognise. It reaches here unchanged rather than as
-      // Available. `isAdoptable` below would refuse it too, but with the raw stored value as the
-      // reason; the applicant gets a sentence instead.
-      return {
-        success: false,
-        error: `We cannot confirm ${pet.name}'s adoption status right now, so we cannot accept an application for them. Please contact the shelter.`,
-      };
-    }
     const presentation = getPetStatusPresentation(pet.status);
     if (!presentation.isAdoptable) {
       // `isAdoptable` rather than a status comparison here, so this agrees with the gallery's
@@ -195,6 +185,9 @@ export async function submitApplication(
       // alone: `Pending` is a stage of the adoption track whose button already renders
       // disabled, and that is the product call recorded in
       // `tasks/decisions/2026-09-10-pending-is-a-stage-of-adoption-not-a-track.md`.
+      //
+      // A stored status the mapper did not recognise reaches here unchanged, not as Available,
+      // and is refused with the label "Status unknown".
       return {
         success: false,
         error: `${pet.name} is not currently accepting adoption applications (${presentation.labelFallback}).`,

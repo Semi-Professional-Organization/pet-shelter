@@ -214,8 +214,8 @@ export function AdoptionWizard({ standalone = false, ...controllerProps }: Adopt
               {unavailableSelection && (
                 <p role="status" className="mb-2 text-sm text-muted-foreground">
                   {isMs
-                    ? `${unavailableSelection.name} tidak menerima permohonan adopsi buat masa ini. Sila pilih haiwan lain.`
-                    : `${unavailableSelection.name} is not currently accepting adoption applications. Please choose another animal.`}
+                    ? `${unavailableSelection.name} tidak menerima permohonan adopsi buat masa ini.${petOptions.length > 0 ? " Sila pilih haiwan lain." : ""}`
+                    : `${unavailableSelection.name} is not currently accepting adoption applications.${petOptions.length > 0 ? " Please choose another animal." : ""}`}
                 </p>
               )}
               {/* Adoptable animals only (`petOptions`), the ones `submitApplication` accepts. The

@@ -184,8 +184,9 @@ export function buildPetStatusFilterOptions(
 
 /**
  * Compare a pet's status against a gallery filter value, which arrives as a raw string
- * from the URL. Both sides are normalized, so selecting "In Rehabilitation" also matches
- * animals stored under the legacy `Rehabilitation` alias, and vice versa.
+ * from the URL. Compared by tone, so selecting "In Rehabilitation" also matches animals
+ * stored under the legacy `Rehabilitation` alias, and an unrecognised stored status is found
+ * under Pending, the bucket that counts it.
  */
 export function matchesStatusFilter(status: PetStatus, selectedStatus: string): boolean {
   if (selectedStatus === "all") return true;

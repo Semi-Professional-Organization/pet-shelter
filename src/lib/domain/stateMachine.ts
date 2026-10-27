@@ -23,7 +23,7 @@ export const APPLICATION_TRANSITION_GRAPH: Record<ApplicationStatus, Application
  * clinical or behavioural care and not yet cleared for adoption. Transitions are
  * always evaluated against the canonical value.
  */
-const PET_STATUS_ALIASES: Record<PetStatus, PetStatus> = {
+export const PET_STATUS_ALIASES: Readonly<Record<PetStatus, PetStatus>> = {
   Available: "Available",
   Pending: "Pending",
   Adopted: "Adopted",

@@ -235,7 +235,8 @@ describe("submitApplication under strict persistence", () => {
       const result = await submitApplication(applicationFor("pet-001"));
 
       expect(result.success).toBe(false);
-      expect(result.error).toMatch(/cannot confirm Bella's adoption status/i);
+      expect(result.error).toMatch(/Bella is not currently accepting adoption applications/i);
+      expect(result.error).toContain("Status unknown");
       expect(prismaDouble.adoptionApplication.create).not.toHaveBeenCalled();
     });
 

@@ -179,9 +179,11 @@ export function findServerPetById(id: string): Pet | null {
  * `findServerPetByIdAsync` moves every animal it reads to the head of this
  * array, and that read sits behind an anonymous profile GET and an
  * unauthenticated adoption POST. So a visitor could choose which of two
- * same-named animals `atomicUpdateApplicationStatus` marks on approval — and
- * the caller writes the returned id into the `PET_STATUS_TRANSITION_ADOPTED`
- * audit row, making it a wrong permanent record rather than a stale cache.
+ * same-named animals `atomicUpdateApplicationStatus` marks on approval — and,
+ * with no database, the caller writes the returned id into the
+ * `PET_STATUS_TRANSITION_ADOPTED` audit row (with one, the row comes from the
+ * transaction's own update), making it a wrong permanent record rather than a
+ * stale cache.
  * Pinned by `tests/integration/approvalMarksTheAnimalItAsksFor.test.ts`;
  * settled in `tasks/decisions/2026-09-22-an-approval-marks-the-id-it-asks-for.md`.
  *

@@ -262,9 +262,7 @@ export function useAdoptionFormController({
 
   return {
     state: {
-      availablePets,
       petOptions,
-      defaultPet,
       unavailableSelection: showUnavailableSelection,
       isSubmitted,
       submittedData,

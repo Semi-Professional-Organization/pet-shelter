@@ -9,7 +9,8 @@ held text. Prisma refuses to decode a value outside the enum, so a row holding `
 its outage `catch` and serve the mirror or `pets.json` for the whole catalogue.
 
 #198 makes the mapper refuse an unrecognised status and read case drift correctly, which holds for
-every route that reaches it (fixtures, the mirror, a raw query). Whether Prisma's typed reads can
+every value that goes through it. `pets.json` does not: the fixture is loaded without the mapper,
+so a drifted spelling there is not folded, only refused as unrecognised. Whether Prisma's typed reads can
 reach it with a drifted value at all is not known from here: agents cannot read the production
 database, and no test drives an off-enum value through the real client.
 

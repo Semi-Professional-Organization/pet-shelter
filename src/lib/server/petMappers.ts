@@ -2,6 +2,7 @@ import { MedicalTimelineEvent, Pet, PetUpdate } from "@/types/pet";
 import { PetStatus as PrismaPetStatus } from "@prisma/client";
 import {
   DomainValidationError,
+  PET_STATUS_ALIASES,
   isKnownPetStatus,
   normalizePetStatus,
 } from "@/lib/domain/stateMachine";
@@ -36,14 +37,15 @@ export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
   return PrismaPetStatus.Available;
 }
 
-/** Known spellings, keyed case-, space- and underscore-insensitively. */
-const DB_STATUS_SPELLINGS: Record<string, Pet["status"]> = {
-  available: "Available",
-  pending: "Pending",
-  adopted: "Adopted",
-  "in rehabilitation": "In Rehabilitation",
-  rehabilitation: "In Rehabilitation",
-};
+/** Folds case, surrounding space and `_`/space runs, the drift a text column has been seen to allow. */
+function statusKey(status: string): string {
+  return status.trim().toLowerCase().replace(/[\s_]+/g, " ");
+}
+
+/** Every known spelling, folded, to its canonical status. Built from the alias table, not listed again. */
+const DB_STATUS_SPELLINGS: Readonly<Record<string, Pet["status"]>> = Object.fromEntries(
+  (Object.keys(PET_STATUS_ALIASES) as Pet["status"][]).map((s) => [statusKey(s), PET_STATUS_ALIASES[s]])
+);
 
 /**
  * Maps a persisted PetStatus database enum or legacy string to domain PetStatus.
@@ -56,7 +58,11 @@ const DB_STATUS_SPELLINGS: Record<string, Pet["status"]> = {
  * `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-available.md`.
  */
 export function fromDbPetStatus(status: PrismaPetStatus | string): Pet["status"] {
-  const key = status.trim().toLowerCase().replace(/[\s_]+/g, " ");
+  // ceiling: folds case, outer space and `_`; hyphens and abbreviations (`In-Rehabilitation`,
+  // `Rehab`) stay unrecognised and are refused. Not measured against production, which agents
+  // cannot read, and Prisma's enum may fail the read before this runs:
+  // `tasks/open/a-drifted-pet-status-fails-the-whole-prisma-read.md`.
+  const key = statusKey(status);
   // `hasOwn`, not a bare index: the column is free text, and `constructor` or `toString` would
   // otherwise return a prototype member. The cast is the honest gap: the domain type has no
   // member for a value nobody anticipated.

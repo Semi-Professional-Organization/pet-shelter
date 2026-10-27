@@ -151,6 +151,20 @@ describe("PetFormDialog birth date field", () => {
     expect(Object.keys(payload)).not.toContain("ageCategory");
   });
 
+  it("says why an animal with an unrecognised stored status will not save", async () => {
+    // The status select offers the stored value first so the row can be corrected; the schema
+    // refuses it, and without a message the save did nothing visible.
+    const { onSave, user } = renderDialog(
+      makePet({ status: "Fostered" as Pet["status"], birthDate: "2023-04-15", intakeDate: "2026-06-12" })
+    );
+
+    expect(screen.getByRole("option", { name: "Unrecognised: Fostered" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /update pet profile/i }));
+
+    expect(await screen.findByText(/choose a recognised status before saving/i)).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   /**
    * Two clicks back to back must save one pet record, not two. react-hook-form disables the
    * button from the first click (`isSubmitting`); this pins the outcome, whichever guard holds.

@@ -393,8 +393,10 @@ export async function atomicUpdateApplicationStatus(
 
         becomesApproved = targetStatus === "APPROVED" && oldStatus !== "APPROVED";
         if (becomesApproved && current.petId) {
+          // `not: "Adopted"` so the count means a transition: re-approving after a step back to
+          // review matches an animal already adopted, and must not audit Adopted -> Adopted.
           const adopted = await tx.pet.updateMany({
-            where: { id: current.petId },
+            where: { id: current.petId, status: { not: "Adopted" } },
             data: { status: "Adopted" },
           });
           if (adopted.count > 0) adoptedPetId = current.petId;

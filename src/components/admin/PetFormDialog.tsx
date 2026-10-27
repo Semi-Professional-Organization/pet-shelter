@@ -502,6 +502,11 @@ export function PetFormDialog({
                     </option>
                   ))}
                 </select>
+                {errors.status && (
+                  <p className="text-xs text-destructive">
+                    Choose a recognised status before saving.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
