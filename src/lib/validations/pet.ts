@@ -281,7 +281,7 @@ export const petBaseFormSchema = z.object({
 
   // Nested history. Left without a default on purpose: an absent key must stay
   // absent so the action layer can tell "not supplied" from "supplied empty".
-  // Both are treated as "no events" — see updatePet in src/actions/pets.ts.
+  // Absent leaves the stored rows untouched; `[]` clears them — see updatePet in src/actions/pets.ts.
   updates: z.array(petUpdateSchema).optional(),
   medicalTimeline: z.array(medicalTimelineEventSchema).optional(),
 
