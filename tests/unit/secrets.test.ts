@@ -13,6 +13,13 @@ import {
 } from "@/lib/security/secrets";
 
 const DEV_DEFAULT = "dev-only-insecure-test-secret-change-me";
+
+/** Each secret's accessor by name, for policy tests that run over all three. */
+const ACCESSORS: Record<string, () => string> = {
+  SESSION_SECRET: getSessionSecret,
+  ADMIN_SECRET_KEY: getAdminSecretKey,
+  STAFF_INVITE_SECRET: getStaffInviteSecret,
+};
 const STRONG = "9f2c1d7a4b8e6035aa17cc93de40b52f7168e0d4";
 
 describe("resolveSecret", () => {
@@ -195,23 +202,57 @@ describe("assertSecretsConfigured", () => {
       expect(() => assertSecretsConfigured()).not.toThrow();
     });
 
-    // The gap this function closes: only SESSION_SECRET was validated at boot,
-    // so a deploy missing either of the other two started and failed later.
-    it("throws when ADMIN_SECRET_KEY is unset even though the session secret is fine", () => {
+    // Only the session secret may stop the boot
+    // (tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md).
+    // A weak admin key or invite code used to return HTTP 500 on every public page.
+    it.each([
+      ["ADMIN_SECRET_KEY", "the legacy admin_session cookie"],
+      ["STAFF_INVITE_SECRET", "staff registration"],
+    ])("boots with %s unset, and logs which feature it disables", (name, feature) => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
-      vi.stubEnv("ADMIN_SECRET_KEY", undefined);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      vi.stubEnv(name, undefined);
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(error).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`${name} is not set.*${feature} is disabled`)));
+      // The accessor still refuses on every call: the feature stays off.
+      expect(() => ACCESSORS[name]()).toThrow(SecretConfigurationError);
+    });
+
+    it("boots with both non-session secrets weak, and never logs their values", () => {
+      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
+      vi.stubEnv("ADMIN_SECRET_KEY", "jkmpq2");
+      vi.stubEnv("STAFF_INVITE_SECRET", "HoPe2026");
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).not.toThrow();
+      const logged = error.mock.calls.flat().join(" ");
+      expect(logged).toMatch(/ADMIN_SECRET_KEY/);
+      expect(logged).toMatch(/STAFF_INVITE_SECRET/);
+      expect(logged).not.toMatch(/jkmpq2/);
+      expect(logged).not.toMatch(/hope2026/i);
+    });
+
+    it("does not say the site is serving when the session secret refuses the boot", () => {
+      vi.stubEnv("SESSION_SECRET", undefined);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
+      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      expect(() => assertSecretsConfigured()).toThrow(/2 authentication secret\(s\)/);
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    it("still refuses to boot when only the session secret is unsafe", () => {
+      vi.stubEnv("SESSION_SECRET", undefined);
+      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
 
       expect(() => assertSecretsConfigured()).toThrow(SecretConfigurationError);
-      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY/);
-    });
-
-    it("throws when STAFF_INVITE_SECRET is unset even though the others are fine", () => {
-      vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
-      vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
-      vi.stubEnv("STAFF_INVITE_SECRET", undefined);
-
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+      expect(() => assertSecretsConfigured()).toThrow(/SESSION_SECRET is not set/);
     });
 
     // One deploy cycle should be enough to fix every problem.
@@ -219,6 +260,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("SESSION_SECRET", undefined);
       vi.stubEnv("ADMIN_SECRET_KEY", undefined);
       vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      vi.spyOn(console, "error").mockImplementation(() => {});
 
       let message = "";
       try {
@@ -248,6 +290,7 @@ describe("assertSecretsConfigured", () => {
       // A published code in an unusual case: short codes now boot, so this is
       // what makes the invite path fail and put its own line in the message.
       vi.stubEnv("STAFF_INVITE_SECRET", "HoPe2026");
+      vi.spyOn(console, "error").mockImplementation(() => {});
 
       let message = "";
       try {
@@ -282,7 +325,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", DEV_SECRET_DEFAULTS.STAFF_INVITE_SECRET);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET/);
     });
 
     // Short, so allowShort alone would accept them; refused because this
@@ -292,7 +335,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
     });
 
     // The seeded staff passwords are published too, and short enough that the
@@ -302,7 +345,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
     });
 
     // Matching case variants of a dev default would be a new boot refusal for
@@ -322,7 +365,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
     });
 
     it.each(['"HOPE2026"', "'admin123'", '"Hope2026"', '""HOPE2026""', `"'HOPE2026'"`, '"HOPE2026', "admin123'"])("refuses a published code wrapped in quotes (%s)", (code) => {
@@ -330,7 +373,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/publishes/);
     });
 
     // The same reading for every secret, so one mistake gets one diagnosis.
@@ -346,7 +389,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
       vi.stubEnv(name, `"${devDefault}"`);
 
-      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is (still set to the documented|set to a value)`));
+      expect(() => ACCESSORS[name]()).toThrow(new RegExp(`${name} is (still set to the documented|set to a value)`));
     });
 
     // The wrong `.env.example` line pasted into the wrong slot.
@@ -359,7 +402,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
       vi.stubEnv(name, otherDefault);
 
-      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+      expect(() => ACCESSORS[name]()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
     });
 
     it("reports a quotes-only admin key as not set, as for the invite code", () => {
@@ -367,7 +410,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", '""');
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
 
-      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY is set to only quote marks/);
+      expect(() => getAdminSecretKey()).toThrow(/ADMIN_SECRET_KEY is set to only quote marks/);
     });
 
     // Characters pasted from Word, Notion or a rendered page.
@@ -380,7 +423,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", `${LDQ}HOPE2026${RDQ}`);
 
-      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/publishes/);
     });
 
     // Unicode categories, not a list: every quotation style is recognised.
@@ -396,7 +439,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", `${open}HOPE2026${close}`);
 
-      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/publishes/);
     });
 
     // Brackets are not quote marks: a bracketed code is a code, not unset, and
@@ -432,7 +475,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET is set to only quote marks/);
     });
 
     it("warns, without the value, that an accepted admin key keeps curly quotes", () => {
@@ -489,7 +532,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", code);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET is set to a value this repository publishes/);
     });
 
     // A published value that itself ends in an edge character must still match:
@@ -511,7 +554,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", undefined);
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET is not set/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET is not set/);
     });
 
     // Placeholders earlier versions of .env.example published; still in git history.
@@ -527,7 +570,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
       vi.stubEnv(name, placeholder);
 
-      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+      expect(() => ACCESSORS[name]()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
     });
 
     // Hardcoded fallbacks the source used before 3b43293; still in git history.
@@ -540,7 +583,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
       vi.stubEnv(name, fallback);
 
-      expect(() => assertSecretsConfigured()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
+      expect(() => ACCESSORS[name]()).toThrow(new RegExp(`${name} is set to a value this repository publishes`));
     });
 
     it("refuses a published invite code typed in fullwidth characters", () => {
@@ -550,7 +593,7 @@ describe("assertSecretsConfigured", () => {
       const fullwidth = [..."HOPE2026"].map((c) => String.fromCharCode(c.charCodeAt(0) + 0xfee0)).join("");
       vi.stubEnv("STAFF_INVITE_SECRET", fullwidth);
 
-      expect(() => assertSecretsConfigured()).toThrow(/publishes/);
+      expect(() => getStaffInviteSecret()).toThrow(/publishes/);
     });
 
     it("still refuses a whitespace-only invite code", () => {
@@ -558,7 +601,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", "   ");
 
-      expect(() => assertSecretsConfigured()).toThrow(/STAFF_INVITE_SECRET/);
+      expect(() => getStaffInviteSecret()).toThrow(/STAFF_INVITE_SECRET/);
     });
 
     // Length is measured on the value as set. Measuring it without edge
@@ -577,7 +620,7 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("ADMIN_SECRET_KEY", "short-admin");
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
 
-      expect(() => assertSecretsConfigured()).toThrow(/ADMIN_SECRET_KEY/);
+      expect(() => getAdminSecretKey()).toThrow(/ADMIN_SECRET_KEY/);
     });
   });
 

@@ -19,3 +19,10 @@
 # with "bad interpreter". The hooks are the only shell scripts here, and they are
 # the files most likely to be run on a machine that is not this one.
 .claude/hooks/* text eol=lf
+
+# SOPS's dotenv parser splits on LF only, so a CRLF checkout leaves a carriage
+# return on every line and decryption fails on `sops_lastmodified`
+# ("parsing time ...\x0d", tasks/open history, #69). The committed blob is LF;
+# this keeps `core.autocrlf=true` from converting it in the working tree.
+# `-text` rather than `eol=lf`: the file is ciphertext, never to be rewritten.
+.env.production.enc -text

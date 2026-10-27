@@ -180,3 +180,20 @@ To enable GitHub Actions to decrypt secrets during testing or deployment:
 2. Change the secret (e.g. `SESSION_SECRET` or `DATABASE_URL`).
 3. Save and commit `.env.production.enc`.
 4. Deploy the updated build to production.
+
+---
+
+## Troubleshooting: `parsing time "...Z\x0d"`
+
+The working copy of `.env.production.enc` has Windows (CRLF) line endings. SOPS's dotenv parser
+splits on LF only, so every value keeps a carriage return and the timestamp fails first. The
+committed file is LF, and `.gitattributes` marks it `-text` so `core.autocrlf` leaves it alone.
+A copy checked out before that rule is restored with:
+
+```bash
+git checkout HEAD -- .env.production.enc
+npm run secrets:check
+```
+
+`secrets:check` refuses a CRLF copy by name and exits 1 on any `[FAIL]`. Never re-encrypt or
+hand-convert the file to fix this: it is ciphertext, and the git copy is the backup.

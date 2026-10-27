@@ -34,6 +34,24 @@ function findSopsBinary() {
 
 const SOPS_BIN = findSopsBinary();
 
+/**
+ * Refuses an encrypted file that carries a carriage return. SOPS's dotenv parser
+ * splits on LF only, so a CRLF checkout (`core.autocrlf=true` on Windows) leaves
+ * `\r` on every value and decryption fails with `parsing time "...Z\x0d"`. The
+ * committed blob is LF and `.gitattributes` keeps it so; this names the cause
+ * for a working copy checked out before that rule. It never rewrites the file:
+ * it is ciphertext, and the git blob is the copy to restore from.
+ */
+function lineEndingProblem(file) {
+  const bytes = fs.readFileSync(file);
+  if (!bytes.includes(0x0d)) return null;
+  return (
+    `${file} has Windows (CRLF) line endings in this working copy, which SOPS cannot parse.\n` +
+    `       If git tracks it, the committed copy is fine; restore it (keep a copy first if you edited it):\n` +
+    `         git checkout HEAD -- ${file}`
+  );
+}
+
 function parseDotenv(content) {
   const env = {};
   const lines = content.split(/\r?\n/);
@@ -75,6 +93,8 @@ const command = process.argv[2] || "check";
 switch (command) {
   case "check": {
     const targetFile = process.argv[3] || ".env.production.enc";
+    // Every [FAIL] sets this, so automation cannot read a failed check as a pass.
+    let failed = false;
     console.log("=== SOPS & age Status Check ===");
     // 1. Check SOPS binary
     try {
@@ -99,10 +119,17 @@ switch (command) {
       console.log(`[OK] .sops.yaml config file found`);
     } else {
       console.error(`[FAIL] .sops.yaml configuration file missing in root.`);
+      failed = true;
     }
 
     // 4. Test decrypting target file if it exists
-    if (fs.existsSync(targetFile)) {
+    const crlf = fs.existsSync(targetFile) && lineEndingProblem(targetFile);
+    if (!fs.existsSync(targetFile)) {
+      console.log(`[INFO] Target file ${targetFile} does not exist yet.`);
+    } else if (crlf) {
+      console.error(`[FAIL] ${crlf}`);
+      failed = true;
+    } else {
       try {
         const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", targetFile], {
           encoding: "utf-8",
@@ -113,13 +140,14 @@ switch (command) {
           console.log(`[OK] Successfully decrypted and validated ${targetFile} (${keyCount} keys configured)`);
         } else {
           console.error(`[FAIL] Decrypting ${targetFile} failed:\n${result.stderr}`);
+          failed = true;
         }
       } catch (e) {
         console.error(`[FAIL] Error decrypting ${targetFile}:`, e.message);
+        failed = true;
       }
-    } else {
-      console.log(`[INFO] Target file ${targetFile} does not exist yet.`);
     }
+    process.exit(failed ? 1 : 0);
     break;
   }
 
@@ -129,9 +157,15 @@ switch (command) {
       console.error(`File ${fileToEdit} does not exist. Create or encrypt it first.`);
       process.exit(1);
     }
+    const crlf = lineEndingProblem(fileToEdit);
+    if (crlf) {
+      console.error(crlf);
+      process.exit(1);
+    }
     console.log(`Opening ${fileToEdit} with SOPS editor...`);
     const proc = spawnSync(SOPS_BIN, [fileToEdit], { stdio: "inherit" });
-    process.exit(proc.status ?? 0);
+    if (proc.error) console.error(proc.error.message);
+    process.exit(proc.status ?? 1);
     break;
   }
 
@@ -140,6 +174,11 @@ switch (command) {
     const destFile = process.argv[4] || ".env.local";
     if (!fs.existsSync(sourceEncFile)) {
       console.error(`Encrypted source file ${sourceEncFile} not found.`);
+      process.exit(1);
+    }
+    const crlf = lineEndingProblem(sourceEncFile);
+    if (crlf) {
+      console.error(crlf);
       process.exit(1);
     }
     console.log(`Decrypting ${sourceEncFile} -> ${destFile}...`);
@@ -178,6 +217,11 @@ switch (command) {
       console.error(`Encrypted file ${encFile} not found.`);
       process.exit(1);
     }
+    const crlf = lineEndingProblem(encFile);
+    if (crlf) {
+      console.error(crlf);
+      process.exit(1);
+    }
 
     const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", encFile], {
       encoding: "utf-8",
@@ -202,7 +246,8 @@ switch (command) {
       stdio: "inherit",
       env: injectedEnv,
     });
-    process.exit(proc.status ?? 0);
+    if (proc.error) console.error(proc.error.message);
+    process.exit(proc.status ?? 1);
     break;
   }
 

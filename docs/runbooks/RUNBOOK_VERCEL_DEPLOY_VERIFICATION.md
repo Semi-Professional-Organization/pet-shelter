@@ -13,8 +13,8 @@ something that looks like success. A green deployment is not evidence that the a
 | Variable | Missing in production | Where |
 |---|---|---|
 | `SESSION_SECRET` | **Build fails.** `SecretConfigurationError` while collecting page data | `src/lib/security/crypto.ts:7` resolves it at module load; `next build` imports every route module |
-| `ADMIN_SECRET_KEY` | **Boot fails**, after a green build | `src/instrumentation.ts` → `assertSecretsConfigured()` |
-| `STAFF_INVITE_SECRET` | **Boot fails**, after a green build | same |
+| `ADMIN_SECRET_KEY` | **Logged at boot**; the legacy `admin_session` cookie grants nothing. The site serves | `src/instrumentation.ts` → `assertSecretsConfigured()` |
+| `STAFF_INVITE_SECRET` | **Logged at boot**; staff registration is refused. The site serves | same |
 | `DATABASE_URL` | **Silent.** Serves `src/data/pets.json` fixtures | `src/lib/server/petRepository.ts` |
 | `RESEND_API_KEY` | **Silent.** Emails "sent", audit row written with `simulated: true`, nothing delivered | `src/lib/email.ts:65` |
 | `EMAIL_FROM` | **Silent.** From-address stays on Resend's shared sandbox sender | `src/lib/email.ts:31` |
@@ -22,7 +22,9 @@ something that looks like success. A green deployment is not evidence that the a
 | `NEXT_PUBLIC_APP_URL` | **Silent.** Email links point at the default host | `src/lib/email.ts:34` |
 
 `next build` compiles `instrumentation.ts` but never calls `register()`, which is why the two
-non-session secrets clear the build and fail at boot instead. Only `SESSION_SECRET` is resolved at
+non-session secrets clear the build. At boot each is logged with `console.error`, naming the
+feature it disables; search the runtime log for `[security/secrets]` after a deploy
+(`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`). Only `SESSION_SECRET` is resolved at
 module scope, and only module scope runs during a build.
 
 > `EMAIL_FROM` is the name the code reads. Do not set `SENDER_EMAIL` — nothing reads it.

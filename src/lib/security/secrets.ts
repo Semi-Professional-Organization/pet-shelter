@@ -9,7 +9,8 @@
  *
  * | Environment              | Missing / weak / known-default secret                      |
  * |--------------------------|------------------------------------------------------------|
- * | `production`             | throw — fail the boot loudly rather than serve forgeries    |
+ * | `production`             | throw — refuse the secret rather than serve forgeries; only |
+ * |                          | `SESSION_SECRET` also stops the boot (see `BOOT_CHECKS`)    |
  * | `development` / `test`   | warn once per reason; an unset secret falls back to a dev   |
  * |                          | default, any other weak value is used as configured         |
  *
@@ -68,7 +69,8 @@ export interface ResolveSecretOptions {
 
 /**
  * Development fallbacks. These are intentionally long, self-describing, and
- * useless as credentials: any deploy still carrying one refuses to boot.
+ * useless as credentials: any deploy still carrying one is refused (see
+ * `BOOT_CHECKS` for which refusals stop the boot).
  */
 export const DEV_SECRET_DEFAULTS = {
   SESSION_SECRET: "dev-only-insecure-session-secret-change-me-before-deploy",
@@ -323,7 +325,7 @@ export function resolveSecret(name: string, opts: ResolveSecretOptions): string 
     // the kind and the length, but are different things to tell an operator.
     `${name}:${weakness.description}:${value.length}`,
     `[security/secrets] ${name} is ${weakness.description}; ${used}. ` +
-      `This configuration refuses to boot with NODE_ENV=production.`
+      `This configuration is refused with NODE_ENV=production.`
   );
 
   return value.length === 0 ? opts.devDefault : value;
@@ -350,8 +352,8 @@ export function getAdminSecretKey(): string {
  * Invite code required to register any staff account.
  *
  * Resolved per call rather than at module load, so rotating `STAFF_INVITE_SECRET`
- * takes effect without a redeploy. `assertSecretsConfigured()` covers the
- * fail-fast half; this accessor covers the rotation half.
+ * takes effect without a redeploy. `assertSecretsConfigured()` reports a bad
+ * code at boot (logged, not fatal); this accessor refuses it on every call.
  *
  * **Recommended: 16 or more random characters.** Shorter is accepted, with a
  * warning, because the owner decided the length is theirs to choose
@@ -367,17 +369,16 @@ export function getAdminSecretKey(): string {
  * which declines to trust a forwarding header no proxy vouches for — the code's
  * length is all that bounds guessing it.
  *
- * Still refused at boot: unset, because this policy fails fast on a missing
- * secret rather than on the first registration (`registerAction` would refuse
- * an empty submitted code anyway); and the development default and
- * `PUBLISHED_INVITE_CODES`, because this repository publishes them.
+ * Still refused in production: unset, and the development default and
+ * `PUBLISHED_INVITE_CODES`, because this repository publishes them. A refused
+ * code disables staff registration only; the boot logs it and carries on
+ * (`assertSecretsConfigured`).
  *
  * ceiling: no lower bound on a configured code, so even one character boots.
  * The rate limit does not make up for it: `checkRateLimit` is a per-process Map,
  * so each warm serverless instance counts separately, and a botnet is bounded by
  * neither the per-address nor the per-email budget (see the ceiling in
- * `registerAction`). Upgrade path: let a weak code disable registration only,
- * not the boot (option 2 in the decision), or move the limiter to shared state.
+ * `registerAction`). Upgrade path: move the limiter to shared state.
  */
 export function getStaffInviteSecret(): string {
   return resolveSecret("STAFF_INVITE_SECRET", {
@@ -388,36 +389,70 @@ export function getStaffInviteSecret(): string {
 }
 
 /**
+ * The secrets checked at boot, and whether a bad one may stop the boot.
+ *
+ * Only `SESSION_SECRET` is fatal: it signs every session cookie and keys field
+ * encryption, so `crypto.ts` resolves it at module load and nothing that reads
+ * a session can run without it. The other two each gate one feature, and their
+ * accessors throw on every call in production, so a bad one disables only that
+ * feature: `registerAction` refuses staff sign-up, and `getAdminPrincipal`
+ * catches the throw and grants nothing to the legacy `admin_session` cookie.
+ * Failing the boot for them took every public page down
+ * (`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`).
+ */
+const BOOT_CHECKS: readonly { accessor: () => string; disables?: string }[] = [
+  // No `disables`: a bad session secret stops the boot.
+  { accessor: getSessionSecret },
+  { accessor: getAdminSecretKey, disables: "the legacy admin_session cookie" },
+  { accessor: getStaffInviteSecret, disables: "staff registration" },
+];
+
+/**
  * Validates every authentication secret in one pass, for the startup hook.
  *
- * Only `SESSION_SECRET` was previously checked at boot (resolved at module load
- * by `crypto.ts`). `ADMIN_SECRET_KEY` and `STAFF_INVITE_SECRET` are read lazily
- * per request, so a production deploy missing either booted green and failed on
- * the first upload or registration instead — the "runtime check per call"
- * failure mode that `TARGET_SECRET_HARDENING.md` §2 explicitly rejects, because
- * it surfaces when nobody is watching.
+ * `ADMIN_SECRET_KEY` and `STAFF_INVITE_SECRET` are read lazily per request, so
+ * without this a production deploy missing either booted silently and failed
+ * on the first upload or registration instead — the "runtime check per call"
+ * failure mode that `TARGET_SECRET_HARDENING.md` §2 rejects, because it
+ * surfaces when nobody is watching. This keeps it loud at boot: each one is
+ * logged with `console.error`, naming the feature it disables.
  *
  * Reports *every* misconfigured secret at once so a single deploy cycle fixes
  * them all, rather than revealing them one restart at a time.
  *
- * @throws {SecretConfigurationError} in production when any secret is unsafe.
+ * @throws {SecretConfigurationError} in production when `SESSION_SECRET` is
+ * unsafe. The message lists the other unsafe secrets too.
  */
 export function assertSecretsConfigured(): void {
   const failures: string[] = [];
+  const disabled: string[] = [];
+  let fatal = false;
 
-  for (const accessor of [getSessionSecret, getAdminSecretKey, getStaffInviteSecret]) {
+  for (const check of BOOT_CHECKS) {
     try {
-      accessor();
+      check.accessor();
     } catch (error) {
       if (!(error instanceof SecretConfigurationError)) throw error;
       failures.push(error.message);
+      if (check.disables) {
+        disabled.push(`${error.message} Until it is fixed, ${check.disables} is disabled.`);
+      } else {
+        fatal = true;
+      }
     }
   }
 
-  if (failures.length === 0) return;
+  if (!fatal) {
+    // Only once the boot is known to go ahead, so "serving" is never said of a refused boot.
+    for (const line of disabled) {
+      console.error(`[security/secrets] ${line} The rest of the site is serving.`);
+    }
+    return;
+  }
 
   throw new SecretConfigurationError(
-    `Refusing to start: ${failures.length} authentication secret(s) unsafe for production.\n` +
+    `Refusing to start: SESSION_SECRET is unsafe for production. ` +
+      `${failures.length} authentication secret(s) need fixing:\n` +
       failures.map((failure) => `  - ${failure}`).join("\n")
   );
 }

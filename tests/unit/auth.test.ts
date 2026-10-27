@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loginAction, registerAction, logoutAction, getCurrentUserAction } from "@/actions/auth";
 import { resetUserStore } from "@/lib/server/userStore";
 import { ROLES } from "@/lib/security/rbac";
-import { SecretConfigurationError } from "@/lib/security/secrets";
 
 // The configured invite secret for this suite. Deliberately not "1234" or
 // "HOPE2026" so the regression tests below prove those literals are dead.
@@ -302,16 +301,18 @@ describe("Authentication Server Actions (Native Register & Login)", () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("STAFF_INVITE_SECRET", undefined);
 
-      await expect(
-        registerAction({
-          name: "Misconfigured Deploy",
-          email: "misconfigured@test.com",
-          password: "ValidPassword123!",
-          role: ROLES.STAFF,
-          staffInviteCode: "any-guess",
-        })
-      ).rejects.toBeInstanceOf(SecretConfigurationError);
+      // Disabled, not thrown: the boot no longer stops for this secret, so the
+      // action itself is where a bad one must refuse, and say so.
+      const res = await registerAction({
+        name: "Misconfigured Deploy",
+        email: "misconfigured@test.com",
+        password: "ValidPassword123!",
+        role: ROLES.STAFF,
+        staffInviteCode: "any-guess",
+      });
 
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/Staff registration is unavailable/);
       expect(cookieStore.get("hope_shelter_session")).toBeUndefined();
     });
 
