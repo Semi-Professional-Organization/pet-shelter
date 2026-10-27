@@ -19,7 +19,7 @@ Record active multi-step work streams below.
 
 **Branch:** `claude/project-thread-c0pu58` · 2026-10-27 · base `5aea5bb`
 
-- [x] #195 merged; the ledger sync closed #157, which kept its parent #191
+- [x] #195 merged; its body's closing keyword closed #157 (not the sync), which kept parent #191
 - [x] #182 (the ledger-sync entry's mirror) added to `agent-tooling-and-process`; summary widened
 - [ ] After merge: `npm run issues:groups -- --apply` (plans `add #182` and `update #193`)
 
@@ -27,9 +27,11 @@ Record active multi-step work streams below.
 
 `/code-review xhigh` on #197, at the owner's request. Fixed: the squash body is set by hand, since
 the repo's default would carry the already-shipped #195 commit into it; the stale open entry is
-updated; the group summary now covers the issue and ledger scripts; the commit's account of when
-#182 appeared is corrected (it came from the ledger sync that ran alongside the first `--apply`,
-nine seconds before #183, not after the grouping).
+updated; the group summary now covers the issue and ledger scripts. 77c2960's message says #182
+appeared after the grouping ran; it came from the ledger sync that ran alongside the first
+`--apply`, nine seconds before #183, and the hand-set squash body says so. Round 2 found the entry
+crediting the sync with closing #157: #195's body ("the ledger sync closes #157") was a closing
+keyword, so GitHub closed it. Fixed; any PR body naming an issue after "closes" does the same.
 
 Deliberately not done, each a behaviour change beyond this PR: a check that warns when a PR adds
 a `tasks/open` entry with no group (new entries otherwise land ungrouped until someone edits the
