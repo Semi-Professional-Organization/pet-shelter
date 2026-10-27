@@ -915,6 +915,30 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       expect(data.medicalTimeline).toEqual({ create: [] });
     });
 
+    it("should replace only the collection an edit submits", async () => {
+      const created = await createPet({ ...baseForm, name: "Tuah Partial" });
+      const petId = created.data!.id;
+      prismaSpies.transaction.mockClear();
+
+      const partialForm: Record<string, unknown> = {
+        ...baseForm,
+        name: "Tuah Partial",
+        medicalTimeline: [timelineIntake],
+      };
+      delete partialForm.updates;
+      expect((await updatePet(petId, partialForm as typeof baseForm)).success).toBe(true);
+
+      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
+      expect(queued.map((q) => q.__op)).toEqual(["medicalTimelineEvent.deleteMany", "pet.update"]);
+      const data = (queued[1].__args as { data: Record<string, unknown> }).data;
+      expect("updates" in data).toBe(false);
+      expect(data.medicalTimeline).toMatchObject({ create: [{ id: "tl-hist-1" }] });
+
+      const stored = await getPetById(petId);
+      expect(stored?.medicalTimeline?.map((e) => e.id)).toEqual(["tl-hist-1"]);
+      expect(stored?.updates?.map((u) => u.id).sort()).toEqual(["up-hist-1", "up-hist-2"]);
+    });
+
     it("should not delete or rewrite stored history rows on a status change", async () => {
       const created = await createPet({ ...baseForm, name: "Tuah Cleared For Adoption" });
       const petId = created.data!.id;

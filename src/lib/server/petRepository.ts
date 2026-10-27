@@ -288,11 +288,15 @@ export async function updateServerPet(
   }
 
   // The mirror and the audit row describe what was written: a collection this write did not
-  // replace keeps the copy already held, not whatever the caller's object carried.
+  // replace keeps the copy the mirror holds *now*, not the caller's copy, and not `previous`, which
+  // was read before the await above and may predate a concurrent write.
+  const keptFrom = serverPets.find((p) => p.id === id) ?? previous;
   const stored: Pet = {
     ...updated,
-    updates: replaceHistory.updates ? updated.updates : previous.updates,
-    medicalTimeline: replaceHistory.medicalTimeline ? updated.medicalTimeline : previous.medicalTimeline,
+    updates: replaceHistory.updates ? updated.updates : keptFrom.updates,
+    medicalTimeline: replaceHistory.medicalTimeline
+      ? updated.medicalTimeline
+      : keptFrom.medicalTimeline,
   };
   serverPets = serverPets.map((p) => (p.id === id ? stored : p));
 

@@ -411,12 +411,12 @@ export function buildPetCreatePayload(pet: Pet): PetCreatePayload {
  * Only the collections `replace` names get a nested create.
  */
 export function buildPetUpdatePayload(pet: Pet, replace: PetHistoryReplacement): PetUpdatePayload {
-  const history =
-    replace.updates || replace.medicalTimeline ? buildPetHistoryNestedCreate(pet) : null;
   return {
     ...buildPetPersistencePayload(pet),
-    ...(history && replace.updates ? { updates: history.updates } : {}),
-    ...(history && replace.medicalTimeline ? { medicalTimeline: history.medicalTimeline } : {}),
+    ...(replace.updates ? { updates: buildPetHistoryNestedCreate(pet).updates } : {}),
+    ...(replace.medicalTimeline
+      ? { medicalTimeline: buildPetHistoryNestedCreate(pet).medicalTimeline }
+      : {}),
   };
 }
 
