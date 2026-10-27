@@ -226,7 +226,9 @@ export function AdoptionWizard({ standalone = false, ...controllerProps }: Adopt
                 {...register("petId")}
                 onChange={(e) => {
                   const pet = petOptions.find((p: Pet) => p.id === e.target.value);
-                  setValue("petId", pet?.id ?? "");
+                  // Validated here: the registered onChange this replaces would have cleared a
+                  // "select a pet" error shown before the choice.
+                  setValue("petId", pet?.id ?? "", { shouldValidate: true });
                   setValue("petName", pet?.name ?? "");
                 }}
                 className={SELECT_CLASS}

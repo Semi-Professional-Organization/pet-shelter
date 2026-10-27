@@ -4,7 +4,7 @@ import { useState, useEffect, useEffectEvent, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pet } from "@/types/pet";
-import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
+import { isPetAdoptable as isAdoptable } from "@/lib/presentation/petStatusPresentation";
 import { useApplicationStore } from "@/lib/client/applicationStore";
 import { submitApplication } from "@/actions/applications";
 import {
@@ -53,10 +53,6 @@ export const ADOPTION_STEPS = [
 export type AdoptionStepId = (typeof ADOPTION_STEPS)[number]["id"];
 
 export const ADOPTION_STEP_COUNT = ADOPTION_STEPS.length;
-
-function isAdoptable(pet: Pet): boolean {
-  return getPetStatusPresentation(pet.status).isAdoptable;
-}
 
 /**
  * The pet the form opens on. Shared with the dialog wrapper so the title and
@@ -187,7 +183,19 @@ export function useAdoptionFormController({
     if (open) applyFieldPet();
   }, [open, selectedPetId]);
 
-  const activePetId = useWatch({ control, name: "petId" }) || fieldPet?.id;
+  // An animal can stop being adoptable while the form is open (the list refreshes after an
+  // approval). The field then holds an id the select no longer offers, so it is cleared and the
+  // step's validation asks for a choice, rather than the server refusing it after four steps.
+  const watchedPetId = useWatch({ control, name: "petId" });
+  const watchedPetOffered = !watchedPetId || petOptions.some((p) => p.id === watchedPetId);
+  useEffect(() => {
+    if (!watchedPetOffered) {
+      setValue("petId", "");
+      setValue("petName", "");
+    }
+  }, [watchedPetOffered, setValue]);
+
+  const activePetId = watchedPetId || fieldPet?.id;
   const activePet = allPets.find((p) => p.id === activePetId) || selectedPet;
 
   const isFirstStep = stepIndex === 0;

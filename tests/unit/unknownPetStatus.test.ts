@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { fromDbPetStatus, toDbPetStatus } from "@/lib/server/petMappers";
 import { DomainValidationError, isKnownPetStatus } from "@/lib/domain/stateMachine";
-import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
+import {
+  buildPetStatusFilterOptions,
+  getPetStatusPresentation,
+  matchesStatusFilter,
+} from "@/lib/presentation/petStatusPresentation";
 import { PetStatus } from "@/types/pet";
 
 /**
@@ -50,5 +54,20 @@ describe("toDbPetStatus", () => {
   it("still writes the canonical statuses and the legacy alias", () => {
     expect(toDbPetStatus("Available")).toBe("Available");
     expect(toDbPetStatus("Rehabilitation")).toBe("In_Rehabilitation");
+  });
+});
+
+describe("an unrecognised status in the status filter", () => {
+  it("is found under the bucket that counts it", () => {
+    const pets = [{ status: "Reserved" as PetStatus }, { status: "Pending" as PetStatus }];
+    const pending = buildPetStatusFilterOptions(pets).find((o) => o.value === "Pending");
+
+    expect(pending?.count).toBe(2);
+    expect(pets.filter((p) => matchesStatusFilter(p.status, "Pending"))).toHaveLength(2);
+    expect(matchesStatusFilter("Reserved" as PetStatus, "Available")).toBe(false);
+  });
+
+  it("matches nothing for a filter value that is not a status", () => {
+    expect(matchesStatusFilter("Pending", "Reserved")).toBe(false);
   });
 });

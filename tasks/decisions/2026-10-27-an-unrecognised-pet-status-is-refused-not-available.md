@@ -26,8 +26,13 @@ Display surfaces show such an animal with the Pending tone, labelled with its ra
 admin status control does not show it as a second "Pending". Lookups on the free-text value are
 own-key checks (`isKnownPetStatus`), so `constructor` or `__proto__` cannot pass for a status. Two consequences were closed with it:
 `toDbPetStatus` refuses an unknown status instead of writing it back as `Available` (the
-repository checks it before the persistence `try`, which would otherwise swallow the refusal), and an unknown
-status may move to any canonical one, so staff can correct the row.
+repository checks it before the persistence `try`, which would otherwise swallow the
+refusal), and an unknown status may move to any canonical one, so staff can correct the row. The status filter matches by
+tone, so an unrecognised status is found under the Pending bucket that counts it.
+
+Whether a drifted value can reach the mapper through Prisma's typed reads is open: the schema
+declares the enum, and Prisma may fail the whole query instead.
+`tasks/open/a-drifted-pet-status-fails-the-whole-prisma-read.md`.
 
 ## The adoption audit row (#101)
 

@@ -153,6 +153,12 @@ export function getPetStatusPresentation(status: PetStatus): PetStatusPresentati
   return { ...PRESENTATIONS.pending, labelKey: "petStatus.unrecognised", labelFallback: String(status) };
 }
 
+/** Whether an animal accepts adoption applications. The one predicate the form, gallery and
+ * server share. */
+export function isPetAdoptable(pet: Pick<Pet, "status">): boolean {
+  return getPetStatusPresentation(pet.status).isAdoptable;
+}
+
 /**
  * Build the status filter's options and their counts over a supplied population.
  *
@@ -183,7 +189,11 @@ export function buildPetStatusFilterOptions(
  */
 export function matchesStatusFilter(status: PetStatus, selectedStatus: string): boolean {
   if (selectedStatus === "all") return true;
-  return normalizePetStatus(status) === normalizePetStatus(selectedStatus as PetStatus);
+  if (!isKnownPetStatus(selectedStatus)) return false;
+  // By tone, the way `buildPetStatusFilterOptions` counts. The same as comparing normalized
+  // statuses for every known one, and it files an unrecognised stored status under Pending, where
+  // it is counted and badged, instead of under no filter at all.
+  return getPetStatusPresentation(status).tone === getPetStatusPresentation(selectedStatus).tone;
 }
 
 /**

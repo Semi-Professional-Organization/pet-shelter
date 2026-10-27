@@ -22,7 +22,7 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 import { AGE_BANDS, formatAgeBandRange } from "@/lib/domain/petAge";
 import { GENDER_VALUES } from "@/lib/validations/pet";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
-import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
+import { isPetAdoptable } from "@/lib/presentation/petStatusPresentation";
 
 /**
  * i18n keys for the lifecycle band names. The year range printed beside each name is derived
@@ -373,10 +373,8 @@ export function PetGallery({
                   // The second fallback matches what `resolveDefaultPet` picks when handed `null`;
                   // the form now sets its pet field from that same animal on every opening, so
                   // passing `null` is safe, and the explicit pick only keeps the intent visible here.
-                  const isAdoptable = (pet: (typeof pets)[number]) =>
-                    getPetStatusPresentation(pet.status).isAdoptable;
                   setActivePetForAdoption(
-                    filteredPets.find(isAdoptable) ?? pets.find(isAdoptable) ?? null
+                    filteredPets.find(isPetAdoptable) ?? pets.find(isPetAdoptable) ?? null
                   );
                   setIsAdoptionOpen(true);
                 }}
