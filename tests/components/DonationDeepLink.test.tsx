@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, within } from "@testing-library/react";
 
 vi.mock("@/actions/donations", () => ({ submitDonationPledgeAction: vi.fn() }));
-// The widget falls back to fetching the public catalogue when it is handed no
-// pets. Every test below supplies `initialPets`, so this exists to keep an
-// unexpected fetch from reaching Prisma rather than to be exercised.
+// The widget fetches the public catalogue when it is handed no pets. Every test
+// but the last supplies `initialPets`; the last overrides this once to exercise it.
 vi.mock("@/actions/pets", () => ({ getPublicPets: vi.fn().mockResolvedValue([]) }));
 
 import { DonationWidget } from "@/components/features/donations/DonationWidget";

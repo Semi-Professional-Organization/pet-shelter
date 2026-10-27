@@ -111,7 +111,7 @@ export async function getStoredGalleryImages(id: string): Promise<string[] | nul
 export class PetStoreUnavailableError extends Error {
   readonly cause?: unknown;
   constructor(id: string, cause?: unknown) {
-    // JSON-quoted: the id is caller-supplied, and a raw newline in it would forge a log line.
+    // JSON-quoted: the id is caller-supplied, so a newline in it cannot forge a log line.
     super(`Could not read pet ${JSON.stringify(id)} from the database`);
     this.name = "PetStoreUnavailableError";
     this.cause = cause;
@@ -195,7 +195,10 @@ export async function findPetForWriteAsync(id: string): Promise<Pet | null> {
     row = await prisma.pet.findUnique({ where: { id: id.trim() } });
   } catch (err) {
     if (isStrictPersistence()) throw err;
-    console.error("[Database Store] Pet read for a write path failed:", err instanceof Error ? err.message : err);
+    console.error(
+      `[Database Store] Pet read for a write path failed for ${JSON.stringify(id.trim())}:`,
+      err instanceof Error ? err.message : err
+    );
     throw new PetStoreUnavailableError(id.trim(), err);
   }
   return row ? mapDbPetToPet(row as unknown as DbPetRecord) : null;

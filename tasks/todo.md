@@ -54,6 +54,15 @@ The owner decided `src/data/pets.json` must not be used on a write or payment pa
   in the two open entries this PR adds). Side effect worth knowing: a submission no longer
   refreshes the mirror, which `markCachedPetAdopted` reads on approval; the admin catalogue read
   refreshes it anyway.
+- [x] Second xhigh round: 15 findings. Fixed: the chooser fetch had no rejection handler; the
+  sponsorship exact-id check (the two write paths now accept the same ids); stale schema, test
+  and comment wording; a missing mock export; the repository log line now names the id.
+  Recorded, not fixed: the donation earmark is free text (`donation-earmarks-are-free-text.md`),
+  the three guard copies (`three-copies-of-the-pet-visibility-guard.md`), the raw P2002 text
+  (`a-colliding-application-id-shows-prisma-text-to-the-public.md`), and the colder mirror on
+  approval (noted in the existing audit-row entry). Declined: caller-triggered query errors
+  (a NUL byte) logging as an outage, since they still refuse safely; rendering the chooser on
+  the server, which would let a database-less build bake fixtures into a revalidated page.
 
 # The context meter's root-cause pass
 

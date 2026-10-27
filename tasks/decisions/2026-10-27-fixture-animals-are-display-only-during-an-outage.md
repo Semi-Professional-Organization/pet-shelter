@@ -30,8 +30,9 @@ When a database is configured and a pet read fails outside strict mode,
   also writes them (`tasks/open/a-failed-settings-save-is-served-as-saved.md`). Both written down
   at the reader.
 - **The donation page no longer seeds its animal chooser from `pets.json`.** It always did, not
-  only in an outage, so a gift could be earmarked for Tuah or Comel, whom production does not
-  hold. It now loads the catalogue from the server.
+  only in an outage, so the page offered Tuah and Comel, whom production does not hold. It now
+  loads the catalogue from the server. The earmark itself is still unchecked free text, so this
+  narrows the donation path rather than closing it: `tasks/open/donation-earmarks-are-free-text.md`.
 
 This narrows `tasks/lessons/2026-09-04-a-dual-layer-fallback-must-never-let-a-swallowed-database-error-fail.md`
 for one write. That lesson is about the fallback mode, where no database is configured and a

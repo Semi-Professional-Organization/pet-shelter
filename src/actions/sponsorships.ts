@@ -151,11 +151,13 @@ export async function createPetSponsorshipAction(
     // message, not the "could not confirm" one.
     // A pet-store outage was already logged by the repository.
     if (!(err instanceof PetStoreUnavailableError)) {
-      console.error("[Sponsorship Checkout] Sponsor lookup failed:", err);
+      console.error("[Sponsorship Checkout] Pet or sponsor lookup failed:", err);
     }
     return { success: false, error: SPONSORSHIP_RECORDING_FAILURE_MESSAGE };
   }
-  if (!pet) {
+  // Exact id, as in `submitApplication`: with no database configured the in-memory lookup
+  // lowercases, and the two write paths should accept the same ids.
+  if (!pet || pet.id !== validated.petId.trim()) {
     return { success: false, error: SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE };
   }
   // Archiving is the shelter's "take this down" action. `getPetById` already refuses an archived

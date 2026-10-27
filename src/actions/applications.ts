@@ -155,8 +155,10 @@ export async function submitApplication(
     // The first two lines are the same checks as `getPetById`'s guard in `src/actions/pets.ts`,
     // whose comment explains them, but over a different reader: that page uses the display reader,
     // which may answer from the mirror during an outage, and this uses `findPetForWriteAsync`,
-    // which may not. Sponsorship checkout carries the archive check too; a fourth site wants
-    // `findVisiblePetById` in the repository instead.
+    // which may not. Sponsorship checkout is the third site carrying the exact-id and archive checks
+    // (not the status check: whether an adopted animal may still be sponsored is the status-guards
+    // work's call), so the extraction into the repository is now due —
+    // `tasks/open/three-copies-of-the-pet-visibility-guard.md`.
     //
     // Placed after the rate limits on purpose. This is a database query on an unauthenticated
     // POST; the mirror read it replaces was free, so leaving it above the budgets would hand
