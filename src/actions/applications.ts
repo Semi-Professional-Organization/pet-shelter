@@ -286,8 +286,8 @@ export async function submitApplication(
   } catch (err: unknown) {
     // Thrown, not returned, from inside `withIdempotency`, so a retry with the same key runs again
     // instead of replaying this failure.
+    // The repository has already logged the cause.
     if (err instanceof ApplicationWriteError) {
-      console.error("[Adoption Application] Insert failed:", err.cause);
       return { success: false, error: APPLICATION_STORE_UNAVAILABLE_MESSAGE };
     }
     const msg = err instanceof Error ? err.message : "Failed to submit adoption application";
