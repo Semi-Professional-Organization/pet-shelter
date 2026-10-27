@@ -20,8 +20,9 @@ import {
  *
  * What made that reachable rather than theoretical: the array's order is publicly influenceable.
  * `findServerPetByIdAsync` moves every animal it reads to the front of the mirror, and that read
- * sits behind an anonymous profile GET and — since the adoption submission guards landed — an
- * unauthenticated POST, before any check the submission would fail. So the caller chooses which
+ * sits behind an anonymous profile GET (and, from the adoption submission guards until
+ * 2026-10-27, an unauthenticated POST; the submission now reads with `findPetForWriteAsync`,
+ * which leaves the mirror alone). So the caller chooses which
  * of two same-named animals is first, and `atomicUpdateApplicationStatus` then marks that one
  * Adopted on approval and writes *its* id into the `PET_STATUS_TRANSITION_ADOPTED` audit row.
  * The wrong animal is recorded as adopted, not merely cached as adopted.
