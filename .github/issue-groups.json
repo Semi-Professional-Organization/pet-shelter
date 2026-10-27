@@ -6,21 +6,21 @@
       "title": "Database outage fallbacks",
       "summary": "What the site serves, writes or claims while the database cannot answer, and readers that cannot tell an empty table from an unreachable one.",
       "parent": 183,
-      "issues": [90, 97, 65]
+      "issues": [90, 97, 65, 201, 202, 203, 204, 206]
     },
     {
       "key": "adoption-and-status-guards",
       "title": "Adoption and pet status guards",
       "summary": "Where an animal's status decides what a visitor or coordinator may do, and the places that let a refused or archived animal through.",
       "parent": 184,
-      "issues": [98, 99, 96, 101, 91, 58]
+      "issues": [98, 99, 96, 101, 91, 58, 207, 214, 215]
     },
     {
       "key": "admin-pet-form-and-dates",
       "title": "Admin pet form and birth dates",
       "summary": "The admin pet form, the birth-date migration, and how dates are validated and defaulted in the admin dialogs.",
       "parent": 185,
-      "issues": [107, 146, 111, 112, 118, 126, 105, 106, 149, 62]
+      "issues": [107, 146, 111, 112, 118, 126, 105, 106, 149, 62, 208, 209, 210, 211, 212]
     },
     {
       "key": "public-gallery-and-navigation",
@@ -55,14 +55,14 @@
       "title": "Donations, receipts and sponsor portal",
       "summary": "General donations and their receipts, follow-ups from #109, and the sponsor portal.",
       "parent": 190,
-      "issues": [50, 70, 170, 132, 133, 134]
+      "issues": [50, 70, 170, 132, 133, 134, 205]
     },
     {
       "key": "production-secrets-deploys-and-ci",
       "title": "Production secrets, deploys and CI",
       "summary": "Boot-time secrets, encrypted environment files, what production and previews actually run, and CI settings not yet observed.",
       "parent": 191,
-      "issues": [129, 69, 135, 156, 157, 158, 155]
+      "issues": [129, 69, 135, 156, 157, 158, 155, 213]
     },
     {
       "key": "test-suite",
@@ -76,7 +76,7 @@
       "title": "Agent tooling and session process",
       "summary": "Agent hooks, the drift log, permission rules, the agent scripts, the issue and ledger scripts, and the session close-out.",
       "parent": 193,
-      "issues": [48, 51, 52, 59, 66, 117, 127, 159, 160, 161, 162, 182]
+      "issues": [48, 51, 52, 59, 66, 117, 127, 159, 160, 161, 162, 182, 216, 217]
     }
   ],
   "standalone": [138]
