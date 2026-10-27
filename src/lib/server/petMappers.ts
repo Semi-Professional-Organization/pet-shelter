@@ -51,8 +51,12 @@ const DB_STATUS_SPELLINGS: Record<string, Pet["status"]> = {
  */
 export function fromDbPetStatus(status: PrismaPetStatus | string): Pet["status"] {
   const key = status.trim().toLowerCase().replace(/[\s_]+/g, " ");
-  // The cast is the honest gap: the domain type has no member for a value nobody anticipated.
-  return DB_STATUS_SPELLINGS[key] ?? (status as Pet["status"]);
+  // `hasOwn`, not a bare index: the column is free text, and `constructor` or `toString` would
+  // otherwise return a prototype member. The cast is the honest gap: the domain type has no
+  // member for a value nobody anticipated.
+  return Object.hasOwn(DB_STATUS_SPELLINGS, key)
+    ? DB_STATUS_SPELLINGS[key]
+    : (status as Pet["status"]);
 }
 
 /**

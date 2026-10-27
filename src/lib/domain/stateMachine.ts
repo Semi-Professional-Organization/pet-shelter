@@ -36,7 +36,7 @@ const PET_STATUS_ALIASES: Record<PetStatus, PetStatus> = {
  * so that callers still fail on genuinely invalid input.
  */
 export function normalizePetStatus(status: PetStatus): PetStatus {
-  return PET_STATUS_ALIASES[status] ?? status;
+  return isKnownPetStatus(status) ? PET_STATUS_ALIASES[status] : status;
 }
 
 /**

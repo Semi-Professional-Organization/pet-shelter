@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useEffectEvent, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pet } from "@/types/pet";
@@ -54,6 +54,10 @@ export type AdoptionStepId = (typeof ADOPTION_STEPS)[number]["id"];
 
 export const ADOPTION_STEP_COUNT = ADOPTION_STEPS.length;
 
+function isAdoptable(pet: Pet): boolean {
+  return getPetStatusPresentation(pet.status).isAdoptable;
+}
+
 /**
  * The pet the form opens on. Shared with the dialog wrapper so the title and
  * the form's default selection cannot disagree about which animal this is.
@@ -73,11 +77,7 @@ export const ADOPTION_STEP_COUNT = ADOPTION_STEPS.length;
  * opened the form. The form's pet *field* does not follow it there: see `fieldPetFor`.
  */
 export function resolveDefaultPet(selectedPet: Pet | null, allPets: Pet[]): Pet | null {
-  return selectedPet || allPets.find((p) => getPetStatusPresentation(p.status).isAdoptable) || null;
-}
-
-function isAdoptable(pet: Pet): boolean {
-  return getPetStatusPresentation(pet.status).isAdoptable;
+  return selectedPet || allPets.find(isAdoptable) || null;
 }
 
 /**
@@ -161,16 +161,19 @@ export function useAdoptionFormController({
   // previous one left (the dialog resets on a 200ms timer after close, and only after a
   // submission) and the form could name one animal while submitting for another. Only the pet
   // fields are touched, so the applicant's other answers survive a reopen.
-  const fieldPetId = fieldPet?.id ?? "";
-  const fieldPetName = fieldPet?.name ?? "";
+  //
+  // Keyed on the opening (and an explicit change of `selectedPet`), not on `fieldPet`: a refresh
+  // of `allPets` while the form is open must not overwrite an animal the applicant picked.
+  const applyFieldPet = useEffectEvent(() => {
+    setValue("petId", fieldPet?.id ?? "");
+    setValue("petName", fieldPet?.name ?? "");
+  });
+  const selectedPetId = selectedPet?.id;
   useEffect(() => {
-    if (open) {
-      setValue("petId", fieldPetId);
-      setValue("petName", fieldPetName);
-    }
-  }, [open, fieldPetId, fieldPetName, setValue]);
+    if (open) applyFieldPet();
+  }, [open, selectedPetId]);
 
-  const activePetId = useWatch({ control, name: "petId" }) || defaultPet?.id;
+  const activePetId = useWatch({ control, name: "petId" }) || fieldPet?.id;
   const activePet = allPets.find((p) => p.id === activePetId) || selectedPet;
 
   const isFirstStep = stepIndex === 0;

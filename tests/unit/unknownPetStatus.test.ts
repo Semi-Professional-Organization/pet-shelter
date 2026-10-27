@@ -23,7 +23,7 @@ describe("fromDbPetStatus", () => {
     expect(fromDbPetStatus(stored)).toBe(expected);
   });
 
-  it.each(["Fostered", "", "Avail able!"])(
+  it.each(["Fostered", "", "Avail able!", "constructor", "toString", "__proto__"])(
     "passes the unrecognised value %j through instead of reading it as Available",
     (stored) => {
       const status = fromDbPetStatus(stored);
@@ -33,6 +33,12 @@ describe("fromDbPetStatus", () => {
       expect(getPetStatusPresentation(status).isAdoptable).toBe(false);
     }
   );
+
+  it("labels an unrecognised value as what it is, not as Pending", () => {
+    // The admin status control lists the row's own status beside every canonical one; labelling
+    // the unknown value "Pending" showed two Pendings and hid the row staff need to correct.
+    expect(getPetStatusPresentation("Fostered" as PetStatus).labelFallback).toBe("Fostered");
+  });
 });
 
 describe("toDbPetStatus", () => {

@@ -443,6 +443,20 @@ describe("AdoptionForm", () => {
       await completeContactStepExpectingRefusal(user);
     });
 
+    it("keeps the applicant's pick when the animal list refreshes while the form is open", async () => {
+      const bella = makePet({ name: "Bella", status: "Available" });
+      const max = makePet({ name: "Max", status: "Available" });
+      const coco = makePet({ name: "Coco", status: "Available" });
+      const props = { selectedPet: null, onOpenChange: vi.fn(), open: true };
+      const { rerender } = renderWithLanguage(<AdoptionWizard {...props} allPets={[bella, max, coco]} />);
+      await setupUser().selectOptions(petSelect(), coco.id);
+
+      // Bella is adopted elsewhere, so the default animal becomes Max; the applicant chose Coco.
+      rerender(<AdoptionWizard {...props} allPets={[{ ...bella, status: "Adopted" }, max, coco]} />);
+
+      expect(petSelect().value).toBe(coco.id);
+    });
+
     it("reopened on nobody within the close animation, submits for the animal its title names", async () => {
       // The wizard stays mounted while the dialog animates closed, so this drives it directly
       // through close and reopen. The second opening passes `selectedPet = null`, and the old

@@ -11,6 +11,7 @@ import {
   buildPetCreatePayload,
   buildPetUpdatePayload,
   mapDbPetToPet,
+  toDbPetStatus,
 } from "./petMappers";
 import { registerStateReset } from "@/lib/stateResets";
 
@@ -227,13 +228,22 @@ export function markCachedPetAdopted(petId: string, petName: string): Pet | null
   return adopted;
 }
 
+/**
+ * Refuses an unrecognised status before the write. `toDbPetStatus` refuses it too, but inside the
+ * persistence `try`, where `handlePersistenceError` would swallow the refusal outside strict mode
+ * and the mirror would take the pet anyway.
+ */
+function assertKnownPetStatus(status: Pet["status"]): void {
+  toDbPetStatus(status);
+}
+
 export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<void> {
-  // Built outside the `try`: `toDbPetStatus` refuses an unrecognised status, and
-  // `handlePersistenceError` would swallow that refusal and mirror the pet anyway.
-  const data = buildPetCreatePayload(newPet);
+  assertKnownPetStatus(newPet.status);
   // DB first: a refused write must not leave the mirror ahead of the database.
   try {
-    await prisma.pet.create({ data });
+    await prisma.pet.create({
+      data: buildPetCreatePayload(newPet),
+    });
   } catch (err) {
     handlePersistenceError("Prisma pet creation", err, "write");
     // Unique violations rethrow (see persistenceMode) — never mirror a conflicted id.
@@ -264,13 +274,15 @@ export async function updateServerPet(id: string, updated: Pet, actor: SessionUs
     validatePetTransition(previous.status, updated.status);
   }
 
-  // Outside the `try` for the same reason as in `insertServerPet`.
-  const data = buildPetUpdatePayload(updated);
+  assertKnownPetStatus(updated.status);
   try {
     await prisma.$transaction([
       prisma.petUpdate.deleteMany({ where: { petId: id } }),
       prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } }),
-      prisma.pet.update({ where: { id }, data }),
+      prisma.pet.update({
+        where: { id },
+        data: buildPetUpdatePayload(updated),
+      }),
     ]);
   } catch (err) {
     handlePersistenceError("Prisma pet update", err, "write");

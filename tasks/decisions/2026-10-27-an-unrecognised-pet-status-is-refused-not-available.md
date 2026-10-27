@@ -22,9 +22,11 @@ listed, none was taken whole:
   catalogue render. **Not mapped to `Pending`:** that writes a guess into the domain value.
 
 The cost: `Pet["status"]` can now hold a string outside its union, behind one cast in the mapper.
-Display surfaces show such an animal with the Pending tone. Two consequences were closed with it:
-`toDbPetStatus` refuses an unknown status instead of writing it back as `Available` (the payload is
-built outside the persistence `try`, which would otherwise swallow the refusal), and an unknown
+Display surfaces show such an animal with the Pending tone, labelled with its raw value so the
+admin status control does not show it as a second "Pending". Lookups on the free-text value are
+own-key checks (`isKnownPetStatus`), so `constructor` or `__proto__` cannot pass for a status. Two consequences were closed with it:
+`toDbPetStatus` refuses an unknown status instead of writing it back as `Available` (the
+repository checks it before the persistence `try`, which would otherwise swallow the refusal), and an unknown
 status may move to any canonical one, so staff can correct the row.
 
 ## The adoption audit row (#101)
@@ -41,5 +43,6 @@ Backfilling `petId` for legacy applications was not done: it needs the productio
 - A non-adoptable `selectedPet` still names the dialog title, as `resolveDefaultPet`'s tests
   require, but the field starts empty and the wizard says the animal is not accepting applications.
 - Every opening sets the pet field from the animal the title names, including nobody. Only the pet
-  fields are touched, so other answers survive a reopen.
+  fields are touched, so other answers survive a reopen, and a refresh of the animal list while
+  the form is open does not overwrite the applicant's pick.
 - On success the local list and the confirmation use the animal the server recorded.

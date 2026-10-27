@@ -1,5 +1,5 @@
 import { Pet, PetStatus } from "@/types/pet";
-import { normalizePetStatus } from "@/lib/domain/stateMachine";
+import { isKnownPetStatus, normalizePetStatus } from "@/lib/domain/stateMachine";
 
 export type PetStatusTone = "available" | "rehabilitation" | "pending" | "adopted";
 
@@ -144,8 +144,12 @@ export interface PetStatusFilterOption {
  * legacy `Rehabilitation` alias and the canonical `In Rehabilitation` render identically.
  */
 export function getPetStatusPresentation(status: PetStatus): PetStatusPresentation {
-  const tone = TONE_BY_STATUS[normalizePetStatus(status)] ?? "pending";
-  return PRESENTATIONS[tone];
+  if (isKnownPetStatus(status)) return PRESENTATIONS[TONE_BY_STATUS[normalizePetStatus(status)]];
+  // A stored status the domain does not know (`fromDbPetStatus` passes it through). It fails
+  // closed with the pending tone, but is labelled as what it is: calling it "Pending" made the
+  // admin status control show two Pendings and hid the row staff need to correct.
+  // `isKnownPetStatus` is an own-key check, so `constructor` cannot pass for a known tone.
+  return { ...PRESENTATIONS.pending, labelKey: "petStatus.unrecognised", labelFallback: String(status) };
 }
 
 /**

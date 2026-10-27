@@ -30,8 +30,11 @@ are in `tasks/decisions/2026-10-27-an-unrecognised-pet-status-is-refused-not-ava
 ## Review
 
 Not done, on purpose: a fifth `Unknown` status; backfilling `petId` on legacy applications (needs
-the production database); the mirror's name-keyed auto-reject of other applications, which is a
-separate defect from #101.
+the production database); the mirror's auto-reject of other applications, logged as
+`tasks/open/an-approval-auto-rejects-legacy-applications-by-empty-pet-id.md`. Review round 1 found
+six in-scope defects (fixed), that one (logged), and two declined: dangling links to the deleted
+`open/` entries inside older decisions (decisions are never rewritten) and a third copy of the
+adoptable predicate in `PetGallery.tsx` (outside the change).
 
 # The context meter's root-cause pass
 
