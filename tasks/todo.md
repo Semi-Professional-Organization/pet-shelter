@@ -33,8 +33,9 @@ appeared after the grouping ran; it came from the ledger sync that ran alongside
 crediting the sync with closing #157: #195's body ("the ledger sync closes #157") was a closing
 keyword, so GitHub closed it. Fixed; any PR body naming an issue after "closes" does the same.
 
-Deliberately not done, each a behaviour change beyond this PR: a check that warns when a PR adds
-a `tasks/open` entry with no group (`tasks/open/new-ledger-entries-land-in-no-issue-group.md`); an
+Deliberately not done, each a behaviour change beyond this PR: letting a new `tasks/open` entry
+name its group, since its issue exists only after merge and so cannot be grouped in its own PR
+(`tasks/open/new-ledger-entries-land-in-no-issue-group.md`); an
 automatic `--apply` on push to master (already rejected in the issue-groups decision); and a
 clearer note for a closed member whose entry was settled rather than renamed
 (`tasks/open/issue-groups-calls-a-settled-member-renamed.md`). Both new entries will themselves

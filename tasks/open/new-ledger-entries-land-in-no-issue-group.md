@@ -2,15 +2,17 @@
 
 **Status:** open · opened 2026-10-27
 
-Each new `tasks/open` entry is mirrored into a GitHub issue by `scripts/ledger-issues.mjs`, but
-`.github/issue-groups.json` only groups the issues it names. So every new entry's issue sits in no
-group, listed by every `npm run issues:groups` dry run, until a pull request adds it to the file and
-someone runs `--apply`. #182 waited six days this way. Nothing warns at the pull request that adds
-the entry, when its group is easiest to choose.
+Each mirrored `tasks/open` entry (every top-level entry except session claims and hand-offs, which
+`scripts/ledger-issues.mjs` skips) becomes a GitHub issue only after its pull request merges, when
+the ledger sync runs on master. `.github/issue-groups.json` names issues by number, so the pull
+request that adds an entry cannot group it: the issue does not exist yet. Every new entry's issue
+therefore sits in no group, listed by every `npm run issues:groups` dry run, until a later pull
+request adds its number and someone runs `--apply`. #182 waited six days this way.
 
-Declined in #197 as new behaviour beyond that PR. One shape: a CI step that runs the dry run's
-ungrouped check and warns when a PR adds a `tasks/open` entry that no group will hold; another: let
-an entry name its group in its own header.
+Declined in #197 as new behaviour beyond that PR. A shape that works: let an entry name its group in
+its own header, and have the grouping script find that entry's issue through the mirror's marker,
+so the group is chosen when the entry is written.
 
-**Settles when:** an entry added to `tasks/open` is grouped as part of the pull request that adds
-it, or the owner decides that grouping stays a manual follow-up and this is recorded as a decision.
+**Settles when:** an entry can name its group where it is written and the grouping picks its issue
+up without a second pull request, or the owner decides that grouping stays a manual follow-up and
+this is recorded as a decision.

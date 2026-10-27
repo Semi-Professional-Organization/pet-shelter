@@ -19,7 +19,8 @@ What has been observed so far:
 - Every body rewrite the sync has made so far predates the parents: the last ones (#159 at
   16:20:31Z, #59 at 16:20:34Z on 2026-10-21) came before the first parent, #183, at 16:20:42Z.
 
-**Settles when:** a ledger sync that updates a linked mirror's body leaves `parent` set on it (read
-with `gh api graphql` on `issue(number: N) { parent { number } }`). If the link is gone, the
+**Settles when:** a ledger sync that updates a linked mirror's body, and one that closes a linked
+mirror (posting its close comment), each leave `parent` set on it (read with `gh api graphql` on
+`issue(number: N) { parent { number } }`). If the link is gone, the
 grouping script has to re-link after every sync, and the decision in
 `tasks/decisions/2026-10-21-issue-groups-are-native-sub-issues.md` is wrong on that point.
