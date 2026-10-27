@@ -25,16 +25,18 @@ Record active multi-step work streams below.
 
 ## Review
 
-`/code-review xhigh` on #197, at the owner's request, six rounds. No code bug was found; every
-finding was a claim. Fixed:
+`/code-review xhigh` on #197, at the owner's request. Seven rounds by the time it went to the owner
+for the stop decision; no code bug was found, every finding was a claim, and round 7 found only
+wording. Fixed:
 
 - The stale open entry now records what was observed, and that #195's closing keyword, not the
   sync, closed #157: any PR body that names an issue after "closes" does the same.
 - The group summary covers the issue and ledger scripts.
 - The squash message is drafted in the PR description and used at merge. The repo's default would
   carry every branch commit's message, including the already-shipped #195 one and 0bb9aaf's
-  claim later shown false. 77c2960 also says #182 appeared after the grouping ran; the real cause
-  is that the grouping file was written before #182 existed.
+  claim later shown false. 77c2960 also says #182 appeared after the grouping ran; in fact the
+  grouping file was written before #182 existed, and #194, which edited it after, missed it too
+  although that apply had listed #182 as in no group.
 - Rounds 4 to 6 kept finding untested designs in the two new follow-up entries, so the entries now
   state only the problem and what settles it.
 
