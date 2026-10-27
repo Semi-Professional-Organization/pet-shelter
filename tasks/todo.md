@@ -34,10 +34,11 @@ crediting the sync with closing #157: #195's body ("the ledger sync closes #157"
 keyword, so GitHub closed it. Fixed; any PR body naming an issue after "closes" does the same.
 
 Deliberately not done, each a behaviour change beyond this PR: a check that warns when a PR adds
-a `tasks/open` entry with no group (new entries otherwise land ungrouped until someone edits the
-file); an automatic `--apply` on push to master (it stays a manual, ask-gated step, as decided);
-and a clearer note for a closed member whose entry was settled rather than renamed (#157's note
-says "renamed" on every dry run). The branch carries a merge of its own already-squashed history,
+a `tasks/open` entry with no group (`tasks/open/new-ledger-entries-land-in-no-issue-group.md`); an
+automatic `--apply` on push to master (already rejected in the issue-groups decision); and a
+clearer note for a closed member whose entry was settled rather than renamed
+(`tasks/open/issue-groups-calls-a-settled-member-renamed.md`). Both new entries will themselves
+land ungrouped, which is the first entry's point. The branch carries a merge of its own already-squashed history,
 so `git cherry` will keep showing e58836b as unshipped; its tree equals 5aea5bb.
 
 # The context meter's root-cause pass
