@@ -142,8 +142,9 @@ describe("the repository distinguishes a missing row from an unreachable databas
     //
     // What it does pin is narrower and still worth having: a declined read leaves the mirror
     // alone rather than mutating it. Asserted on a *different* fixture id than the one just
-    // queried, so it does not also forbid evicting the row the database denied — which is the
-    // natural repair for `tasks/open/an-outage-serves-and-bills-fixture-animals.md`.
+    // queried, so it does not also forbid evicting the row the database denied — which was one
+    // option for the outage case, settled instead by
+    // `tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`.
     const mirror = getServerPets();
     expect(mirror.length).toBeGreaterThan(0);
     expect(mirror.some((p) => p.id === "pet-002")).toBe(true);

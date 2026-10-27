@@ -54,6 +54,8 @@ export interface PrismaDouble {
    * them.
    */
   faq: { findMany: ReturnType<typeof vi.fn> };
+  /** Reads only, for `emptyReadersAreAnswers.test.ts`. The upsert has no suite here yet. */
+  shelterSettings: { findUnique: ReturnType<typeof vi.fn> };
   $transaction: ReturnType<typeof vi.fn>;
   $queryRaw: ReturnType<typeof vi.fn>;
   $disconnect: ReturnType<typeof vi.fn>;
@@ -120,6 +122,7 @@ export function createPrismaDouble(): PrismaDouble {
       create: vi.fn().mockResolvedValue({}),
     },
     faq: { findMany: vi.fn().mockResolvedValue([]) },
+    shelterSettings: { findUnique: vi.fn().mockResolvedValue(null) },
     // Wired below, so the callback runs against this double.
     $transaction: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),

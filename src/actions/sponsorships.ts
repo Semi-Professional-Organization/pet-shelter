@@ -19,7 +19,12 @@ import {
   generatePledgeRef,
   reconciliationNotice,
 } from "@/lib/domain/petSponsorship";
-import { SPONSORSHIP_RECORDING_UNCONFIRMED_MESSAGE } from "@/lib/domain/contributionFailure";
+import {
+  SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE,
+  SPONSORSHIP_RECORDING_FAILURE_MESSAGE,
+  SPONSORSHIP_RECORDING_UNCONFIRMED_MESSAGE,
+  SPONSORSHIP_ANIMAL_UNAVAILABLE_MESSAGE,
+} from "@/lib/domain/contributionFailure";
 import {
   SponsorshipWriteError,
   listPendingSponsorships,
@@ -35,7 +40,7 @@ import { requirePermission } from "@/lib/security/dal";
 import { PERMISSIONS, isAuthorizationError } from "@/lib/security/rbac";
 import { getCurrentSponsorSession } from "@/lib/security/sponsorSession";
 import { findSponsorById } from "@/lib/server/sponsorRepository";
-import { findServerPetByIdAsync } from "@/lib/server/petRepository";
+import { PetStoreUnavailableError, findPetForWriteAsync } from "@/lib/server/petRepository";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
 
 /** What the supporter sees the moment checkout completes. */
@@ -131,19 +136,34 @@ export async function createPetSponsorshipAction(
   const amountSen = senFromRinggit(validated.amountMYR);
   const pledgeRef = generatePledgeRef();
 
+  // `findPetForWriteAsync`, not the display reader: a pledge must name an animal the database
+  // holds, so an outage throws here rather than answering from the `src/data/pets.json` mirror
+  // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`).
   let pet;
   let sponsorUserId: string | null;
   try {
     [pet, sponsorUserId] = await Promise.all([
-      findServerPetByIdAsync(validated.petId),
+      findPetForWriteAsync(validated.petId),
       resolveCheckoutSponsorId(sponsorEmail),
     ]);
   } catch (err) {
-    console.error("[Sponsorship Checkout] Identity lookup failed:", err);
-    return { success: false, error: SPONSORSHIP_RECORDING_UNCONFIRMED_MESSAGE };
+    // Both lookups run before any write, so nothing was recorded: the "could not record"
+    // message, not the "could not confirm" one.
+    // A pet-store outage was already logged by the repository.
+    if (!(err instanceof PetStoreUnavailableError)) {
+      console.error("[Sponsorship Checkout] Pet or sponsor lookup failed:", err);
+    }
+    return { success: false, error: SPONSORSHIP_RECORDING_FAILURE_MESSAGE };
   }
-  if (!pet) {
-    return { success: false, error: SPONSORSHIP_RECORDING_UNCONFIRMED_MESSAGE };
+  // Exact id, as in `submitApplication`: with no database configured the in-memory lookup
+  // lowercases, and the two write paths should accept the same ids.
+  if (!pet || pet.id !== validated.petId.trim()) {
+    return { success: false, error: SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE };
+  }
+  // Archiving is the shelter's "take this down" action. `getPetById` already refuses an archived
+  // animal on the profile; checkout is the path that takes money, so it refuses too (#91).
+  if (pet.isArchived) {
+    return { success: false, error: SPONSORSHIP_ANIMAL_UNAVAILABLE_MESSAGE };
   }
 
   let record;
