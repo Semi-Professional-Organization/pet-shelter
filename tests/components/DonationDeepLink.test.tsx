@@ -182,3 +182,18 @@ describe("DonationWidget deep linking", () => {
     });
   });
 });
+
+describe("DonationWidget with no initial pets", () => {
+  it("offers the server's catalogue, never the bundled pets.json animals", async () => {
+    // `/donate` renders the widget with no `initialPets`. It used to seed the chooser from
+    // `src/data/pets.json`, so the page always offered the demo animals — including Tuah and
+    // Comel, which production does not hold — and a gift could be earmarked for one of them.
+    const { getPublicPets } = await import("@/actions/pets");
+    vi.mocked(getPublicPets).mockResolvedValueOnce([makePet({ id: "pet-db-1", name: "Persisted Rex" })]);
+    renderWithLanguage(<DonationWidget />);
+
+    expect(await within(carousel()).findByRole("button", { name: /persisted rex/i })).toBeInTheDocument();
+    expect(within(carousel()).queryByRole("button", { name: /tuah/i })).toBeNull();
+    expect(within(carousel()).queryByRole("button", { name: /bella/i })).toBeNull();
+  });
+});

@@ -35,8 +35,6 @@ import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
 import { getPublicPets } from "@/actions/pets";
 import { SponsorshipTier } from "@/types/sponsorship";
 import { Pet } from "@/types/pet";
-import initialPetsData from "@/data/pets.json";
-import { withDerivedAge } from "@/lib/domain/petAge";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { PetChooserCarousel } from "./PetChooserCarousel";
 
@@ -53,12 +51,11 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const urlTier = searchParams.get("tier");
   const urlFreq = searchParams.get("freq");
 
-  const basePets: Pet[] =
-    initialPets.length > 0
-      ? initialPets
-      : (initialPetsData as unknown as Pet[])
-          .map((p) => withDerivedAge(p))
-          .filter((p) => !p.isArchived);
+  // No `src/data/pets.json` fallback: the bundled demo animals are not the shelter's, and a gift
+  // earmarked for one is a payment recorded against an animal nobody entered
+  // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`). With no
+  // `initialPets`, the effect below loads the catalogue from the server.
+  const basePets: Pet[] = initialPets;
 
   const [pets, setPets] = useState<Pet[]>(basePets);
 

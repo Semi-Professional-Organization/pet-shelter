@@ -40,7 +40,7 @@ import { requirePermission } from "@/lib/security/dal";
 import { PERMISSIONS, isAuthorizationError } from "@/lib/security/rbac";
 import { getCurrentSponsorSession } from "@/lib/security/sponsorSession";
 import { findSponsorById } from "@/lib/server/sponsorRepository";
-import { findPetForWriteAsync } from "@/lib/server/petRepository";
+import { PetStoreUnavailableError, findPetForWriteAsync } from "@/lib/server/petRepository";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
 
 /** What the supporter sees the moment checkout completes. */
@@ -149,7 +149,10 @@ export async function createPetSponsorshipAction(
   } catch (err) {
     // Both lookups run before any write, so nothing was recorded: the "could not record"
     // message, not the "could not confirm" one.
-    console.error("[Sponsorship Checkout] Pet or sponsor lookup failed:", err);
+    // A pet-store outage was already logged by the repository.
+    if (!(err instanceof PetStoreUnavailableError)) {
+      console.error("[Sponsorship Checkout] Sponsor lookup failed:", err);
+    }
     return { success: false, error: SPONSORSHIP_RECORDING_FAILURE_MESSAGE };
   }
   if (!pet) {

@@ -4,7 +4,7 @@ import { validatePetTransition } from "@/lib/domain/stateMachine";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
-import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
+import { handlePersistenceError, isDatabasePersistent, isStrictPersistence } from "@/lib/persistenceMode";
 import { withDerivedAge } from "@/lib/domain/petAge";
 import {
   DbPetRecord,
@@ -111,23 +111,11 @@ export async function getStoredGalleryImages(id: string): Promise<string[] | nul
 export class PetStoreUnavailableError extends Error {
   readonly cause?: unknown;
   constructor(id: string, cause?: unknown) {
-    super(`Could not read pet "${id}" from the database`);
+    // JSON-quoted: the id is caller-supplied, and a raw newline in it would forge a log line.
+    super(`Could not read pet ${JSON.stringify(id)} from the database`);
     this.name = "PetStoreUnavailableError";
     this.cause = cause;
   }
-}
-
-/** One row from PostgreSQL, synced into the mirror on the way back; `null` when there is none. */
-async function readPetRow(id: string): Promise<Pet | null> {
-  const norm = id.trim().toLowerCase();
-  const row = await prisma.pet.findUnique({
-    where: { id: id.trim() },
-    include: PET_INCLUDE,
-  });
-  if (!row) return null;
-  const pet = mapDbPetToPet(row as unknown as DbPetRecord);
-  serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
-  return pet;
 }
 
 /**
@@ -161,9 +149,17 @@ async function readPetRow(id: string): Promise<Pet | null> {
  * carries the reasoning.
  */
 export async function findServerPetByIdAsync(id: string): Promise<Pet | null> {
+  const norm = id.trim().toLowerCase();
   if (isDatabasePersistent()) {
     try {
-      return await readPetRow(id);
+      const row = await prisma.pet.findUnique({
+        where: { id: id.trim() },
+        include: PET_INCLUDE,
+      });
+      if (!row) return null;
+      const pet = mapDbPetToPet(row as unknown as DbPetRecord);
+      serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
+      return pet;
     } catch (err) {
       handlePersistenceError("Prisma pet find by id", err, "read");
       return findServerPetById(id);
@@ -175,25 +171,34 @@ export async function findServerPetByIdAsync(id: string): Promise<Pet | null> {
 /**
  * Reads one animal for a path that **writes a record or takes a pledge**.
  *
- * Same read as {@link findServerPetByIdAsync}, without its outage fallback:
+ * The same row as {@link findServerPetByIdAsync}, without its outage fallback:
  * when a database is configured and the query throws, this throws
  * {@link PetStoreUnavailableError} rather than answering from the mirror, so
  * the caller refuses instead of acknowledging an application or a pledge
- * against a `src/data/pets.json` demo animal. It throws in strict mode too —
- * the point of strict mode is that nothing is absorbed, and this absorbs
- * nothing.
+ * against a `src/data/pets.json` demo animal. Under strict persistence the
+ * query's own error is rethrown verbatim, as `handlePersistenceError` does
+ * everywhere else, so a broken query is not mistaken for an outage in tests.
+ *
+ * **The `pets` row only, and the mirror is left alone.** The callers read the
+ * id, name, breed, status and archive flag, so the returned pet carries no
+ * `updates` or `medicalTimeline`. Without the joins, a fault in those tables
+ * cannot refuse an adoption or a pledge, and an anonymous POST no longer
+ * reorders the mirror that `markCachedPetAdopted` searches.
  *
  * With no database configured the mirror is the whole store, the ledgers it
  * would be written to are in memory as well, and it is answered from there.
  */
 export async function findPetForWriteAsync(id: string): Promise<Pet | null> {
   if (!isDatabasePersistent()) return findServerPetById(id);
+  let row;
   try {
-    return await readPetRow(id);
+    row = await prisma.pet.findUnique({ where: { id: id.trim() } });
   } catch (err) {
+    if (isStrictPersistence()) throw err;
     console.error("[Database Store] Pet read for a write path failed:", err instanceof Error ? err.message : err);
     throw new PetStoreUnavailableError(id.trim(), err);
   }
+  return row ? mapDbPetToPet(row as unknown as DbPetRecord) : null;
 }
 
 export function findServerPetById(id: string): Pet | null {
@@ -211,8 +216,9 @@ export function findServerPetById(id: string): Pet | null {
  *
  * That mattered because the order is publicly influenceable:
  * `findServerPetByIdAsync` moves every animal it reads to the head of this
- * array, and that read sits behind an anonymous profile GET and an
- * unauthenticated adoption POST. So a visitor could choose which of two
+ * array, and that read sits behind an anonymous profile GET (and, until
+ * 2026-10-27, an unauthenticated adoption POST, which now reads with
+ * `findPetForWriteAsync` and leaves the array alone). So a visitor could choose which of two
  * same-named animals `atomicUpdateApplicationStatus` marks on approval — and
  * the caller writes the returned id into the `PET_STATUS_TRANSITION_ADOPTED`
  * audit row, making it a wrong permanent record rather than a stale cache.

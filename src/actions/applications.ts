@@ -152,10 +152,11 @@ export async function submitApplication(
 
     // 2. The target animal: it must exist, not be archived, and be adoptable.
     //
-    // The first two lines are `getPetById`'s guard in `src/actions/pets.ts`, deliberately
-    // identical, and **that comment is the long form of both** — not restated here, so the two
-    // copies cannot drift into disagreeing explanations of the same three lines. This is the
-    // second site carrying it; a third wants `findVisiblePetById` in the repository instead.
+    // The first two lines are the same checks as `getPetById`'s guard in `src/actions/pets.ts`,
+    // whose comment explains them, but over a different reader: that page uses the display reader,
+    // which may answer from the mirror during an outage, and this uses `findPetForWriteAsync`,
+    // which may not. Sponsorship checkout carries the archive check too; a fourth site wants
+    // `findVisiblePetById` in the repository instead.
     //
     // Placed after the rate limits on purpose. This is a database query on an unauthenticated
     // POST; the mirror read it replaces was free, so leaving it above the budgets would hand

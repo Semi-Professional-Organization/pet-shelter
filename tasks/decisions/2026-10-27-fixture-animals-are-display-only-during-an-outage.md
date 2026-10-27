@@ -24,9 +24,14 @@ When a database is configured and a pet read fails outside strict mode,
 - **Checkout refuses an archived animal** with its own message, and a missing one with "could not
   find that animal", instead of the "could not confirm that a pledge was recorded" copy, which is
   about a write that may have happened.
-- **Two list readers keep their answers.** An empty `adoptionApplication` table returns `[]`; a
-  missing settings row returns the shipped defaults, because the row is created by the first
-  admin save. Both written down at the reader.
+- **Two readers keep their answers.** An empty `adoptionApplication` table returns `[]`. A
+  missing settings row is answered from the in-memory settings, because the row is created by
+  the first admin save; those hold the shipped defaults on a fresh process, but a failed save
+  also writes them (`tasks/open/a-failed-settings-save-is-served-as-saved.md`). Both written down
+  at the reader.
+- **The donation page no longer seeds its animal chooser from `pets.json`.** It always did, not
+  only in an outage, so a gift could be earmarked for Tuah or Comel, whom production does not
+  hold. It now loads the catalogue from the server.
 
 This narrows `tasks/lessons/2026-09-04-a-dual-layer-fallback-must-never-let-a-swallowed-database-error-fail.md`
 for one write. That lesson is about the fallback mode, where no database is configured and a

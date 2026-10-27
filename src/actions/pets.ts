@@ -141,8 +141,10 @@ export async function getPetById(id: string): Promise<Pet | null> {
   // it refuses a *case-variant* of a fixture id, and nothing more. `/pets/pet-001`, spelled
   // exactly as `pets.json` spells it, satisfies `pet.id === requested` and is served from the
   // fixture on either route. That residual is deliberate for a page, and only for a page: the
-  // write and payment paths read with `findPetForWriteAsync` instead
-  // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`). So: do not delete this guard on
+  // public adoption and sponsorship writes read with `findPetForWriteAsync` instead
+  // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`); the
+  // admin edits further down do not yet
+  // (`tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md`). So: do not delete this guard on
   // the grounds that the repository "returns null now" — it does not, on those two paths — and
   // do not read it as closing them.
   const requested = id.trim();

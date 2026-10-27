@@ -31,8 +31,7 @@ The owner decided `src/data/pets.json` must not be used on a write or payment pa
 - **Not done, on purpose:** the admin pet edit and archive paths (same shape, but the pet form is
   being reworked in another pull request; recorded in
   `tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md`); no-database mode,
-  which still answers from the mirror because it is the whole store there; the donation widget's
-  client-side `pets.json` list, which is display and is now refused by the server if chosen; no
+  which still answers from the mirror because it is the whole store there; no
   P2003 retry with `petId: null` (refused instead, per the owner's "refuse rare edge states").
 
 ## Review
@@ -45,6 +44,16 @@ The owner decided `src/data/pets.json` must not be used on a write or payment pa
   the pet read, raw P2002 text on an `id` collision (pre-existing), status guards on checkout
   (the status-guards pull request), a shared error base class. Recorded:
   `tasks/open/a-failed-settings-save-is-served-as-saved.md`.
+- [x] Owner asked for an xhigh `/code-review` before merge: 12 findings. Fixed: the donation
+  page seeded its chooser from `pets.json` in every mode (now loads from the server, with a
+  component test); the write-path read now selects the `pets` row alone and leaves the mirror
+  untouched; strict mode rethrows the query's own error; the log line quotes the caller's id;
+  checkout logs a pet outage once; stale comments and the settings wording; console spies
+  restored; the refused-insert test asserts no confirmation emails. Declined: moving the write
+  rule into `handlePersistenceError` for every repository (a cross-repository change, recorded
+  in the two open entries this PR adds). Side effect worth knowing: a submission no longer
+  refreshes the mirror, which `markCachedPetAdopted` reads on approval; the admin catalogue read
+  refreshes it anyway.
 
 # The context meter's root-cause pass
 

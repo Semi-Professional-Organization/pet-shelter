@@ -48,6 +48,7 @@ vi.mock("@/lib/security/session", () => ({
 }));
 
 vi.mock("@/lib/server/petRepository", () => ({
+  PetStoreUnavailableError: class PetStoreUnavailableError extends Error {},
   findPetForWriteAsync: vi.fn(async (id: string) => ({ id, name: "Bella" })),
   resetPets: vi.fn(),
 }));

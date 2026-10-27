@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from "vitest";
 import initialPets from "@/data/pets.json";
 import {
   getPrismaDouble,
@@ -75,6 +75,12 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// The console spies below silence expected noise; restoring them keeps a later failure's
+// diagnostics visible. Spies only: the module mocks above are not affected.
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 /** Production's shape: a database is configured, and nothing rethrows. */
 function inProductionMode() {
   vi.stubEnv("STRICT_PERSISTENCE", "false");
@@ -131,11 +137,26 @@ describe("the write-path reader does not answer from the mirror", () => {
     await expect(findPetForWriteAsync(FIXTURE_ID)).rejects.toBeInstanceOf(PetStoreUnavailableError);
   });
 
-  it("throws under strict persistence too", async () => {
-    givenDatabaseDown();
-    const { findPetForWriteAsync, PetStoreUnavailableError } = await import("@/lib/server/petRepository");
+  it("rethrows the query's own error under strict persistence, as every reader does", async () => {
+    // Still no mirror; but a broken query in the strict tier must surface as itself, not as an
+    // outage the callers would turn into polite refusal copy.
+    double.pet.findUnique.mockRejectedValue(new Error('relation "pets" does not exist'));
+    const { findPetForWriteAsync } = await import("@/lib/server/petRepository");
 
-    await expect(findPetForWriteAsync(FIXTURE_ID)).rejects.toBeInstanceOf(PetStoreUnavailableError);
+    await expect(findPetForWriteAsync(FIXTURE_ID)).rejects.toThrow(/relation "pets"/);
+  });
+
+  it("reads the pets row alone and leaves the mirror untouched", async () => {
+    // The callers need the scalar columns only. Without the joins, a fault in the history
+    // tables cannot refuse an adoption or a pledge, and an anonymous POST cannot reorder the
+    // mirror `markCachedPetAdopted` searches.
+    double.pet.findUnique.mockResolvedValue(makeDbPet({ id: FIXTURE_ID, name: "Persisted Bella" }));
+    const { findPetForWriteAsync, getServerPets } = await import("@/lib/server/petRepository");
+    const mirrorBefore = getServerPets();
+
+    expect(await findPetForWriteAsync(FIXTURE_ID)).toMatchObject({ id: FIXTURE_ID, name: "Persisted Bella" });
+    expect(double.pet.findUnique).toHaveBeenCalledWith({ where: { id: FIXTURE_ID } });
+    expect(getServerPets()).toBe(mirrorBefore);
   });
 
   it("answers from the mirror when no database is configured, where it is the whole store", async () => {
@@ -237,6 +258,10 @@ describe("an adoption application is never acknowledged without a database row (
     expect(result.error).not.toMatch(/nothing was submitted/i);
     expect(double.adoptionApplication.create).toHaveBeenCalled();
     expect(getServerApplications()).toHaveLength(before);
+    // The side effects that would hand out a reference code anyway.
+    const email = await import("@/lib/email");
+    expect(email.sendApplicationConfirmationEmail).not.toHaveBeenCalled();
+    expect(email.sendStaffApplicationAlert).not.toHaveBeenCalled();
   });
 
   it("still accepts and writes the application when the database is healthy", async () => {

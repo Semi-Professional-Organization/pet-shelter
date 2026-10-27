@@ -7,7 +7,9 @@ import { getPrismaDouble, resetPrismaDouble, type PrismaDouble } from "./support
  *
  * - Applications: an answer. An empty table returns `[]`, never the `applications.json` demo
  *   applicants; the fixtures are reached only from the `catch`.
- * - Settings: the shipped defaults, on both exits. The row is created by the first admin save,
+ * - Settings: the in-memory copy, on both exits — the shipped defaults on a fresh process, though
+ *   a failed save writes it too (`tasks/open/a-failed-settings-save-is-served-as-saved.md`).
+ *   The row is created by the first admin save,
  *   so "no row" means "not saved yet", and the defaults are the right answer to it. What keeps
  *   that from overwriting real settings is `getServerSettingsWithSource` saying `fromDatabase:
  *   false`, so that is asserted too.
@@ -55,7 +57,7 @@ describe("an empty applications table is an answer", () => {
   });
 });
 
-describe("a missing settings row is answered with the shipped defaults", () => {
+describe("a missing settings row is answered from the in-memory copy", () => {
   it("serves the defaults, and does not claim they came from the database", async () => {
     double.shelterSettings.findUnique.mockResolvedValue(null);
     const { getServerSettingsAsync, getServerSettingsWithSource, getServerSettings } = await import(
@@ -63,6 +65,8 @@ describe("a missing settings row is answered with the shipped defaults", () => {
     );
 
     expect(await getServerSettingsAsync()).toEqual(getServerSettings());
+    // A fresh process: the copy is the shipped defaults.
+    expect(getServerSettings().shelterName).toBe("Hope for Strays");
     expect((await getServerSettingsWithSource()).fromDatabase).toBe(false);
   });
 
