@@ -63,6 +63,14 @@ The owner decided `src/data/pets.json` must not be used on a write or payment pa
   approval (noted in the existing audit-row entry). Declined: caller-triggered query errors
   (a NUL byte) logging as an outage, since they still refuse safely; rendering the chooser on
   the server, which would let a database-less build bake fixtures into a revalidated page.
+- [x] Third xhigh round: 9 findings. Fixed: a test for the sponsorship exact-id check (probed:
+  red without it), the archived refusal no longer names the animal, the refused insert's log
+  line no longer says "fallback", a stale test header. Recorded: the profile page can cache a
+  fixture render (`a-profile-rendered-in-an-outage-can-stay-cached.md`), the single-application
+  readers' empty-read fallback (`single-application-readers-serve-fixtures-after-an-empty-read.md`).
+  Declined: the chooser's extra catalogue request per visit, a `sponsorPetId` link submitted
+  before the catalogue loads going to general care, and the reader duplication. Review stopped
+  here and the owner was asked, per the scope rule: findings were not falling to zero.
 
 # The context meter's root-cause pass
 

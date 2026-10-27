@@ -8,7 +8,9 @@ When a database is configured and a pet read fails outside strict mode,
 `src/data/pets.json`. Four open entries asked what that may be used for. The answer:
 
 - **A page may show it.** `/pets/pet-001` still renders the demo animal for the length of an
-  outage. A page is stale for a minute and recovers; nothing is recorded against it.
+  outage, and nothing is recorded against it. The intent is that it recovers; on the profile page
+  it may not yet, because `/pets/[id]` is statically generated and a profile first rendered during
+  an outage can stay cached — `tasks/open/a-profile-rendered-in-an-outage-can-stay-cached.md`.
 - **Nothing may be written or billed against it.** `submitApplication` and
   `createPetSponsorshipAction` read with `findPetForWriteAsync`, which throws
   `PetStoreUnavailableError` instead of answering from the mirror. The applicant or supporter is

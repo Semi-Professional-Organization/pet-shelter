@@ -20,7 +20,8 @@ import { Loader2 } from "lucide-react";
  * rather than discovering later: a build that cannot reach the database bakes the `pets.json`
  * fixtures into the page until the next revalidation — the outage fallback, which
  * `tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md` allows for the
- * length of an outage and no longer — and the catalogue is the surface
+ * length of an outage and no longer (the profile pages do not yet keep to that:
+ * `tasks/open/a-profile-rendered-in-an-outage-can-stay-cached.md`) — and the catalogue is the surface
  * where a stale animal is most visible. `/faq`, `/get-involved` and `/sponsors` already say this
  * the same way.
  */

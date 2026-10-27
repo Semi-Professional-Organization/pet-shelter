@@ -276,7 +276,7 @@ export async function insertServerApplication(newApp: AdoptionApplicationRecord)
     } catch (err) {
       // Unique violations and strict mode rethrow here — a duplicate submission must reach the
       // caller, not the mirror. Everything else is a lost application if it is swallowed.
-      handlePersistenceError("Prisma application creation", err, "write");
+      handlePersistenceError("Prisma application creation (refused, not mirrored)", err, "write");
       throw new ApplicationWriteError(err);
     }
   }

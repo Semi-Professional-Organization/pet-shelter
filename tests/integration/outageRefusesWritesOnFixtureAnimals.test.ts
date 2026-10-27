@@ -8,6 +8,7 @@ import {
 } from "./support/prismaDouble";
 import {
   SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE,
+  SPONSORSHIP_ANIMAL_UNAVAILABLE_MESSAGE,
   SPONSORSHIP_RECORDING_FAILURE_MESSAGE,
 } from "@/lib/domain/contributionFailure";
 
@@ -206,7 +207,9 @@ describe("sponsorship checkout refuses an archived animal (#91)", () => {
     const result = await createPetSponsorshipAction(sponsorship("sponsor.archived@example.test"));
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/Persisted Bella is no longer available for sponsorship/);
+    expect(result).toEqual({ success: false, error: SPONSORSHIP_ANIMAL_UNAVAILABLE_MESSAGE });
+    // Not named: an anonymous caller should not learn what staff took down.
+    expect(result.error).not.toContain("Persisted Bella");
     expect(ledger.recordSponsorshipPledge).not.toHaveBeenCalled();
   });
 
@@ -219,6 +222,23 @@ describe("sponsorship checkout refuses an archived animal (#91)", () => {
 
     expect(result).toEqual({ success: false, error: SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE });
     expect(ledger.recordSponsorshipPledge).not.toHaveBeenCalled();
+  });
+});
+
+describe("sponsorship checkout accepts only the exact id", () => {
+  it("refuses a case-variant on the no-database route, where the store lowercases", async () => {
+    vi.stubEnv("STRICT_PERSISTENCE", "false");
+    vi.stubEnv("DATABASE_URL", "");
+    const ledger = await import("@/lib/server/sponsorshipLedger");
+    const { createPetSponsorshipAction } = await import("@/actions/sponsorships");
+
+    const variant = await createPetSponsorshipAction({ ...sponsorship("sponsor.case@example.test"), petId: "PET-001" });
+    expect(variant).toEqual({ success: false, error: SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE });
+    expect(ledger.recordSponsorshipPledge).not.toHaveBeenCalled();
+
+    // The discriminator: the canonical spelling goes through on the same route.
+    const exact = await createPetSponsorshipAction(sponsorship("sponsor.exact@example.test"));
+    expect(exact.success).toBe(true);
   });
 });
 

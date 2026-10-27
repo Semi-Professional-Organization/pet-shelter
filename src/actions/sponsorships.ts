@@ -23,7 +23,7 @@ import {
   SPONSORSHIP_ANIMAL_NOT_FOUND_MESSAGE,
   SPONSORSHIP_RECORDING_FAILURE_MESSAGE,
   SPONSORSHIP_RECORDING_UNCONFIRMED_MESSAGE,
-  sponsorshipAnimalUnavailableMessage,
+  SPONSORSHIP_ANIMAL_UNAVAILABLE_MESSAGE,
 } from "@/lib/domain/contributionFailure";
 import {
   SponsorshipWriteError,
@@ -163,7 +163,7 @@ export async function createPetSponsorshipAction(
   // Archiving is the shelter's "take this down" action. `getPetById` already refuses an archived
   // animal on the profile; checkout is the path that takes money, so it refuses too (#91).
   if (pet.isArchived) {
-    return { success: false, error: sponsorshipAnimalUnavailableMessage(pet.name) };
+    return { success: false, error: SPONSORSHIP_ANIMAL_UNAVAILABLE_MESSAGE };
   }
 
   let record;
