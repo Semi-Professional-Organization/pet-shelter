@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, within } from "@testing-library/react";
 
 vi.mock("@/actions/donations", () => ({ submitDonationPledgeAction: vi.fn() }));
-// The widget falls back to fetching the public catalogue when it is handed no
-// pets. Every test below supplies `initialPets`, so this exists to keep an
-// unexpected fetch from reaching Prisma rather than to be exercised.
+// The widget fetches the public catalogue when it is handed no pets. Every test
+// but the last supplies `initialPets`; the last overrides this once to exercise it.
 vi.mock("@/actions/pets", () => ({ getPublicPets: vi.fn().mockResolvedValue([]) }));
 
 import { DonationWidget } from "@/components/features/donations/DonationWidget";
@@ -180,5 +179,20 @@ describe("DonationWidget deep linking", () => {
       expect(selectedAmount()).toMatch(/^RM 10\.00/);
       expect(selectedAmount()).toMatch(/\/ mo/);
     });
+  });
+});
+
+describe("DonationWidget with no initial pets", () => {
+  it("offers the server's catalogue, never the bundled pets.json animals", async () => {
+    // `/donate` renders the widget with no `initialPets`. It used to seed the chooser from
+    // `src/data/pets.json`, so the page always offered the demo animals — including Tuah and
+    // Comel, which production does not hold — and a gift could be earmarked for one of them.
+    const { getPublicPets } = await import("@/actions/pets");
+    vi.mocked(getPublicPets).mockResolvedValueOnce([makePet({ id: "pet-db-1", name: "Persisted Rex" })]);
+    renderWithLanguage(<DonationWidget />);
+
+    expect(await within(carousel()).findByRole("button", { name: /persisted rex/i })).toBeInTheDocument();
+    expect(within(carousel()).queryByRole("button", { name: /tuah/i })).toBeNull();
+    expect(within(carousel()).queryByRole("button", { name: /bella/i })).toBeNull();
   });
 });

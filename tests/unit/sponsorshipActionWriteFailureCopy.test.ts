@@ -48,7 +48,8 @@ vi.mock("@/lib/security/session", () => ({
 }));
 
 vi.mock("@/lib/server/petRepository", () => ({
-  findServerPetByIdAsync: vi.fn(async (id: string) => ({ id, name: "Bella" })),
+  PetStoreUnavailableError: class PetStoreUnavailableError extends Error {},
+  findPetForWriteAsync: vi.fn(async (id: string) => ({ id, name: "Bella" })),
   resetPets: vi.fn(),
 }));
 
@@ -118,7 +119,10 @@ describe("createPetSponsorshipAction write-failure copy", () => {
 
     expect(ledgerMocks.recordSponsorshipPledge).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/could not confirm that a pledge was recorded/i);
+    // The lookup runs before any write, so nothing was recorded and the copy may say so — while
+    // still not denying a transfer the supporter may already have sent.
+    expect(result.error).toMatch(/no pledge was recorded/i);
+    expect(result.error).toMatch(/bank reference/i);
 
     lookup.mockRestore();
   });

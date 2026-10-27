@@ -53,6 +53,12 @@ This is why the fix below is keyed off the transaction rather than the mirror: `
 returns a count, so "the database adopted this pet" is knowable without consulting the cache at
 all, and it closes both directions at once.
 
+**The cold mirror got likelier on 2026-10-27.** A submission used to warm the mirror with the
+animal it was for, because `submitApplication` read it through `findServerPetByIdAsync`. It now
+reads through `findPetForWriteAsync`, which leaves the mirror alone
+(`decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`), so only a catalogue
+or profile read in the same process warms it before an approval.
+
 **Not fixed with that change on purpose.** The repair is in the caller, not the repository, and it
 is a real product question rather than a mechanical one: either key the audit row off the row the
 transaction actually updated (`updateMany` returns a count, so "0 rows" is detectable), or decline
