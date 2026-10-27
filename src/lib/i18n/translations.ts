@@ -32,6 +32,7 @@ export interface TranslationDictionary {
     pending: string;
     adopted: string;
     inRehabilitation: string;
+    statusUnknown: string;
     rehabStage: string;
     rehabProgress: string;
     sponsorMe: string;
@@ -404,6 +405,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       pending: "Pending",
       adopted: "Adopted",
       inRehabilitation: "In Rehabilitation",
+      statusUnknown: "Status unknown",
       rehabStage: "Rehabilitation Stage",
       rehabProgress: "Recovery Progress",
       sponsorMe: "Sponsor Me",
@@ -779,6 +781,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       pending: "Sedang Diproses",
       adopted: "Telah Diadopsi",
       inRehabilitation: "Dalam Pemulihan",
+      statusUnknown: "Status tidak diketahui",
       rehabStage: "Peringkat Pemulihan",
       rehabProgress: "Kemajuan Pemulihan",
       sponsorMe: "Tajai Saya",

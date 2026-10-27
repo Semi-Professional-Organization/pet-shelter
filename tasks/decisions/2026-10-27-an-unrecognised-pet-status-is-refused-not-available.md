@@ -22,8 +22,9 @@ listed, none was taken whole:
   catalogue render. **Not mapped to `Pending`:** that writes a guess into the domain value.
 
 The cost: `Pet["status"]` can now hold a string outside its union, behind one cast in the mapper.
-Display surfaces show such an animal with the Pending tone, labelled with its raw value so the
-admin status control does not show it as a second "Pending". Lookups on the free-text value are
+Display surfaces show such an animal with the Pending tone, labelled "Status unknown" (the raw
+stored text is not for the public catalogue); the admin form names the stored value so staff can
+correct it. Lookups on the free-text value are
 own-key checks (`isKnownPetStatus`), so `constructor` or `__proto__` cannot pass for a status. Two consequences were closed with it:
 `toDbPetStatus` refuses an unknown status instead of writing it back as `Available` (the
 repository checks it before the persistence `try`, which would otherwise swallow the

@@ -38,10 +38,13 @@ describe("fromDbPetStatus", () => {
     }
   );
 
-  it("labels an unrecognised value as what it is, not as Pending", () => {
+  it("labels an unrecognised value as unknown, not as Pending and not as its raw text", () => {
     // The admin status control lists the row's own status beside every canonical one; labelling
-    // the unknown value "Pending" showed two Pendings and hid the row staff need to correct.
-    expect(getPetStatusPresentation("Fostered" as PetStatus).labelFallback).toBe("Fostered");
+    // the unknown value "Pending" showed two Pendings and hid the row staff need to correct. The
+    // raw stored text is not for the public catalogue.
+    const presentation = getPetStatusPresentation("HOLD_vet_check" as PetStatus);
+    expect(presentation.labelKey).toBe("common.statusUnknown");
+    expect(presentation.labelFallback).toBe("Status unknown");
   });
 });
 

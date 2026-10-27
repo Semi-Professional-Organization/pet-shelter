@@ -146,11 +146,11 @@ export interface PetStatusFilterOption {
 export function getPetStatusPresentation(status: PetStatus): PetStatusPresentation {
   if (isKnownPetStatus(status)) return PRESENTATIONS[TONE_BY_STATUS[normalizePetStatus(status)]];
   // A stored status the domain does not know (`fromDbPetStatus` passes it through). It fails
-  // closed with the pending tone, but is labelled as what it is: calling it "Pending" made the
-  // admin status control show two Pendings and hid the row staff need to correct.
-  // `isKnownPetStatus` is an own-key check, so `constructor` cannot pass for a known tone. The key
-  // has no dictionary entry on purpose: the label is the stored value, which has no translation.
-  return { ...PRESENTATIONS.pending, labelKey: "petStatus.unrecognised", labelFallback: String(status) };
+  // closed with the pending tone, but is labelled "Status unknown": calling it "Pending" made the
+  // admin status control show two Pendings and hid the row staff need to correct, and the raw
+  // stored text is not for the public catalogue. `isKnownPetStatus` is an own-key check, so
+  // `constructor` cannot pass for a known tone.
+  return { ...PRESENTATIONS.pending, labelKey: "common.statusUnknown", labelFallback: "Status unknown" };
 }
 
 /** Whether an animal accepts adoption applications, as the adoption form and gallery ask it.

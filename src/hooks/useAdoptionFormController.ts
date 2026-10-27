@@ -188,8 +188,9 @@ export function useAdoptionFormController({
   // `submitApplication` refuses it by name at the end. Re-syncing on refresh was tried and spawned
   // its own cases (a stale `selectedPet` snapshot, a transient empty list); upgrade path is to
   // re-check `petId` against the server when the applicant leaves the first step.
-  const activePetId = useWatch({ control, name: "petId" }) || fieldPet?.id;
-  const activePet = allPets.find((p) => p.id === activePetId) || selectedPet;
+  // The notice about a non-adoptable `selectedPet` gives way once the applicant has chosen.
+  const chosenPetId = useWatch({ control, name: "petId" });
+  const showUnavailableSelection = unavailableSelection && !chosenPetId ? unavailableSelection : null;
 
   const isFirstStep = stepIndex === 0;
   const isLastStep = stepIndex === ADOPTION_STEPS.length - 1;
@@ -264,8 +265,7 @@ export function useAdoptionFormController({
       availablePets,
       petOptions,
       defaultPet,
-      unavailableSelection,
-      activePet,
+      unavailableSelection: showUnavailableSelection,
       isSubmitted,
       submittedData,
       submissionError,

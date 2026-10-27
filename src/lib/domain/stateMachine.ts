@@ -48,15 +48,17 @@ export function isKnownPetStatus(status: string): status is PetStatus {
   return Object.hasOwn(PET_STATUS_ALIASES, status);
 }
 
+// Derived from the alias table rather than listed again, so a new status cannot be left out.
+const CANONICAL_PET_STATUSES = (Object.keys(PET_STATUS_ALIASES) as PetStatus[]).filter(
+  (s) => PET_STATUS_ALIASES[s] === s
+);
 
 /**
  * Legal moves out of a status. An unrecognised status may move to any canonical one: that is how
  * staff correct a corrupt row, and with no way out the animal would be stuck refused forever.
  */
 function transitionsFrom(from: PetStatus): PetStatus[] {
-  if (!isKnownPetStatus(from)) {
-    return (Object.keys(PET_STATUS_ALIASES) as PetStatus[]).filter((s) => PET_STATUS_ALIASES[s] === s);
-  }
+  if (!isKnownPetStatus(from)) return CANONICAL_PET_STATUSES;
   return PET_TRANSITION_GRAPH[from].map(normalizePetStatus);
 }
 

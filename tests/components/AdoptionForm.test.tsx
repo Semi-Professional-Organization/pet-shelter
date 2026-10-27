@@ -441,6 +441,11 @@ describe("AdoptionForm", () => {
       expect(petSelect().value).toBe("");
 
       await completeContactStepExpectingRefusal(user);
+
+      // The notice gives way once the applicant has chosen an adoptable animal.
+      await user.selectOptions(petSelect(), bella.id);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.queryByText(/please select an adoptable pet/i)).not.toBeInTheDocument();
     });
 
     it("keeps the applicant's pick when the animal list refreshes while the form is open", async () => {
