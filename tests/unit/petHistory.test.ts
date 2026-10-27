@@ -888,6 +888,8 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
 
       const saved = await updatePet(petId, omittedForm as typeof baseForm);
       expect(saved.success).toBe(true);
+      // The action reports the pet as stored, history included, not the history-less payload.
+      expect(saved.data?.medicalTimeline?.map((e) => e.id).sort()).toEqual(["tl-hist-1", "tl-hist-2"]);
 
       const stored = await getPetById(petId);
       expect(stored?.medicalTimeline?.map((e) => e.id).sort()).toEqual(["tl-hist-1", "tl-hist-2"]);

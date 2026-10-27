@@ -73,4 +73,18 @@ describe("usePetStore.updatePet history", () => {
     expect(saved.medicalTimeline ?? []).toEqual([]);
     expect(saved.updates ?? []).toEqual([]);
   });
+
+  it("replaces only the collection the edit submits", () => {
+    const { result } = renderHook(() => usePetStore());
+    const pet = result.current.pets.find((p) => p.id === "pet-009")!;
+    const [firstEvent] = pet.medicalTimeline!;
+
+    act(() => {
+      result.current.updatePet(pet.id, { ...formFrom(pet), medicalTimeline: [firstEvent] });
+    });
+
+    const saved = result.current.pets.find((p) => p.id === "pet-009")!;
+    expect(saved.medicalTimeline?.map((e) => e.id)).toEqual([firstEvent.id]);
+    expect(saved.updates?.map((u) => u.id).sort()).toEqual(pet.updates!.map((u) => u.id).sort());
+  });
 });

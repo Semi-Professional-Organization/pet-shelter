@@ -343,7 +343,10 @@ export async function updatePet(
       },
     });
 
-    const stored = (await updateServerPet(id, updated, actor, replaceHistory)) ?? updated;
+    const stored = await updateServerPet(id, updated, actor, replaceHistory);
+    if (!stored) {
+      return { success: false, error: "Pet not found" };
+    }
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
     // after editing a description, or reordering the existing gallery, notifies
