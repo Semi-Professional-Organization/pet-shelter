@@ -52,11 +52,15 @@ function lineEndingProblem(file) {
   if (!bytes.includes(0x0d)) return null;
   return (
     `${file} has Windows (CRLF) line endings in this working copy, which SOPS cannot parse.\n` +
-    `       If git tracks it, the committed copy is fine; restore it (keep a copy first if you edited it),\n` +
-    `       running each command on its own (git skips the file without the first):\n` +
-    `         git rm --cached -q "${file}"\n` +
-    `         git checkout HEAD -- "${file}"`
+    `       If git tracks it, the committed copy is fine. Keep a copy if you edited it, delete this\n` +
+    `       file, then restore it (git skips a file it thinks is unchanged, so delete it first):\n` +
+    `         git checkout -- "${file}"`
   );
+}
+
+/** Why a sops run failed: its stderr, else the spawn error or the signal. */
+function sopsFailure(result) {
+  return result.stderr?.trim() || result.error?.message || (result.signal ? `sops stopped by ${result.signal}` : "no output");
 }
 
 /** Exits 1 with the line-ending diagnosis before a CRLF file reaches `sops`. */
@@ -159,7 +163,7 @@ switch (command) {
           const keyCount = Object.keys(parsed).length;
           console.log(`[OK] Successfully decrypted and validated ${targetFile} (${keyCount} keys configured)`);
         } else {
-          console.error(`[FAIL] Decrypting ${targetFile} failed:\n${result.stderr ?? result.error?.message}`);
+          console.error(`[FAIL] Decrypting ${targetFile} failed:\n${sopsFailure(result)}`);
           failed = true;
         }
       } catch (e) {
@@ -199,7 +203,7 @@ switch (command) {
       encoding: "utf-8",
     });
     if (result.status !== 0) {
-      console.error(`Decryption failed:`, result.stderr);
+      console.error(`Decryption failed:`, sopsFailure(result));
       process.exit(1);
     }
     fs.writeFileSync(destFile, result.stdout, "utf-8");
@@ -236,7 +240,7 @@ switch (command) {
       encoding: "utf-8",
     });
     if (result.status !== 0) {
-      console.error(`Failed to decrypt ${encFile} for execution:`, result.stderr);
+      console.error(`Failed to decrypt ${encFile} for execution:`, sopsFailure(result));
       process.exit(1);
     }
 

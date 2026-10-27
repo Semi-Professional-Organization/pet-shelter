@@ -188,14 +188,13 @@ To enable GitHub Actions to decrypt secrets during testing or deployment:
 The working copy of `.env.production.enc` has Windows (CRLF) line endings. SOPS's dotenv parser
 splits on LF only, so every value keeps a carriage return and the timestamp fails first. The
 committed file is LF, and `.gitattributes` marks it `text eol=lf` so it is always checked out LF.
-A copy checked out before that rule is restored with the two git commands below, run separately
-(Windows PowerShell 5 has no `&&`). The first is needed: on its own, `git checkout` skips a file
-whose size and timestamp still match the index, so it would leave the CRLF copy in place. Neither
-command changes what is committed.
+A copy checked out before that rule is restored by deleting it and checking it out again. The
+delete is needed: on its own, `git checkout` skips a file whose size and timestamp still match the
+index, so it would leave the CRLF copy in place. Nothing is staged or committed.
 
 ```bash
-git rm --cached -q .env.production.enc
-git checkout HEAD -- .env.production.enc
+rm .env.production.enc          # PowerShell: Remove-Item .env.production.enc
+git checkout -- .env.production.enc
 npm run secrets:check
 ```
 

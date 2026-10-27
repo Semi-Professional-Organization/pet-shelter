@@ -23,7 +23,8 @@ something that looks like success. A green deployment is not evidence that the a
 
 `next build` compiles `instrumentation.ts` but never calls `register()`, which is why the two
 non-session secrets clear the build. At boot each is logged with `console.error`, naming the
-feature it disables; search the runtime log for `[security/secrets]` after a deploy
+feature it disables. On Vercel that is each function's cold start, so after a deploy load a page
+first, then search the runtime log for `[security/secrets]`
 (`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`). Only `SESSION_SECRET` is resolved at
 module scope, and only module scope runs during a build.
 

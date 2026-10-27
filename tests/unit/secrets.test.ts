@@ -198,8 +198,11 @@ describe("assertSecretsConfigured", () => {
       vi.stubEnv("SESSION_SECRET", STRONG_SESSION);
       vi.stubEnv("ADMIN_SECRET_KEY", STRONG_ADMIN);
       vi.stubEnv("STAFF_INVITE_SECRET", STRONG_INVITE);
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
       expect(() => assertSecretsConfigured()).not.toThrow();
+      // Nothing disabled: a wrongly refused strong key would log here, not throw.
+      expect(error).not.toHaveBeenCalled();
     });
 
     // Only the session secret may stop the boot
@@ -816,7 +819,7 @@ describe(".env.example authentication secrets", () => {
  * operator is told to copy from, and asserts the real policy — `resolveSecret`
  * itself must refuse each published value under `NODE_ENV=production`.
  */
-describe("no operator-facing file publishes a secret that boots in production", () => {
+describe("no operator-facing file publishes a secret production accepts", () => {
   // The app's own accessors, not a copy of their options, so this guard tests
   // exactly what production accepts. A short invite code now boots, so a
   // published one fails here; what the scan reads is set out in `collect`.
