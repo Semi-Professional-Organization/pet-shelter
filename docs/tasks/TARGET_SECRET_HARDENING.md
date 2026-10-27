@@ -104,6 +104,11 @@ Rejecting the alternatives, briefly:
 - **Lint rule banning literal fallbacks** — catches the pattern, not the live `"HOPE2026"` bypass,
   and says nothing at deploy time.
 
+> **Narrowed 2026-10-27.** Only `SESSION_SECRET` still fails the boot. A bad `ADMIN_SECRET_KEY` or
+> `STAFF_INVITE_SECRET` is reported at boot with `console.error` and disables only its own feature,
+> because failing the boot for them took every public page down on 2026-10-17. Each accessor still
+> refuses per call. See `tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`.
+
 ---
 
 ## 3. 🛠️ Plan

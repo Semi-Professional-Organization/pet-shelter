@@ -15,4 +15,29 @@ It is asserted from the error, but not yet independently measured, that a carria
 
 Do not normalize or re-encrypt the only copy while diagnosing. Preserve a backup, confirm the intended line-ending/encryption format, and prove successful decryption with the configured age key before replacing anything. Never record decrypted values in this ledger or command output.
 
+## 2026-10-27: cause found, two of three conditions met
+
+Measured, not asserted: the committed blob of `.env.production.enc` holds **no** carriage return
+(19 LF, 0 CR). The `\r` therefore comes from the working copy: `core.autocrlf=true` on the
+owner's Windows checkout converts the file to CRLF, and SOPS's dotenv parser splits on LF only,
+so `sops_lastmodified` keeps its `\r`. Nothing needs re-encrypting; the git copy is intact.
+
+- `.gitattributes` now marks the file `text eol=lf`, so it is always checked out LF and a CRLF
+  copy is normalised on `git add`. (`-text` was tried first; review found it let `git add` commit
+  the CRLF bytes.)
+- `scripts/secrets.mjs` refuses a CRLF copy by name in `check`, `decrypt-to-local` and `run`,
+  with the restore command, and `check` exits 1 on any `[FAIL]`.
+- `tests/unit/sopsConfig.test.ts` covers both with a fake `sops`, no key and no secret.
+
+**Found while fixing this, not fixed here** (no `sops` binary to verify against in the session):
+`secrets:edit` runs `sops <file>` without `--input-type dotenv`, so sops may pick a format from
+the `.enc` extension and fail to open the file at all; and on Windows `secrets:run -- npm ...`
+spawns `npm.cmd` without a shell, which current Node refuses (EINVAL). A shell fix must quote the
+arguments: `shell: true` alone joins them unquoted, so an `&` in a database URL splits the command.
+
+**Still open:** decrypting the real file with the configured age key. That needs the owner's key,
+on the owner's machine: delete the working copy of `.env.production.enc` (git skips the file
+otherwise), then `git checkout -- .env.production.enc`, then `npm run secrets:check` (it prints
+only a key count). Delete this entry when that passes.
+
 **Settles when:** the existing production environment can be decrypted with the configured age key, `npm run secrets:check` exits nonzero on a decryption failure, and a secret-free regression test covers the relevant CRLF/timestamp case.

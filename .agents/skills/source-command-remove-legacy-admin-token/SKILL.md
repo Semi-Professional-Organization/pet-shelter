@@ -39,8 +39,9 @@ removal would break a live path.
 ## Then the actual decision, before any code
 
 **What happens to `ADMIN_SECRET_KEY`?** `assertSecretsConfigured()`
-(`src/lib/security/secrets.ts`) requires it at boot, by design — §2 of the hardening target
-explicitly rejects lazy per-request validation. Once nothing reads it:
+(`src/lib/security/secrets.ts`) checks it at boot and logs a bad one, which disables the legacy
+cookie but no longer stops the boot (only `SESSION_SECRET` does, since 2026-10-27). Once nothing
+reads it:
 
 - drop it entirely (touches `secrets.ts`, `.sops.yaml`, the runbook, ~12 assertions in
   `tests/unit/secrets.test.ts`);

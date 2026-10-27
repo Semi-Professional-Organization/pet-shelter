@@ -24,7 +24,7 @@ This runbook documents the secrets management workflow for the `pet-shelter` rep
 
 ### Core Security Invariants
 1. **Zero Plaintext Secrets in Git**: Plaintext `.env` and `.env.local` files are gitignored.
-2. **Strict Boot Validation**: Secrets loaded into production must satisfy the entropy and policy checks in `src/lib/security/secrets.ts` via `assertSecretsConfigured()`.
+2. **Strict Boot Validation**: Secrets loaded into production must satisfy the entropy and policy checks in `src/lib/security/secrets.ts`, which `assertSecretsConfigured()` runs at boot. A bad `SESSION_SECRET` stops the boot; a bad `ADMIN_SECRET_KEY` or `STAFF_INVITE_SECRET` is logged and disables only its own feature.
 3. **Decentralized Access**: Multiple team members and CI/CD runners can have distinct `age` keys listed in `.sops.yaml`.
 
 ---
@@ -180,3 +180,23 @@ To enable GitHub Actions to decrypt secrets during testing or deployment:
 2. Change the secret (e.g. `SESSION_SECRET` or `DATABASE_URL`).
 3. Save and commit `.env.production.enc`.
 4. Deploy the updated build to production.
+
+---
+
+## Troubleshooting: `parsing time "...Z\x0d"`
+
+The working copy of `.env.production.enc` has Windows (CRLF) line endings. SOPS's dotenv parser
+splits on LF only, so every value keeps a carriage return and the timestamp fails first. The
+committed file is LF, and `.gitattributes` marks it `text eol=lf` so it is always checked out LF.
+A copy checked out before that rule is restored by deleting it and checking it out again. The
+delete is needed: on its own, `git checkout` skips a file whose size and timestamp still match the
+index, so it would leave the CRLF copy in place. Nothing is staged or committed.
+
+```bash
+rm .env.production.enc          # PowerShell: Remove-Item .env.production.enc
+git checkout -- .env.production.enc
+npm run secrets:check
+```
+
+`secrets:check` refuses a CRLF copy by name and exits 1 on any `[FAIL]`. Never re-encrypt or
+hand-convert the file to fix this: it is ciphertext, and the git copy is the backup.
