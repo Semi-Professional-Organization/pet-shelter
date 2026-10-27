@@ -232,7 +232,9 @@ describe("an adoption application is never acknowledged without a database row (
     const result = await submitApplication(application());
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/adoption records are unavailable/i);
+    // Not "nothing was submitted": a commit followed by a lost connection lands here too.
+    expect(result.error).toMatch(/could not confirm that your application was saved/i);
+    expect(result.error).not.toMatch(/nothing was submitted/i);
     expect(double.adoptionApplication.create).toHaveBeenCalled();
     expect(getServerApplications()).toHaveLength(before);
   });

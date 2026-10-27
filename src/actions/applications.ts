@@ -66,11 +66,18 @@ export async function getApplications(): Promise<AdoptionApplicationRecord[]> {
 const MAX_REFERENCE_CODE_ATTEMPTS = 5;
 
 /**
- * What an applicant is told when the database could not be read or written. Nothing was
- * saved, so it asks for a retry rather than quoting a reference code.
+ * What an applicant is told when the animal could not be read. Nothing was written, so it
+ * says so and asks for a retry.
  */
 const APPLICATION_STORE_UNAVAILABLE_MESSAGE =
-  "We could not save your application because our adoption records are unavailable right now. Nothing was submitted; please try again in a few minutes.";
+  "We could not submit your application because our adoption records are unavailable right now. Nothing was submitted; please try again in a few minutes.";
+
+/**
+ * What an applicant is told when the insert failed. A connection lost after Postgres committed
+ * also lands here, so this cannot claim nothing was saved; it says what is known instead.
+ */
+const APPLICATION_WRITE_UNCONFIRMED_MESSAGE =
+  "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes; if it turns out both attempts were saved, the shelter will treat them as one application.";
 
 /**
  * True for a unique violation that names the `referenceCode` index.
@@ -288,7 +295,7 @@ export async function submitApplication(
     // instead of replaying this failure.
     // The repository has already logged the cause.
     if (err instanceof ApplicationWriteError) {
-      return { success: false, error: APPLICATION_STORE_UNAVAILABLE_MESSAGE };
+      return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
     }
     const msg = err instanceof Error ? err.message : "Failed to submit adoption application";
     return { success: false, error: msg };

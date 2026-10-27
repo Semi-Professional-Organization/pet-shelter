@@ -15,7 +15,9 @@ When a database is configured and a pet read fails outside strict mode,
   told nothing was recorded and to try again.
 - **An application insert that a configured database refused fails the submission.**
   `insertServerApplication` throws `ApplicationWriteError` instead of mirroring the record, so no
-  reference code is handed out for a row that no database holds. A foreign-key miss (P2003) is
+  reference code is handed out for a row that no database holds. The applicant is told the save
+  could not be confirmed, not that nothing was saved: a connection lost after the commit lands
+  here too, and a retry may then leave two rows for staff to merge. A foreign-key miss (P2003) is
   refused too, not retried with `petId: null`: the animal was read from the database a moment
   earlier, so it needs a hard delete inside that window, and a clear refusal beats an application
   quietly detached from its animal.

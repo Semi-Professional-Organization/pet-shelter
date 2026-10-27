@@ -149,7 +149,7 @@ export async function createPetSponsorshipAction(
   } catch (err) {
     // Both lookups run before any write, so nothing was recorded: the "could not record"
     // message, not the "could not confirm" one.
-    console.error("[Sponsorship Checkout] Identity lookup failed:", err);
+    console.error("[Sponsorship Checkout] Pet or sponsor lookup failed:", err);
     return { success: false, error: SPONSORSHIP_RECORDING_FAILURE_MESSAGE };
   }
   if (!pet) {
