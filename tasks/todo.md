@@ -25,11 +25,12 @@ Record active multi-step work streams below.
 
 ## Review
 
-`/code-review xhigh` on #197, at the owner's request. Fixed: the squash body is set by hand, since
-the repo's default would carry the already-shipped #195 commit into it; the stale open entry is
+`/code-review xhigh` on #197, at the owner's request. Fixed: the squash body is drafted in the PR
+description and used at merge, since the repo's default would carry the already-shipped #195
+commit and two superseded messages into it; the stale open entry is
 updated; the group summary now covers the issue and ledger scripts. 77c2960's message says #182
 appeared after the grouping ran; it came from the ledger sync that ran alongside the first
-`--apply`, nine seconds before #183, and the hand-set squash body says so. Round 2 found the entry
+`--apply`, nine seconds before #183, and the drafted squash body says so. Round 2 found the entry
 crediting the sync with closing #157: #195's body ("the ledger sync closes #157") was a closing
 keyword, so GitHub closed it. Fixed; any PR body naming an issue after "closes" does the same.
 

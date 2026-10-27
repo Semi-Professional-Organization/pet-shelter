@@ -5,8 +5,9 @@
 Each mirrored `tasks/open` entry (every top-level entry except session claims and hand-offs, which
 `scripts/ledger-issues.mjs` skips) becomes a GitHub issue only after its pull request merges, when
 the ledger sync runs on master. `.github/issue-groups.json` names issues by number, so the pull
-request that adds an entry cannot group it: the issue does not exist yet. Every new entry's issue
-therefore sits in no group, listed by every `npm run issues:groups` dry run, until a later pull
+request that adds an entry cannot group it: the issue does not exist yet. (An entry re-added at a
+path that had a mirror before reopens that issue, which keeps any parent it had.) A new entry's
+issue therefore sits in no group, listed by every `npm run issues:groups` dry run, until a later pull
 request adds its number and someone runs `--apply`. #182 waited six days this way.
 
 Declined in #197 as new behaviour beyond that PR. A shape that works: let an entry name its group in
