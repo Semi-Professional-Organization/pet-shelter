@@ -181,8 +181,8 @@ export async function submitApplication(
     }
     if (!isKnownPetStatus(pet.status)) {
       // A stored status the mapper did not recognise. It reaches here unchanged rather than as
-      // Available, and gets its own message: the presentation fallback would label it "Pending",
-      // which is not what the row says.
+      // Available. `isAdoptable` below would refuse it too, but with the raw stored value as the
+      // reason; the applicant gets a sentence instead.
       return {
         success: false,
         error: `We cannot confirm ${pet.name}'s adoption status right now, so we cannot accept an application for them. Please contact the shelter.`,

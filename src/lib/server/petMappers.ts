@@ -12,17 +12,23 @@ import {
 } from "@/lib/domain/petAge";
 
 /**
- * Converts a domain PetStatus into the Prisma database enum.
- * Normalizes legacy aliases (e.g. "Rehabilitation" -> In_Rehabilitation).
+ * Refuses an unrecognised status before it is written. Writes used to default it to Available, so
+ * saving an animal read with an unrecognised status wrote it back as adoptable.
  */
-export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
-  // Refused rather than defaulted. The default used to be Available, so saving an animal that was
-  // read with an unrecognised status wrote it back as adoptable.
+export function assertKnownPetStatus(status: Pet["status"]): void {
   if (!isKnownPetStatus(status)) {
     throw new DomainValidationError(
       `'${status}' is not a recognised pet status. Choose Available, Pending, Adopted or In Rehabilitation.`
     );
   }
+}
+
+/**
+ * Converts a domain PetStatus into the Prisma database enum.
+ * Normalizes legacy aliases (e.g. "Rehabilitation" -> In_Rehabilitation).
+ */
+export function toDbPetStatus(status: Pet["status"]): PrismaPetStatus {
+  assertKnownPetStatus(status);
   const norm = normalizePetStatus(status);
   if (norm === "In Rehabilitation") return PrismaPetStatus.In_Rehabilitation;
   if (norm === "Pending") return PrismaPetStatus.Pending;

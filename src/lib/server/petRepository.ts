@@ -11,7 +11,7 @@ import {
   buildPetCreatePayload,
   buildPetUpdatePayload,
   mapDbPetToPet,
-  toDbPetStatus,
+  assertKnownPetStatus,
 } from "./petMappers";
 import { registerStateReset } from "@/lib/stateResets";
 
@@ -228,16 +228,9 @@ export function markCachedPetAdopted(petId: string, petName: string): Pet | null
   return adopted;
 }
 
-/**
- * Refuses an unrecognised status before the write. `toDbPetStatus` refuses it too, but inside the
- * persistence `try`, where `handlePersistenceError` would swallow the refusal outside strict mode
- * and the mirror would take the pet anyway.
- */
-function assertKnownPetStatus(status: Pet["status"]): void {
-  toDbPetStatus(status);
-}
-
 export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<void> {
+  // Before the `try`: `handlePersistenceError` would swallow the refusal outside strict mode and
+  // the mirror would take the pet anyway.
   assertKnownPetStatus(newPet.status);
   // DB first: a refused write must not leave the mirror ahead of the database.
   try {
@@ -274,7 +267,7 @@ export async function updateServerPet(id: string, updated: Pet, actor: SessionUs
     validatePetTransition(previous.status, updated.status);
   }
 
-  assertKnownPetStatus(updated.status);
+  assertKnownPetStatus(updated.status); // before the `try`, as in `insertServerPet`
   try {
     await prisma.$transaction([
       prisma.petUpdate.deleteMany({ where: { petId: id } }),

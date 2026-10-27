@@ -457,6 +457,24 @@ describe("AdoptionForm", () => {
       expect(petSelect().value).toBe(coco.id);
     });
 
+    it("reopened for another animal after a submission, starts a fresh form for that animal", async () => {
+      // The confirmation used to be cleared by a `reset()` on a timer after close, which a quick
+      // reopen could beat (and an Escape close, which bypasses the wizard's own close, never ran).
+      const bella = makePet({ name: "Bella", status: "Available" });
+      const max = makePet({ name: "Max", status: "Available" });
+      const props = { allPets: [bella, max], onOpenChange: vi.fn() };
+      const { rerender } = renderWithLanguage(<AdoptionWizard {...props} selectedPet={bella} open />);
+      await submitCompletedApplication(setupUser());
+      expect(await screen.findByText(/application submitted/i)).toBeInTheDocument();
+
+      rerender(<AdoptionWizard {...props} selectedPet={bella} open={false} />);
+      rerender(<AdoptionWizard {...props} selectedPet={max} open />);
+
+      expect(screen.queryByText(/application submitted/i)).not.toBeInTheDocument();
+      expect(petSelect().value).toBe(max.id);
+      expect(screen.getByLabelText(/full name/i)).toHaveValue("");
+    });
+
     it("reopened on nobody within the close animation, submits for the animal its title names", async () => {
       // The wizard stays mounted while the dialog animates closed, so this drives it directly
       // through close and reopen. The second opening passes `selectedPet = null`, and the old

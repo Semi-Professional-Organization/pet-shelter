@@ -164,12 +164,26 @@ export function useAdoptionFormController({
   //
   // Keyed on the opening (and an explicit change of `selectedPet`), not on `fieldPet`: a refresh
   // of `allPets` while the form is open must not overwrite an animal the applicant picked.
+  //
+  // A finished submission is cleared here, on the next opening, rather than on a timer after close:
+  // the timer's `reset()` could land after a quick reopen had set the field, and put back the
+  // animal captured at mount.
   const applyFieldPet = useEffectEvent(() => {
+    if (isSubmitted) {
+      setIsSubmitted(false);
+      setSubmissionError(null);
+      setReferenceCode(null);
+      setStepIndex(0);
+      reset();
+    }
     setValue("petId", fieldPet?.id ?? "");
     setValue("petName", fieldPet?.name ?? "");
   });
   const selectedPetId = selectedPet?.id;
   useEffect(() => {
+    // Runs once per opening, not per render, so the state it clears cannot cascade; and the form
+    // values it resets live in react-hook-form, which only an effect may touch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open) applyFieldPet();
   }, [open, selectedPetId]);
 
@@ -239,17 +253,9 @@ export function useAdoptionFormController({
 
   const handleClose = () => {
     onOpenChange(false);
-    if (isSubmitted) {
-      setTimeout(() => {
-        setIsSubmitted(false);
-        setSubmissionError(null);
-        setReferenceCode(null);
-        setStepIndex(0);
-        reset();
-      }, 200);
-    } else {
-      setSubmissionError(null);
-    }
+    // A submitted form keeps its confirmation through the close animation; the next opening
+    // clears it (see `applyFieldPet`).
+    if (!isSubmitted) setSubmissionError(null);
   };
 
   return {
