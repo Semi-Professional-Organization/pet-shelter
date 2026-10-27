@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { DEV_SECRET_DEFAULTS } from "@/lib/security/secrets";
 
@@ -52,5 +54,132 @@ describe("SOPS & age Configuration Guards", () => {
   it("ensures scripts/secrets.mjs exists and is executable", () => {
     const scriptPath = path.join(rootDir, "scripts", "secrets.mjs");
     expect(fs.existsSync(scriptPath)).toBe(true);
+  });
+});
+// #69, on every platform: Windows with core.autocrlf=true is where it happens.
+describe("the committed encrypted environment file", () => {
+  const rootDir = path.resolve(__dirname, "../../");
+  const ENC = ".env.production.enc";
+
+  // The index and the attribute, not the working copy: a copy checked out
+  // before the rule stays CRLF until restored, which `secrets:check` reports.
+  it("is LF in git and marked eol=lf", () => {
+    const blob = execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir });
+    expect(blob.includes(0x0d)).toBe(false);
+    const attr = execFileSync("git", ["check-attr", "eol", "--", ENC], { cwd: rootDir, encoding: "utf-8" });
+    expect(attr.trim()).toBe(`${ENC}: eol: lf`);
+  });
+});
+
+/**
+ * #69: `npm run secrets:check` printed `parsing time "...Z\x0d"` and exited 0.
+ * The `\r` came from a CRLF working copy (`core.autocrlf=true`); SOPS's dotenv
+ * parser splits on LF only. A fake `sops` stands in for the real one, so these
+ * need no key and no secret.
+ *
+ * ceiling: POSIX only, because the fake is a shell script; Windows runs the
+ * git-level test above but not these. Upgrade path: a `sops.cmd` fake.
+ */
+describe.skipIf(process.platform === "win32")("secrets:check", () => {
+  const rootDir = path.resolve(__dirname, "../../");
+  const ENC = ".env.production.enc";
+  let dir: string;
+  let calls: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sops-check-"));
+    calls = path.join(dir, "calls.log");
+    // `--version` succeeds; a decrypt fails with the error #69 recorded.
+    fs.writeFileSync(
+      path.join(dir, "sops"),
+      [
+        "#!/bin/sh",
+        `echo "$@" >> "${calls}"`,
+        'if [ "$1" = "--version" ]; then echo "sops 3.9.4"; exit 0; fi',
+        'if [ -n "$FAKE_SOPS_OK" ]; then printf "A=1\\nB=2\\n"; exit 0; fi',
+        `echo 'parsing time "2026-08-27T16:18:08Z\\x0d": extra text: "\\x0d"' >&2`,
+        "exit 1",
+      ].join("\n"),
+      { mode: 0o755 }
+    );
+  });
+
+  afterEach(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  function secrets(args: string[], extraEnv: Record<string, string> = {}) {
+    return spawnSync(process.execPath, [path.join(rootDir, "scripts", "secrets.mjs"), ...args], {
+      cwd: rootDir,
+      encoding: "utf-8",
+      env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, SOPS_AGE_KEY: "unused", ...extraEnv },
+    });
+  }
+
+  function check(file: string, extraEnv: Record<string, string> = {}) {
+    return secrets(["check", file], extraEnv);
+  }
+
+  function crlfCopy() {
+    const crlf = path.join(dir, "crlf.enc");
+    fs.writeFileSync(crlf, fs.readFileSync(path.join(rootDir, ENC)).toString("latin1").replace(/\n/g, "\r\n"), "latin1");
+    return crlf;
+  }
+
+  function committedCopy() {
+    // The committed blob, not the working copy, which may predate the eol rule.
+    const committed = path.join(dir, "committed.enc");
+    fs.writeFileSync(committed, execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir }));
+    return committed;
+  }
+
+  it("exits zero and prints only a key count when decryption works", () => {
+    const result = check(committedCopy(), { FAKE_SOPS_OK: "1" });
+
+    expect(result.stdout).toMatch(/\[OK\] Successfully decrypted .* \(2 keys configured\)/);
+    expect(result.stdout).not.toMatch(/A=1/);
+    expect(result.status).toBe(0);
+  });
+
+  it("exits nonzero when a named file does not exist", () => {
+    const result = check(path.join(dir, "missing.enc"));
+
+    expect(result.stderr).toMatch(/\[FAIL\] .*missing\.enc does not exist/);
+    expect(result.status).toBe(1);
+  });
+
+  it("exits nonzero when decryption fails", () => {
+    const result = check(committedCopy());
+
+    expect(result.stderr).toMatch(/\[FAIL\] Decrypting/);
+    expect(result.status).toBe(1);
+  });
+
+  it("refuses a CRLF copy by name, without handing it to sops", () => {
+    const result = check(crlfCopy());
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/CRLF\) line endings/);
+    expect(fs.readFileSync(calls, "utf-8")).not.toMatch(/--decrypt/);
+  });
+  // The destination sits in the temp dir, so a regressed guard cannot
+  // overwrite the checkout's .env.local.
+  it.each([
+    ["decrypt-to-local", (file: string, out: string) => ["decrypt-to-local", file, out]],
+    ["run", (file: string) => ["run", file, "--", process.execPath, "-e", ""]],
+  ])("%s refuses a CRLF copy before calling sops", (_name, argsFor) => {
+    const result = secrets(argsFor(crlfCopy(), path.join(dir, "out.env")), { FAKE_SOPS_OK: "1" });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/CRLF\) line endings/);
+    expect(fs.existsSync(calls) ? fs.readFileSync(calls, "utf-8") : "").not.toMatch(/--decrypt/);
+    expect(fs.existsSync(path.join(dir, "out.env"))).toBe(false);
+  });
+
+  it("run exits nonzero when the command cannot start", () => {
+    const result = secrets(["run", committedCopy(), "--", path.join(dir, "no-such-command")], { FAKE_SOPS_OK: "1" });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(/ENOENT/);
   });
 });

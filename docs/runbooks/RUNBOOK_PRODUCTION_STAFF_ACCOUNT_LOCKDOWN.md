@@ -20,7 +20,7 @@ Confirmed by the owner, not observed from the repo:
 |---|---|---|
 | `DATABASE_URL` | Set; the Neon production branch (`ep-broad-band-…`); working | Suspending a row ends a live session on its **next request** wherever the app checks through `getVerifiedSession()`, which re-reads status. Not everywhere — see below |
 | `RESEND_API_KEY` | **Not set** | Every email is simulated and delivered to nobody — see §2 |
-| `STAFF_INVITE_SECRET` | Set (production refuses to boot without it) | "Create Account" on `/admin/login` works for anyone holding the value |
+| `STAFF_INVITE_SECRET` | Set (without it, production disables staff registration and logs why at boot) | "Create Account" on `/admin/login` works for anyone holding the value |
 | `SESSION_SECRET` | Not rotated — **owner's decision of 2026-09-17**, made before the gap below was known | Accepts the 24-hour window described below. **Reconsider:** rotating is the only thing that closes it |
 
 **What suspension and the code fix do not close.** A seeded-account cookie issued before

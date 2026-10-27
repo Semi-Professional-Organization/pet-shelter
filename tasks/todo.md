@@ -36,6 +36,28 @@ six in-scope defects (fixed), that one (logged), and two declined: dangling link
 `open/` entries inside older decisions (decisions are never rewritten) and a third copy of the
 adoptable predicate in `PetGallery.tsx` (outside the change).
 
+# Secrets: one weak secret no longer takes the site down; SOPS CRLF
+
+**Branch:** `claude/secrets-boot-and-sops-crlf` · opened 2026-10-27 · base `91205dd` · #129, #69
+
+- **Done when:** a bad `ADMIN_SECRET_KEY` or `STAFF_INVITE_SECRET` no longer stops the boot;
+  `secrets:check` exits nonzero on failure; a CRLF working copy can no longer happen or is
+  refused by name; tests cover both without a secret; every gate is green.
+- **In scope:** `secrets.ts` boot check, `registerAction`'s invite read, `scripts/secrets.mjs`,
+  `.gitattributes`, their tests, the runbook note, the ledger.
+- **Out of scope:** the per-process rate limiter (shared state is its own change); rotating any
+  secret; re-encrypting `.env.production.enc` (not needed: the committed blob is LF).
+
+## Review
+
+- [x] Only `SESSION_SECRET` is fatal at boot; the other two are logged with the feature they
+      disable (`tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`).
+- [x] `.env.production.enc` is `text eol=lf`; `secrets.mjs` refuses CRLF and `check` exits 1 on `[FAIL]`.
+- [ ] Decrypting the real file with the owner's age key: owner's machine only, kept open in
+      `tasks/open/sops-encrypted-env-timestamp-crlf-breaks-decryption.md`.
+- Deliberately not done: catching the CRLF case by stripping `\r` in memory before calling
+  `sops`. It would hide a checkout that git should not have produced; refusing names the fix.
+
 # Outage fallback off the write and payment paths
 
 **Branch:** `claude/outage-refuses-writes-on-fixture-animals` · opened 2026-10-27 · base `91205dd`
@@ -655,7 +677,7 @@ Mutants are tabulated in the decision entry.
 
 - No minimum length: the owner's choice.
 - Not limiting a weak secret's damage to the feature it gates (option 2): the better design,
-  but not chosen. It is tracked in `tasks/open/one-weak-secret-still-takes-the-whole-site-down.md`.
+  but not chosen. It was taken on 2026-10-27: `tasks/decisions/2026-10-27-only-the-session-secret-can-stop-the-boot.md`.
 - The rate limiter stays per-process, so it does not bound guessing on serverless hosts.
 - Quoted invite codes of 8-15 characters inside prose are not scanned by the guard; that is the
   stated ceiling.

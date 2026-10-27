@@ -119,7 +119,7 @@ Some repositories already contained dangling Git objects, and the local `git` re
 
 1. `npm audit` reported six vulnerabilities: five high and one moderate, involving the direct `prisma` dependency and transitive packages including `@prisma/config`, `deepmerge-ts`, `mysql2`, `fast-uri`, and `qs`. The proposed Prisma remediation was a semver-major downgrade to `6.19.3`, so no automatic audit fix was applied. Review upgrades deliberately.
 2. Package install-script approvals remain pending for `@prisma/engines`, `esbuild`, `prisma`, and `unrs-resolver`. Resolve them through the repository's package-manager policy rather than blanket-enabling scripts.
-3. `npm run secrets:check` printed a decryption failure for `.env.production.enc` because a timestamp contained a carriage return, yet exited with code 0. This is tracked in `tasks/open/sops-encrypted-env-timestamp-crlf-breaks-decryption.md`.
+3. `npm run secrets:check` printed a decryption failure for `.env.production.enc` because a timestamp contained a carriage return, yet exited with code 0. Since 2026-10-27 it exits 1 and names the cause (a CRLF working copy); what remains is tracked in `tasks/open/sops-encrypted-env-timestamp-crlf-breaks-decryption.md`.
 
 ## Operating rules
 

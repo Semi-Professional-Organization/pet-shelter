@@ -34,6 +34,43 @@ function findSopsBinary() {
 
 const SOPS_BIN = findSopsBinary();
 
+/**
+ * Refuses an encrypted file that carries a carriage return. SOPS's dotenv parser
+ * splits on LF only, so a CRLF checkout (`core.autocrlf=true` on Windows) leaves
+ * `\r` on every value and decryption fails with `parsing time "...Z\x0d"`. The
+ * committed blob is LF and `.gitattributes` keeps it so; this names the cause
+ * for a working copy checked out before that rule. It never rewrites the file:
+ * it is ciphertext, and the git blob is the copy to restore from.
+ */
+function lineEndingProblem(file) {
+  let bytes;
+  try {
+    bytes = fs.readFileSync(file);
+  } catch (e) {
+    return `${file} cannot be read: ${e.code ?? e.message}`;
+  }
+  if (!bytes.includes(0x0d)) return null;
+  return (
+    `${file} has Windows (CRLF) line endings in this working copy, which SOPS cannot parse.\n` +
+    `       If git tracks it, the committed copy is fine. Keep a copy if you edited it, delete this\n` +
+    `       file, then restore it (git skips a file it thinks is unchanged, so delete it first):\n` +
+    `         git checkout -- "${file}"`
+  );
+}
+
+/** Why a sops run failed: its stderr, else the spawn error or the signal. */
+function sopsFailure(result) {
+  return result.stderr?.trim() || result.error?.message || (result.signal ? `sops stopped by ${result.signal}` : "no output");
+}
+
+/** Exits 1 with the line-ending diagnosis before a CRLF file reaches `sops`. */
+function refuseCrlf(file) {
+  const problem = lineEndingProblem(file);
+  if (!problem) return;
+  console.error(problem);
+  process.exit(1);
+}
+
 function parseDotenv(content) {
   const env = {};
   const lines = content.split(/\r?\n/);
@@ -75,6 +112,8 @@ const command = process.argv[2] || "check";
 switch (command) {
   case "check": {
     const targetFile = process.argv[3] || ".env.production.enc";
+    // Every [FAIL] sets this, so automation cannot read a failed check as a pass.
+    let failed = false;
     console.log("=== SOPS & age Status Check ===");
     // 1. Check SOPS binary
     try {
@@ -99,10 +138,22 @@ switch (command) {
       console.log(`[OK] .sops.yaml config file found`);
     } else {
       console.error(`[FAIL] .sops.yaml configuration file missing in root.`);
+      failed = true;
     }
 
-    // 4. Test decrypting target file if it exists
-    if (fs.existsSync(targetFile)) {
+    // 4. Test decrypting target file if it exists. Missing is a failure only
+    // when a file was named: the default may not exist yet on a first setup.
+    const exists = fs.existsSync(targetFile);
+    const crlf = exists && lineEndingProblem(targetFile);
+    if (!exists && process.argv[3]) {
+      console.error(`[FAIL] ${targetFile} does not exist.`);
+      failed = true;
+    } else if (!exists) {
+      console.log(`[INFO] Target file ${targetFile} does not exist yet.`);
+    } else if (crlf) {
+      console.error(`[FAIL] ${crlf}`);
+      failed = true;
+    } else {
       try {
         const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", targetFile], {
           encoding: "utf-8",
@@ -112,14 +163,16 @@ switch (command) {
           const keyCount = Object.keys(parsed).length;
           console.log(`[OK] Successfully decrypted and validated ${targetFile} (${keyCount} keys configured)`);
         } else {
-          console.error(`[FAIL] Decrypting ${targetFile} failed:\n${result.stderr}`);
+          console.error(`[FAIL] Decrypting ${targetFile} failed:\n${sopsFailure(result)}`);
+          failed = true;
         }
       } catch (e) {
         console.error(`[FAIL] Error decrypting ${targetFile}:`, e.message);
+        failed = true;
       }
-    } else {
-      console.log(`[INFO] Target file ${targetFile} does not exist yet.`);
     }
+    // exitCode, not exit(): lets Node flush piped stdout/stderr first.
+    process.exitCode = failed ? 1 : 0;
     break;
   }
 
@@ -131,7 +184,9 @@ switch (command) {
     }
     console.log(`Opening ${fileToEdit} with SOPS editor...`);
     const proc = spawnSync(SOPS_BIN, [fileToEdit], { stdio: "inherit" });
-    process.exit(proc.status ?? 0);
+    if (proc.error) console.error(proc.error.message);
+    if (proc.signal) console.error(`Stopped by ${proc.signal}.`);
+    process.exit(proc.status ?? 1);
     break;
   }
 
@@ -142,12 +197,13 @@ switch (command) {
       console.error(`Encrypted source file ${sourceEncFile} not found.`);
       process.exit(1);
     }
+    refuseCrlf(sourceEncFile);
     console.log(`Decrypting ${sourceEncFile} -> ${destFile}...`);
     const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", sourceEncFile], {
       encoding: "utf-8",
     });
     if (result.status !== 0) {
-      console.error(`Decryption failed:`, result.stderr);
+      console.error(`Decryption failed:`, sopsFailure(result));
       process.exit(1);
     }
     fs.writeFileSync(destFile, result.stdout, "utf-8");
@@ -178,12 +234,13 @@ switch (command) {
       console.error(`Encrypted file ${encFile} not found.`);
       process.exit(1);
     }
+    refuseCrlf(encFile);
 
     const result = spawnSync(SOPS_BIN, ["--decrypt", "--input-type", "dotenv", "--output-type", "dotenv", encFile], {
       encoding: "utf-8",
     });
     if (result.status !== 0) {
-      console.error(`Failed to decrypt ${encFile} for execution:`, result.stderr);
+      console.error(`Failed to decrypt ${encFile} for execution:`, sopsFailure(result));
       process.exit(1);
     }
 
@@ -202,7 +259,9 @@ switch (command) {
       stdio: "inherit",
       env: injectedEnv,
     });
-    process.exit(proc.status ?? 0);
+    if (proc.error) console.error(proc.error.message);
+    if (proc.signal) console.error(`Stopped by ${proc.signal}.`);
+    process.exit(proc.status ?? 1);
     break;
   }
 

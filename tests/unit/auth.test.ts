@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { loginAction, registerAction, logoutAction, getCurrentUserAction } from "@/actions/auth";
-import { resetUserStore } from "@/lib/server/userStore";
+import { findUserByEmail, resetUserStore } from "@/lib/server/userStore";
 import { ROLES } from "@/lib/security/rbac";
-import { SecretConfigurationError } from "@/lib/security/secrets";
 
 // The configured invite secret for this suite. Deliberately not "1234" or
 // "HOPE2026" so the regression tests below prove those literals are dead.
@@ -36,6 +35,7 @@ describe("Authentication Server Actions (Native Register & Login)", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   describe("loginAction", () => {
@@ -301,18 +301,46 @@ describe("Authentication Server Actions (Native Register & Login)", () => {
     it("must fail closed, not open, when STAFF_INVITE_SECRET is unset in production", async () => {
       vi.stubEnv("NODE_ENV", "production");
       vi.stubEnv("STAFF_INVITE_SECRET", undefined);
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      await expect(
-        registerAction({
-          name: "Misconfigured Deploy",
-          email: "misconfigured@test.com",
-          password: "ValidPassword123!",
-          role: ROLES.STAFF,
-          staffInviteCode: "any-guess",
-        })
-      ).rejects.toBeInstanceOf(SecretConfigurationError);
+      // Disabled, not thrown: the boot no longer stops for this secret, so the
+      // action itself is where a bad one must refuse, and say so.
+      const res = await registerAction({
+        name: "Misconfigured Deploy",
+        email: "misconfigured@test.com",
+        password: "ValidPassword123!",
+        role: ROLES.STAFF,
+        staffInviteCode: "any-guess",
+      });
 
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/Staff registration is unavailable/);
       expect(cookieStore.get("hope_shelter_session")).toBeUndefined();
+    });
+
+    // The site now boots with a published invite secret, so the action is the
+    // only guard: submitting that same published code must create nothing.
+    it("creates no account in production when the invite secret is published and matched", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("STAFF_INVITE_SECRET", "HOPE2026");
+      const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const res = await registerAction({
+        name: "Published Code",
+        email: "published-code@test.com",
+        password: "ValidPassword123!",
+        role: ROLES.STAFF,
+        staffInviteCode: "HOPE2026",
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.error).toMatch(/Staff registration is unavailable/);
+      expect(await findUserByEmail("published-code@test.com")).toBeFalsy();
+      expect(cookieStore.get("hope_shelter_session")).toBeUndefined();
+      // Logged per request with the reason, never the value.
+      const logged = error.mock.calls.flat().join(" ");
+      expect(logged).toMatch(/Staff registration refused: STAFF_INVITE_SECRET is set to a value this repository publishes/);
+      expect(logged).not.toMatch(/hope2026/i);
     });
 
     it("should honour a rotated STAFF_INVITE_SECRET at call time", async () => {

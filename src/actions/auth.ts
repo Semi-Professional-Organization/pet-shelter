@@ -13,7 +13,7 @@ import { getVerifiedSession } from "@/lib/security/dal";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { findUserByEmail, createUser, UserRecord } from "@/lib/server/userStore";
 import { Role, ROLES, normalizeRole } from "@/lib/security/rbac";
-import { getStaffInviteSecret } from "@/lib/security/secrets";
+import { SecretConfigurationError, getStaffInviteSecret } from "@/lib/security/secrets";
 import { recordLogin } from "@/lib/server/memberStore";
 import { USER_STATUSES } from "@/lib/security/permissions";
 import { isPublishedStaffPassword, PUBLISHED_PASSWORD_MESSAGE } from "@/lib/security/publishedPasswords";
@@ -259,8 +259,25 @@ export async function registerAction(data: {
   // 2. Invite Guard — required for EVERY role.
   // A shelter has no anonymous-staff use case, and the default STAFF role is
   // authorized for getApplications(), which returns applicant PII (PDPA 2010).
+  //
+  // In production a weak or unset STAFF_INVITE_SECRET disables registration
+  // here, and only here: the boot logs it and keeps serving the public site
+  // (`assertSecretsConfigured`). Nothing is created; the caller is told why.
+  let inviteSecret: string;
+  try {
+    inviteSecret = getStaffInviteSecret();
+  } catch (error) {
+    if (!(error instanceof SecretConfigurationError)) throw error;
+    // Per request, not only at boot: a cold-start line is easy to miss. The
+    // message never carries the value.
+    console.error(`[security/secrets] Staff registration refused: ${error.message}`);
+    return {
+      success: false,
+      error: "Staff registration is unavailable right now. Please contact a shelter administrator.",
+    };
+  }
   const inviteCode = (data.staffInviteCode || "").trim();
-  if (!inviteCode || !timingSafeCompare(inviteCode, getStaffInviteSecret())) {
+  if (!inviteCode || !timingSafeCompare(inviteCode, inviteSecret)) {
     return {
       success: false,
       error: "A valid staff invite code is required to register an account. Please contact a shelter administrator.",
