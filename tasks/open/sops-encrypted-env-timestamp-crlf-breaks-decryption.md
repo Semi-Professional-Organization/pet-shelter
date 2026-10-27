@@ -25,9 +25,15 @@ so `sops_lastmodified` keeps its `\r`. Nothing needs re-encrypting; the git copy
 - `.gitattributes` now marks the file `text eol=lf`, so it is always checked out LF and a CRLF
   copy is normalised on `git add`. (`-text` was tried first; review found it let `git add` commit
   the CRLF bytes.)
-- `scripts/secrets.mjs` refuses a CRLF copy by name in `check`, `edit`, `decrypt-to-local` and `run`,
+- `scripts/secrets.mjs` refuses a CRLF copy by name in `check`, `decrypt-to-local` and `run`,
   with the restore command, and `check` exits 1 on any `[FAIL]`.
 - `tests/unit/sopsConfig.test.ts` covers both with a fake `sops`, no key and no secret.
+
+**Found while fixing this, not fixed here** (no `sops` binary to verify against in the session):
+`secrets:edit` runs `sops <file>` without `--input-type dotenv`, so sops may pick a format from
+the `.enc` extension and fail to open the file at all; and on Windows `secrets:run -- npm ...`
+spawns `npm.cmd` without a shell, which current Node refuses (EINVAL). A shell fix must quote the
+arguments: `shell: true` alone joins them unquoted, so an `&` in a database URL splits the command.
 
 **Still open:** decrypting the real file with the configured age key. That needs the owner's key,
 on the owner's machine: `git rm --cached -q .env.production.enc`, then

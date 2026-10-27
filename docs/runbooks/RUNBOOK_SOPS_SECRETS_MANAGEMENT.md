@@ -24,7 +24,7 @@ This runbook documents the secrets management workflow for the `pet-shelter` rep
 
 ### Core Security Invariants
 1. **Zero Plaintext Secrets in Git**: Plaintext `.env` and `.env.local` files are gitignored.
-2. **Strict Boot Validation**: Secrets loaded into production must satisfy the entropy and policy checks in `src/lib/security/secrets.ts` via `assertSecretsConfigured()`.
+2. **Strict Boot Validation**: Secrets loaded into production must satisfy the entropy and policy checks in `src/lib/security/secrets.ts`, which `assertSecretsConfigured()` runs at boot. A bad `SESSION_SECRET` stops the boot; a bad `ADMIN_SECRET_KEY` or `STAFF_INVITE_SECRET` is logged and disables only its own feature.
 3. **Decentralized Access**: Multiple team members and CI/CD runners can have distinct `age` keys listed in `.sops.yaml`.
 
 ---

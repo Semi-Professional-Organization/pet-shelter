@@ -61,7 +61,9 @@ describe("the committed encrypted environment file", () => {
   const rootDir = path.resolve(__dirname, "../../");
   const ENC = ".env.production.enc";
 
-  it("is LF in git and checked out as LF everywhere", () => {
+  // The index and the attribute, not the working copy: a copy checked out
+  // before the rule stays CRLF until restored, which `secrets:check` reports.
+  it("is LF in git and marked eol=lf", () => {
     const blob = execFileSync("git", ["cat-file", "blob", `:${ENC}`], { cwd: rootDir });
     expect(blob.includes(0x0d)).toBe(false);
     const attr = execFileSync("git", ["check-attr", "eol", "--", ENC], { cwd: rootDir, encoding: "utf-8" });

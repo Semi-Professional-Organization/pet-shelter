@@ -27,6 +27,7 @@
 # `eol=lf`, not `-text`: `-text` would also stop `git add` normalising an
 # existing CRLF copy, so a CRLF blob could be committed. The blob has no CR, so
 # git never rewrites the ciphertext itself.
-# Every *.enc, not only this one. (`.sops.yaml` also matches other names; add
-# them here if a dotenv-format one is ever committed.)
-*.enc text eol=lf
+# Every encrypted dotenv file, by the `.env*.enc` name `.gitignore` allows. Not
+# `*.enc`: `text` skips binary detection, and would rewrite CR LF pairs inside a
+# binary ciphertext someone names `.enc`.
+.env*.enc text eol=lf
