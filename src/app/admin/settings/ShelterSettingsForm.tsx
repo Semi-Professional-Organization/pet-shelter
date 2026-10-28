@@ -188,7 +188,7 @@ export function ShelterSettingsForm({
   const testEmailTool = (
     <div className="border border-border bg-muted/30 p-6 rounded-lg space-y-4">
       <h3 className="text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
-        <Send className="size-4 text-primary" />
+        <Send className="size-4 text-primary-ink" />
         Live Email Dispatch Verification Tool
       </h3>
       <p className="text-xs text-muted-foreground leading-relaxed">
@@ -305,7 +305,7 @@ export function ShelterSettingsForm({
           onClick={() => setActiveTab("general")}
           className={`pb-3 px-1 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === "general"
-              ? "border-primary text-primary"
+              ? "border-primary text-primary-ink"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -318,7 +318,7 @@ export function ShelterSettingsForm({
           onClick={() => setActiveTab("email")}
           className={`pb-3 px-1 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === "email"
-              ? "border-primary text-primary"
+              ? "border-primary text-primary-ink"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -331,7 +331,7 @@ export function ShelterSettingsForm({
           onClick={() => setActiveTab("storage")}
           className={`pb-3 px-1 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === "storage"
-              ? "border-primary text-primary"
+              ? "border-primary text-primary-ink"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -344,7 +344,7 @@ export function ShelterSettingsForm({
           onClick={() => setActiveTab("donation")}
           className={`pb-3 px-1 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === "donation"
-              ? "border-primary text-primary"
+              ? "border-primary text-primary-ink"
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -505,7 +505,7 @@ export function ShelterSettingsForm({
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <div className="space-y-0.5">
                   <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                    <Mail className="size-4 text-primary" />
+                    <Mail className="size-4 text-primary-ink" />
                     Resend Transactional Email Service
                   </h2>
                   <p className="text-xs text-muted-foreground">
@@ -582,7 +582,7 @@ export function ShelterSettingsForm({
           <div className="border border-border bg-card p-6 sm:p-8 space-y-6 rounded-lg shadow-sm">
             <div className="border-b border-border pb-3">
               <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                <HardDrive className="size-4 text-primary" />
+                <HardDrive className="size-4 text-primary-ink" />
                 Media & Photo Upload Storage
               </h2>
               <p className="text-xs text-muted-foreground">

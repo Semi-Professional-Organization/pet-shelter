@@ -258,7 +258,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                     2. Choose Sponsorship Package or Custom Amount
                   </label>
                   <span className="text-xs font-semibold text-muted-foreground">
-                    Selected Total: <strong className="text-primary font-mono text-sm">RM {finalAmount.toFixed(2)}</strong>
+                    Selected Total: <strong className="text-primary-ink font-mono text-sm">RM {finalAmount.toFixed(2)}</strong>
                   </span>
                 </div>
 
@@ -291,7 +291,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                           </div>
                         </div>
 
-                        <div className="mt-3 pt-2 border-t border-border/60 text-3xs text-primary font-medium">
+                        <div className="mt-3 pt-2 border-t border-border/60 text-3xs text-primary-ink font-medium">
                           {tier.impactMetrics}
                         </div>
                       </button>
@@ -348,7 +348,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                 {(frequency === "monthly" || selectedTier.id === "kibble") && (
                   <div className="border border-primary/30 bg-primary/5 p-4 rounded-xl space-y-2.5">
                     <div className="flex items-center gap-1.5 font-heading text-xs font-bold text-foreground">
-                      <Sparkles className="size-3.5 text-primary" />
+                      <Sparkles className="size-3.5 text-primary-ink" />
                       <span>Rescue Companion Perks — {targetPet ? targetPet.name : "Shelter Rescues"}</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
@@ -373,12 +373,12 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
               <div className="border border-border bg-muted/30 p-5 sm:p-6 rounded-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-border pb-3">
                   <div className="flex items-center gap-2">
-                    <QrCode className="size-4.5 text-primary" />
+                    <QrCode className="size-4.5 text-primary-ink" />
                     <span className="text-xs font-bold uppercase tracking-wider text-foreground">
                       3. Official Payment Rail: DuitNow National QR / Maybank Transfer
                     </span>
                   </div>
-                  <span className="text-xs font-bold font-mono text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                  <span className="text-xs font-bold font-mono text-primary-ink bg-primary/10 px-2.5 py-1 rounded-md">
                     Amount: RM {finalAmount.toFixed(2)} {frequency === "monthly" ? "/ month" : ""}
                   </span>
                 </div>

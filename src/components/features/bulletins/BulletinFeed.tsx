@@ -13,6 +13,7 @@ import { Bulletin } from "@/types/bulletin";
 import type { TranslationKey } from "@/lib/i18n/translations";
 import { presentBulletinCategory } from "@/lib/presentation/bulletinPresentation";
 import { Translated } from "@/components/providers/Translated";
+import { BulletinCarouselDots } from "@/components/features/bulletins/BulletinCarouselDots";
 
 interface BulletinFeedProps {
   /**
@@ -89,8 +90,8 @@ export function BulletinFeed({
            Embla gives touch dragging for free, so the arrows are not the only way through. */
         <Carousel opts={{ loop: bulletins.length > 1 }} className="w-full">
           <div className="mb-5 flex items-center justify-end gap-2">
-            <CarouselPrevious className="static translate-y-0 size-9" />
-            <CarouselNext className="static translate-y-0 size-9" />
+            <CarouselPrevious variant="default" className="static translate-y-0 size-9" />
+            <CarouselNext variant="default" className="static translate-y-0 size-9" />
           </div>
           <CarouselContent>
             {bulletins.map((bulletin) => {
@@ -99,7 +100,7 @@ export function BulletinFeed({
                 <CarouselItem key={bulletin.id}>
                   <article className="grid grid-cols-1 items-center gap-6 lg:grid-cols-2 lg:gap-10">
                     {bulletin.mediaType === "video" && bulletin.videoEmbedUrl ? (
-                      <div className="relative aspect-16/9 w-full overflow-hidden rounded-3xl border border-border bg-black">
+                      <div className="relative aspect-16/9 w-full overflow-hidden rounded-card bg-black">
                         <iframe
                           src={bulletin.videoEmbedUrl}
                           title={bulletin.title}
@@ -109,11 +110,11 @@ export function BulletinFeed({
                         ></iframe>
                       </div>
                     ) : bulletin.mediaType === "image" && bulletin.mediaUrl ? (
-                      <div className="relative aspect-16/9 w-full overflow-hidden rounded-3xl border border-border bg-muted">
+                      <div className="relative aspect-16/9 w-full overflow-hidden rounded-card bg-primary-panel">
                         <Image src={bulletin.mediaUrl} alt={bulletin.title} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 50vw" />
                       </div>
                     ) : (
-                      <div className="aspect-16/9 w-full rounded-3xl border border-border bg-muted" />
+                      <div className="aspect-16/9 w-full rounded-card bg-primary-panel" />
                     )}
 
                     <div className="space-y-3">
@@ -142,6 +143,7 @@ export function BulletinFeed({
               );
             })}
           </CarouselContent>
+          {bulletins.length > 1 && <BulletinCarouselDots total={bulletins.length} />}
         </Carousel>
       ) : bulletins.length > 0 && layout === "lead" ? (
         (() => {

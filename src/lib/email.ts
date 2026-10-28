@@ -391,7 +391,7 @@ https://hopeforstrays.org/admin/applications
   `.trim();
 
   const html = wrapEmailHtml(`
-    <h2 style="margin-top:0; font-size: 18px; color: ${EMAIL_BRAND.primary};">🐾 New Adoption Application Submitted</h2>
+    <h2 style="margin-top:0; font-size: 18px; color: ${EMAIL_BRAND.primaryInk};">🐾 New Adoption Application Submitted</h2>
     <p>A new adoption application has been submitted for <strong>${escapeHtml(app.petName)}</strong>.</p>
     <div class="card">
       <strong>Application Reference:</strong> ${app.id}<br/>

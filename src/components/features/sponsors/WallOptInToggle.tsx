@@ -43,7 +43,7 @@ export function WallOptInToggle({ initialValue }: { initialValue: boolean }) {
         />
         <span className="space-y-1">
           <span className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Globe2 className="size-4 text-primary" aria-hidden />
+            <Globe2 className="size-4 text-primary-ink" aria-hidden />
             {isMs
               ? "Paparkan nama saya di Dinding Penaja awam Hope for Strays"
               : "Display my name on the Hope for Strays Public Sponsor Wall"}
@@ -65,7 +65,7 @@ export function WallOptInToggle({ initialValue }: { initialValue: boolean }) {
         ) : error ? (
           <span className="text-destructive">{error}</span>
         ) : displayOnWall ? (
-          <span className="inline-flex items-center gap-1.5 text-primary">
+          <span className="inline-flex items-center gap-1.5 text-primary-ink">
             <Check className="size-3" aria-hidden />
             {isMs ? "Anda kelihatan di /sponsors" : "You appear on /sponsors"}
           </span>

@@ -57,7 +57,7 @@ export function AllocationSummary({
         </p>
         <Link
           href="/transparency"
-          className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-primary hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-primary-ink hover:underline"
         >
           {isMs ? "Lihat halaman ketelusan" : "Open the transparency page"}
           <ArrowRight className="size-4" />
@@ -136,7 +136,7 @@ export function AllocationSummary({
               <dt className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {isMs && stat.labelMs ? stat.labelMs : stat.label}
               </dt>
-              <dd className="m-0 font-heading text-3xl font-bold text-primary sm:text-4xl">
+              <dd className="m-0 font-heading text-3xl font-bold text-primary-ink sm:text-4xl">
                 {stat.metricValue}
               </dd>
             </div>
@@ -152,7 +152,7 @@ export function AllocationSummary({
         </p>
         <Link
           href="/transparency"
-          className="inline-flex items-center gap-1.5 text-sm font-bold text-primary hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-primary-ink hover:underline"
         >
           {isMs
             ? "Lihat setiap resit dan laporan teraudit"

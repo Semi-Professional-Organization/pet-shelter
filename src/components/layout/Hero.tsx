@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Heart,
   ArrowRight,
@@ -25,7 +26,7 @@ import {
  * Presentation for the five counters. Kept here rather than in the domain module
  * so `metrics.ts` stays React-free and testable in the node tier. There is no
  * per-counter tone: tones were picked by hue rather than meaning, which had
- * "Adopted into Homes" in `danger` red, so every figure takes `text-primary`.
+ * "Adopted into Homes" in `danger` red, so every figure takes `text-primary-ink`.
  */
 const METRIC_PRESENTATION: Record<HomeMetricIcon, { icon: typeof ShieldCheck }> = {
   neutered: { icon: ShieldCheck },
@@ -36,6 +37,17 @@ const METRIC_PRESENTATION: Record<HomeMetricIcon, { icon: typeof ShieldCheck }> 
 };
 
 const COUNT_UP_MS = 1100;
+
+const HERO_ANIMALS = [
+  { src: "/cutouts/cat-png-17.png", className: "h-32 w-24", style: { left: "20%", top: "7%" }, delay: "0s" },
+  { src: "/cutouts/cat-png-6.png", className: "h-28 w-24", style: { right: "20%", top: "7%" }, delay: "-1.2s" },
+  { src: "/cutouts/dog-png-30.png", className: "h-36 w-28", style: { left: "7%", top: "28%" }, delay: "-2.4s" },
+  { src: "/cutouts/dog-png-18.png", className: "h-32 w-24", style: { right: "7%", top: "28%" }, delay: "-3.6s" },
+  { src: "/cutouts/cat-png-28.png", className: "h-28 w-24", style: { left: "7%", bottom: "14%" }, delay: "-4.8s" },
+  { src: "/cutouts/dog-png-22.png", className: "h-24 w-28", style: { right: "7%", bottom: "14%" }, delay: "-6s" },
+  { src: "/cutouts/dog-png-14.png", className: "h-40 w-28", style: { left: "22%", bottom: "4%" }, delay: "-7.2s" },
+  { src: "/cutouts/cat-png-20.png", className: "h-36 w-24", style: { right: "22%", bottom: "4%" }, delay: "-8.4s" },
+] as const;
 
 /**
  * Counts a figure up from zero, as progressive enhancement.
@@ -89,11 +101,11 @@ function ImpactStatCard({ metric, isMs }: { metric: HomeMetric; isMs: boolean })
   return (
     <div
       data-testid={`impact-stat-${metric.key}`}
-      className="border border-border bg-work-panel p-4 rounded-2xl space-y-1.5 shadow-xs"
+      className="rounded-card bg-work-panel p-4 space-y-1.5"
     >
       <div className="flex items-center justify-between">
         <span
-          className="font-heading text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-primary"
+          className="font-heading text-2xl sm:text-3xl font-bold tracking-tight tabular-nums text-primary-ink"
         >
           {/*
             The climbing digits are decoration, so they are hidden and the
@@ -105,7 +117,7 @@ function ImpactStatCard({ metric, isMs }: { metric: HomeMetric; isMs: boolean })
           <span aria-hidden="true">{display}</span>
           <span className="sr-only">{metric.value}</span>
         </span>
-        <Icon className="size-4 text-muted-foreground opacity-60" />
+        <Icon className="size-4 text-primary-ink opacity-70" />
       </div>
       <p className="text-xs font-semibold text-foreground leading-tight">
         {metricLabel(metric, isMs)}
@@ -131,12 +143,22 @@ export function Hero({ metrics }: HeroProps = {}) {
 
   return (
     <>
-      {/* Text only for now. The ring of animal cut-outs this hero was designed around is not
-          licensed for use, so it waits for images the shelter owns (docs/page-style-guide.md §4
-          still describes the intended treatment). */}
       <section className="relative flex min-h-[calc(100dvh-4rem)] items-center overflow-hidden bg-work-ground">
+        <div className="pointer-events-none absolute inset-0 z-0 hidden lg:block" aria-hidden="true">
+          {HERO_ANIMALS.map((animal) => (
+            <Image
+              key={animal.src}
+              src={animal.src}
+              alt=""
+              width={320}
+              height={476}
+              className={`hero-animal-float absolute object-contain drop-shadow-xl ${animal.className}`}
+              style={{ ...animal.style, animationDelay: animal.delay }}
+            />
+          ))}
+        </div>
         <div className="relative w-full px-6 py-12 sm:px-8 lg:px-12">
-          <div className="mx-auto max-w-2xl space-y-6 text-center">
+          <div className="relative z-10 mx-auto max-w-2xl space-y-6 text-center">
             <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.15]">
               {t("hero.tnrmHeadline")}
             </h1>
@@ -161,6 +183,19 @@ export function Hero({ metrics }: HeroProps = {}) {
               </Link>
             </div>
 
+            <div className="grid grid-cols-4 gap-3 pt-8 lg:hidden" aria-hidden="true">
+              {HERO_ANIMALS.map((animal) => (
+                <Image
+                  key={animal.src}
+                  src={animal.src}
+                  alt=""
+                  width={320}
+                  height={476}
+                  className="hero-animal-float h-28 w-full object-contain drop-shadow-lg sm:h-36"
+                  style={{ animationDelay: animal.delay }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>

@@ -134,7 +134,7 @@ export function PetGallery({
         {featuredOnly ? (
           <Link
             href="/pets"
-            className="group inline-flex shrink-0 items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary focus-visible:ring-2 rounded-xl"
+            className="group inline-flex shrink-0 items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary-ink focus-visible:ring-2 rounded-xl"
           >
             {t("home.viewAllPets", "View All Adoptable Pets")}
             <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />

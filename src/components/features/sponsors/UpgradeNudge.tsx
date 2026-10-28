@@ -62,12 +62,12 @@ export function UpgradeNudge({
       />
 
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-ink">
           <Lock className="size-5" aria-hidden />
         </div>
 
         <div className="flex-1 space-y-2">
-          <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-primary">
+          <p className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wide text-primary-ink">
             <Sparkles className="size-3" aria-hidden />
             {isMs ? `Keistimewaan ${required}` : `${required} privilege`}
           </p>

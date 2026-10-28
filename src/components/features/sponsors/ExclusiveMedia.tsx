@@ -110,7 +110,7 @@ export function ExclusiveVideoDiary({
               sizes="(max-width: 768px) 100vw, 50vw"
             />
             <span className="absolute inset-0 flex items-center justify-center">
-              <span className="flex size-14 items-center justify-center rounded-full bg-background/85 text-primary shadow-lg transition-transform duration-200 group-hover:scale-105">
+              <span className="flex size-14 items-center justify-center rounded-full bg-background/85 text-primary-ink shadow-lg transition-transform duration-200 group-hover:scale-105">
                 <Play className="size-6 fill-current" aria-hidden />
               </span>
             </span>

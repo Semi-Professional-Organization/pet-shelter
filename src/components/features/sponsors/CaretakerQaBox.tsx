@@ -43,7 +43,7 @@ export function CaretakerQaBox() {
     <div className="space-y-4 rounded-2xl border border-border bg-card p-6">
       <div className="space-y-1">
         <h3 className="inline-flex items-center gap-2 font-heading text-lg font-bold text-foreground">
-          <MessageCircleHeart className="size-4.5 text-primary" aria-hidden />
+          <MessageCircleHeart className="size-4.5 text-primary-ink" aria-hidden />
           {isMs ? "Soal jawab dengan penjaga" : "Caretaker Q&A"}
         </h3>
         <p className="text-sm text-muted-foreground">
@@ -56,7 +56,7 @@ export function CaretakerQaBox() {
       {sent ? (
         <p
           role="status"
-          className="inline-flex items-center gap-2 rounded-lg bg-primary/10 p-3 text-sm font-semibold text-primary"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary/10 p-3 text-sm font-semibold text-primary-ink"
         >
           <CheckCircle2 className="size-4" aria-hidden />
           {isMs

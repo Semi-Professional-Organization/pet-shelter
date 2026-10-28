@@ -3,8 +3,9 @@
 How a public page is put together: its frame, gutters, vertical rhythm, heading scale, cards and
 calls to action. Every rule here was read from the home page — [`Hero.tsx`](../src/components/layout/Hero.tsx),
 [`Section.tsx`](../src/components/layout/Section.tsx) and
-[`HomeSections.tsx`](../src/components/layout/HomeSections.tsx) — on 2026-10-01. The home page is
-the reference; a new page should be indistinguishable from it in rhythm and shape.
+[`HomeSections.tsx`](../src/components/layout/HomeSections.tsx) — on 2026-10-01, and re-read on
+2026-10-28 after the move to one light-blue accent and flat, borderless cards. The home page is the
+reference; a new page should be indistinguishable from it in rhythm and shape.
 
 This document owns **composition**. Token values — colours, the radius scale, shadows, the button
 and card shells — live in [`design-system.md`](design-system.md) and are not repeated here. Where
@@ -14,7 +15,8 @@ the two disagree, see §8.
 
 ## 1. The page frame
 
-A page is a stack of full-bleed bands on `bg-work-ground`, each holding one centred content column.
+A page is a stack of full-bleed bands on `bg-work-ground` — a warm cream — each holding one centred
+content column.
 Do not hand-roll the band — use the primitives:
 
 ```tsx
@@ -61,7 +63,8 @@ Everything sits on Tailwind's 4px grid ([`design-system.md` §7](design-system.m
 
 Two families: **Playfair Display** (`font-heading`) for headings, **Geist** (`font-sans`, the body
 default) for everything else. Headings are always `font-heading font-bold tracking-tight
-text-foreground`; the only thing that changes between levels is size.
+text-foreground` — a dark brown, as is all body text; the only thing that changes between levels is
+size. The one blue in type is `text-primary-ink`, and only in the roles marked below.
 
 | Role | Size classes | px (mobile → desktop) | Notes |
 |---|---|---|---|
@@ -72,10 +75,11 @@ text-foreground`; the only thing that changes between levels is size.
 | **Lead paragraph** | `text-base sm:text-lg leading-relaxed text-muted-foreground` | 16 → 18 | under H1/H2 |
 | **Body** | `text-base leading-relaxed text-muted-foreground` | 16 | editorial copy |
 | **Card body** | `text-sm leading-relaxed text-muted-foreground` | 14 | |
-| **Bullet / highlight** | `text-sm font-medium text-foreground/90` | 14 | with a `size-4 text-primary` icon |
-| **Eyebrow** | `text-2xs font-bold uppercase tracking-wider text-primary` | 11 | category label above an H3 or a panel title — **never above the page H1**, which stands alone |
-| **Inline CTA link** | `text-xs font-bold uppercase tracking-wider text-primary` | 12 | with a `size-3.5` arrow |
-| **Step number** | `font-mono text-2xl font-bold text-foreground` | 24 | numbered process cards |
+| **Bullet / highlight** | `text-sm font-medium text-foreground/90` | 14 | with a `size-4 text-primary-ink` icon |
+| **Eyebrow** | `text-2xs font-bold uppercase tracking-wider text-primary-ink` | 11 | category label above an H3 or a panel title — **never above the page H1**, which stands alone |
+| **Inline CTA link** | `text-xs font-bold uppercase tracking-wider text-primary-ink` | 12 | with a `size-3.5` arrow |
+| **Figure** | `font-heading text-2xl sm:text-3xl font-bold tabular-nums text-primary-ink` | 24 → 30 | impact counters; no pill or chip behind it |
+| **Step number** | `size-10 rounded-full bg-primary font-mono text-sm font-bold text-primary-foreground` | 14 | the timeline marker on the steps rail |
 
 Naming: the page H1 **is the page name** — the same words as the nav or footer link that leads
 there (a fuller form is fine: FAQ → Frequently Asked Questions). A visitor checks the H1 to confirm
@@ -111,6 +115,9 @@ One per page, first band, directly under the navbar.
   air. Same side gutter as every section.
 - **Alignment**: centred, single column, `max-w-2xl`. The hero is the **only** centred text on the site.
 - **One CTA.** The primary button (§6), with a leading and trailing `size-4` icon.
+- **Impact strip** directly beneath, still on `bg-work-ground`: a `text-2xs` uppercase label, then a
+  `grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4` of **white** panels (§5) holding a figure
+  (§3) and its label. One colour for every figure — no per-tile accent.
 - **Imagery**: transparent cut-outs, not framed photos — no border, no radius, `object-contain`,
   `drop-shadow-xl` so the shadow follows the silhouette. Scattered absolutely at `lg` and up;
   below `lg` they collapse to a `grid grid-cols-4 gap-3 pt-8` row. Position them with inline
@@ -122,46 +129,66 @@ every title below the hero. No `mx-auto` and no `text-center` on the block.
 
 ## 5. Cards
 
-The home page card — the "panel" — is one recipe, used for action cards, process steps and
-side panels:
+A card is a **flat panel**: tight corners, no border, no shadow. It is told apart from the cream
+band by its fill alone. One recipe, used for action cards, impact tiles and side panels:
 
 ```tsx
-const panel =
-  "rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7";
+const panel = "rounded-card bg-work-panel p-6 sm:p-7";
 ```
 
 | Property | Value |
 |---|---|
-| Radius | `rounded-3xl` (≈2.53rem, from the `--radius` scale) |
-| Surface | `bg-work-panel` — white in light, `#1f2937` in dark — on the `work-ground` band |
-| Edge | `border border-border` |
-| Elevation | `shadow-xs` |
+| Radius | `rounded-card` (0.75rem) — the named card shape, so `Card` and hand-built panels agree |
+| Surface | `bg-work-panel` — white on the cream band. `bg-primary-panel` (pale blue) is the one alternative, used by `PetCard` |
+| Edge | none. No `border`, no `ring`, no rainbow of per-card accent borders |
+| Elevation | none |
 | Padding | `p-6 sm:p-7` (24 → 28px) |
 | Body layout | `flex flex-col gap-3` |
 
 Variants of the same recipe:
 
-- **Linked card** — add `group overflow-hidden transition-colors hover:border-primary/40`. The
-  hover is a border tint only; no lift, no scale on the card itself. A trailing arrow may nudge
+- **Linked card** — add `group overflow-hidden transition-colors hover:bg-accent-subtle-strong`. The
+  hover turns the panel pale blue; no lift, no scale, no border. A trailing arrow may nudge
   `group-hover:translate-x-0.5`.
 - **Image card** — move padding off the shell onto the body; image on top at `aspect-4/3` (cards)
-  or `aspect-16/10` (editorial rows), `object-cover`, background `bg-work-ground` while loading.
-  The card's `overflow-hidden` rounds the image; do not round it separately.
-- **Standalone editorial image** — the same `rounded-3xl border border-border bg-work-panel` with
-  no padding.
+  or `aspect-16/10` (editorial rows), `object-cover`. The card's `overflow-hidden` rounds the image;
+  do not round it separately.
+- **Standalone editorial image** — `rounded-card bg-primary-panel overflow-hidden`, no border, no
+  padding; the pale blue shows only while the photo loads.
 
-Nested elements step **down** the radius scale so corners stay concentric:
+To change a card's shape, change `--radius-card`, never pass `rounded-md` through `cn()`:
+`tailwind-merge` does not see `rounded-card` and a scale step as a conflict, so both classes land and
+stylesheet order decides (`tasks/lessons/2026-10-28-twmerge-does-not-dedupe-a-named-theme-radius.md`).
+
+Nested elements step **down** the radius scale so corners stay concentric — inside a 0.75rem card,
+use `rounded-sm` or smaller:
 
 | Element | Recipe |
 |---|---|
-| Inner tile inside a panel | `rounded-xl border border-border bg-background p-4` |
-| Muted inset block | `rounded-2xl border border-border bg-muted/30 p-5` |
-| Icon tile | `flex size-10 items-center justify-center rounded-xl bg-muted text-foreground`, icon `size-5` |
-| Small icon tile | `size-8 rounded-lg bg-foreground text-background` |
+| Inner tile inside a panel | `rounded-sm bg-background p-4` |
+| Muted inset block | `rounded-sm bg-muted/30 p-5` |
+| Icon tile | `flex size-10 items-center justify-center rounded-sm bg-muted text-foreground`, icon `size-5` |
 | Panel header rule | `pb-3 border-b border-border` |
 
 Grids: `grid grid-cols-1 gap-6`, widening to `md:grid-cols-3` for equal cards or `lg:grid-cols-3`
 when one column stacks two smaller cards.
+
+### 5.1 The accent
+
+There is one accent colour, the light blue `--primary`, and it marks **what you can act on**:
+buttons, carousel arrows, the steps rail markers, the hover wash, the scrollbar. It never colours a
+card edge, a heading or body text.
+
+| Need | Use | Why |
+|---|---|---|
+| A blue fill | `bg-primary` + `text-primary-foreground` (brown) | brown on light blue is 7.45:1 |
+| Blue text or an icon | `text-primary-ink` | `--primary` as text is 1.61:1 on cream; `text-primary` fails `designSystemGuards` |
+| A pale blue panel | `bg-primary-panel` | opaque; `bg-primary/15` composites over cream into grey-green |
+| Hover on a control or card | `hover:bg-accent-subtle-strong` | |
+
+The navbar is the one blue band: it stays light blue in dark mode, so everything on it uses
+`text-primary-foreground` and `focus-visible:outline-primary-foreground`, never `text-foreground`,
+which turns pale in dark mode.
 
 ## 6. Calls to action
 
@@ -169,8 +196,13 @@ when one column stacks two smaller cards.
   [`button.tsx`](../src/components/ui/button.tsx). Use a `Link` with that class for navigation.
   The shell already supplies the radius, uppercase tracked label and shadow; do not restyle them
   (see §8 for why).
-- **Inline text CTA** — inside a card, the uppercase `text-primary` label from §3 with an arrow.
+- **Inline text CTA** — inside a card, the uppercase `text-primary-ink` label from §3 with an arrow.
   Not a button.
+- **Focus** — every button and link shows the base 2px `outline-ring` at `outline-offset-2`, on the
+  page ground. Do not add `outline-none` or a bare `focus-visible:ring-2`.
+- **Carousel** — arrows are `variant="default"` (blue). A carousel of more than one slide carries
+  position marks beneath it: an ink dot per slide, the current one stretched into a line, each a
+  24px button (`BulletinCarouselDots.tsx`).
 - **One primary button per band.** Secondary actions use `variant="outline"` or the inline CTA.
 
 ## 7. Responsive rules
@@ -191,10 +223,11 @@ Recorded so a new page copies the intent, not the drift.
    compiled dev CSS (built 2026-09-28): the later rule wins at equal specificity, so `rounded-xl`
    and `shadow-xs` take effect while `text-sm`, `font-bold`, `tracking-wide` and `px-6` lose to the
    shell's `text-xs`, `font-semibold`, `tracking-widest` and `px-8`. Use the plain shell (§6).
-2. **Home panels are not the `Card` component.** `ui/card.tsx` is `rounded-card` (1.4rem) +
-   `ring-1` + `shadow-brand-lg`; every home-page panel is `rounded-3xl` + `border` + `shadow-xs` on
-   `bg-work-panel`. Public pages follow the home panel (§5). Until the two are reconciled, do not
-   mix them in one view.
+2. **`Card` still carries a ring and a shadow.** `ui/card.tsx` is `rounded-card` + `ring-1` +
+   `shadow-brand-lg`; the home panel (§5) shares the radius but has neither. `PetCard` passes
+   `ring-0`, but its `shadow-brand-lg` survives. Interior pages (`/donate`, `/applications/track`,
+   `/get-involved`, `/transparency`) still use the old `rounded-3xl border border-border shadow-xs`
+   panel; they have not been moved to §5 yet.
 3. **`<Section className="space-y-…">` spaces nothing.** `Section` puts `className` on the outer
    `<section>`, but renders children inside its own inner `<div>`, so a `space-y-*` there applies
    to one child. Home's `our-work` and "Join us" sections pass spacing that way; `how-it-works`

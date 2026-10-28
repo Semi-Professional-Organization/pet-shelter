@@ -75,7 +75,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
       <section className="border-b border-border bg-card py-14 sm:py-18 lg:py-22">
         <div className="mx-auto w-full max-w-6xl px-6 sm:px-8 lg:px-12">
           <div className="mx-auto max-w-3xl space-y-4 text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-primary">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wider text-primary-ink">
               <Wallet className="size-4" />
               {isMs ? "Ketelusan Kewangan Penuh" : "Full Financial Transparency"}
             </div>
@@ -93,7 +93,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
             <div className="flex flex-wrap items-center justify-center gap-3 pt-3 text-xs font-semibold sm:text-sm">
               {snapshot.lastExpenseDate && (
                 <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-muted/60 px-3 py-1 text-foreground">
-                  <Receipt className="size-4 text-primary" />
+                  <Receipt className="size-4 text-primary-ink" />
                   {isMs ? "Dikemas kini" : "Updated"}{" "}
                   {formatLongDate(snapshot.lastExpenseDate, isMs)}
                 </span>
@@ -107,7 +107,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
       <section className="border-b border-border bg-muted/20 py-14 sm:py-18">
         <div className="mx-auto w-full max-w-6xl space-y-8 px-6 sm:px-8 lg:px-12">
           <div className="max-w-2xl">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary-ink">
               {isMs ? "Impak Terkini" : "Measured Impact"}
             </span>
             <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -125,7 +125,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
       >
         <div className="mx-auto w-full max-w-6xl space-y-10 px-6 sm:px-8 lg:px-12">
           <div className="max-w-2xl">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary-ink">
               {isMs ? "Pecahan Perbelanjaan" : "Expense Breakdown"}
             </span>
             <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -159,7 +159,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
       <section className="border-b border-border bg-muted/20 py-14 sm:py-18">
         <div className="mx-auto w-full max-w-6xl space-y-8 px-6 sm:px-8 lg:px-12">
           <div className="max-w-2xl">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary-ink">
               {isMs ? "Lejar Awam" : "Public Ledger"}
             </span>
             <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -184,7 +184,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
       <section className="border-b border-border bg-card py-14 sm:py-18">
         <div className="mx-auto w-full max-w-6xl space-y-8 px-6 sm:px-8 lg:px-12">
           <div className="max-w-2xl">
-            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary-ink">
               {isMs ? "Pematuhan ROS & AGM" : "ROS & AGM Compliance"}
             </span>
             <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
@@ -193,7 +193,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
                 : "Annual Audit & Spending Reports"}
             </h2>
             <p className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
-              <ScrollText className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+              <ScrollText className="mt-0.5 size-4 shrink-0 text-primary-ink" aria-hidden="true" />
               <span>
                 {isMs
                   ? "Penyata teraudit yang difailkan kepada Pendaftar Pertubuhan (ROS) dan dibentangkan pada Mesyuarat Agung Tahunan kami."
@@ -209,7 +209,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
       {/* 6. Closing CTA */}
       <section className="bg-muted/20 py-14 sm:py-18">
         <div className="mx-auto w-full max-w-3xl space-y-4 px-6 text-center sm:px-8">
-          <HeartHandshake className="mx-auto size-8 text-primary" aria-hidden="true" />
+          <HeartHandshake className="mx-auto size-8 text-primary-ink" aria-hidden="true" />
           <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             {isMs
               ? "Sumbangan Anda Muncul Dalam Lejar Ini"

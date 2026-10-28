@@ -54,7 +54,7 @@ export function AdoptOrFosterApply() {
           href="/pets?type=foster"
           className={cn(
             buttonVariants({ size: "lg", variant: "outline" }),
-            "gap-2 border-primary bg-transparent text-primary hover:bg-primary/10 hover:text-primary dark:bg-transparent dark:hover:bg-primary/10"
+            "gap-2 border-primary bg-transparent text-primary-ink hover:bg-primary/10 hover:text-primary-ink dark:bg-transparent dark:hover:bg-primary/10"
           )}
         >
           <Heart className="size-4" />

@@ -23,7 +23,7 @@ export default async function SponsorLoginPage() {
     <section className="w-full px-6 py-16 sm:px-8 lg:px-12">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-10 lg:flex-row lg:items-start lg:justify-center">
         <div className="max-w-md space-y-4 lg:pt-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary-ink">
             Hope for Strays
           </p>
           <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">

@@ -111,9 +111,9 @@ export function PetChooserCarousel({
           }`}
         >
           <div className="space-y-2">
-            <div className="relative aspect-4/3 w-full rounded-xl overflow-hidden bg-primary/15 border border-primary/20 flex flex-col items-center justify-center text-primary">
-              <Building2 className="size-8 mb-1 text-primary" />
-              <span className="text-3xs font-bold uppercase tracking-wider text-primary">
+            <div className="relative aspect-4/3 w-full rounded-xl overflow-hidden bg-primary/15 border border-primary/20 flex flex-col items-center justify-center text-primary-ink">
+              <Building2 className="size-8 mb-1 text-primary-ink" />
+              <span className="text-3xs font-bold uppercase tracking-wider text-primary-ink">
                 {isMs ? "Seluruh Santuari" : "Whole Shelter"}
               </span>
               {isGeneralSelected && (
@@ -125,7 +125,7 @@ export function PetChooserCarousel({
 
             <div>
               <div className="flex items-center gap-1 font-heading text-sm font-bold text-foreground">
-                <Sparkles className="size-3.5 text-primary shrink-0" />
+                <Sparkles className="size-3.5 text-primary-ink shrink-0" />
                 <span>{t("donations.generalSanctuaryFund", "General Sanctuary Fund")}</span>
               </div>
               <p className="text-2xs text-muted-foreground mt-1 leading-tight line-clamp-2">
@@ -137,7 +137,7 @@ export function PetChooserCarousel({
             </div>
           </div>
 
-          <div className="mt-3 pt-2 border-t border-border text-3xs font-semibold text-primary">
+          <div className="mt-3 pt-2 border-t border-border text-3xs font-semibold text-primary-ink">
             🐾 {isMs ? "Semua Haiwan Reskue" : "All Rescue Animals"}
           </div>
         </button>
@@ -199,7 +199,7 @@ export function PetChooserCarousel({
 
               <div className="mt-3 pt-2 border-t border-border flex items-center justify-between text-3xs text-muted-foreground">
                 <span className="font-medium text-foreground">{pet.species}</span>
-                <span className="text-primary font-bold">
+                <span className="text-primary-ink font-bold">
                   {statusPres.isInRehabilitation
                     ? isMs
                       ? "Program Rawatan"

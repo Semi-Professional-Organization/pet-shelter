@@ -78,7 +78,7 @@ export function DonationQrSettings({ form, canEdit }: DonationQrSettingsProps) {
     <div className="border border-border bg-card p-6 sm:p-8 space-y-6 rounded-lg shadow-sm">
       <div className="border-b border-border pb-3">
         <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-          <QrCode className="size-4 text-primary" />
+          <QrCode className="size-4 text-primary-ink" />
           Donation &amp; QR Codes
         </h2>
         <p className="text-xs text-muted-foreground">
@@ -123,7 +123,7 @@ export function DonationQrSettings({ form, canEdit }: DonationQrSettingsProps) {
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-0.5">
             <Label htmlFor="autoGenerateQr" className="text-sm font-semibold flex items-center gap-1.5">
-              <Wand2 className="size-3.5 text-primary" />
+              <Wand2 className="size-3.5 text-primary-ink" />
               Auto-generate a QR from a payment string
             </Label>
             <p className="text-xs text-muted-foreground">

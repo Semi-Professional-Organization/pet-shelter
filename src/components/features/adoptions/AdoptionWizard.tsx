@@ -56,7 +56,7 @@ function StepRail({ stepIndex, isMs }: { stepIndex: number; isMs: boolean }) {
             <p
               className={
                 "mt-1.5 text-2xs font-semibold uppercase tracking-wide hidden sm:block " +
-                (isCurrent ? "text-primary" : "text-muted-foreground")
+                (isCurrent ? "text-primary-ink" : "text-muted-foreground")
               }
             >
               {index + 1}. {isMs ? STEP_TITLES[step.id].ms : STEP_TITLES[step.id].en}
