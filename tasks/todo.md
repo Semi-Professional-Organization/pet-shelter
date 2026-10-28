@@ -15,6 +15,29 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Group the 17 issues left in no group
+
+**Branch:** `chore/group-17-issues` · opened 2026-10-27 · base `cae2d75` · #201 to #217
+
+- [x] Each of #201 to #217 added to the group the owner approved; `--suggest` was the starting
+      point, and the five pet write bugs from the #196 review went together under the admin pet
+      form.
+- [x] The summaries of the admin pet form group (#185) and the secrets group (#191) widened to
+      cover their new members.
+- [x] `tasks/open/issue-group-links-through-ledger-sync-unobserved.md` closed: a sync body
+      rewrite and a sync close of a linked mirror have both been seen keeping the parent. The
+      evidence is in `tasks/decisions/2026-10-28-issue-group-links-survive-the-ledger-sync.md`.
+
+## Review
+
+Not done, on purpose: moving #201, #202, #204, #214 or #215 to another group, which review
+suggested and the owner's approved grouping does not; removing closed members (#90, #97, #65, #91,
+#101, #157, and #182 once it closes), which would plan an unlink and is tracked in
+`tasks/open/issue-groups-has-no-settled-reading-for-a-closed-member.md`; grouping new ledger
+entries automatically (#217); and a back-reference in the 2026-10-21 decision, since decisions are
+never rewritten. Review rounds: 1 found two summaries that did not cover their new members, 2 found
+that the open entry's settle condition was already met, 3 found the decision's query did not run.
+
 # Pet status and adoption guards
 
 **Branch:** `fix/pet-status-and-adoption-guards` · opened 2026-10-27 · base `91205dd`

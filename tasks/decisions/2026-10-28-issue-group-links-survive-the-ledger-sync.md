@@ -24,8 +24,18 @@ posted its close comment (its entry left `tasks/open/` in 51c8ebb, #199), and st
 #184. Closes by a pull request's closing keyword kept their links too: #157 (closed by #195,
 parent #191) and #101 (closed by #198 at 2026-10-27T16:34:29Z, parent #184).
 
-Read with `gh api graphql`: `issue(number: N) { parent { number } userContentEdits { editedAt
-editor { login } } timelineItems(itemTypes: [PARENT_ISSUE_ADDED_EVENT, PARENT_ISSUE_REMOVED_EVENT]) }`.
+`github-actions` is `.github/workflows/ledger-issues.yml`, the only workflow that edits issues, and
+the close comment on #91 is the sync's own text. Read with `gh api graphql`, `issue(number: N)`:
+
+```graphql
+parent { number }
+userContentEdits(first: 20) { nodes { editedAt editor { login } } }
+timelineItems(first: 20, itemTypes: [PARENT_ISSUE_ADDED_EVENT, PARENT_ISSUE_REMOVED_EVENT, CLOSED_EVENT]) {
+  nodes { __typename ... on ParentIssueAddedEvent { createdAt parent { number } }
+          ... on ParentIssueRemovedEvent { createdAt parent { number } }
+          ... on ClosedEvent { createdAt actor { login } } }
+}
+```
 
 So the grouping script does not need to re-link after a sync, and the 2026-10-21 decision stands
 on that point.
