@@ -11,7 +11,7 @@
  * Usage:
  *   node scripts/commit-msg.mjs <file>        # git commit-msg hook interface
  *   node scripts/commit-msg.mjs --stdin       # lint a message on stdin
- *   node scripts/commit-msg.mjs --audit [rev] # report on existing history
+ *   node scripts/commit-msg.mjs --audit [--first-parent] [rev] # report on existing history
  *
  * Exit codes: 0 clean (warnings allowed), 1 at least one error.
  * `--audit` exits 0 regardless unless `--strict` is passed, because the history
@@ -435,11 +435,15 @@ async function main(argv) {
   if (argv[0] === "--audit") {
     const { execFileSync } = await import("node:child_process");
     const strict = argv.includes("--strict");
+    const firstParent = argv.includes("--first-parent");
     const rev = argv.slice(1).find((a) => !a.startsWith("--")) ?? "HEAD";
     // NUL between records so a message containing blank lines still parses.
+    const gitLogArgs = ["log", "-z", "--no-merges", "--format=%H%n%B"];
+    if (firstParent) gitLogArgs.push("--first-parent");
+    gitLogArgs.push(rev);
     const out = execFileSync(
       "git",
-      ["log", "-z", "--no-merges", "--format=%H%n%B", rev],
+      gitLogArgs,
       { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     );
     const records = out.split("\0").filter((r) => r.trim() !== "");
@@ -491,7 +495,7 @@ async function main(argv) {
     process.stderr.write(
       "usage: node scripts/commit-msg.mjs <file>\n" +
         "       node scripts/commit-msg.mjs --stdin\n" +
-        "       node scripts/commit-msg.mjs --audit [--strict] [--verbose] [<range>]\n",
+      "       node scripts/commit-msg.mjs --audit [--strict] [--verbose] [--first-parent] [<range>]\n",
     );
     process.exitCode = 1;
     return;

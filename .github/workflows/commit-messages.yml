@@ -51,7 +51,7 @@ jobs:
         # below: a branch name may contain characters the shell would act on.
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: node scripts/commit-msg.mjs --audit --strict --verbose "origin/$BASE_REF..HEAD"
+        run: node scripts/commit-msg.mjs --audit --strict --verbose --first-parent "origin/$BASE_REF..HEAD"
       # This repository squash-merges, so the commits linted above are discarded,
       # and the subject that reaches master is the pull request title (or, for a
       # one-commit pull request, that commit's subject, which the step above checks).

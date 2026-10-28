@@ -167,11 +167,9 @@ request no longer has would either block the merge or wave the wrong subject thr
 that Dependabot opens skip the commit audit, because their bodies quote release notes, but not the
 title check.
 
-It is not a guarantee that pre-standard history is never re-linted, and an earlier version of this
-page claimed it was. Merging some **other** unmerged branch into your feature branch adds every one
-of its commits to the range, grandfathered or not; this repo's own `78609a1` did exactly that. If
-that happens, `--strict` will fail on messages nobody is writing any more. Merge the base branch
-rather than a sibling, or expect to explain the red.
+The CI audit uses `--first-parent`, so when your branch merges a sibling branch, its side-history
+commits are not re-linted as part of your pull request's check. The first-parent path still catches
+the commits made directly on your branch.
 
 **What nothing lints: merge commits.** The audit passes `--no-merges`, and the hook skips any
 subject beginning `Merge `, `Revert `, `fixup!`, `squash!` or `amend!`. Git generates those, and
