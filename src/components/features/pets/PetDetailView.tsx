@@ -37,6 +37,7 @@ import {
 import { getRehabStageLabel, getRehabProgressPercent, getPlacementOptions } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
 import { PetStatusIcon } from "./PetStatusIcon";
+import { ICON_BY_TRAINING, trainingKindsIn, type TrainingKind } from "./petTraining";
 import { usePetDetailViewController, PetDetailTab } from "@/hooks/usePetDetailViewController";
 import { formatMYR } from "@/lib/domain/money";
 
@@ -72,6 +73,12 @@ export function PetDetailView(props: PetDetailViewProps) {
 
   const isInRehabilitation = statusPresentation.isInRehabilitation;
   const placement = getPlacementOptions(pet);
+  const training = trainingKindsIn(pet.tags);
+  const trainingLabel: Record<TrainingKind, string> = {
+    houseTrained: t("petDetail.houseTrained", "House Trained"),
+    litterBoxTrained: t("petDetail.litterBoxTrained", "Litter Box Trained"),
+    leashTrained: t("petDetail.leashTrained", "Leash Trained"),
+  };
   const rehabStage = isInRehabilitation ? getRehabStageLabel(pet, isMs) : undefined;
   const rehabProgress = isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
   // Newest first, and never mutate the array the store handed us.
@@ -460,6 +467,27 @@ export function PetDetailView(props: PetDetailViewProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* Training: positive only. A missing tag means unknown, not untrained, so nothing says "No". */}
+                {training.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      {t("petDetail.trainingTitle", "Training")}
+                    </h2>
+
+                    <ul className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+                      {training.map((kind) => {
+                        const Icon = ICON_BY_TRAINING[kind];
+                        return (
+                          <li key={kind} className="border border-border bg-background p-3 rounded-xl">
+                            <Icon className="size-4 mx-auto mb-1 text-muted-foreground" aria-hidden="true" />
+                            <div className="text-xs font-bold text-success-text">{trainingLabel[kind]}</div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 
