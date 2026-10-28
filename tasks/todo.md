@@ -30,13 +30,14 @@ Record active multi-step work streams below.
 
 ## Review
 
-Not done, on purpose: moving #201, #202, #204, #214 or #215 to another group, which review
-suggested and the owner's approved grouping does not; removing closed members (#90, #97, #65, #91,
-#101, #157, and #182 once it closes), which would plan an unlink and is tracked in
-`tasks/open/issue-groups-has-no-settled-reading-for-a-closed-member.md`; grouping new ledger
-entries automatically (#217); and a back-reference in the 2026-10-21 decision, since decisions are
-never rewritten. Review rounds: 1 found two summaries that did not cover their new members, 2 found
-that the open entry's settle condition was already met, 3 found the decision's query did not run.
+Not done, on purpose: moving #201, #202, #204, #214 or #215 to another group, which review suggested
+and the owner's approved grouping does not; removing closed members (the dry run names 11: #90, #97,
+#65, #98, #99, #96, #101, #91, #107, #129, #157; #182 joins them once it closes), which would plan
+an unlink and is tracked in `tasks/open/issue-groups-has-no-settled-reading-for-a-closed-member.md`;
+grouping new ledger entries automatically (#217); and a back-reference in the 2026-10-21 decision,
+since decisions are never rewritten. Review rounds: 1 found two summaries that did not cover their
+new members, 2 found that the open entry's settle condition was already met, 3 found the decision's
+query did not run. 4 found the closed-member list short and the query not paste-ready.
 
 # Pet status and adoption guards
 
