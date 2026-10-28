@@ -80,6 +80,7 @@ Welcome to the centralized documentation repository for the **Hope for Strays** 
 - **[Operational Runbook & Disaster Recovery](runbooks/OPERATIONAL_RUNBOOK.md)**: Day-to-day operations, health checks, rate limiting, audit inspection, and troubleshooting.
 - **[Production Staff Account Lockdown](runbooks/RUNBOOK_PRODUCTION_STAFF_ACCOUNT_LOCKDOWN.md)**: Replacing the seeded staff accounts, whose passwords are public, with a real Super Admin while email is unconfigured — in the app or by rehearsed SQL — without locking the owner out.
 - **[Donations & LHDN Tax e-Receipts](runbooks/RUNBOOK_DONATION_AND_LHDN_TAX_RECEIPTS.md)**: DuitNow QR, bank transfer verification, statutory LHDN Subsection 44(6) tax receipts, and ROS reporting.
+- **[Release & Rollback](runbooks/RUNBOOK_RELEASE_AND_ROLLBACK.md)**: Preview deployments as staging, Vercel Instant Rollback, and the snapshot-first order for shipping a migration so a rollback stays safe.
 - **[Prisma Database Setup & Migrations](runbooks/RUNBOOK_PRISMA_DATABASE_SETUP.md)**: Step-by-step PostgreSQL schema migrations, fallback mechanisms, and seed automation.
 - **[Production Media & Pet Image Storage](runbooks/RUNBOOK_PRODUCTION_MEDIA_STORAGE.md)**: Image pipeline, local uploads, AWS S3 / Supabase storage adapters, and Sharp optimization.
 - **[Email Deliverability & Resend Integration](runbooks/EMAIL_DELIVERABILITY_BEST_PRACTICES.md)**: Transactional email delivery, SPF/DKIM/DMARC setup, and webhook delivery.
