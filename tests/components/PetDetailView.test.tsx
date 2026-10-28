@@ -204,6 +204,40 @@ describe("PetDetailView", () => {
     });
   });
 
+  describe("training row", () => {
+    const trainingList = () =>
+      screen.getByRole("heading", { name: /^training$/i }).parentElement!.querySelector("ul")!;
+
+    it("lists the recorded training once each, in display order", () => {
+      renderWithLanguage(
+        <PetDetailView
+          initialPet={makePet({ id: "pet-training-under-test", tags: ["Leash Trained", "House-trained", "House-Trained"] })}
+        />
+      );
+
+      const items = within(trainingList()).getAllByRole("listitem");
+      expect(items.map((li) => li.textContent)).toEqual(["House Trained", "Leash Trained"]);
+    });
+
+    it("renders nothing when no tag records training", () => {
+      renderWithLanguage(
+        <PetDetailView initialPet={makePet({ id: "pet-untrained-under-test", tags: ["Playful"] })} />
+      );
+
+      expect(screen.queryByRole("heading", { name: /^training$/i })).not.toBeInTheDocument();
+    });
+
+    it("labels the training in Malay", () => {
+      renderWithLanguage(
+        <PetDetailView initialPet={makePet({ id: "pet-training-ms-under-test", tags: ["Litter Box Trained"] })} />,
+        { language: "ms" }
+      );
+
+      expect(screen.getByRole("heading", { name: /^latihan$/i })).toBeInTheDocument();
+      expect(screen.getByText("Terlatih Guna Kotak Pasir")).toBeInTheDocument();
+    });
+  });
+
   describe("status-dependent content", () => {
     it("counts published updates on the updates tab", () => {
       renderView();

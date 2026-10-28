@@ -1,5 +1,6 @@
 import { Pet } from "@/types/pet";
 import { QuizAnswers, PetMatchResult, MatchScoreBreakdown } from "@/types/match";
+import { trainingKindFor } from "@/lib/presentation/petTraining";
 
 /**
  * Evaluates compatibility between a prospective adopter's lifestyle and a rescue pet.
@@ -159,7 +160,7 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
   const isSenior = pet.ageCategory === "senior";
 
   if (answers.experience === "first_time") {
-    if (pet.tags.some((t) => /gentle|house-trained|friendly|easy/i.test(t)) && !isSpecialNeeds) {
+    if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || trainingKindFor(t) === "houseTrained") && !isSpecialNeeds) {
       experienceScore = 25;
       reasons.push("Gentle & beginner-friendly demeanor makes them an easy first pet.");
     } else if (isSpecialNeeds) {

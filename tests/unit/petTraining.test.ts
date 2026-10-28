@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Footprints } from "lucide-react";
 
-import { HouseCheck, LitterBox } from "@/components/icons/pet-icons";
-import { trainingIconFor, trainingKindFor, trainingKindsIn } from "@/components/features/pets/petTraining";
+import { trainingKindFor, trainingKindsIn } from "@/lib/presentation/petTraining";
 
 describe("trainingKindFor", () => {
   it.each([
@@ -10,32 +8,25 @@ describe("trainingKindFor", () => {
     ["House-trained", "houseTrained"],
     ["house trained", "houseTrained"],
     ["HOUSE_TRAINED", "houseTrained"],
+    ["Housetrained", "houseTrained"],
+    ["House–Trained", "houseTrained"],
     ["  House -  Trained ", "houseTrained"],
     ["Litter Box Trained", "litterBoxTrained"],
     ["litter-box-trained", "litterBoxTrained"],
+    ["LitterBox Trained", "litterBoxTrained"],
+    ["Litter Trained", "litterBoxTrained"],
     ["Leash Trained", "leashTrained"],
   ])("reads %j as %s", (tag, kind) => {
     expect(trainingKindFor(tag)).toBe(kind);
   });
 
-  it.each(["Playful", "", "Housetrained", "Not House Trained", "constructor", "toString"])(
+  // The ceiling on purpose: synonyms and negations stay plain tags rather than being guessed at.
+  it.each(["Playful", "", "Housebroken", "Not House Trained", "House Training", "constructor", "toString"])(
     "leaves %j unmatched",
     (tag) => {
       expect(trainingKindFor(tag)).toBeUndefined();
     },
   );
-});
-
-describe("trainingIconFor", () => {
-  it("maps each training tag to its icon", () => {
-    expect(trainingIconFor("House-Trained")).toBe(HouseCheck);
-    expect(trainingIconFor("Litter Box Trained")).toBe(LitterBox);
-    expect(trainingIconFor("Leash Trained")).toBe(Footprints);
-  });
-
-  it("returns undefined for an unknown tag", () => {
-    expect(trainingIconFor("Gentle")).toBeUndefined();
-  });
 });
 
 describe("trainingKindsIn", () => {

@@ -7,7 +7,11 @@ import { createLucideIcon } from "lucide-react";
  * the same `lucide` class as every other Lucide icon.
  */
 
-/** Litter box trained: Lucide's `cat` outline and eyes, unchanged, over a litter tray. */
+/**
+ * Litter box trained: the top of Lucide's `cat` outline, cut at the tray rim (y=14), over a
+ * litter tray. The eyes move up from y=14 to y=9.5 and the nose is dropped, so a later
+ * Lucide `cat` update cannot be copied in as it stands.
+ */
 export const LitterBox = createLucideIcon("litter-box", [
   ["path", { d: "M3 14v-.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44V14", key: "cat" }],
   ["path", { d: "M2 14h20", key: "rim" }],
