@@ -15,6 +15,70 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Home page: one light-blue accent, flat borderless cards
+
+**Branch:** `feature/frontend` · opened 2026-10-28 · on top of the owner's uncommitted WIP
+
+The owner shared two Pinterest references (MODOA, Wash House) and asked for their card treatment —
+less rounded, no border, one accent colour (the light blue `#9bcfe5`) for buttons, scrollbars and
+controls — coherent across the home page. Their WIP already set `--primary: #9bcfe5` and inlined
+hex values, which left four `designSystemGuards` cases red; `text-primary` read 1.61:1 on cream.
+
+- **Decision (owner, this session):** light-blue *fill* with dark text; blue *text* moves to a new
+  `--primary-ink` token, and `text-primary` call sites are renamed to `text-primary-ink`.
+- **Done when:** the home page shows no inlined hex, no per-card rainbow borders, cards at
+  `rounded-md` without a border; buttons, carousel controls, focus ring and scrollbar are blue;
+  every guard and gate is green.
+- **In scope:** tokens in `globals.css` (primary, ink, surface, ring, hover washes, brand shadows,
+  scrollbar, `--work-ground` → the WIP's cream), the email hex mirror, the rename, and the home
+  components (Hero, HomeSections, page, PetCard, BulletinFeed carousel).
+- **Not in scope:** the warm neutrals (`--border`, `--muted*`, `--secondary`, `--accent`), the
+  dark theme beyond keeping primary/ink readable, a carousel progress bar (new behaviour), and the
+  unmerged `src/app/get-involved/page.tsx` left by an earlier stash pop.
+
+- [x] Tokens + scrollbar + email mirror + contrast pairing for `--primary-ink`
+- [x] Rename `text-primary` → `text-primary-ink` (not `-foreground`) — 104 uses, 37 files
+- [x] Hero, HomeSections, page.tsx, PetCard, BulletinFeed: tokens only, flat cards
+- [x] Gates: typecheck, test, test:components, lint, docs:check, build
+
+## Review
+
+- **Shipped (uncommitted, on top of the owner's WIP):** `--primary-ink`, `--primary-panel`
+  (renamed from `-surface`: the tone guard reads that suffix as a tone), `--radius-card` 1.4rem →
+  0.75rem, `--work-ground` → the WIP's cream `#fff7df`, blue ring / hover washes / `shadow-brand-sm|md`,
+  `scrollbar-color`. Home cards, stat tiles, pillar images, pet cards and carousel media are
+  borderless `rounded-card` panels; carousel arrows use the default (blue) button. All inlined hex
+  from the WIP is gone. Navbar "UM" tag moved to the navy foreground (ink was 3.54:1 on the blue bar).
+- **Owner follow-up:** stat tiles back to white (`bg-work-panel`), figures in `text-primary-ink`
+  (a `bg-primary` pill was tried and rejected by the owner); `--foreground` / `--card-foreground` / `--popover-foreground` → the brown
+  `#4a2c20` (11.3–12.6:1 on every ground, 7.45:1 on the pill), email mirror to match.
+- **Owner follow-ups, later:** quick-action cards white; notice dots under the home carousel
+  (`BulletinCarouselDots.tsx` — ink marks, current one a line, 24px targets, `bulletins.goToNotice`
+  in both locales; probed: clicking mark 2 shows notice 2, the arrows keep the marks in sync).
+- **wcag-auditor pass (owner's standing rule):** fixed what the recolour caused — header labels
+  and focus use `--primary-foreground`, now the brown `#4a2c20` in both themes (the bar stays light
+  blue in dark mode); `outline-none` dropped from `buttonVariants` so buttons get the base 2px
+  outline; scrollbar thumb at ink. Probed in light and dark: every header control outlines in
+  brown, page buttons in `--ring`. `--ring` declared on four grounds in the guard. Header links no
+  longer change colour on hover (all one brown; current page is bold/underlined). That closes
+  `buttons-show-no-visible-keyboard-focus.md`; the rest is in
+  `tasks/open/wcag-findings-that-predate-the-blue-recolour.md`.
+- **Guards:** contrast pairs now measure `--primary-ink` on five grounds; a new case rejects any
+  `text-primary` utility (probed: matches `text-primary`, `hover:text-primary`, `text-primary/80`;
+  not `-ink` / `-foreground`).
+- **Gates (2026-10-28, final):** typecheck 0 · unit 2355/2356 — `homeAnchors` updated to the
+  owner's `#corporate` anchor; `agentEntryPoint` fails only until the ledger commit removes the
+  closed button-focus entry from the index · components 283/283 · integration 93/93 · lint 0 errors (14 pre-existing warnings, none in
+  touched files) · docs:check OK · build exit 0 (dead-port `DATABASE_URL`, throwaway secrets).
+  Visual: 1280px full-page screenshots of the owner's running dev server.
+- **Not done, on purpose:** the warm neutrals, footer, navbar bar and `/bulletins` layouts
+  (`tasks/open/home-palette-still-carries-terracotta-neutrals.md`); a carousel progress bar like
+  the reference's — new behaviour, not asked for; no mobile screenshot (no layout changed, only
+  colour and radius); code went in as one commit (`feat(ui): Move the site to one light-blue accent`) because the owner's WIP, the
+  recolour, the dots and the WCAG fixes interleave inside the same files, and the branch is
+  squash-merged; `.gitignore` (`/tasks`, twice, uncommitted, not this session's) left out at the
+  owner's word, so new `tasks/` files were added with `-f`; not pushed.
+
 # Group the 17 issues left in no group
 
 **Branch:** `chore/group-17-issues` · opened 2026-10-27 · base `cae2d75` · #201 to #217

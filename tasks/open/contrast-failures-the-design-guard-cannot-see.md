@@ -27,5 +27,11 @@ muted, primary, secondary, accent and destructive against their grounds) plus th
 pairs. None of the pairs above is on it, so the suite is green while the pages fail. Colours are
 due to be redone; this list is the measurement that redo needs.
 
+**2026-10-28 update.** `text-primary` no longer exists on `feature/frontend`: blue text is
+`text-primary-ink`, and the guard now declares `--primary-ink` on `--background`, `--card`,
+`--work-ground`, `--work-panel` and `--primary-panel` in both themes, all passing. That retires the
+two `feature/frontend`-only lines above. The "tinted primary washes" pairs (`bg-primary/10` chips)
+were not re-measured — translucent fills are not on the list.
+
 **Settles when:** every text-colour/ground pair the UI renders is either declared in the guard or
 shown to be unused, and the guard fails on each pair above until that pair is fixed.
