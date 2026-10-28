@@ -27,9 +27,9 @@ test.describe("bilingual switching", () => {
 
   test("re-renders the catalogue in Bahasa Malaysia", async ({ page }) => {
     await page.goto("/pets");
-    // Level 2: the catalogue's own title is the gallery heading, and `/pets`
-    // has no `h1` at all — the animal name is the `h1`, and only on a profile.
-    const galleryHeading = page.getByRole("heading", { level: 2 }).first();
+    // Level 1: on `/pets` the gallery is the page, so its title is the `h1`
+    // ("Meet Our Animals", following the "Looking to" filter — see PetGallery).
+    const galleryHeading = page.getByRole("heading", { level: 1 });
     const englishHeading = await galleryHeading.textContent();
 
     await toggle(page).getByRole("button", { name: "BM" }).click();

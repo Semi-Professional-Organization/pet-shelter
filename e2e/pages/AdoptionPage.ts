@@ -29,7 +29,7 @@ export class AdoptionPage {
   /** Opens the public catalogue. */
   async gotoCatalogue(): Promise<void> {
     await this.page.goto("/pets");
-    await this.page.getByRole("heading", { name: /adoptable animals/i }).first().waitFor();
+    await this.page.getByRole("heading", { level: 1, name: /meet our animals/i }).waitFor();
   }
 
   searchBox(): Locator {
