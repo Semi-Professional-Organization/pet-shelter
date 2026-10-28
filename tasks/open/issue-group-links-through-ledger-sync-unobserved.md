@@ -4,8 +4,8 @@
 
 `scripts/issue-groups.mjs` links issues under parent issues with GitHub's native sub-issues, and
 most of them are `ledger` mirrors that `scripts/ledger-issues.mjs` rewrites (81 of the 87 grouped
-issues carry the label; 70 of those are open, with an entry the sync reads). The claim that the links survive
-rests on reading that script: it edits a mirror's title and body (`gh issue edit --title
+issues carry the label; 70 of those are open, with an entry the sync reads). The claim that the
+links survive rests on reading that script: it edits a mirror's title and body (`gh issue edit --title
 --body-file`), and opens and closes it, and never calls a sub-issue API. Relationships are stored
 apart from the body, so a rewrite or a close should leave them alone.
 

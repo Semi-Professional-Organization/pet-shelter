@@ -18,7 +18,7 @@
     {
       "key": "admin-pet-form-and-dates",
       "title": "Admin pet form and birth dates",
-      "summary": "The admin pet form, the birth-date migration, and how dates are validated and defaulted in the admin dialogs.",
+      "summary": "The admin pet form and the writes behind it, the birth-date migration, and how dates are validated and defaulted in the admin dialogs.",
       "parent": 185,
       "issues": [107, 146, 111, 112, 118, 126, 105, 106, 149, 62, 208, 209, 210, 211, 212]
     },
@@ -60,7 +60,7 @@
     {
       "key": "production-secrets-deploys-and-ci",
       "title": "Production secrets, deploys and CI",
-      "summary": "Boot-time secrets, encrypted environment files, what production and previews actually run, and CI settings not yet observed.",
+      "summary": "Boot-time secrets and the staff invite code, encrypted environment files, what production and previews actually run, and CI settings not yet observed.",
       "parent": 191,
       "issues": [129, 69, 135, 156, 157, 158, 155, 213]
     },
