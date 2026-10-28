@@ -351,6 +351,7 @@ export interface TranslationDictionary {
     categoryAnnouncement: string;
     pinned: string;
     postedBy: string;
+    goToNotice: string;
     noUpdates: string;
   };
   footer: {
@@ -717,6 +718,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       categoryAnnouncement: "Notice",
       pinned: "Pinned",
       postedBy: "Posted by:",
+      goToNotice: "Show notice {n} of {total}",
       noUpdates: "No updates to show right now.",
     },
     footer: {
@@ -1077,6 +1079,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       categoryAnnouncement: "Notis",
       pinned: "Disemat",
       postedBy: "Dihantar oleh:",
+      goToNotice: "Papar notis {n} daripada {total}",
       noUpdates: "Tiada kemas kini untuk dipaparkan buat masa ini.",
     },
     footer: {

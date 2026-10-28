@@ -145,7 +145,7 @@ export function PetDataTable({
             <span
               className={`inline-flex items-center gap-1 text-xs font-mono font-semibold px-2 py-0.5 border ${
                 count > 0
-                  ? "bg-primary/10 text-primary border-primary/30"
+                  ? "bg-primary/10 text-primary-ink border-primary/30"
                   : "bg-muted text-muted-foreground border-border"
               }`}
             >
@@ -213,7 +213,7 @@ export function PetDataTable({
                   variant="outline"
                   size="xs"
                   onClick={() => setArchiveCandidate({ pet, archive: false })}
-                  className="text-xs text-primary hover:text-primary"
+                  className="text-xs text-primary-ink hover:text-primary-ink"
                   title="Restore pet profile"
                 >
                   <RotateCcw className="size-3 mr-1" /> Restore

@@ -461,7 +461,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           </h3>
           <span className="text-xs font-semibold text-muted-foreground">
             {isMs ? "Dipilih:" : "Selected:"}{" "}
-            <strong className="text-primary font-mono text-sm">
+            <strong className="text-primary-ink font-mono text-sm">
               RM {finalAmount}.00 {frequency === "monthly" ? (isMs ? "/ bln" : "/ mo") : ""}
             </strong>
           </span>
@@ -498,7 +498,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-2.5 border-t border-border/60 text-xs text-primary font-medium">
+                <div className="mt-4 pt-2.5 border-t border-border/60 text-xs text-primary-ink font-medium">
                   {tier.impactMetrics}
                 </div>
               </button>
@@ -562,7 +562,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
         {(frequency === "monthly" || selectedTier.id === "kibble") && (
           <div className="border border-primary/30 bg-primary/5 p-4 sm:p-5 rounded-2xl space-y-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
+              <Sparkles className="size-4 text-primary-ink" />
               <h4 className="font-heading text-sm font-bold text-foreground">
                 {t("donations.companionTierTitle", "Rescue Companion & Updates")} — {selectedPet ? selectedPet.name : (isMs ? "Haiwan Perlindungan" : "Shelter Rescues")}
               </h4>
@@ -603,7 +603,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
       <div className="border border-border bg-muted/30 p-6 sm:p-7 rounded-2xl space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
-            <QrCode className="size-5 text-primary" />
+            <QrCode className="size-5 text-primary-ink" />
             <h3 className="font-heading text-base font-bold text-foreground">
               4.{" "}
               {isMs
@@ -611,7 +611,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 : "Malaysian Payment Rail: DuitNow National QR / Maybank Transfer"}
             </h3>
           </div>
-          <span className="text-xs font-bold font-mono text-primary bg-primary/10 px-3 py-1 rounded-md">
+          <span className="text-xs font-bold font-mono text-primary-ink bg-primary/10 px-3 py-1 rounded-md">
             Pay: RM {finalAmount}.00{" "}
             {frequency === "monthly" ? (isMs ? "/ bulan" : "/ month") : ""}
           </span>

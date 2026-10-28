@@ -155,7 +155,7 @@ export function HomeOurWorkSection() {
           {pillars.map((pillar, idx) => (
             <div key={idx} className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
               <div
-                className={`relative aspect-16/10 overflow-hidden rounded-3xl border border-border bg-work-panel ${
+                className={`relative aspect-16/10 overflow-hidden rounded-card bg-primary-panel ${
                   idx % 2 ? "lg:order-2" : ""
                 }`}
               >
@@ -168,7 +168,7 @@ export function HomeOurWorkSection() {
                 />
               </div>
               <div className="space-y-4">
-                <p className="text-2xs font-bold uppercase tracking-wider text-primary">
+                <p className="text-2xs font-bold uppercase tracking-wider text-primary-ink">
                   {isMs ? pillar.categoryMs : pillar.categoryEn}
                 </p>
                 <h3 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
@@ -180,7 +180,7 @@ export function HomeOurWorkSection() {
                 <div className="space-y-2 pt-1">
                   {(isMs ? pillar.highlightsMs : pillar.highlightsEn).map((item) => (
                     <div key={item} className="flex items-start gap-2 text-sm font-medium text-foreground/90">
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" />
                       <span>{item}</span>
                     </div>
                   ))}
@@ -192,7 +192,7 @@ export function HomeOurWorkSection() {
                     // adoption steps: reorder the array and every link after
                     // the change would silently point somewhere else.
                     href={pillar.href}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary-ink transition-colors"
                   >
                     <span>{isMs ? "Lihat cara ini berfungsi" : "See how this works"}</span>
                     <ArrowRight className="size-3.5" />
@@ -260,13 +260,13 @@ export function HomeQuickActionsSection() {
   const big = [lead, third].filter(Boolean);
   const small = [second, fourth].filter(Boolean);
   const cardShell =
-    "group flex flex-col overflow-hidden rounded-3xl border border-border bg-work-panel shadow-xs transition-colors hover:border-primary/40";
+    "group flex flex-col overflow-hidden rounded-card bg-work-panel transition-colors hover:bg-accent-subtle-strong";
 
   const cardBody = (a: (typeof actions)[number], titleSize: string) => (
     <div className="flex flex-1 flex-col gap-3 p-6 sm:p-7">
       <h3 className={`font-heading ${titleSize} font-bold text-foreground`}>{a.title}</h3>
       <p className="text-sm leading-relaxed text-muted-foreground">{a.description}</p>
-      <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-xs font-bold uppercase tracking-wider text-primary">
+      <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-xs font-bold uppercase tracking-wider text-primary-ink">
         {a.cta}
         <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
       </span>
@@ -290,7 +290,7 @@ export function HomeQuickActionsSection() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {big.map((a) => (
             <Link key={a.href} href={a.href} className={cardShell}>
-              <div className="relative aspect-4/3 w-full bg-work-ground">
+              <div className="relative aspect-4/3 w-full">
                 <Image src={a.image} alt={a.alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 33vw" />
               </div>
               {cardBody(a, "text-2xl")}

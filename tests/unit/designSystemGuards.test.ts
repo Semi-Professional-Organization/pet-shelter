@@ -292,6 +292,25 @@ describe("design system guards", () => {
     ).toEqual([]);
   });
 
+  it("writes blue text with the ink, never with the light-blue fill", () => {
+    const pattern = /(?:^|[^a-zA-Z0-9_-])((?:[a-z][a-z0-9-]*:)*text-primary)(?![a-zA-Z0-9_-])/g;
+
+    const offenders: string[] = [];
+    for (const [file, source] of sources) {
+      let match: RegExpExecArray | null;
+      pattern.lastIndex = 0;
+      while ((match = pattern.exec(source))) {
+        offenders.push(`${file}:${lineAt(source, match.index)}  ${match[1]}`);
+      }
+    }
+
+    expect(
+      offenders,
+      "`--primary` is a light-blue fill that reads 1.61:1 as text on cream. Use " +
+        `text-primary-ink, the same hue at text strength. Declared in ${GLOBALS}.`
+    ).toEqual([]);
+  });
+
   it("pairs no dark: variant with a raw palette colour", () => {
     // Subsumed by the assertion above, but kept separate for its message: the
     // instinct being corrected here is "add a dark: override", and the answer
@@ -472,9 +491,9 @@ describe("design system guards", () => {
     const AA_TEXT = 4.5;
 
     /**
-     * Brand pairings that are actually rendered. `--primary` and `--destructive` appear as
-     * *foregrounds* too — `text-primary` alone has 121 call sites — so each is checked in
-     * both directions rather than only as a fill.
+     * Brand pairings that are actually rendered. `--destructive` appears as a *foreground*
+     * too, so it is checked in both directions. `--primary` is a fill only; blue text is
+     * `--primary-ink` (`text-primary-ink`, ~100 call sites), checked on every ground it sits on.
      */
     const BRAND_PAIRS: ReadonlyArray<readonly [string, string]> = [
       ["--foreground", "--background"],
@@ -483,8 +502,18 @@ describe("design system guards", () => {
       ["--muted-foreground", "--card"],
       ["--muted-foreground", "--muted"],
       ["--primary-foreground", "--primary"],
-      ["--primary", "--background"],
-      ["--primary", "--card"],
+      ["--primary-ink", "--background"],
+      ["--primary-ink", "--card"],
+      ["--primary-ink", "--work-ground"],
+      ["--primary-ink", "--work-panel"],
+      ["--primary-ink", "--primary-panel"],
+      ["--foreground", "--primary-panel"],
+      ["--muted-foreground", "--primary-panel"],
+      // The focus outline sits 2px off the control, on the page ground.
+      ["--ring", "--background"],
+      ["--ring", "--card"],
+      ["--ring", "--work-ground"],
+      ["--ring", "--work-panel"],
       ["--secondary-foreground", "--secondary"],
       ["--accent-foreground", "--accent"],
       ["--destructive-foreground", "--destructive"],
@@ -576,8 +605,8 @@ describe("design system guards", () => {
       expect(
         offenders,
         "Text below 4.5:1 is unreadable for a large number of people, and a token is the " +
-          "wrong place to compromise: one value here is every call site at once — `text-primary` " +
-          "alone has 121. Fix the token's lightness rather than the call site, and keep hue and " +
+          "wrong place to compromise: one value here is every call site at once — `text-primary-ink` " +
+          "alone has ~100. Fix the token's lightness rather than the call site, and keep hue and " +
           "chroma so the brand survives. Note the fix may be needed in only one theme: .dark " +
           "chooses its own lightness for a dark ground and is usually already fine."
       ).toEqual([]);

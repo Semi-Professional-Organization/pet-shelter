@@ -284,7 +284,7 @@ function ApplicationTrackerContent() {
               {result.petId && (
                 <Link
                   href={`/pets/${result.petId}`}
-                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"
+                  className="text-xs font-semibold text-primary-ink hover:underline flex items-center gap-1 shrink-0"
                 >
                   {isMs ? "Lihat Profil" : "View Profile"} <ChevronRight className="size-3.5" />
                 </Link>
@@ -313,7 +313,7 @@ function ApplicationTrackerContent() {
                           reached
                             ? isDecision
                               ? "tone-soft tone-success"
-                              : "bg-primary/5 border-primary/40 text-primary"
+                              : "bg-primary/5 border-primary/40 text-primary-ink"
                             : "bg-muted/30 border-border text-muted-foreground"
                         }`}
                       >
@@ -322,7 +322,7 @@ function ApplicationTrackerContent() {
                             reached
                               ? isDecision
                                 ? "text-success-accent"
-                                : "text-primary"
+                                : "text-primary-ink"
                               : "text-muted-foreground"
                           }`}
                         />
@@ -502,7 +502,7 @@ export default function TrackApplicationPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center p-8">
-          <Loader2 className="size-6 animate-spin text-primary" />
+          <Loader2 className="size-6 animate-spin text-primary-ink" />
         </div>
       }
     >

@@ -41,7 +41,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
   const rehabProgress = status.isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
 
   return (
-    <Card className="group flex h-full flex-col justify-between gap-0 py-0 ring-0 overflow-hidden border border-border bg-work-panel shadow-xs transition-colors duration-200 hover:border-primary/40 rounded-3xl">
+    <Card className="group flex h-full flex-col justify-between gap-0 py-0 ring-0 overflow-hidden bg-primary-panel transition-colors duration-200 hover:bg-accent-subtle-strong">
       <div>
         {/* Pet Image Container */}
         <div className="relative aspect-4/3 w-full overflow-hidden bg-work-ground">

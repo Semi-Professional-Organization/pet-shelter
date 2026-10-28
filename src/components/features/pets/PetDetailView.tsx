@@ -173,7 +173,7 @@ export function PetDetailView(props: PetDetailViewProps) {
             {/* Quick Location & Visiting Note */}
             <div className="border border-border bg-muted/30 p-4 text-xs space-y-1.5 rounded-xl">
               <div className="font-bold text-foreground flex items-center gap-1.5">
-                <MapPin className="size-3.5 text-primary" />
+                <MapPin className="size-3.5 text-primary-ink" />
                 {t("petDetail.sanctuaryLocationHours", "Sanctuary Location & Visiting Hours")}
               </div>
               <p className="text-muted-foreground">
@@ -379,7 +379,7 @@ export function PetDetailView(props: PetDetailViewProps) {
                           : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                       }`}
                     >
-                      <Icon className={`size-4 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                      <Icon className={`size-4 ${isActive ? "text-primary-ink" : "text-muted-foreground"}`} />
                       <span>{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 && (
                         <span className="px-1.5 py-0.5 text-3xs font-mono font-bold bg-muted text-muted-foreground rounded-full">
@@ -638,7 +638,7 @@ export function PetDetailView(props: PetDetailViewProps) {
                         {t("petDetail.sponsorPetPerksDesc", `Sponsor ${pet.name} monthly to receive personalized updates and help fund ongoing care.`)}
                       </p>
                     </div>
-                    <span className="font-heading text-2xl font-black text-primary font-mono shrink-0">
+                    <span className="font-heading text-2xl font-black text-primary-ink font-mono shrink-0">
                       RM 30<span className="text-xs font-normal text-muted-foreground">/mo</span>
                     </span>
                   </div>

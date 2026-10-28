@@ -47,7 +47,7 @@ export default async function SponsorWallPage() {
     <section className="w-full px-6 py-16 sm:px-8 lg:px-12">
       <div className="mx-auto max-w-5xl space-y-12">
         <header className="mx-auto max-w-3xl space-y-4 text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary-ink">
             Hope for Strays
           </p>
           <h1 className="font-heading text-4xl font-bold text-foreground sm:text-5xl">

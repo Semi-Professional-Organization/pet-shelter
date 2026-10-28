@@ -50,7 +50,7 @@ export default async function SponsorDashboardPage() {
           >
             <div className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
-                <FileBadge className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                <FileBadge className="mt-0.5 size-5 shrink-0 text-primary-ink" aria-hidden />
                 <div className="space-y-1">
                   <p className="font-heading text-lg font-bold text-foreground">
                     Your {dashboard.tier === "GOLD" ? "Gold" : "Silver"} sponsorship
@@ -84,7 +84,7 @@ export default async function SponsorDashboardPage() {
           >
             <div className="space-y-4">
               <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-6">
-                <Ticket className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+                <Ticket className="mt-0.5 size-5 shrink-0 text-primary-ink" aria-hidden />
                 <div className="space-y-1">
                   <p className="font-heading text-lg font-bold text-foreground">
                     Sanctuary open day — 18 October 2026

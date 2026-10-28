@@ -223,7 +223,7 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
             setMode(isRegister ? "login" : "register");
             setError(null);
           }}
-          className="font-semibold text-primary underline underline-offset-4 cursor-pointer"
+          className="font-semibold text-primary-ink underline underline-offset-4 cursor-pointer"
         >
           {isRegister
             ? isMs

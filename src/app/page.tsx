@@ -43,7 +43,7 @@ export default async function HomePage() {
   const metrics = selectHomeMetrics(impactStats);
 
   return (
-    <div className="flex flex-col bg-background">
+    <div className="flex flex-col bg-work-ground">
       {/* 1. Hero Section with 5 Impact Stats */}
       <Hero metrics={metrics} />
 

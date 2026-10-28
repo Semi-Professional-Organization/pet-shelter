@@ -133,7 +133,7 @@ export function MedicalTimeline({ pet, compact = false }: MedicalTimelineProps) 
 
                 {event.veterinarian && (
                   <div className="pt-1 text-2xs text-muted-foreground flex items-center gap-1.5">
-                    <Stethoscope className="size-3 text-primary shrink-0" />
+                    <Stethoscope className="size-3 text-primary-ink shrink-0" />
                     <span>
                       {t("medicalTimeline.verifiedBy", "Verified by")} <strong>{event.veterinarian}</strong>
                     </span>

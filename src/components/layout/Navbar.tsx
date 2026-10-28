@@ -65,23 +65,23 @@ export function Navbar() {
       label: isMs ? "CSR Korporat & Kolaborasi" : "Corporate CSR & Collaboration",
     },
     {
-      href: "/get-involved#partnerships",
+      href: "/get-involved#corporate",
       label: isMs ? "Kerjasama" : "Partnerships",
     },
   ];
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-border bg-card/95 backdrop-blur-md">
+      <header className="sticky top-0 z-40 w-full bg-primary/95 backdrop-blur-md">
         <div className="flex h-16 w-full items-center justify-between px-6 sm:px-8 lg:px-10">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 focus-visible:ring-2">
+          <Link href="/" className="flex items-center gap-2.5 focus-visible:outline-primary-foreground">
             <div className="flex size-9 items-center justify-center overflow-hidden rounded-mark bg-brand-mark text-primary-foreground shadow-brand-sm ring-1 ring-brand-mark-ring">
               <Image src="/android-icon-192x192.png" alt="Hope for Strays" width={36} height={36} className="h-full w-full object-cover" style={{ width: "auto", height: "auto" }} priority />
             </div>
             <div className="flex flex-col">
-              <span className="font-heading text-base sm:text-lg font-bold tracking-tight text-foreground leading-tight">
-                Hope for Strays <span className="text-primary text-xs font-bold uppercase tracking-wider">UM</span>
+              <span className="font-heading text-base sm:text-lg font-bold tracking-tight text-primary-foreground leading-tight">
+                Hope for Strays <span className="text-primary-foreground text-xs font-bold uppercase tracking-wider">UM</span>
               </span>
               {/*
                 The English here is verbatim the hero's `<h1>`, while the Malay
@@ -92,7 +92,7 @@ export function Navbar() {
                 content decision rather than a deduplication. Tracked in
                 `tasks/open/home-page-copy-is-duplicated-outside-the-dictionary.md`.
               */}
-              <span className="text-3xs text-muted-foreground font-medium uppercase tracking-wider hidden sm:block">
+              <span className="text-3xs text-primary-foreground font-medium uppercase tracking-wider hidden sm:block">
                 {isMs ? "Kewujudan Bersama melalui TNRM" : "Coexistence through TNRM & Education"}
               </span>
             </div>
@@ -113,10 +113,10 @@ export function Navbar() {
                 aria-haspopup="true"
                 aria-expanded={openDropdown === "adoption"}
                 onClick={() => setOpenDropdown((prev) => (prev === "adoption" ? null : "adoption"))}
-                className={`inline-flex items-center gap-1 text-sm font-semibold transition-colors hover:text-foreground cursor-pointer ${
+                className={`inline-flex items-center gap-1 text-sm font-semibold focus-visible:outline-primary-foreground cursor-pointer ${
                   pathname.startsWith("/applications") || pathname === "/adoption"
-                    ? "text-foreground font-bold"
-                    : "text-muted-foreground"
+                    ? "text-primary-foreground font-bold"
+                    : "text-primary-foreground"
                 }`}
               >
                 {isMs ? "Adopsi & Asuh" : "Adopt & Foster"}
@@ -154,10 +154,10 @@ export function Navbar() {
                 aria-haspopup="true"
                 aria-expanded={openDropdown === "get-involved"}
                 onClick={() => setOpenDropdown((prev) => (prev === "get-involved" ? null : "get-involved"))}
-                className={`inline-flex items-center gap-1 text-sm font-semibold transition-colors hover:text-foreground cursor-pointer ${
+                className={`inline-flex items-center gap-1 text-sm font-semibold focus-visible:outline-primary-foreground cursor-pointer ${
                   pathname === "/get-involved"
-                    ? "text-foreground font-bold"
-                    : "text-muted-foreground"
+                    ? "text-primary-foreground font-bold"
+                    : "text-primary-foreground"
                 }`}
               >
                 {isMs ? "Sertai Kami" : "Get Involved"}
@@ -185,10 +185,10 @@ export function Navbar() {
             {/* Top Level: Donate & Sponsor */}
             <Link
               href="/donate"
-              className={`text-sm font-semibold transition-colors hover:text-foreground focus-visible:ring-2 ${
+              className={`text-sm font-semibold focus-visible:outline-primary-foreground ${
                 pathname === "/donate"
-                  ? "text-foreground border-b-2 border-foreground pb-0.5"
-                  : "text-muted-foreground"
+                  ? "text-primary-foreground border-b-2 border-primary-foreground pb-0.5"
+                  : "text-primary-foreground"
               }`}
             >
               {isMs ? "Taja & Sumbang" : "Donate & Sponsor"}
@@ -196,10 +196,10 @@ export function Navbar() {
 
             <Link
               href="/transparency"
-              className={`text-sm font-semibold transition-colors hover:text-foreground focus-visible:ring-2 ${
+              className={`text-sm font-semibold focus-visible:outline-primary-foreground ${
                 pathname === "/transparency"
-                  ? "text-foreground border-b-2 border-foreground pb-0.5"
-                  : "text-muted-foreground"
+                  ? "text-primary-foreground border-b-2 border-primary-foreground pb-0.5"
+                  : "text-primary-foreground"
               }`}
             >
               {t("nav.transparency")}
@@ -208,10 +208,10 @@ export function Navbar() {
             {/* Top Level: FAQ */}
             <Link
               href="/faq"
-              className={`text-sm font-semibold transition-colors hover:text-foreground focus-visible:ring-2 ${
+              className={`text-sm font-semibold focus-visible:outline-primary-foreground ${
                 pathname === "/faq"
-                  ? "text-foreground border-b-2 border-foreground pb-0.5"
-                  : "text-muted-foreground"
+                  ? "text-primary-foreground border-b-2 border-primary-foreground pb-0.5"
+                  : "text-primary-foreground"
               }`}
             >
               {isMs ? "Soalan Lazim" : "FAQ"}
@@ -224,7 +224,7 @@ export function Navbar() {
               variant="outline"
               size="sm"
               onClick={() => setIsQuizOpen(true)}
-              className="text-xs font-semibold gap-1.5 h-8 px-2.5 rounded-xl cursor-pointer"
+              className="text-xs font-semibold gap-1.5 h-8 px-2.5 rounded-xl cursor-pointer focus-visible:outline-primary-foreground"
             >
               <Compass className="size-3.5" />
               {isMs ? "Kuiz Keserasian" : "Match Quiz"}
@@ -247,7 +247,7 @@ export function Navbar() {
               href="/pets"
               className={buttonVariants({
                 size: "sm",
-                className: "text-xs font-bold uppercase tracking-wider gap-1.5 h-8 px-3.5 rounded-xl focus-visible:ring-2",
+                className: "text-xs font-bold uppercase tracking-wider gap-1.5 h-8 px-3.5 rounded-xl focus-visible:outline-primary-foreground",
               })}
             >
               <Heart className="size-3.5 fill-current" />
@@ -261,7 +261,7 @@ export function Navbar() {
             <ThemeToggle />
             <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
               <SheetTrigger
-                className="inline-flex size-9 items-center justify-center text-foreground hover:bg-muted focus-visible:ring-2 rounded-xl"
+                className="inline-flex size-9 items-center justify-center text-primary-foreground hover:bg-muted focus-visible:outline-primary-foreground rounded-xl"
                 aria-label="Open Navigation Menu"
               >
                 <Menu className="size-5" />
@@ -309,14 +309,14 @@ export function Navbar() {
                     <Link
                       href="/pets"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors"
                     >
                       🐾 {isMs ? "Haiwan Reskue Kami" : "Meet Our Animals"}
                     </Link>
                     <Link
                       href="/adoption"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors"
                     >
                       🏡 {isMs ? "Adopsi atau Asuh" : "Adopt or Foster"}
                     </Link>
@@ -324,7 +324,7 @@ export function Navbar() {
                     <Link
                       href="/donate"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors"
                     >
                       💖 {isMs ? "Taja & Sumbang" : "Donate & Sponsor"}
                     </Link>
@@ -332,7 +332,7 @@ export function Navbar() {
                     <Link
                       href="/get-involved"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors"
                     >
                       👥 {isMs ? "Sertai Kami" : "Get Involved"}
                     </Link>
@@ -340,7 +340,7 @@ export function Navbar() {
                     <Link
                       href="/faq"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors"
                     >
                       ❓ {isMs ? "Soalan Lazim" : "FAQ"}
                     </Link>
@@ -348,7 +348,7 @@ export function Navbar() {
                     <Link
                       href="/applications/track"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors border-t border-border/40 pt-3 mt-3"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors border-t border-border/40 pt-3 mt-3"
                     >
                       🔍 {isMs ? "Semak Status Permohonan" : "Track Application"}
                     </Link>
@@ -356,7 +356,7 @@ export function Navbar() {
                     <Link
                       href="/bulletins"
                       onClick={() => setIsMobileOpen(false)}
-                      className="block text-sm font-bold py-2 hover:text-primary transition-colors"
+                      className="block text-sm font-bold py-2 hover:text-primary-ink transition-colors"
                     >
                       📰 {t("nav.bulletins")}
                     </Link>

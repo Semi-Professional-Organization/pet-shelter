@@ -26,7 +26,7 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 
 // Shared recipes from docs/page-style-guide.md §3 and §5.
 const panel = "rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7";
-const eyebrow = "text-2xs font-bold uppercase tracking-wider text-primary";
+const eyebrow = "text-2xs font-bold uppercase tracking-wider text-primary-ink";
 const pill = "inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-semibold text-foreground";
 const iconTile = "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground";
 
@@ -114,7 +114,7 @@ export function DonatePageView({
             {/* Credentials */}
             <div className="flex flex-wrap items-center gap-3">
               <span className={pill}>
-                <Heart className="size-4 text-primary" />
+                <Heart className="size-4 text-primary-ink" />
                 {isMs ? "Jaminan Adopsi 100% Percuma" : "100% Free Adoption Guarantee"}
               </span>
             </div>
@@ -181,7 +181,7 @@ export function DonatePageView({
                 <ul className="space-y-2.5">
                   {cat.items.map((item, itemIdx) => (
                     <li key={itemIdx} className="flex items-start gap-2 text-sm font-medium text-foreground/90">
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" />
                       <span>{item}</span>
                     </li>
                   ))}

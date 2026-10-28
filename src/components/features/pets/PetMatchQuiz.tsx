@@ -161,13 +161,13 @@ export function PetMatchQuiz(props: UsePetMatchQuizControllerProps) {
                             }`}
                           >
                             <div>
-                              <Icon className={`size-5 mb-2.5 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                              <Icon className={`size-5 mb-2.5 ${isSelected ? "text-primary-ink" : "text-muted-foreground"}`} />
                               <div className="text-sm font-bold text-foreground">{item.title}</div>
                               <div className="text-xs text-muted-foreground mt-1 leading-snug">{item.desc}</div>
                             </div>
                             <div className="mt-3 text-2xs font-bold">
                               {isSelected ? (
-                                <span className="text-primary flex items-center gap-1">
+                                <span className="text-primary-ink flex items-center gap-1">
                                   <CheckCircle2 className="size-3.5" /> Selected
                                 </span>
                               ) : (
@@ -368,7 +368,7 @@ export function PetMatchQuiz(props: UsePetMatchQuizControllerProps) {
                                 : "border-border bg-card hover:bg-muted/60"
                             }`}
                           >
-                            <Icon className={`size-4 mb-1.5 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                            <Icon className={`size-4 mb-1.5 ${isSelected ? "text-primary-ink" : "text-muted-foreground"}`} />
                             <div className="text-xs font-bold text-foreground">{item.title}</div>
                             <div className="text-2xs text-muted-foreground mt-0.5 leading-snug">{item.desc}</div>
                           </button>

@@ -26,7 +26,7 @@ const cardTitle = "font-heading text-xl font-bold tracking-tight text-foreground
 const cardBody = "text-sm leading-relaxed text-muted-foreground";
 const iconTile = "flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground";
 const innerTile = "space-y-1.5 rounded-xl border border-border bg-background p-4";
-const groupLabel = "text-2xs font-bold uppercase tracking-wider text-primary";
+const groupLabel = "text-2xs font-bold uppercase tracking-wider text-primary-ink";
 const highlight = "flex items-start gap-2 text-sm font-medium text-foreground/90";
 // Not buttonVariants: its default fill would clash with the brand colour (page-style-guide §8.1).
 const whatsappButton =
@@ -73,7 +73,7 @@ export default async function GetInvolvedPage() {
         <div className="space-y-10">
           <SectionHeader
             title="Volunteer"
-            subtitle="Help care for the cats and dogs at our sanctuary, through regular sessions or occasional project days."
+            subtitle="Help care for the cats and dogs at our sanctuary through regular sessions."
           />
 
           <div className="space-y-4">
@@ -155,12 +155,12 @@ export default async function GetInvolvedPage() {
         </div>
       </Section>
 
-      {/* Corporate CSR & Collaboration — organisations taking part as a group or as sponsors. */}
+      {/* Corporate CSR & Partnerships — organisations looking to collaborate or support our work. */}
       <Section id="corporate" className="scroll-mt-24">
         <div className="space-y-10">
           <SectionHeader
-            title="Corporate CSR & Collaboration"
-            subtitle="Companies, university clubs and other organisations can volunteer together as a group or sponsor our work."
+            title="Corporate CSR & Partnerships"
+            subtitle="Companies, university clubs, veterinary clinics and other organisations can collaborate with or support our work."
           />
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -179,7 +179,7 @@ export default async function GetInvolvedPage() {
               <p className={cardBody}>Sponsor a monthly TNRM sterilisation drive or an equipment upgrade.</p>
               <div className={innerTile}>
                 <p className={highlight}>
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" />
                   Brand logo credited in the shelter bulletin
                 </p>
               </div>
@@ -187,40 +187,8 @@ export default async function GetInvolvedPage() {
           </div>
 
           <WhatsAppLink
-            text="Hi Hope for Strays, our organisation would like to collaborate on a CSR activity."
-            label="WhatsApp CSR Coordinator"
-          />
-        </div>
-      </Section>
-
-      {/* Partnerships — clinics and universities working with us on an ongoing basis. */}
-      <Section id="partnerships" className="scroll-mt-24">
-        <div className="space-y-10">
-          <SectionHeader
-            title="Partnerships"
-            subtitle="We work with veterinary clinics across Petaling Jaya, Subang Jaya and Kuala Lumpur, and with Universiti Malaya faculties and student societies."
-          />
-
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <Stethoscope className="size-5" />
-              </div>
-              <h3 className={cardTitle}>Veterinary Clinics</h3>
-              <p className={cardBody}>Subsidised spay/neuter slots and emergency trauma triage.</p>
-            </div>
-            <div className={`${panel} flex flex-col gap-3`}>
-              <div className={iconTile}>
-                <ShieldCheck className="size-5" />
-              </div>
-              <h3 className={cardTitle}>Universities & Student Societies</h3>
-              <p className={cardBody}>Joint educational seminars, campus feeder registries, and research on urban stray coexistence.</p>
-            </div>
-          </div>
-
-          <WhatsAppLink
-            text="Hi Hope for Strays, we would like to discuss a partnership."
-            label="WhatsApp Partnerships Liaison"
+            text="Hi Hope for Strays, we would like more information about collaboration and partnership opportunities."
+            label="Contact for More Information"
           />
         </div>
       </Section>
