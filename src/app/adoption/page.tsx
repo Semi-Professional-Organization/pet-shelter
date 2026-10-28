@@ -1,0 +1,20 @@
+import { Metadata } from "next";
+import { AdoptOrFosterIntro, AdoptOrFosterApply } from "@/components/features/adoptions/AdoptOrFoster";
+import { HomeProcessSection } from "@/components/layout/HomeSections";
+
+export const metadata: Metadata = {
+  title: "Adopt or Foster | Hope for Strays UM",
+  description:
+    "Adopt a rescue for life, or foster one that is still building confidence around people — both are free and follow the same three steps at Hope for Strays UM: apply, meet the animal at the sanctuary, and welcome them home.",
+};
+
+// Explain the process first, then choose and apply.
+export default function AdoptionPage() {
+  return (
+    <div className="flex min-h-screen flex-col">
+      <AdoptOrFosterIntro />
+      <HomeProcessSection />
+      <AdoptOrFosterApply />
+    </div>
+  );
+}

@@ -7,7 +7,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { lookupApplicationStatusAction } from "@/actions/applications";
 import { PublicApplicationTrackingDTO } from "@/lib/validations/applicationTracking";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Section } from "@/components/layout/Section";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/components/providers/LanguageProvider";
@@ -25,8 +26,6 @@ import {
   Loader2,
   FileCheck2,
   ChevronRight,
-  ShieldCheck,
-  Building,
   Home,
   type LucideIcon,
 } from "lucide-react";
@@ -161,24 +160,21 @@ function ApplicationTrackerContent() {
   const currentStep = result?.milestoneIndex ?? 0;
 
   return (
-    <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto space-y-8">
-        
+    <Section className="min-h-screen">
+      <div className="space-y-12">
+
         {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-            <ShieldCheck className="size-3.5" /> {t("tracking.badge", "Adopter Self-Service Portal")}
-          </div>
-          <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-            {t("tracking.title", "Track Adoption Application")}
+        <div className="space-y-6">
+          <h1 className="font-heading text-3xl font-bold leading-[1.15] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            {t("tracking.title", "Track Application Status")}
           </h1>
-          <p className="text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">
-            {t("tracking.subtitle", "Check the live review status, scheduled meet-and-greet sessions, and finalization instructions for your shelter adoption inquiry.")}
+          <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
+            {t("tracking.subtitle", "Enter your reference ID to see where your application stands.")}
           </p>
         </div>
 
         {/* Lookup Card */}
-        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-sm">
+        <div className="rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -190,7 +186,7 @@ function ApplicationTrackerContent() {
                   placeholder={t("tracking.refPlaceholder", "e.g. HFS-APP-202609-K7QM")}
                   value={referenceId}
                   onChange={(e) => setReferenceId(e.target.value)}
-                  className="font-mono text-sm rounded-lg"
+                  className="font-mono text-sm"
                   required
                 />
               </div>
@@ -205,7 +201,7 @@ function ApplicationTrackerContent() {
                   placeholder={t("tracking.emailPlaceholder", "your.email@example.com")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="text-sm rounded-lg"
+                  className="text-sm"
                   required
                 />
               </div>
@@ -214,7 +210,8 @@ function ApplicationTrackerContent() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full font-semibold uppercase tracking-wider text-xs py-2.5 gap-2 cursor-pointer"
+              size="lg"
+              className="w-full gap-2 cursor-pointer"
             >
               {loading ? (
                 <>
@@ -241,7 +238,7 @@ function ApplicationTrackerContent() {
           <div className="space-y-6 animate-in">
             
             {/* Target Rescue Summary Card */}
-            <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            <div className="flex flex-col items-start gap-5 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:flex-row sm:items-center sm:p-7">
               {result.petImage ? (
                 <div className="relative size-20 sm:size-24 rounded-xl overflow-hidden shrink-0 border border-border">
                   <Image
@@ -287,7 +284,7 @@ function ApplicationTrackerContent() {
               {result.petId && (
                 <Link
                   href={`/pets/${result.petId}`}
-                  className="text-xs font-semibold text-primary hover:underline flex items-center gap-1 shrink-0"
+                  className="text-xs font-semibold text-primary-ink hover:underline flex items-center gap-1 shrink-0"
                 >
                   {isMs ? "Lihat Profil" : "View Profile"} <ChevronRight className="size-3.5" />
                 </Link>
@@ -296,8 +293,8 @@ function ApplicationTrackerContent() {
 
             {/* Stepper Timeline (if not rejected) */}
             {result.status !== "REJECTED" ? (
-              <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b border-border pb-2">
+              <div className="space-y-6 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
+                <h3 className="border-b border-border pb-3 font-heading text-xl font-bold tracking-tight text-foreground">
                   {t("tracking.timelineTitle", "Adoption Review Timeline")}
                 </h3>
 
@@ -316,7 +313,7 @@ function ApplicationTrackerContent() {
                           reached
                             ? isDecision
                               ? "tone-soft tone-success"
-                              : "bg-primary/5 border-primary/40 text-primary"
+                              : "bg-primary/5 border-primary/40 text-primary-ink"
                             : "bg-muted/30 border-border text-muted-foreground"
                         }`}
                       >
@@ -325,7 +322,7 @@ function ApplicationTrackerContent() {
                             reached
                               ? isDecision
                                 ? "text-success-accent"
-                                : "text-primary"
+                                : "text-primary-ink"
                               : "text-muted-foreground"
                           }`}
                         />
@@ -442,20 +439,20 @@ function ApplicationTrackerContent() {
               </div>
             ) : (
               /* Rejected State Closure Card */
-              <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-sm space-y-4">
+              <div className="space-y-4 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <AlertCircle className="size-5 text-warning-accent" />
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                  <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">
                     {t("tracking.closedTitle", "Application Status: Closed")}
                   </h3>
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {t("tracking.closedDesc", "Thank you for your interest. After evaluating all submissions and the specific temperament requirements of this rescue, we were unable to proceed with this match.")}
                 </p>
                 <div className="pt-2">
                   <Link
                     href="/pets"
-                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-xs font-semibold hover:bg-primary/90 transition"
+                    className={buttonVariants({ className: "gap-2" })}
                   >
                     <Heart className="size-3.5" /> {t("tracking.viewOtherPetsBtn", "View Other Available Rescues")}
                   </Link>
@@ -464,28 +461,28 @@ function ApplicationTrackerContent() {
             )}
 
             {/* Direct Support & Shelter Contact Card */}
-            <div className="bg-muted/40 border border-border rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1 text-xs">
-                <h4 className="font-bold text-foreground flex items-center gap-1.5">
-                  <Building className="size-3.5 text-primary" /> {t("tracking.helplineTitle", "Hope for Strays Sanctuary & Helpline")}
+            <div className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-border bg-muted/30 p-6 sm:flex-row sm:items-center sm:p-7">
+              <div className="space-y-2">
+                <h4 className="font-heading text-xl font-bold tracking-tight text-foreground">
+                  {t("tracking.helplineTitle", "Hope for Strays Sanctuary & Helpline")}
                 </h4>
-                <p className="text-muted-foreground">
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {t("tracking.helplineHours", "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Hours: Tue – Sun 10am – 5pm")}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2 shrink-0">
+              <div className="flex flex-wrap gap-3 shrink-0">
                 <a
                   href={SHELTER_WHATSAPP_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 bg-success-solid text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-success-solid transition"
+                  className="inline-flex h-10 items-center gap-2 rounded-control bg-brand-whatsapp px-6 text-xs font-semibold uppercase tracking-widest text-white shadow-brand-xs transition-colors hover:bg-brand-whatsapp-hover"
                 >
                   <MessageCircle className="size-3.5" /> {t("tracking.whatsAppBtn", "WhatsApp Coordinator")}
                 </a>
                 <a
                   href={`tel:${SHELTER_PHONE_TEL}`}
-                  className="inline-flex items-center gap-1.5 border border-border bg-card text-foreground px-3.5 py-1.5 rounded-lg text-xs font-semibold hover:bg-accent transition"
+                  className={buttonVariants({ variant: "outline", className: "gap-2" })}
                 >
                   <Phone className="size-3.5" /> {t("tracking.callBtn", SHELTER_PHONE_DISPLAY)}
                 </a>
@@ -496,7 +493,7 @@ function ApplicationTrackerContent() {
         )}
 
       </div>
-    </div>
+    </Section>
   );
 }
 
@@ -505,7 +502,7 @@ export default function TrackApplicationPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center p-8">
-          <Loader2 className="size-6 animate-spin text-primary" />
+          <Loader2 className="size-6 animate-spin text-primary-ink" />
         </div>
       }
     >

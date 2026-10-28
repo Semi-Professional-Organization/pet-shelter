@@ -68,7 +68,7 @@ export function FinancialReportsTable({
               </th>
               <td className="px-4 py-4">
                 <div className="flex items-start gap-2.5">
-                  <FileText className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <FileText className="mt-0.5 size-4 shrink-0 text-primary-ink" aria-hidden="true" />
                   <div className="space-y-1">
                     <p className="font-semibold leading-snug text-foreground">
                       {report.title}

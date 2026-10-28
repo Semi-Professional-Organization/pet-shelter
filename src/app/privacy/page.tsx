@@ -1,7 +1,6 @@
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -13,7 +12,7 @@ export const metadata: Metadata = {
 export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-card py-12 sm:py-16">
-      <div className="mx-auto max-w-4xl px-6 sm:px-8 lg:px-10 space-y-10">
+      <div className="mx-auto max-w-4xl px-6 sm:px-8 lg:px-12 space-y-10">
         {/* Header */}
         <div className="space-y-4 border-b border-border pb-8">
           <Link
@@ -28,16 +27,11 @@ export default function PrivacyPolicyPage() {
             Back to Home
           </Link>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-secondary text-secondary-foreground text-xs font-semibold border border-border">
-            <ShieldCheck className="size-3.5 text-foreground" />
-            <span>Malaysian PDPA Act 2010 Compliance</span>
-          </div>
-
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
             Personal Data Protection & Privacy Notice
           </h1>
           <p className="text-sm text-muted-foreground">
-            Last Updated: August 2026 • Persatuan Harapan Haiwan Terbiar Selangor (ROS Reg: {PUBLIC_ROS_REGISTRATION_NO})
+            Last Updated: August 2026 • Hope for Strays
           </p>
         </div>
 
@@ -55,7 +49,7 @@ export default function PrivacyPolicyPage() {
             <p>We may collect and process personal data that you provide directly, including:</p>
             <ul className="list-disc list-inside space-y-1.5 text-muted-foreground pl-2">
               <li><strong>Adoption & Foster Applicants:</strong> Full name, Malaysian NRIC / Passport number, residential address, telephone number, email, housing type, landlord consent records, and household pet history.</li>
-              <li><strong>Donors & Sponsors:</strong> Donor name, email address, contact number, payment transaction references, and Tax Identification Number / NRIC for official LHDN Section 44(6) tax exemption receipts.</li>
+              <li><strong>Donors & Sponsors:</strong> Donor name, email address, contact number, payment transaction references, and, if you provide it, your NRIC / Passport / SSM number.</li>
               <li><strong>Volunteers & Visitors:</strong> Name, contact information, emergency contacts, availability schedules, and sanctuary sign-in logs.</li>
             </ul>
           </section>
@@ -65,16 +59,15 @@ export default function PrivacyPolicyPage() {
             <p>Your personal data is processed strictly for legitimate non-profit shelter operations, including:</p>
             <ul className="list-disc list-inside space-y-1.5 text-muted-foreground pl-2">
               <li>Assessing adoption and temporary foster care applications for animal welfare and premises safety.</li>
-              <li>Issuing official tax-deductible e-Receipts in compliance with Inland Revenue Board of Malaysia (LHDN) regulations.</li>
+              <li>Recording donations and sending donation confirmations.</li>
               <li>Scheduling adoption meet-and-greets, home checks, and veterinary follow-up consultations.</li>
-              <li>Complying with statutory reporting requirements set by the Registrar of Societies (ROS) Malaysia.</li>
             </ul>
           </section>
 
           <section className="space-y-3">
             <h2 className="font-heading text-xl font-bold text-foreground">4. Disclosure & Data Protection</h2>
             <p>
-              We maintain strict confidentiality. We do not sell, rent, or lease personal information to third-party commercial entities. Personal data is disclosed only to authorized shelter coordinators, appointed veterinary surgeons for microchip registration, or regulatory authorities (LHDN / ROS) where legally required.
+              We maintain strict confidentiality. We do not sell, rent, or lease personal information to third-party commercial entities. Personal data is disclosed only to authorized shelter coordinators, appointed veterinary surgeons for microchip registration, or regulatory authorities where legally required.
             </p>
           </section>
 

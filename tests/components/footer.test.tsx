@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { Footer } from "@/components/layout/Footer";
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import { translations } from "@/lib/i18n/translations";
 import { renderWithLanguage } from "./support/render";
 
@@ -23,22 +22,22 @@ import { renderWithLanguage } from "./support/render";
  *
  * The registration line is the reason this file exists: its call changed
  * shape, with the interpolation params moving from the third argument to the
- * second, and it prints a statutory identifier.
+ * second, and it printed a statutory identifier. That line is withdrawn until
+ * the shelter's registration is confirmed
+ * (`tasks/open/shelter-not-registered-tax-receipts.md`), so the cases below now
+ * pin its absence.
  */
 describe("Footer", () => {
-  it("prints the public ROS registration number in English", () => {
+  it("makes no registration claim in English", () => {
     renderWithLanguage(<Footer />);
 
-    expect(screen.getByText(`ROS Reg: ${PUBLIC_ROS_REGISTRATION_NO}`)).toBeInTheDocument();
-    // An unresolved placeholder would mean the params never reached `t()`.
-    expect(screen.queryByText(/\{regNo\}/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ROS Reg/)).not.toBeInTheDocument();
   });
 
-  it("prints the public ROS registration number in Malay", () => {
+  it("makes no registration claim in Malay", () => {
     renderWithLanguage(<Footer />, { language: "ms" });
 
-    expect(screen.getByText(`No. ROS: ${PUBLIC_ROS_REGISTRATION_NO}`)).toBeInTheDocument();
-    expect(screen.queryByText(/\{regNo\}/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No\. ROS/)).not.toBeInTheDocument();
   });
 
   it("renders the link whose key the dictionary lacks as words, not a path", () => {
@@ -68,16 +67,16 @@ describe("Footer", () => {
     expect(screen.queryByText(translations[other].nav.sponsorWall)).not.toBeInTheDocument();
   });
 
-  it("fills in the registration number when rendered with no provider at all", () => {
+  it("leaves no placeholder unresolved when rendered with no provider at all", () => {
     // `useLanguage` has a fallback for components rendered outside a
     // `LanguageProvider`, and it was a separate, diverged copy of `t`: it never
-    // interpolated, so this line printed "ROS Reg: {regNo}" in place of the
-    // shelter's registration number. Both paths now share one `translate()`.
+    // interpolated, so the registration line printed "ROS Reg: {regNo}". Both
+    // paths now share one `translate()`, and that line is gone; this keeps the
+    // provider-less render honest for whatever interpolates here next.
     // Rendered with plain `render`, deliberately — every other case here goes
     // through the provider, which is why the defect was invisible.
     render(<Footer />);
-    expect(screen.getByText(`ROS Reg: ${PUBLIC_ROS_REGISTRATION_NO}`)).toBeInTheDocument();
-    expect(screen.queryByText(/\{regNo\}/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\{[A-Za-z]+\}/)).not.toBeInTheDocument();
   });
 
   it("names the bulletin feature the way the rest of the site does", () => {

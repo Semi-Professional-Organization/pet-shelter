@@ -40,16 +40,6 @@
     "isPublished": true
   },
   {
-    "id": "faq-005",
-    "category": "sponsorship",
-    "question": "Is my donation tax-deductible in Malaysia, and how do I receive an official e-Receipt?",
-    "questionMs": "Adakah sumbangan saya layak mendapat pelepasan cukai di Malaysia, dan bagaimana saya menerima e-Resit rasmi?",
-    "answer": "Yes! Hope For Strays (Persatuan Harapan Haiwan Terbiar) is a registered welfare society approved under Subsection 44(6) of the Income Tax Act 1967 (Approval Ref: LHDN.01/35/42/51/179-6.4912). When you make a donation or sponsorship pledge through our website with your Full Name and Malaysian IC / Passport / SSM Company Number, you receive a pledge reference to quote on your transfer, and an official computerized tax-exempt e-Receipt with full LHDN reference numbers is emailed to you once our coordinator has matched that transfer against the shelter's bank statement, usually within 2 working days.",
-    "answerMs": "Ya! Pertubuhan Kebajikan Hope for Strays merupakan badan kebajikan yang diluluskan di bawah Seksyen 44(6) Akta Cukai Pendapatan 1967 (Ruj: LHDN.01/35/42/51/179-6.4912). Setiap sumbangan tunai yang disahkan layak menerima e-Resit pengecualian cukai rasmi untuk taksiran cukai individu atau korporat, dihantar melalui e-mel selepas penyelaras kami memadankan pemindahan anda dengan penyata bank.",
-    "displayOrder": 1,
-    "isPublished": true
-  },
-  {
     "id": "faq-009",
     "category": "adoption",
     "question": "How much does it cost to adopt a pet from Hope for Strays?",
@@ -187,6 +177,26 @@
     "answer": "We accept owner surrenders only when we genuinely have space, and our kennels are usually full, so please contact us before bringing an animal to the sanctuary. Speak to a coordinator first: many surrenders are driven by a landlord dispute, a new baby, a behavioural problem or a vet bill, and we can often help you resolve the underlying issue and keep your pet at home. If surrender really is the only option, we will ask for the animal's vaccination and medical records and an honest account of its temperament, because accurate information is what lets us find the right next home rather than a failed placement.",
     "answerMs": "Kami menerima penyerahan daripada pemilik hanya apabila kami benar-benar mempunyai ruang, dan kandang kami selalunya penuh, jadi sila hubungi kami sebelum membawa haiwan ke santuari. Berbincang dengan penyelaras terlebih dahulu: banyak penyerahan berpunca daripada pertikaian dengan tuan rumah, kelahiran anak, masalah tingkah laku atau bil veterinar, dan selalunya kami dapat membantu anda menyelesaikan punca sebenar serta mengekalkan haiwan itu di rumah. Sekiranya penyerahan benar-benar satu-satunya pilihan, kami akan meminta rekod vaksinasi dan perubatan haiwan serta gambaran jujur tentang perangainya, kerana maklumat yang tepat membolehkan kami mencari rumah seterusnya yang sesuai dan mengelakkan penempatan yang gagal.",
     "displayOrder": 0,
+    "isPublished": true
+  },
+  {
+    "id": "faq-024",
+    "category": "general",
+    "question": "How do I transfer directly or pay by DuitNow QR?",
+    "questionMs": "Bagaimanakah cara membuat pindahan terus atau imbas DuitNow QR?",
+    "answer": "Scan our DuitNow QR code with any Malaysian banking app, or transfer directly to our Maybank account 5140 1234 5678 (Hope for Strays).",
+    "answerMs": "Imbas kod DuitNow QR kami menggunakan mana-mana aplikasi perbankan Malaysia, atau buat pindahan terus ke akaun Maybank 5140 1234 5678 (Hope for Strays).",
+    "displayOrder": 1,
+    "isPublished": true
+  },
+  {
+    "id": "faq-025",
+    "category": "general",
+    "question": "Can I drop off supplies at the shelter?",
+    "questionMs": "Bolehkah saya menghantar bekalan terus ke pusat perlindungan?",
+    "answer": "Yes. We welcome supply drop-offs at the sanctuary (No. 18, Jalan SS 2/72) from Tuesday to Sunday, 10:00 AM – 5:00 PM. Closed Mondays.",
+    "answerMs": "Ya. Kami mengalu-alukan penghantaran barangan ke santuari (No. 18, Jalan SS 2/72) dari Selasa hingga Ahad, 10:00 pagi – 5:00 petang. Tutup pada hari Isnin.",
+    "displayOrder": 2,
     "isPublished": true
   },
   {

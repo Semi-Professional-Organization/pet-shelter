@@ -41,7 +41,7 @@ export function SponsorWallGrid({
           id={`wall-${tier}`}
           className="inline-flex items-center gap-2 font-heading text-2xl font-bold text-foreground"
         >
-          <Award className="size-5 text-primary" aria-hidden />
+          <Award className="size-5 text-primary-ink" aria-hidden />
           {isMs
             ? `Penaja ${tierLabel(tier, true)}`
             : `${tierLabel(tier, false)} sponsors`}

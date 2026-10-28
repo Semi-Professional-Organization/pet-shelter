@@ -48,7 +48,7 @@ export function ImpactStatHighlights({ stats }: { stats: ImpactStatRecord[] }) {
               {isMs && stat.periodMs ? stat.periodMs : stat.period}
             </span>
           </dt>
-          <dd className="m-0 font-heading text-4xl font-extrabold tracking-tight text-primary sm:text-5xl">
+          <dd className="m-0 font-heading text-4xl font-extrabold tracking-tight text-primary-ink sm:text-5xl">
             {stat.metricValue}
           </dd>
         </div>

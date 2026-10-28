@@ -265,7 +265,7 @@ export function RehabNeedsSection({
       <div className="border border-border bg-muted/30 p-6 sm:p-8 rounded-3xl space-y-5 mt-12">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-primary-ink flex items-center gap-1.5">
               <Sparkles className="size-3.5" />
               {isMs ? "Panduan Penghantaran & Bantuan Barangan" : "Physical Delivery & In-Kind Donation Guide"}
             </span>
@@ -286,7 +286,7 @@ export function RehabNeedsSection({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
           <div className="border border-border bg-background p-4 rounded-2xl flex items-start gap-3.5">
-            <MapPin className="size-5 text-primary shrink-0 mt-0.5" />
+            <MapPin className="size-5 text-primary-ink shrink-0 mt-0.5" />
             <div className="space-y-1 text-xs sm:text-sm">
               <p className="font-bold text-foreground">
                 {isMs ? "Pusat Santuari & Rumah Pemulihan PJ:" : "Sanctuary & Rehabilitation House:"}
@@ -298,7 +298,7 @@ export function RehabNeedsSection({
           </div>
 
           <div className="border border-border bg-background p-4 rounded-2xl flex items-start gap-3.5">
-            <Clock className="size-5 text-primary shrink-0 mt-0.5" />
+            <Clock className="size-5 text-primary-ink shrink-0 mt-0.5" />
             <div className="space-y-1 text-xs sm:text-sm">
               <p className="font-bold text-foreground">
                 {isMs ? "Waktu Penerimaan Barangan:" : "Receiving Hours:"}

@@ -282,7 +282,7 @@ export function TransparencyEditor() {
             onClick={() => setTab(id)}
             className={`flex items-center gap-2 border-b-2 px-1 pb-3 transition-colors ${
               tab === id
-                ? "border-primary text-primary"
+                ? "border-primary text-primary-ink"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -857,7 +857,7 @@ function ImpactTab({
             className="space-y-3 rounded-2xl border border-border bg-background p-4"
           >
             <div>
-              <p className="font-heading text-3xl font-extrabold text-primary">
+              <p className="font-heading text-3xl font-extrabold text-primary-ink">
                 {stat.metricValue}
               </p>
               <p className="text-sm font-bold text-foreground">{stat.label}</p>

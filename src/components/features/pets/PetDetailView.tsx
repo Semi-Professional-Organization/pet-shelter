@@ -7,6 +7,8 @@ import { AdoptionForm } from "@/components/features/adoptions/AdoptionForm";
 import { SponsorshipModal } from "./SponsorshipModal";
 import { MedicalTimeline } from "./MedicalTimeline";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   Heart,
@@ -32,7 +34,7 @@ import {
   Gift,
   Clock,
 } from "lucide-react";
-import { getRehabStageLabel, getRehabProgressPercent } from "@/lib/presentation/petStatusPresentation";
+import { getRehabStageLabel, getRehabProgressPercent, getPlacementOptions } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
 import { PetStatusIcon } from "./PetStatusIcon";
 import { usePetDetailViewController, PetDetailTab } from "@/hooks/usePetDetailViewController";
@@ -69,6 +71,7 @@ export function PetDetailView(props: PetDetailViewProps) {
   } = handlers;
 
   const isInRehabilitation = statusPresentation.isInRehabilitation;
+  const placement = getPlacementOptions(pet);
   const rehabStage = isInRehabilitation ? getRehabStageLabel(pet, isMs) : undefined;
   const rehabProgress = isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
   // Newest first, and never mutate the array the store handed us.
@@ -112,7 +115,7 @@ export function PetDetailView(props: PetDetailViewProps) {
     <div className="min-h-screen bg-card pb-20">
       {/* Top Breadcrumbs & Back */}
       <div className="border-b border-border bg-muted/20">
-        <div className="w-full px-6 sm:px-8 lg:px-12 py-4 flex items-center justify-between">
+        <div className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12 py-4 flex items-center justify-between">
           <Link
             href="/pets"
             className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
@@ -135,7 +138,7 @@ export function PetDetailView(props: PetDetailViewProps) {
         </div>
       </div>
 
-      <div className="w-full px-6 sm:px-8 lg:px-12 pt-8 sm:pt-10">
+      <div className="mx-auto w-full max-w-7xl px-6 sm:px-8 lg:px-12 pt-8 sm:pt-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 max-w-7xl mx-auto">
           
           {/* Left Column: Pet Portrait & Quick Facts */}
@@ -170,7 +173,7 @@ export function PetDetailView(props: PetDetailViewProps) {
             {/* Quick Location & Visiting Note */}
             <div className="border border-border bg-muted/30 p-4 text-xs space-y-1.5 rounded-xl">
               <div className="font-bold text-foreground flex items-center gap-1.5">
-                <MapPin className="size-3.5 text-primary" />
+                <MapPin className="size-3.5 text-primary-ink" />
                 {t("petDetail.sanctuaryLocationHours", "Sanctuary Location & Visiting Hours")}
               </div>
               <p className="text-muted-foreground">
@@ -222,7 +225,27 @@ export function PetDetailView(props: PetDetailViewProps) {
             isInRehabilitation ? "sm:grid-cols-2" : "sm:grid-cols-3"
               }`}
             >
-              {!isInRehabilitation && (
+              {/* An animal that needs socialising is offered for foster instead of adoption
+                  (getPlacementOptions). Interim: a WhatsApp message until applications can record
+                  "foster". Animals under care get neither — sponsorship below. */}
+              {placement.foster && (
+                <a
+                  href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
+                    `Hi Hope for Strays, I would like to foster ${pet.name}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    buttonVariants(),
+                    "w-full text-xs sm:text-sm font-bold uppercase tracking-wider gap-1.5 py-3 cursor-pointer rounded-xl"
+                  )}
+                >
+                  <Heart className="size-4" />
+                  {t("petDetail.applyToFoster", "Apply to Foster")}
+                </a>
+              )}
+
+              {!isInRehabilitation && !placement.foster && (
                 <Button
                 disabled={!isAvailable}
                 onClick={() => setIsAdoptionOpen(true)}
@@ -356,7 +379,7 @@ export function PetDetailView(props: PetDetailViewProps) {
                           : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                       }`}
                     >
-                      <Icon className={`size-4 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                      <Icon className={`size-4 ${isActive ? "text-primary-ink" : "text-muted-foreground"}`} />
                       <span>{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 && (
                         <span className="px-1.5 py-0.5 text-3xs font-mono font-bold bg-muted text-muted-foreground rounded-full">
@@ -615,7 +638,7 @@ export function PetDetailView(props: PetDetailViewProps) {
                         {t("petDetail.sponsorPetPerksDesc", `Sponsor ${pet.name} monthly to receive personalized updates and help fund ongoing care.`)}
                       </p>
                     </div>
-                    <span className="font-heading text-2xl font-black text-primary font-mono shrink-0">
+                    <span className="font-heading text-2xl font-black text-primary-ink font-mono shrink-0">
                       RM 30<span className="text-xs font-normal text-muted-foreground">/mo</span>
                     </span>
                   </div>

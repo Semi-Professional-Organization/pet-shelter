@@ -1,16 +1,11 @@
 "use client";
 
-import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  PUBLIC_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   QrCode,
   CheckCircle2,
   Copy,
-  ShieldCheck,
   ArrowRight,
   RotateCcw,
   RotateCw,
@@ -187,8 +182,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     if (!donorName.trim() || !donorEmail.trim()) {
       setErrorMessage(
         isMs
-          ? "Sila masukkan nama dan alamat emel anda untuk menerima resit rasmi."
-          : "Please enter your name and email address to receive your official tax receipt."
+          ? "Sila masukkan nama dan alamat emel anda untuk melengkapkan ikrar."
+          : "Please enter your name and email address to complete your pledge."
       );
       return;
     }
@@ -267,7 +262,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
   if (completedPledge) {
     return (
-      <div className="border border-border bg-card p-6 sm:p-10 rounded-2xl shadow-sm space-y-6">
+      <div className="space-y-6 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
         <div className="bg-success-surface border border-success-accent/30 p-5 rounded-xl flex items-start gap-3.5">
           <CheckCircle2 className="size-6 text-success-accent shrink-0 mt-0.5" />
           <div>
@@ -400,7 +395,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   }
 
   return (
-    <div className="border border-border bg-card p-6 sm:p-8 lg:p-10 rounded-2xl shadow-sm space-y-8">
+    <div className="space-y-8 rounded-3xl border border-border bg-work-panel p-6 shadow-xs sm:p-7">
       {errorMessage && (
         <div className="bg-destructive/10 border border-destructive/30 p-4 text-sm text-destructive font-medium rounded-xl flex items-center gap-2">
           <span>⚠️ {errorMessage}</span>
@@ -466,7 +461,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           </h3>
           <span className="text-xs font-semibold text-muted-foreground">
             {isMs ? "Dipilih:" : "Selected:"}{" "}
-            <strong className="text-primary font-mono text-sm">
+            <strong className="text-primary-ink font-mono text-sm">
               RM {finalAmount}.00 {frequency === "monthly" ? (isMs ? "/ bln" : "/ mo") : ""}
             </strong>
           </span>
@@ -503,7 +498,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-2.5 border-t border-border/60 text-xs text-primary font-medium">
+                <div className="mt-4 pt-2.5 border-t border-border/60 text-xs text-primary-ink font-medium">
                   {tier.impactMetrics}
                 </div>
               </button>
@@ -567,7 +562,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
         {(frequency === "monthly" || selectedTier.id === "kibble") && (
           <div className="border border-primary/30 bg-primary/5 p-4 sm:p-5 rounded-2xl space-y-3">
             <div className="flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
+              <Sparkles className="size-4 text-primary-ink" />
               <h4 className="font-heading text-sm font-bold text-foreground">
                 {t("donations.companionTierTitle", "Rescue Companion & Updates")} — {selectedPet ? selectedPet.name : (isMs ? "Haiwan Perlindungan" : "Shelter Rescues")}
               </h4>
@@ -608,7 +603,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
       <div className="border border-border bg-muted/30 p-6 sm:p-7 rounded-2xl space-y-5">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
-            <QrCode className="size-5 text-primary" />
+            <QrCode className="size-5 text-primary-ink" />
             <h3 className="font-heading text-base font-bold text-foreground">
               4.{" "}
               {isMs
@@ -616,7 +611,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 : "Malaysian Payment Rail: DuitNow National QR / Maybank Transfer"}
             </h3>
           </div>
-          <span className="text-xs font-bold font-mono text-primary bg-primary/10 px-3 py-1 rounded-md">
+          <span className="text-xs font-bold font-mono text-primary-ink bg-primary/10 px-3 py-1 rounded-md">
             Pay: RM {finalAmount}.00{" "}
             {frequency === "monthly" ? (isMs ? "/ bulan" : "/ month") : ""}
           </span>
@@ -651,10 +646,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 <Building2 className="size-3.5" /> Beneficiary Organization
               </div>
               <div className="font-bold text-foreground text-sm">
-                Pertubuhan Kebajikan Hope for Strays
-              </div>
-              <div className="text-2xs text-muted-foreground">
-                ROS Reg: {PUBLIC_ROS_REGISTRATION_NO}
+                Hope for Strays
               </div>
             </div>
 
@@ -688,16 +680,6 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                     : t("donations.copyAccountBtn", "Copy")}
                 </Button>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 text-xs text-muted-foreground bg-success-surface p-3 rounded-xl border border-success-accent/30">
-              <ShieldCheck className="size-4 text-success-accent shrink-0" />
-              <span>
-                Official LHDN Tax-Exempt Reference:{" "}
-                <strong className="text-success-text ">
-                  {LHDN_TAX_DEDUCTIBLE_REF}
-                </strong>
-              </span>
             </div>
           </div>
         </div>
@@ -758,12 +740,12 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
         <div className="space-y-4">
           <div>
             <h3 className="font-heading text-lg font-bold text-foreground">
-              5. {isMs ? "Maklumat Penderma (Untuk e-Resit Rasmi LHDN)" : "Donor Details (For Official Tax-Exempt e-Receipt)"}
+              5. {isMs ? "Maklumat Penderma" : "Donor Details"}
             </h3>
             <p className="text-xs text-muted-foreground">
               {t(
                 "donations.taxReliefNoticeDesc",
-                "Provide your Full Name and Malaysian IC / Passport / SSM number to receive an official e-Receipt valid for tax deductions."
+                "Provide your name and email so we can confirm your pledge."
               )}
             </p>
           </div>
@@ -880,13 +862,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
         </div>
 
         {/* Submit */}
-        <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="text-xs text-muted-foreground">
-            {t(
-              "donations.taxReliefNoticeTitle",
-              "LHDN Tax Exemption (Subsek 44(6) ACP 1967)"
-            )}
-          </div>
+        <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
 
           <Button
             type="submit"
@@ -896,7 +872,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           >
             <Gift className="size-4" />
             {isProcessing
-              ? t("donations.pledgeProcessing", "Recording Tax-Deductible Pledge...")
+              ? t("donations.pledgeProcessing", "Recording Pledge...")
               : `${t("donations.pledgeBtn", "Complete Donation Pledge")} — RM ${finalAmount}`}
             <ArrowRight className="size-4" />
           </Button>

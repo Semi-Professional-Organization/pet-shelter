@@ -18,20 +18,25 @@
 :root {
   /* --- Brand surface palette: cream, terracotta, rosewood (from the paw logo) --- */
   --background: #fff8f4;
-  --foreground: #2a1b1b;
+  --foreground: #4a2c20;
   --card: #fffdfb;
-  --card-foreground: #2a1b1b;
+  --card-foreground: #4a2c20;
   --popover: #fffdfb;
-  --popover-foreground: #2a1b1b;
-  /* Terracotta, dark enough to work in both directions. It has to host white text AND be
-     readable as text on cream — `text-primary` has 121 call sites and the default button
-     renders `text-primary-foreground` on it at 12px, where WCAG's large-text allowance does
-     not apply. At the previous oklch(67.9% …) it was 3.00:1 and 2.90:1, below AA for both.
-     Hue and chroma are unchanged; only lightness moved, by 11 points.
-     Measured in docs/tasks/TARGET_LIGHT_PRIMARY_CONTRAST.md. */
-  --primary: #b2594f;
-  --primary-hover: #aa5148;
-  --primary-foreground: #fffdfb;
+  --popover-foreground: #4a2c20;
+  /* The one accent: light blue. It is a FILL only — buttons, the scrollbar thumb, step
+     markers — carrying the brown text at 7.45:1, in both themes, which is
+     why the navbar's labels use it: the bar stays light blue in dark mode. As text on cream it measures 1.61:1, so blue
+     *text* takes `--primary-ink` instead: the same hue, dark enough to read (5.28:1 on
+     `--primary-panel`, 5.58:1 on `--work-ground`). `text-primary` is therefore not used;
+     write `text-primary-ink`. The terracotta it replaced worked both ways, and its history
+     is in docs/tasks/TARGET_LIGHT_PRIMARY_CONTRAST.md. */
+  --primary: #9bcfe5;
+  --primary-hover: #86c3df;
+  --primary-foreground: #4a2c20;
+  --primary-ink: #1f6a8f;
+  /* Pale blue panel for cards that sit on the cream ground without a border. Opaque on
+     purpose: `bg-primary/15` composites over cream into a grey-green. */
+  --primary-panel: #eaf5fb;
   --secondary: #f6e3dc;
   --secondary-hover: #f3d7d1;
   --secondary-foreground: #3a2524;
@@ -39,9 +44,17 @@
   --muted-foreground: #6b4c4a;
   --accent: #f4c7b6;
   --accent-foreground: #3a2524;
-  /* Hover wash for ghost / outline controls — one step lighter than `--secondary`. */
-  --accent-subtle: #fff1ec;
-  --accent-subtle-strong: #fbeee9;
+  /* Hover wash for ghost / outline controls — pale blue, so every control answers in the
+     one accent rather than in peach. */
+  --accent-subtle: #f0f8fc;
+  --accent-subtle-strong: #e3f1f8;
+  /* --- Page shell: a warm cream ground, white panels, colour carried by the accent ---
+     Declared here rather than written as a hex at the call site: the palette guard rejects
+     an inlined colour because it cannot follow the theme, and a token gives it a dark twin. --- */
+  --work-ground: #fff7df;
+  --work-panel: #ffffff;
+  --band-blush: #ffeef1;
+  --band-mint: #e8f8f0;
   /* The same red as `--tone-danger-text`, and deliberately not a third one. A destructive
      action and the danger tone mean the same thing, and two hand-maintained reds is how the
      palette ends up with a "delete" that does not match "rejected". `designSystemGuards`
@@ -55,7 +68,7 @@
   --destructive-foreground: #fffdfb;
   --border: #ecd7d0;
   --input: #f1e2dc;
-  --ring: #c66f67;
+  --ring: #1f6a8f;
   --radius: 1.15rem;
 
   /* --- Brand mark: the logo tile in the navbar --- */
@@ -220,20 +233,15 @@
   --card-foreground: #f8efe9;
   --popover: #201a1b;
   --popover-foreground: #f8efe9;
-  /* The same brand colour as `:root`, re-lit for a dark ground: identical hue (27.9°) and
-     chroma (0.118), with only the lightness chosen for what it sits on. That is the rule the
-     token layer is built on, and this token was the one place breaking it — at #eaa39b it had
-     drifted to its own hue and two thirds of the chroma, which is to say a different, paler
-     colour that merely resembled the brand.
-     It also has to stay clear of `--destructive`: both were pale pinks ΔEok 0.036 apart, and a
-     destructive control read as a primary one. Rotating the hue could not fix that (0.075 even
-     at 60°, where it stops being the brand) because near L 80% pale colours converge —
-     lightness was the lever. This is 0.147 apart, and holds 5.21:1 as text on card.
-     See docs/tasks/TARGET_DARK_BRAND_SEPARATION.md. */
-  --primary: #d17469;
+  /* The same light blue as `:root`. On a dark ground it reads as text too (10.16:1 on card),
+     so the ink is the fill itself. Blue also ends the old dark-theme clash with the pink
+     `--destructive` (docs/tasks/TARGET_DARK_BRAND_SEPARATION.md). */
+  --primary: #9bcfe5;
   /* Hover moves *away* from the background, as in `:root` — there it darkens, here it lightens. */
-  --primary-hover: #dc7e73;
-  --primary-foreground: #221718;
+  --primary-hover: #b4dbec;
+  --primary-foreground: #4a2c20;
+  --primary-ink: #9bcfe5;
+  --primary-panel: #1a2a33;
   --secondary: #382d2d;
   --secondary-hover: #433535;
   --secondary-foreground: #f8efe9;
@@ -241,17 +249,19 @@
   --muted-foreground: #e9d5ca;
   --accent: #d78d7c;
   --accent-foreground: #221718;
-  --accent-subtle: #2d2424;
-  --accent-subtle-strong: #34292a;
-  /* Tracks `--tone-danger-text` here too — see the note in `:root`. Note this does NOT fix the
-     dark theme's own problem: `--primary` (#eaa39b) and this are both light pinks, ΔEok 0.036
-     apart, so destructive and brand still read alike in dark mode. That needs the dark primary
-     re-picked, which is a separate decision — recorded in §7 of the target above. */
+  --accent-subtle: #1c262c;
+  --accent-subtle-strong: #223139;
+  /* gray-900 / gray-800 — the same ramp, one step apart, so the panel still lifts. */
+  --work-ground: #111827;
+  --work-panel: #1f2937;
+  --band-blush: #251a1d;
+  --band-mint: #15211b;
+  /* Tracks `--tone-danger-text` here too — see the note in `:root`. */
   --destructive: #ffa2a2;
   --destructive-foreground: #221718;
   --border: #4a3c3c;
   --input: #433535;
-  --ring: #f2bea7;
+  --ring: #9bcfe5;
 
   --brand-mark: #382d2d;
   --brand-mark-ring: #5b4040;
@@ -377,10 +387,14 @@
   --color-primary-foreground: var(--primary-foreground);
   --color-primary-hover: var(--primary-hover);
   --color-primary: var(--primary);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-panel: var(--primary-panel);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-work-ground: var(--work-ground);
+  --color-work-panel: var(--work-panel);
 
   --color-brand-mark: var(--brand-mark);
   --color-brand-mark-ring: var(--brand-mark-ring);
@@ -492,13 +506,16 @@
   /* Named shapes for the shells that were carrying arbitrary radii. */
   --radius-mark: 1rem;
   --radius-control: 1.25rem;
-  --radius-card: 1.4rem;
+  /* Cards are flatter than controls: a borderless panel reads as a shape only if its corners
+     stay tight. */
+  --radius-card: 0.75rem;
   --radius-dialog: 1.6rem;
 
-  /* Elevation. Warm-tinted so shadows sit on cream without reading as grey. */
+  /* Elevation. `xs` stays warm so it sits on cream without reading as grey; `sm` and `md`
+     sit under the blue fill, so they carry its hue rather than terracotta's. */
   --shadow-brand-xs: 0 4px 10px rgba(97, 52, 48, 0.08);
-  --shadow-brand-sm: 0 8px 16px rgba(214, 122, 111, 0.18);
-  --shadow-brand-md: 0 8px 18px rgba(215, 122, 111, 0.25);
+  --shadow-brand-sm: 0 8px 16px rgba(31, 106, 143, 0.14);
+  --shadow-brand-md: 0 8px 18px rgba(31, 106, 143, 0.18);
   --shadow-brand-lg: 0 10px 28px rgba(72, 45, 41, 0.06);
   --shadow-brand-xl: 0 20px 45px rgba(49, 34, 30, 0.14);
   --color-expense-medical: var(--expense-medical);
@@ -518,6 +535,9 @@
   }
   html {
     @apply font-sans scroll-smooth;
+    /* The accent reaches the scrollbar too, at ink strength: the light-blue fill is 1.58:1 on
+       cream, under the 3:1 a control needs. Firefox and Chromium 121+ read this. */
+    scrollbar-color: var(--primary-ink) transparent;
   }
   body {
     @apply bg-background text-foreground;
@@ -548,6 +568,26 @@
   .font-mono,
   table :is(td, th) {
     font-variant-numeric: tabular-nums;
+  }
+}
+
+@keyframes hero-animal-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+.hero-animal-float {
+  animation: hero-animal-float 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-animal-float {
+    animation: none;
   }
 }
 

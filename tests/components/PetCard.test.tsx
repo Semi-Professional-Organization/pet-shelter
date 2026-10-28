@@ -17,7 +17,9 @@ describe("PetCard", () => {
   describe("the sex label", () => {
     it("labels the two recorded sexes", () => {
       renderCard({ gender: "Male", age: "2 years" });
-      expect(screen.getByText(/Male • 2 years/)).toBeTruthy();
+      // The pill carries the sex alone; the age sits beside the name, where the weight was.
+      expect(screen.getByText("Male")).toBeTruthy();
+      expect(screen.getByText("2 years")).toBeTruthy();
     });
 
     it.each(["male", "Unknown", ""])(
@@ -33,8 +35,37 @@ describe("PetCard", () => {
         // dialog, detail page and carousel. Pinning the wording would make that a requirement.
         renderCard({ gender: stored as Pet["gender"], age: "1 year" });
 
-        expect(screen.getByText(/(Male|Female) • 1 year/)).toBeTruthy();
+        expect(screen.getByText(/^(Male|Female)$/)).toBeTruthy();
       }
     );
+  });
+});
+
+// The card's primary action follows getPlacementOptions: adopt for an available animal, foster
+// for one tagged "Needs Socialising", sponsorship for one in rehabilitation.
+function renderCardWithActions(overrides: Partial<Pet>) {
+  renderWithLanguage(
+    <PetCard pet={makePet(overrides)} onSelectPet={vi.fn()} onAdoptPet={vi.fn()} onSponsorPet={vi.fn()} />
+  );
+}
+
+describe("PetCard primary action", () => {
+  it("offers adoption for an available animal", () => {
+    renderCardWithActions({ name: "Bolt", status: "Available", tags: ["Playful"] });
+    expect(screen.getByRole("button", { name: /adopt/i })).toBeEnabled();
+    expect(screen.queryByRole("link", { name: /apply to foster/i })).not.toBeInTheDocument();
+  });
+
+  it("offers Apply to Foster, naming the animal, for one that needs socialising", () => {
+    renderCardWithActions({ name: "Bolt", status: "Available", tags: ["Needs Socialising"] });
+    const foster = screen.getByRole("link", { name: /apply to foster/i });
+    expect(foster.getAttribute("href")).toContain(encodeURIComponent("foster Bolt"));
+    expect(screen.queryByRole("button", { name: /^adopt$/i })).not.toBeInTheDocument();
+  });
+
+  it("offers sponsorship, not foster, for an animal in rehabilitation", () => {
+    renderCardWithActions({ name: "Bolt", status: "In Rehabilitation", tags: ["Needs Socialising"] });
+    expect(screen.getByRole("button", { name: /sponsor me/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /apply to foster/i })).not.toBeInTheDocument();
   });
 });

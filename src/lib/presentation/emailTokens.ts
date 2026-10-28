@@ -73,7 +73,7 @@ export const EMAIL_BRAND = {
   /** Page background behind the message card. */
   background: "#fff8f4",
   /** Body copy. */
-  foreground: "#2a1b1b",
+  foreground: "#4a2c20",
   /** The message card itself. */
   card: "#fffdfb",
   /** Hairlines: the card edge, the footer rule. */
@@ -82,10 +82,12 @@ export const EMAIL_BRAND = {
   muted: "#f7efe9",
   /** Secondary copy — fine print, captions, footers. */
   mutedForeground: "#6b4c4a",
-  /** Terracotta. The header band and the call-to-action button. */
-  primary: "#b2594f",
+  /** Light blue. The header band and the call-to-action button — a fill, never text. */
+  primary: "#9bcfe5",
   /** Text on `primary`. */
-  primaryForeground: "#fffdfb",
+  primaryForeground: "#4a2c20",
+  /** Blue at text strength, for a heading in the accent. */
+  primaryInk: "#1f6a8f",
 } as const satisfies Record<string, string>;
 
 /**

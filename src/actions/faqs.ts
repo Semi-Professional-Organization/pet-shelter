@@ -24,8 +24,8 @@ import {
 
 /**
  * Every export here becomes a POST endpoint on each route that imports this
- * module, reachable without a session. `PetsFaqSection` calls `getFaqsAction`
- * for its tab filtering, so the public /pets page hosts these; check with
+ * module, reachable without a session — including through `src/actions/needs.ts`,
+ * which re-exports `getFaqsAction`; check with
  * `.next/server/server-reference-manifest.json` after changing an importer.
  *
  * The reads below are safe to leave unauthenticated because they return only

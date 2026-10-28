@@ -26,9 +26,8 @@ import { FaqItem } from "@/types/faq";
 import { cn } from "@/lib/utils";
 
 /**
- * The "all" tab has no data row to come from, so this strip supplies its own —
- * the same arrangement `PetsFaqSection` uses, and worded for a page that is
- * only about FAQs.
+ * The "all" tab has no data row to come from, so this strip supplies its own,
+ * worded for a page that is only about FAQs.
  */
 const ALL_FAQ_TAB: CategoryTab = {
   value: ALL_CATEGORY_VALUE,
@@ -226,7 +225,7 @@ export function FaqBrowser({
         </div>
       ) : category === ALL_CATEGORY_VALUE && !isSearching ? (
         // Browsing everything: group under category headings for scannability.
-        <div className="space-y-10 max-w-3xl">
+        <div className="space-y-10">
           {groups.map((group) => (
             <section key={group.tab.value}>
               <h2 className="font-heading text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1">
@@ -239,7 +238,7 @@ export function FaqBrowser({
           ))}
         </div>
       ) : (
-        <div className="max-w-3xl">
+        <div>
           <Accordion
             multiple
             hiddenUntilFound

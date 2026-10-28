@@ -24,7 +24,7 @@ export function BulletinsPageIntro() {
   const { t } = useTypedTranslation();
 
   return (
-    <div className="mb-10 max-w-2xl">
+    <div className="mb-10">
       <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
         {t("bulletins.title")}
       </h1>

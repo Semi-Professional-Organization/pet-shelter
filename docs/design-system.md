@@ -104,7 +104,7 @@ otherwise land *below* this project's `rounded-2xl` and invert the scale.
 | `rounded-sm` … `rounded-4xl` | `calc(--radius × 0.6)` … `× 2.6` | The general scale |
 | `rounded-mark` | 1rem | The logo tile |
 | `rounded-control` | 1.25rem | Buttons, navbar, segmented controls |
-| `rounded-card` | 1.4rem | Card surfaces |
+| `rounded-card` | 0.75rem | Card surfaces — flat and borderless ([page guide §5](page-style-guide.md#5-cards)) |
 | `rounded-dialog` | 1.6rem | Modals |
 | `rounded-md` / `rounded-lg` | from the scale | Badges, pills, small tags |
 
@@ -113,7 +113,7 @@ otherwise land *below* this project's `rounded-2xl` and invert the scale.
 - **Do**: Use the named shapes for the four shells that have one; the general scale otherwise.
 - **Do**: Apply radius to both background shapes and border strokes for cohesion.
 - **Don't**: Mix sharp corners with soft rounded corners in the same visual section.
-- **Don't**: write `rounded-[1.4rem]`. An arbitrary radius is invisible to `--radius` and fails
+- **Don't**: write `rounded-[0.75rem]`. An arbitrary radius is invisible to `--radius` and fails
   `designSystemGuards`. If a shape is genuinely missing, add the step to `globals.css`.
 
 ---
@@ -141,15 +141,19 @@ Warm-tinted, so shadows sit on cream without reading as grey. Five named steps, 
 
 ### Font Family
 
-- **Primary**: System stack (Segoe UI, Roboto, -apple-system, sans-serif)
-- **Fallback**: Tailwind's default sans-serif stack
+- **Headings**: Playfair Display, as `font-heading` (`--font-heading`, loaded in `src/app/layout.tsx`)
+- **Body**: Geist, as `font-sans` (the `<body>` default)
+- **Mono**: Geist Mono, as `font-mono`
 
 ### Type Scale
 
+Page-level headings and their responsive steps are owned by
+[`page-style-guide.md` §3](page-style-guide.md#3-type-hierarchy); the H1/H2 rows below mirror it.
+
 | Element | Size | Weight | Line Height | Tailwind Class |
 |---------|------|--------|-------------|----------------|
-| **H1 / Page Title** | 3rem / 48px | 700 (bold) | 1.2 | `text-4xl font-bold` |
-| **H2 / Section Title** | 2rem / 32px | 700 (bold) | 1.3 | `text-3xl font-bold` |
+| **H1 / Page Title** | 30 → 48 → 60px | 700 (bold) | 1.15 | `font-heading text-3xl sm:text-5xl lg:text-6xl font-bold` |
+| **H2 / Section Title** | 30 → 36 → 48px | 700 (bold) | — | `SectionHeader` (`text-3xl sm:text-4xl lg:text-5xl`) |
 | **H3 / Subsection** | 1.5rem / 24px | 600 (semibold) | 1.4 | `text-2xl font-semibold` |
 | **Body / Paragraph** | 1rem / 16px | 400 (normal) | 1.6 | `text-base` |
 | **Small / Caption** | 0.875rem / 14px | 400 (normal) | 1.5 | `text-sm` |
@@ -279,8 +283,9 @@ shell reads (§5).
 
 - WCAG **AA** for body text (4.5:1) is **enforced**, not aspirational. `designSystemGuards.test.ts`
   measures every pairing the vocabulary promises — each tone's `text` on `surface` and on
-  `surface-strong`, `on-solid` on `solid`, every `*-foreground` on its own surface, `--primary` and
-  `--destructive` in both directions, and the receipt inks on paper — in **both** themes, and fails
+  `surface-strong`, `on-solid` on `solid`, every `*-foreground` on its own surface, `--primary-ink`
+  on every ground it sits on, `--destructive` in both directions, `--ring` on the page grounds, and
+  the receipt inks on paper — in **both** themes, and fails
   the build below 4.5:1. Translucent tokens are composited onto the page background first, because
   `.dark` declares all seven tone surfaces with alpha and skipping them would exempt half the
   palette while reporting green.
@@ -289,12 +294,16 @@ shell reads (§5).
   directions, across 262 utility uses, with the default button rendering it at 12px. It was darkened
   to `#b2594f` (hue and chroma held, lightness down 11 points). Everything else already passed.
   See [`TARGET_LIGHT_PRIMARY_CONTRAST.md`](tasks/TARGET_LIGHT_PRIMARY_CONTRAST.md).
+  On 2026-10-28 the brand moved to light blue `#9bcfe5`, which cannot work both ways, so it is now
+  a fill only and blue text is `--primary-ink` (`text-primary-ink`); `text-primary` fails the guard.
+  See `tasks/decisions/2026-10-28-light-blue-is-a-fill-and-blue-text-is-the-ink.md`.
 - **Non-text contrast is deliberately not asserted.** WCAG's 3:1 rule covers boundaries required to
   understand content; a tinted `border` on its own tinted `surface` is decorative, and the panel is
   distinguished by its fill. Asserting those would fail sixteen legitimate design choices. If you add
   a boundary that genuinely carries meaning on its own, measure it by hand.
-- Focus states must always be visible. Note the two mechanisms differ by control: buttons use a
-  `ring-2 ring-ring/30`, inputs use a bottom-border colour change (§5). Do not "fix" an input to
+- Focus states must always be visible. Note the two mechanisms differ by control: buttons and links
+  use the base 2px `outline-ring` at `outline-offset-2` (plus the button's `ring-ring/30` halo),
+  inputs use a bottom-border colour change (§5). Do not "fix" an input to
   match a button.
 - Colour must never be the only carrier of meaning — pair a tone with an icon, a label or a border.
   The seven tones are meanings first (§1.2); the colour is how they are shown, not what they are.

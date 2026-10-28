@@ -1,7 +1,6 @@
-import { LHDN_TAX_DEDUCTIBLE_REF, PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -13,7 +12,7 @@ export const metadata: Metadata = {
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-card py-12 sm:py-16">
-      <div className="mx-auto max-w-4xl px-6 sm:px-8 lg:px-10 space-y-10">
+      <div className="mx-auto max-w-4xl px-6 sm:px-8 lg:px-12 space-y-10">
         {/* Header */}
         <div className="space-y-4 border-b border-border pb-8">
           <Link
@@ -28,16 +27,11 @@ export default function TermsOfServicePage() {
             Back to Home
           </Link>
 
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-secondary text-secondary-foreground text-xs font-semibold border border-border">
-            <ShieldCheck className="size-3.5 text-foreground" />
-            <span>Animal Welfare & Adoption Agreement</span>
-          </div>
-
           <h1 className="font-heading text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
             Adoption Terms & Sanctuary Policies
           </h1>
           <p className="text-sm text-muted-foreground">
-            Effective Date: August 2026 • Persatuan Harapan Haiwan Terbiar Selangor ({PUBLIC_ROS_REGISTRATION_NO})
+            Effective Date: August 2026 • Hope for Strays
           </p>
         </div>
 
@@ -82,9 +76,9 @@ export default function TermsOfServicePage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="font-heading text-xl font-bold text-foreground">5. Donations & Tax Deductions</h2>
+            <h2 className="font-heading text-xl font-bold text-foreground">5. Donations</h2>
             <p>
-              Monetary contributions and sponsorship gifts are voluntary donations eligible for Malaysian income tax deduction under Subsection 44(6) of the Income Tax Act 1967 (Ref: {LHDN_TAX_DEDUCTIBLE_REF}). Official e-Receipts are computer-generated and non-transferable.
+              Monetary contributions and sponsorship gifts are voluntary donations.
             </p>
           </section>
         </div>

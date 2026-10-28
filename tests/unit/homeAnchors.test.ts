@@ -79,6 +79,19 @@ const ANCHORABLE_ELEMENTS = new Set([
  * because its value is an interpolation the capture rejects.
  */
 const ID_ATTRIBUTE = /[\s{]id=["']([A-Za-z0-9_-]+)["']/g;
+
+/**
+ * Components that render their `id` prop onto an anchorable element, keyed by the name they are
+ * exported as, with the file that exports them.
+ *
+ * `<Section id="adopt">` renders `<section id={id}>`: the literal sits on the component, and the
+ * element that finally carries it only ever sees an interpolation, which `ID_ATTRIBUTE` rightly
+ * rejects. Without this the walk finds no id on any page built from the shared section primitive.
+ * Listed rather than inferred, and resolved through the import map so another component that
+ * happens to be called `Section` does not inherit the exemption. The last case in this file
+ * checks that each entry still forwards its id, so the list cannot claim an anchor nothing renders.
+ */
+const ID_FORWARDING_COMPONENTS = new Map([["Section", "src/components/layout/Section.tsx"]]);
 const RENDERED_COMPONENT = /<([A-Z]\w*)/g;
 
 /**
@@ -437,7 +450,16 @@ function idsRenderedBy(
     }
 
     for (const match of body.matchAll(ID_ATTRIBUTE)) {
-      if (ANCHORABLE_ELEMENTS.has(owningTag(body, match.index!))) ids.add(match[1]);
+      const tag = owningTag(body, match.index!);
+      if (ANCHORABLE_ELEMENTS.has(tag)) {
+        ids.add(match[1]);
+        continue;
+      }
+      const target = blocks.has(tag) ? { file, exportName: tag } : imports.get(tag);
+      const forwardingFile = target && ID_FORWARDING_COMPONENTS.get(target.exportName);
+      if (forwardingFile && relative(ROOT, target.file).split(sep).join("/") === forwardingFile) {
+        ids.add(match[1]);
+      }
     }
 
     for (const [, name] of body.matchAll(RENDERED_COMPONENT)) {
@@ -524,7 +546,7 @@ describe("in-app anchor links", () => {
 
     const getInvolved = idsRenderedBy(entriesForRoute("get-involved"));
     expect(getInvolved).toContain("volunteer");
-    expect(getInvolved).toContain("foster");
+    expect(getInvolved).toContain("corporate");
     expect(getInvolved).not.toContain("how-it-works");
   });
 
@@ -796,5 +818,18 @@ describe("in-app anchor links", () => {
       unresolved.map((u) => `${u.file}:${u.line} -> ${u.href}`),
       `routes reached by an anchor link:\n  ${rendered}${parserGaps}`,
     ).toEqual([]);
+  });
+});
+
+describe("id-forwarding components", () => {
+  it.each([...ID_FORWARDING_COMPONENTS])("%s still renders its id onto an anchorable element", (_name, file) => {
+    // The walk takes `<Section id="x">` as rendering `#x` on this component's word alone; if the
+    // component stopped forwarding `id`, every anchor built on it would pass while scrolling
+    // nowhere.
+    const source = readFileSync(join(ROOT, file), "utf8");
+    const forwarded = [...ANCHORABLE_ELEMENTS].some((tag) =>
+      new RegExp(`<${tag}\\b[^>]*\\sid=\\{id\\}`).test(source),
+    );
+    expect(forwarded).toBe(true);
   });
 });

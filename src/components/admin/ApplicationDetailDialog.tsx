@@ -353,7 +353,7 @@ export function ApplicationDetailDialog({
               onClick={() => setActiveTab("review")}
               className={`pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 ${
                 activeTab === "review"
-                  ? "border-primary text-primary"
+                  ? "border-primary text-primary-ink"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -364,7 +364,7 @@ export function ApplicationDetailDialog({
               onClick={() => setActiveTab("interview")}
               className={`pb-2 text-xs font-bold uppercase tracking-wider transition-colors border-b-2 flex items-center gap-1.5 ${
                 activeTab === "interview"
-                  ? "border-primary text-primary"
+                  ? "border-primary text-primary-ink"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -422,7 +422,7 @@ export function ApplicationDetailDialog({
                   type="checkbox"
                   checked={notifyApplicant}
                   onChange={(e) => setNotifyApplicant(e.target.checked)}
-                  className="size-4 rounded border-input text-primary focus:ring-primary"
+                  className="size-4 rounded border-input text-primary-ink focus:ring-primary"
                 />
                 <Label htmlFor="notify-applicant" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
                   <Mail className="size-3.5 text-muted-foreground" />
@@ -531,7 +531,7 @@ export function ApplicationDetailDialog({
                   type="checkbox"
                   checked={notifyApplicant}
                   onChange={(e) => setNotifyApplicant(e.target.checked)}
-                  className="size-4 rounded border-input text-primary focus:ring-primary"
+                  className="size-4 rounded border-input text-primary-ink focus:ring-primary"
                 />
                 <Label htmlFor="notify-interview" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
                   <Send className="size-3.5 text-muted-foreground" />

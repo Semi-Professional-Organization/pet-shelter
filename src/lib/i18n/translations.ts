@@ -14,8 +14,8 @@ export interface TranslationDictionary {
     donate: string;
     trackApplication: string;
     bulletins: string;
-    adoptionProcess: string;
-    volunteerFoster: string;
+    adoptOrFoster: string;
+    volunteer: string;
     matchQuiz: string;
     sponsor: string;
     adopt: string;
@@ -71,8 +71,6 @@ export interface TranslationDictionary {
     submitting: string;
     loading: string;
     verified: string;
-    taxExemptBadge: string;
-    rosBadge: string;
   };
   hero: {
     badge: string;
@@ -85,7 +83,6 @@ export interface TranslationDictionary {
     visitingHoursText: string;
     locationText: string;
     tnrmHeadline: string;
-    imageAlt: string;
   };
   home: {
     bulletinsTitle: string;
@@ -94,9 +91,7 @@ export interface TranslationDictionary {
     availableSubtitle: string;
     viewAllPets: string;
     galleryLoading: string;
-    howItWorksEyebrow: string;
     howItWorksTitle: string;
-    howItWorksSubtitle: string;
     step1Title: string;
     step1Desc: string;
     step2Title: string;
@@ -117,6 +112,10 @@ export interface TranslationDictionary {
   pets: {
     title: string;
     subtitle: string;
+    titleAdopt: string;
+    subtitleAdopt: string;
+    titleFoster: string;
+    subtitleFoster: string;
     speciesFilter: string;
     genderFilter: string;
     ageFilter: string;
@@ -157,6 +156,7 @@ export interface TranslationDictionary {
     sanctuaryLocationHours: string;
     sanctuaryAddress: string;
     applyToAdopt: string;
+    applyToFoster: string;
     adoptionPending: string;
     underCareNotice: string;
     updatesTitle: string;
@@ -184,15 +184,8 @@ export interface TranslationDictionary {
   medicalTimeline: {
     title: string;
     subtitle: string;
-    filterAll: string;
-    filterIntake: string;
-    filterDiagnostic: string;
-    filterTreatment: string;
-    filterVaccination: string;
-    filterSurgery: string;
-    filterClearance: string;
     verifiedBy: string;
-    noMilestones: string;
+    noRecords: string;
   };
   adoptionForm: {
     title: string;
@@ -291,15 +284,12 @@ export interface TranslationDictionary {
     badge: string;
     title: string;
     subtitle: string;
-    rosBadge: string;
-    lhdnBadge: string;
     freeAdoptionGuarantee: string;
     widgetTitle: string;
     selectTierLabel: string;
     customAmountLabel: string;
     frequencyOneTime: string;
     frequencyMonthly: string;
-    taxReliefNoticeTitle: string;
     taxReliefNoticeDesc: string;
     dedicateLabel: string;
     dedicatePlaceholder: string;
@@ -354,7 +344,6 @@ export interface TranslationDictionary {
     urgentBadge: string;
     contactCoordinator: string;
     allNoticesTitle: string;
-    petsFeedTitle: string;
     categoryUrgentNeed: string;
     categoryClinic: string;
     categoryEvent: string;
@@ -362,6 +351,7 @@ export interface TranslationDictionary {
     categoryAnnouncement: string;
     pinned: string;
     postedBy: string;
+    goToNotice: string;
     noUpdates: string;
   };
   footer: {
@@ -372,7 +362,6 @@ export interface TranslationDictionary {
     closedMondays: string;
     locationContactTitle: string;
     address: string;
-    rosReg: string;
     privacyNotice: string;
     adoptionTerms: string;
     staffPortal: string;
@@ -385,10 +374,10 @@ export const translations: Record<Language, TranslationDictionary> = {
     nav: {
       adoptablePets: "Adoptable Pets",
       donate: "Donate & Sponsor",
-      trackApplication: "Track Application",
+      trackApplication: "Track Application Status",
       bulletins: "Shelter Bulletins",
-      adoptionProcess: "Adoption Process",
-      volunteerFoster: "Volunteer & Foster",
+      adoptOrFoster: "Adopt or Foster",
+      volunteer: "Volunteer",
       matchQuiz: "Match Quiz",
       sponsor: "Sponsor Care",
       adopt: "Adopt",
@@ -421,8 +410,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       medium: "Medium",
       large: "Large",
       puppyKitten: "Puppy / Kitten",
-      young: "Young",
-      adult: "Adult",
+      young: "Young Adult",
+      adult: "Mature Adult",
       senior: "Senior",
       low: "Low",
       moderate: "Moderate",
@@ -444,13 +433,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       submitting: "Submitting...",
       loading: "Loading...",
       verified: "Verified",
-      taxExemptBadge: "LHDN Tax Deductible (Sec 44(6) ITA 1967)",
-      rosBadge: "ROS Reg: {regNo}",
     },
     hero: {
-      badge: "Selangor Animal Welfare & Rescue Sanctuary",
+      badge: "Animal Welfare & Rescue Sanctuary",
       title: "Adopt a dog or cat from your local shelter.",
-      subtitle: "We take in strays, owner surrenders, and transfers across Petaling Jaya. Every rescue animal receives full veterinary care, core vaccinations, microchip registration, and spay/neuter surgery before finding their forever family.",
+      subtitle: "We take in strays, owner surrenders, and transfers. Every rescue animal receives full veterinary care, core vaccinations, microchip registration, and spay/neuter surgery before finding their forever family.",
       browseBtn: "Browse Adoptable Pets",
       quizBtn: "Pet Compatibility Quiz",
       sponsorBtn: "Sponsor Care",
@@ -458,24 +445,21 @@ export const translations: Record<Language, TranslationDictionary> = {
       visitingHoursText: "Tuesday through Sunday, 10:00 AM – 5:00 PM. Walk-ins welcome.",
       locationText: "Petaling Jaya, Selangor",
       tnrmHeadline: "Coexistence through TNRM & Education",
-      imageAlt: "Rescued shelter animals enjoying sanctuary grounds",
     },
     home: {
-      bulletinsTitle: "Latest Bulletins",
-      bulletinsSubtitle: "Real-time rescue notices, urgent foster needs, and community events from our Petaling Jaya sanctuary.",
-      availableTitle: "Animals Ready for Adoption",
-      availableSubtitle: "Health-checked, vaccinated, microchipped, and sterilized before rehoming.",
+      bulletinsTitle: "From the shelter",
+      bulletinsSubtitle: "Rescue updates, clinic notes, and news from the sanctuary.",
+      availableTitle: "Adoptable Animals",
+      availableSubtitle: "Rescued dogs, cats and kittens waiting for a home right now.",
       viewAllPets: "View All Adoptable Pets",
       galleryLoading: "Loading rescue animals...",
-      howItWorksEyebrow: "Adoption Protocol",
-      howItWorksTitle: "Our Transparent Adoption Journey",
-      howItWorksSubtitle: "We ensure every rescue goes to a safe, committed home through a straightforward 3-step process with zero commercial adoption fees.",
+      howItWorksTitle: "Application Steps",
       step1Title: "Browse & Submit Application",
-      step1Desc: "Browse our adoptable dogs and cats online or visit our Petaling Jaya sanctuary. Submit a straightforward application to register your household interest.",
+      step1Desc: "Browse our dogs and cats online or visit our sanctuary, then submit a short application. We check basic home suitability — landed vs high-rise pet guidelines, safe fencing, and household agreement.",
       step2Title: "Meet & Socialize",
       step2Desc: "Spend time interacting with the animal in our outdoor play yard or cat room. If you have resident pets, we arrange a structured, supervised introduction.",
       step3Title: "Finalize & Welcome Home",
-      step3Desc: "Sign our standard adoption agreement, with no commercial adoption fees. All animals are already vaccinated, microchipped, and spayed or neutered.",
+      step3Desc: "Sign the adoption or foster agreement, with no commercial adoption fees. All animals are already vaccinated, microchipped, and spayed or neutered. If your circumstances ever change, we will always take the animal back.",
       protocolsTitle: "Our Animal Welfare Standards",
       protocolsSubtitle: "Built upon clinical veterinary rigor, lifetime accountability, and unconditional compassion.",
       protocol1Title: "Complete Veterinary Protocol",
@@ -488,8 +472,12 @@ export const translations: Record<Language, TranslationDictionary> = {
       protocol4Desc: "We verify basic living suitability (landed housing vs high-rise pet guidelines, fenced perimeter safety, and household consensus) to ensure a safe, lasting match.",
     },
     pets: {
-      title: "Adoptable Animals in Selangor",
-      subtitle: "Browse rescued dogs, cats, puppies, and kittens awaiting their forever homes in Petaling Jaya.",
+      title: "Meet Our Animals",
+      subtitle: "Browse the rescued dogs and cats at our sanctuary.",
+      titleAdopt: "Animals to Adopt",
+      subtitleAdopt: "Rescued dogs and cats looking for a permanent home.",
+      titleFoster: "Animals to Foster",
+      subtitleFoster: "Rescued dogs and cats who are still building confidence around people. A foster home gives them the quiet, consistent socialisation they need before adoption.",
       speciesFilter: "Species",
       genderFilter: "Gender",
       ageFilter: "Age Group",
@@ -530,6 +518,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       sanctuaryLocationHours: "Sanctuary Location & Visiting Hours",
       sanctuaryAddress: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Open Tue–Sun: 10:00 AM – 5:00 PM",
       applyToAdopt: "Apply to Adopt",
+      applyToFoster: "Apply to Foster",
       adoptionPending: "Adoption Pending",
       underCareNotice:
         "Under veterinary care — not yet available for adoption. Sponsorship funds this animal's treatment.",
@@ -558,20 +547,13 @@ export const translations: Record<Language, TranslationDictionary> = {
     medicalTimeline: {
       title: "Rescue Intake & Medical Care Timeline",
       subtitle: "Verified chronological clinical history, diagnostic screenings, treatments, and veterinary clearances.",
-      filterAll: "All Milestones",
-      filterIntake: "Rescue Intake",
-      filterDiagnostic: "Diagnostics",
-      filterTreatment: "Treatments",
-      filterVaccination: "Vaccinations",
-      filterSurgery: "Surgeries",
-      filterClearance: "Clearance",
       verifiedBy: "Verified by",
-      noMilestones: "No milestones found for the selected category filter.",
+      noRecords: "No veterinary records yet.",
     },
     adoptionForm: {
       title: "Hope for Strays Adoption Application",
       titleWithPet: "Adoption Application for",
-      subtitle: "Applications take about 5 minutes. Our volunteer coordinators in Petaling Jaya will review and follow up within 1–2 business days.",
+      subtitle: "Applications take about 5 minutes. Our volunteer coordinators will review and follow up within 1–2 business days.",
       selectedPetLabel: "Selected Rescue Animal",
       applicantNameLabel: "Full Name (as per IC / Passport) *",
       applicantNamePlaceholder: "e.g. Nurul Huda binti Ahmad",
@@ -617,8 +599,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     tracking: {
       badge: "Adopter Self-Service Portal",
-      title: "Track Adoption Application",
-      subtitle: "Check the live review status, scheduled meet-and-greet sessions, and finalization instructions for your shelter adoption inquiry.",
+      title: "Track Application Status",
+      subtitle: "Enter your reference ID to see where your application stands.",
       refLabel: "Application Reference ID *",
       refPlaceholder: "e.g. app-1723738192000",
       emailLabel: "Applicant Email Address *",
@@ -665,21 +647,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     donations: {
       badge: "Direct Rescue Giving & Sponsorship",
-      title: "Fuel Lifesaving Medical Care & Nutrition for Rescued Strays",
-      subtitle: "Every ringgit directly supports emergency surgeries, core vaccinations, and wholesome meals at our Petaling Jaya sanctuary. Because of your generosity, 100% of our rescued animals are rehomed through our Free Adoption policy.",
-      rosBadge: "ROS Reg: {regNo}",
-      lhdnBadge: "LHDN Tax Deductible: Sec 44(6) ITA 1967",
+      title: "Donate & Sponsor",
+      subtitle: "Every ringgit directly supports emergency surgeries, core vaccinations, and wholesome meals at our sanctuary. Because of your generosity, 100% of our rescued animals are rehomed through our Free Adoption policy.",
       freeAdoptionGuarantee: "100% Free Adoption Guarantee",
-      widgetTitle: "Make a Tax-Deductible Gift",
+      widgetTitle: "Make a Gift",
       selectTierLabel: "Select Giving Tier",
       customAmountLabel: "Or Enter Custom Amount (MYR)",
       frequencyOneTime: "One-time Donation",
       frequencyMonthly: "Monthly Rescue Hero",
-      taxReliefNoticeTitle: "LHDN Tax Exemption (Subsek 44(6) ACP 1967)",
-      taxReliefNoticeDesc: "Provide your Full Name and Malaysian IC / Passport / SSM number to receive an official e-Receipt valid for tax deductions.",
+      taxReliefNoticeDesc: "Provide your name and email so we can confirm your pledge.",
       dedicateLabel: "Dedicate or Sponsor a Specific Pet (Optional)",
       dedicatePlaceholder: "e.g. For Bella's surgery recovery / Milo's care",
-      donorNameLabel: "Donor Full Name (for tax receipt) *",
+      donorNameLabel: "Donor Full Name *",
       donorEmailLabel: "Email Address (to receive e-Receipt) *",
       donorPhoneLabel: "Phone Number (WhatsApp receipt updates)",
       // No baked-in "*": this field is required only when the donor asks for a
@@ -695,13 +674,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       duitNowScanTitle: "DuitNow National QR Pay",
       duitNowInstructions: "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app.",
       pledgeBtn: "Complete Donation Pledge & Generate e-Receipt",
-      pledgeProcessing: "Recording Tax-Deductible Pledge...",
+      pledgeProcessing: "Recording Pledge...",
       receiptTitle: "Official Donation e-Receipt",
       receiptSubtitle: "Approved Under Subsection 44(6) Income Tax Act 1967 • Ref: {taxRef}",
       printReceiptBtn: "Print Official Receipt",
       transparencyTitle: "Financial Accountability",
       transparencySubtitle: "Where Your Donation Goes",
-      transparencyDesc: "We operate with strict financial transparency. Direct public donations are allocated entirely to animal medical treatment, high-protein sustenance, and sanitary shelter housing in Selangor.",
+      transparencyDesc: "We operate with strict financial transparency. Direct public donations are allocated entirely to animal medical treatment, high-protein sustenance, and sanitary shelter housing.",
       wishlistTitle: "In-Kind Giving",
       wishlistSubtitle: "Shelter Supplies Wishlist",
       wishlistDesc: "Prefer to donate items directly? We gladly accept physical drop-offs of unopened food, medical supplies, and shelter bedding at our Petaling Jaya sanctuary.",
@@ -732,7 +711,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       urgentBadge: "Urgent Notice",
       contactCoordinator: "WhatsApp Coordinator",
       allNoticesTitle: "All Bulletins",
-      petsFeedTitle: "Adoption & Clinic Bulletins",
       categoryUrgentNeed: "Urgent Foster / Need",
       categoryClinic: "Clinic / Vaccine",
       categoryEvent: "Event",
@@ -740,6 +718,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       categoryAnnouncement: "Notice",
       pinned: "Pinned",
       postedBy: "Posted by:",
+      goToNotice: "Show notice {n} of {total}",
       noUpdates: "No updates to show right now.",
     },
     footer: {
@@ -750,21 +729,20 @@ export const translations: Record<Language, TranslationDictionary> = {
       closedMondays: "Closed Mondays for sanctuary deep cleaning",
       locationContactTitle: "Location & Contact",
       address: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia",
-      rosReg: "ROS Reg: {regNo}",
       privacyNotice: "Privacy Notice (PDPA)",
       adoptionTerms: "Adoption Terms",
       staffPortal: "Staff Portal",
-      copyright: "Hope for Strays (Persatuan Harapan Haiwan Terbiar Selangor). All rights reserved.",
+      copyright: "Hope for Strays. All rights reserved.",
     },
   },
   ms: {
     nav: {
       adoptablePets: "Haiwan Angkat",
       donate: "Derma & Penajaan",
-      trackApplication: "Semak Permohonan",
+      trackApplication: "Semak Status Permohonan",
       bulletins: "Buletin Pusat Perlindungan",
-      adoptionProcess: "Proses Adopsi",
-      volunteerFoster: "Sukarelawan & Asuhan",
+      adoptOrFoster: "Adopsi atau Asuh",
+      volunteer: "Sukarelawan",
       matchQuiz: "Kuiz Padanan",
       sponsor: "Taja Rawatan",
       adopt: "Adopsi",
@@ -797,8 +775,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       medium: "Sederhana",
       large: "Besar",
       puppyKitten: "Anak Haiwan",
-      young: "Muda",
-      adult: "Dewasa",
+      young: "Dewasa Muda",
+      adult: "Dewasa Matang",
       senior: "Warga Emas",
       low: "Rendah",
       moderate: "Sederhana",
@@ -820,13 +798,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       submitting: "Menghantar...",
       loading: "Memuatkan...",
       verified: "Disahkan",
-      taxExemptBadge: "Pelepasan Cukai LHDN (Sek 44(6) ACP 1967)",
-      rosBadge: "No. ROS: {regNo}",
     },
     hero: {
-      badge: "Pusat Kebajikan & Penyelamatan Haiwan Selangor",
+      badge: "Pusat Kebajikan & Penyelamatan Haiwan",
       title: "Angkat anjing atau kucing dari pusat perlindungan setempat anda.",
-      subtitle: "Kami menyelamatkan haiwan terbiar dan serahan di seluruh Petaling Jaya. Setiap haiwan reskue menerima rawatan veterinar lengkap, vaksinasi teras, pendaftaran cip mikro, dan pemandulan sebelum mencari keluarga selamanya.",
+      subtitle: "Kami menyelamatkan haiwan terbiar dan serahan. Setiap haiwan reskue menerima rawatan veterinar lengkap, vaksinasi teras, pendaftaran cip mikro, dan pemandulan sebelum mencari keluarga selamanya.",
       browseBtn: "Lihat Haiwan Sedia Diadopsi",
       quizBtn: "Kuiz Keserasian Haiwan",
       sponsorBtn: "Taja Kos Penjagaan",
@@ -834,24 +810,21 @@ export const translations: Record<Language, TranslationDictionary> = {
       visitingHoursText: "Selasa hingga Ahad, 10:00 Pagi – 5:00 Petang. Lawatan terus dialu-alukan.",
       locationText: "Petaling Jaya, Selangor",
       tnrmHeadline: "Kewujudan Bersama melalui TNRM & Pendidikan",
-      imageAlt: "Haiwan reskue menikmati kawasan santuari",
     },
     home: {
-      bulletinsTitle: "Buletin Terkini",
-      bulletinsSubtitle: "Notis penyelamatan segera, keperluan rumah asuhan, dan perkembangan komuniti dari pusat perlindungan Petaling Jaya.",
-      availableTitle: "Haiwan Sedia untuk Diangkat Anak",
-      availableSubtitle: "Telah diperiksa kesihatan, divaksin, dipasang cip mikro, dan dimandulkan sebelum adopsi.",
+      bulletinsTitle: "Dari pusat perlindungan",
+      bulletinsSubtitle: "Kemas kini penyelamatan, nota klinik dan berita dari santuari.",
+      availableTitle: "Haiwan Sedia Diadopsi",
+      availableSubtitle: "Anjing, kucing dan anak kucing reskue yang sedang menanti rumah baharu.",
       viewAllPets: "Lihat Semua Haiwan Sedia Diadopsi",
       galleryLoading: "Memuatkan haiwan reskue...",
-      howItWorksEyebrow: "Protokol Adopsi Santuari",
-      howItWorksTitle: "Proses Adopsi Telus & Mudah",
-      howItWorksSubtitle: "Kami memastikan setiap haiwan diserahkan kepada keluarga yang selamat dan bertanggungjawab melalui 3 langkah mudah tanpa sebarang yuran komersial.",
+      howItWorksTitle: "Langkah Permohonan",
       step1Title: "Semak & Hantar Permohonan",
-      step1Desc: "Semak senarai anjing dan kucing sedia diadopsi dalam talian atau kunjungi pusat perlindungan kami di Petaling Jaya. Hantar borang permohonan ringkas.",
+      step1Desc: "Lihat profil anjing & kucing reskue kami secara dalam talian atau kunjungi santuari kami. Hantar borang ringkas — kami menyemak kesesuaian asas kediaman anda (pagar selamat, garis panduan bangunan bertingkat, persetujuan isi rumah).",
       step2Title: "Sesi Suai Kenal & Interaksi",
       step2Desc: "Luangkan masa berinteraksi bersama haiwan pilihan di kawasan riadah luar atau bilik kucing. Pengenalan terselia disediakan jika anda mempunyai haiwan sedia ada.",
       step3Title: "Tandatangan Perjanjian & Bawa Pulang",
-      step3Desc: "Tandatangani perjanjian adopsi rasmi tanpa sebarang yuran adopsi komersial. Semua haiwan telah lengkap divaksin, dipasang cip mikro dan dimandulkan.",
+      step3Desc: "Tandatangani perjanjian adopsi atau asuhan tanpa sebarang yuran adopsi komersial. Semua haiwan telah lengkap divaksin, dipasang cip mikro dan dimandulkan. Jika keadaan hidup anda berubah, kami sentiasa menerima haiwan itu kembali.",
       protocolsTitle: "Piawaian Kebajikan Haiwan Kami",
       protocolsSubtitle: "Berasaskan ketelitian klinikal veterinar, kebertanggungjawaban sepanjang hayat, dan belas kasihan.",
       protocol1Title: "Protokol Veterinar Lengkap",
@@ -864,8 +837,12 @@ export const translations: Record<Language, TranslationDictionary> = {
       protocol4Desc: "Kami mengesahkan kesesuaian asas kediaman (garis panduan rumah bertanah vs bertingkat, pagar selamat, dan persetujuan seisi rumah) demi pemadanan kekal.",
     },
     pets: {
-      title: "Haiwan Sedia Diangkat Anak di Selangor",
-      subtitle: "Semak senarai anjing, kucing, dan anak haiwan yang menanti keluarga penyayang di Petaling Jaya.",
+      title: "Kenali Haiwan Kami",
+      subtitle: "Lihat anjing dan kucing reskue di santuari kami.",
+      titleAdopt: "Haiwan untuk Diadopsi",
+      subtitleAdopt: "Anjing dan kucing reskue yang mencari rumah kekal.",
+      titleFoster: "Haiwan untuk Diasuh",
+      subtitleFoster: "Anjing dan kucing reskue yang masih membina keyakinan dengan manusia. Rumah asuhan memberi mereka sosialisasi yang tenang dan konsisten sebelum diadopsi.",
       speciesFilter: "Spesis",
       genderFilter: "Jantina",
       ageFilter: "Kumpulan Umur",
@@ -905,7 +882,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       adultsOnly: "Dewasa Sahaja",
       sanctuaryLocationHours: "Lokasi Pusat Perlindungan & Waktu Lawatan",
       sanctuaryAddress: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Buka Sel–Ahad: 10:00 PG – 5:00 PTG",
-      applyToAdopt: "Mohon untuk Mengangkat Anak",
+      applyToAdopt: "Mohon untuk Adopsi",
+      applyToFoster: "Mohon untuk Asuh",
       adoptionPending: "Adopsi Sedang Diproses",
       underCareNotice:
         "Dalam rawatan veterinar — belum tersedia untuk adopsi. Tajaan membiayai rawatan haiwan ini.",
@@ -934,20 +912,13 @@ export const translations: Record<Language, TranslationDictionary> = {
     medicalTimeline: {
       title: "Garis Masa Penyelamatan & Penjagaan Veterinar",
       subtitle: "Rekod klinikal kronologi disahkan, saringan diagnostik, rawatan, dan pengesahan veterinar.",
-      filterAll: "Semua Peristiwa",
-      filterIntake: "Kemasukan Reskue",
-      filterDiagnostic: "Diagnostik",
-      filterTreatment: "Rawatan",
-      filterVaccination: "Vaksinasi",
-      filterSurgery: "Pembedahan",
-      filterClearance: "Kelulusan",
       verifiedBy: "Disahkan oleh",
-      noMilestones: "Tiada rekod klinikal untuk kategori tapisan yang dipilih.",
+      noRecords: "Belum ada rekod veterinar.",
     },
     adoptionForm: {
       title: "Borang Permohonan Adopsi Hope for Strays",
       titleWithPet: "Borang Permohonan Adopsi untuk",
-      subtitle: "Borang mengambil masa sekitar 5 minit. Penyelaras sukarelawan kami di Petaling Jaya akan menyemak dan menghubungi anda dalam 1–2 hari bekerja.",
+      subtitle: "Borang mengambil masa sekitar 5 minit. Penyelaras sukarelawan kami akan menyemak dan menghubungi anda dalam 1–2 hari bekerja.",
       selectedPetLabel: "Haiwan Reskue Pilihan",
       applicantNameLabel: "Nama Penuh (mengikut Kad Pengenalan / Pasport) *",
       applicantNamePlaceholder: "cth. Nurul Huda binti Ahmad",
@@ -993,8 +964,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     tracking: {
       badge: "Portal Layan Diri Pengadopsi",
-      title: "Semak Status Permohonan Adopsi",
-      subtitle: "Semak status semakan langsung, jadual sesi suai kenal, dan arahan penyempurnaan adopsi haiwan perlindungan anda.",
+      title: "Semak Status Permohonan",
+      subtitle: "Masukkan ID rujukan anda untuk melihat status permohonan.",
       refLabel: "Nombor Rujukan Permohonan *",
       refPlaceholder: "cth. app-1723738192000",
       emailLabel: "Alamat E-mel Pemohon *",
@@ -1039,21 +1010,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     donations: {
       badge: "Sumbangan & Penajaan Terus",
-      title: "Taja Rawatan Perubatan & Makanan untuk Haiwan Terbiar",
-      subtitle: "Setiap ringgit disalurkan terus bagi pembedahan kecemasan, vaksinasi teras, dan makanan berkhasiat di pusat perlindungan Petaling Jaya kami. Berkat kemurahan hati anda, 100% haiwan reskue kami diserahkan melalui polisi Adopsi Percuma.",
-      rosBadge: "No. ROS: {regNo}",
-      lhdnBadge: "Pengecualian Cukai LHDN: Sek 44(6) ACP 1967",
+      title: "Taja & Sumbang",
+      subtitle: "Setiap ringgit disalurkan terus bagi pembedahan kecemasan, vaksinasi teras, dan makanan berkhasiat di pusat perlindungan kami. Berkat kemurahan hati anda, 100% haiwan reskue kami diserahkan melalui polisi Adopsi Percuma.",
       freeAdoptionGuarantee: "Jaminan Adopsi 100% Percuma",
-      widgetTitle: "Buat Sumbangan Dikecualikan Cukai",
+      widgetTitle: "Buat Sumbangan",
       selectTierLabel: "Pilih Pakej Sumbangan",
       customAmountLabel: "Atau Masukkan Jumlah Tersuai (MYR)",
       frequencyOneTime: "Sumbangan Sekali Sahaja",
       frequencyMonthly: "Wira Reskue Bulanan",
-      taxReliefNoticeTitle: "Pengecualian Cukai LHDN (Subseksyen 44(6) ACP 1967)",
-      taxReliefNoticeDesc: "Sila masukkan Nama Penuh dan No. Kad Pengenalan / Pasport / SSM Syarikat anda untuk menerima e-Resit rasmi bagi tujuan potongan cukai pendapatan.",
+      taxReliefNoticeDesc: "Sila masukkan nama dan emel anda supaya kami boleh mengesahkan ikrar anda.",
       dedicateLabel: "Dedikasikan atau Taja Haiwan Tertentu (Pilihan)",
       dedicatePlaceholder: "cth. Untuk pemulihan pembedahan Bella / penjagaan Milo",
-      donorNameLabel: "Nama Penuh Penderma (untuk resit cukai) *",
+      donorNameLabel: "Nama Penuh Penderma *",
       donorEmailLabel: "Alamat E-mel (untuk penerimaan e-Resit) *",
       donorPhoneLabel: "Nombor Telefon (makluman WhatsApp)",
       donorIcLabel: "No. Kad Pengenalan / Pasport / No. SSM Syarikat",
@@ -1104,7 +1072,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       urgentBadge: "Notis Segera",
       contactCoordinator: "WhatsApp Penyelaras",
       allNoticesTitle: "Semua Buletin",
-      petsFeedTitle: "Buletin Adopsi & Klinik",
       categoryUrgentNeed: "Asuhan Segera / Keperluan",
       categoryClinic: "Klinik / Vaksin",
       categoryEvent: "Program",
@@ -1112,6 +1079,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       categoryAnnouncement: "Notis",
       pinned: "Disemat",
       postedBy: "Dihantar oleh:",
+      goToNotice: "Papar notis {n} daripada {total}",
       noUpdates: "Tiada kemas kini untuk dipaparkan buat masa ini.",
     },
     footer: {
@@ -1122,11 +1090,10 @@ export const translations: Record<Language, TranslationDictionary> = {
       closedMondays: "Tutup pada hari Isnin untuk sanitasi menyeluruh",
       locationContactTitle: "Lokasi & Hubungan",
       address: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor, Malaysia",
-      rosReg: "No. ROS: {regNo}",
       privacyNotice: "Notis Privasi (PDPA)",
       adoptionTerms: "Syarat Adopsi",
       staffPortal: "Portal Staf",
-      copyright: "Hope for Strays (Persatuan Harapan Haiwan Terbiar Selangor). Hak cipta terpelihara.",
+      copyright: "Hope for Strays. Hak cipta terpelihara.",
     },
   },
 };

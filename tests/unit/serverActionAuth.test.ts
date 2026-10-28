@@ -70,7 +70,7 @@ const INTENTIONALLY_PUBLIC: Record<string, string> = {
   // Public content, served on pages any visitor can open. Pre-existing on
   // master and not touched by this change: listed so the guard passes on
   // today's tree, with their payloads not audited field by field here.
-  getFaqsAction: "published rows only, rendered anonymously by /faq and /pets",
+  getFaqsAction: "published rows only, the same rows /faq renders anonymously",
   fetchFaqsAction: "alias of getFaqsAction",
   getFaqByIdAction: "published rows only, rendered anonymously",
   getRehabNeedsAction: "public rehabilitation needs list",

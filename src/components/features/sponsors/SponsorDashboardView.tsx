@@ -70,7 +70,7 @@ function RescueCard({ rescue }: { rescue: SponsoredRescueDTO }) {
           <p className="text-xs text-muted-foreground">{rescue.breed}</p>
         </div>
 
-        <p className="inline-flex items-center gap-1.5 rounded-lg bg-primary/8 px-2.5 py-1.5 text-xs font-semibold text-primary">
+        <p className="inline-flex items-center gap-1.5 rounded-lg bg-primary/8 px-2.5 py-1.5 text-xs font-semibold text-primary-ink">
           <Stethoscope className="size-3.5" aria-hidden />
           {isMs ? rescue.rehabStageMs : rescue.rehabStage}
         </p>
@@ -146,7 +146,7 @@ export function SponsorDashboardView({
       {/* Header */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
-          <p className="text-2xs font-bold uppercase tracking-widest text-primary">
+          <p className="text-2xs font-bold uppercase tracking-widest text-primary-ink">
             {isMs ? "Portal penaja" : "Sponsor portal"}
           </p>
           <h1 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
@@ -225,7 +225,7 @@ export function SponsorDashboardView({
                 </div>
               </div>
             ) : (
-              <p className="border-t border-border pt-4 text-xs font-semibold text-primary">
+              <p className="border-t border-border pt-4 text-xs font-semibold text-primary-ink">
                 {isMs
                   ? "Anda berada di taraf tertinggi. Terima kasih."
                   : "You are at the highest standing. Thank you."}
@@ -249,7 +249,7 @@ export function SponsorDashboardView({
                   }`}
                 >
                   {perk.unlocked ? (
-                    <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+                    <Check className="mt-0.5 size-4 shrink-0 text-primary-ink" aria-hidden />
                   ) : (
                     <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
                   )}

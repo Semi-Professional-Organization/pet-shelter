@@ -12,6 +12,8 @@ import {
   buildVisibleTrackOptions,
   getPetTrack,
   isPetTrack,
+  isPlacementType,
+  matchesPlacementFilter,
   matchesStatusFilter,
   matchesTrackFilter,
 } from "@/lib/presentation/petStatusPresentation";
@@ -34,6 +36,8 @@ const FILTER_DEFAULTS = {
   size: "all",
   status: "all",
   track: "all",
+  // "Looking to" adopt or foster — set by the Apply to Adopt / Apply to Foster buttons on /adoption.
+  type: "all",
 } as const;
 
 export type PetFilterKey = keyof typeof FILTER_DEFAULTS;
@@ -53,7 +57,7 @@ const FILTER_KEYS = Object.keys(FILTER_DEFAULTS) as PetFilterKey[];
  * folded in here.
  */
 const BASE_MATCHERS: Record<
-  "search" | "species" | "gender" | "ageCategory" | "size",
+  "search" | "species" | "gender" | "ageCategory" | "size" | "type",
   (pet: Pet, value: string) => boolean
 > = {
   // Shared with `getPublicPets`; the two copies this replaced had already drifted once.
@@ -62,6 +66,9 @@ const BASE_MATCHERS: Record<
   gender: (pet, value) => pet.gender === value,
   ageCategory: (pet, value) => pet.ageCategory === value,
   size: (pet, value) => pet.size === value,
+  // Parallel, not staged: it narrows the population before tracks and statuses are counted, so
+  // their counts describe the animals a visitor looking to foster can actually apply for.
+  type: matchesPlacementFilter,
 };
 
 const BASE_MATCHER_KEYS = Object.keys(BASE_MATCHERS) as (keyof typeof BASE_MATCHERS)[];
@@ -102,6 +109,7 @@ function resolveFilters(raw: FilterValues): FilterValues {
     resolved.status = normalizePetStatus(resolved.status as PetStatus);
   }
   if (!isPetTrack(resolved.track)) resolved.track = FILTER_DEFAULTS.track;
+  if (!isPlacementType(resolved.type)) resolved.type = FILTER_DEFAULTS.type;
   return resolved;
 }
 
@@ -201,6 +209,7 @@ export function usePetGalleryController({
   const setSelectedAge = useCallback((value: string) => setFilter("ageCategory", value), [setFilter]);
   const setSelectedSize = useCallback((value: string) => setFilter("size", value), [setFilter]);
   const setSelectedStatus = useCallback((value: string) => setFilter("status", value), [setFilter]);
+  const setSelectedPlacement = useCallback((value: string) => setFilter("type", value), [setFilter]);
 
   /**
    * Changing track keeps the status only where that status still lives.
@@ -335,6 +344,7 @@ export function usePetGalleryController({
       selectedSize: filters.size,
       selectedStatus: filters.status,
       selectedTrack: filters.track,
+      selectedPlacement: filters.type,
       activePetForDetail,
       isDetailOpen,
       activePetForAdoption,
@@ -351,6 +361,7 @@ export function usePetGalleryController({
       setSelectedSize,
       setSelectedStatus,
       setSelectedTrack,
+      setSelectedPlacement,
       handleResetFilters,
       handleOpenDetail,
       handleOpenAdoption,

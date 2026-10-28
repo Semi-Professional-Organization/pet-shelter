@@ -13,7 +13,7 @@ test.describe("public adoption", () => {
     const adoption = new AdoptionPage(page);
     await adoption.gotoCatalogue();
 
-    await expect(page.getByRole("heading", { name: /adoptable animals/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /meet our animals/i })).toBeVisible();
 
     await adoption.search("Bella");
     await expect(page.getByText(/bella/i).first()).toBeVisible();

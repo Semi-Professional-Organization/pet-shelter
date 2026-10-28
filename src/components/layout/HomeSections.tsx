@@ -1,30 +1,24 @@
 "use client";
 
-import { PUBLIC_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { 
-  FileText, 
-  Users, 
-  HomeIcon, 
-  Heart,
-  ShieldCheck,
   ArrowRight,
-  Stethoscope,
-  GraduationCap,
   Loader2,
-  Scissors,
   CheckCircle2,
-  Package
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
 import type { TranslationKey } from "@/lib/i18n/translations";
+import { Section, SectionHeader } from "@/components/layout/Section";
 
 /**
- * The two strings `src/app/page.tsx` used to render itself.
+ * The gallery's loading fallback, which `src/app/page.tsx` used to render
+ * itself. (The view-all link it rendered beside it now sits in the featured
+ * `PetGallery`'s own header, a client component that calls `t()` directly.)
  *
- * They live here because `page.tsx` is a Server Component under
+ * It lives here because `page.tsx` is a Server Component under
  * `revalidate = 300`, and the reader's language is client state —
  * `LanguageProvider` reads `localStorage`, and its `getServerSnapshot` returns
  * `null`, so a server render can only ever produce English. Reading the
@@ -33,7 +27,7 @@ import type { TranslationKey } from "@/lib/i18n/translations";
  * already declined. Moving the literals across the client boundary costs
  * nothing and lets them call `t()`.
  *
- * Like every other Malay string on the site, these switch after hydration: the
+ * Like every other Malay string on the site, this switches after hydration: the
  * **served HTML** is English, because the server cannot know the language. The
  * `<html lang>` attribute takes the same path rather than being simply wrong —
  * `layout.tsx` serves `lang="en"` and `LanguageProvider` corrects
@@ -53,25 +47,6 @@ export function HomeGalleryLoading() {
   );
 }
 
-export function HomeViewAllPetsLink() {
-  const { t } = useTypedTranslation();
-
-  return (
-    <div className="flex justify-center pt-6">
-      <Link
-        href="/pets"
-        className={buttonVariants({
-          variant: "outline",
-          className: "text-sm font-semibold uppercase tracking-wider focus-visible:ring-2 rounded-xl gap-2",
-        })}
-      >
-        {t("home.viewAllPets")}
-        <ArrowRight className="size-4" />
-      </Link>
-    </div>
-  );
-}
-
 /**
  * FE-03: "Our Work" — The 3 Core Pillars of Hope for Strays UM:
  * 1. TNRM (Trap-Neuter-Return-Manage)
@@ -83,14 +58,17 @@ export function HomeOurWorkSection() {
 
   const pillars = [
     {
-      icon: Scissors,
+      image:
+        "https://images.unsplash.com/photo-1511044568932-338cba0ad803?auto=format&fit=crop&w=900&q=80",
+      altEn: "A community cat resting on a pavement",
+      altMs: "Kucing komuniti sedang berehat di kaki lima",
       // `/faq` explains TNRM ("Answers on TNRM and community animals"); its
       // category is internal state, so the page is as deep as a link can go.
       // This used to be `/#how-it-works`, the three-step *adoption* journey —
       // harmless while that anchor rendered nowhere, misleading once restored.
       href: "/faq",
-      tagEn: "Pillar 1: Population Control",
-      tagMs: "Teras 1: Kawalan Populasi",
+      categoryEn: "Population Control",
+      categoryMs: "Kawalan Populasi",
       titleEn: "TNRM (Trap-Neuter-Return-Manage)",
       titleMs: "TNRM (Tangkap-Mandul-Lepas-Urus)",
       descEn:
@@ -107,14 +85,15 @@ export function HomeOurWorkSection() {
         "Stesen makanan berjadual di sekitar kampus UM",
         "Vaksinasi teras & pencegahan rabies semasa mandul",
       ],
-      accent: "border-success-accent/30 bg-success-surface",
-      badgeColor: "text-success-text bg-success-surface",
     },
     {
-      icon: GraduationCap,
+      image:
+        "https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=900&q=80",
+      altEn: "A cat and a dog resting together outdoors",
+      altMs: "Seekor kucing dan anjing berehat bersama di luar",
       href: "/get-involved",
-      tagEn: "Pillar 2: Community Coexistence",
-      tagMs: "Teras 2: Kewujudan Bersama",
+      categoryEn: "Community Coexistence",
+      categoryMs: "Kewujudan Bersama",
       titleEn: "Education & Coexistence",
       titleMs: "Pendidikan & Harmoni Kampus",
       descEn:
@@ -131,20 +110,21 @@ export function HomeOurWorkSection() {
         "Kempen anti-pembuangan haiwan peliharaan",
         "Rangkaian skuad sukarelawan & warden pelajar",
       ],
-      accent: "border-warning-accent/30 bg-warning-surface",
-      badgeColor: "text-warning-text bg-warning-surface",
     },
     {
-      icon: Stethoscope,
+      image:
+        "https://images.unsplash.com/photo-1628009368231-7bb7cfcb0def?auto=format&fit=crop&w=900&q=80",
+      altEn: "A carer gently examining a rescued cat",
+      altMs: "Penjaga sedang memeriksa kucing reskue dengan lembut",
       href: "/needs",
-      tagEn: "Pillar 3: Clinical Care",
-      tagMs: "Teras 3: Rawatan Klinikal",
+      categoryEn: "Clinical Care",
+      categoryMs: "Rawatan Klinikal",
       titleEn: "Sanctuary & Rehabilitation",
       titleMs: "Santuari & Rumah Pemulihan",
       descEn:
-        "Animals with severe fractures, chronic mange, or trauma are admitted to our Petaling Jaya Rehabilitation House. Under veterinary supervision, they receive medical care until fully healed.",
+        "Animals with severe fractures, chronic mange, or trauma are admitted to our Rehabilitation House. Under veterinary supervision, they receive medical care until fully healed.",
       descMs:
-        "Haiwan yang cedera parah, menghidap kurap teruk, atau trauma dimasukkan ke Rumah Pemulihan Petaling Jaya kami untuk rawatan rapi dan terapi pemulihan berterusan.",
+        "Haiwan yang cedera parah, menghidap kurap teruk, atau trauma dimasukkan ke Rumah Pemulihan kami untuk rawatan rapi dan terapi pemulihan berterusan.",
       highlightsEn: [
         "Post-op sterile recovery enclosures & wound care",
         "Medicated baths & demodicosis/sarcoptic therapy",
@@ -155,86 +135,74 @@ export function HomeOurWorkSection() {
         "Mandian berubat kurap & pemulihan bulu",
         "Adopsi percuma 100% setelah sembuh sepenuhnya",
       ],
-      accent: "border-care-accent/30 bg-care-surface",
-      badgeColor: "text-care-text bg-care-surface",
     },
   ];
 
   return (
-    <section id="our-work" className="border-t border-border bg-background py-16 sm:py-20">
-      <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto space-y-12">
-        {/* Header */}
-        <div className="max-w-3xl space-y-3">
-          {/* <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 text-primary text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
-            <Sparkles className="size-3.5" />
-            {isMs ? "Misi & Metodologi Kami" : "Our Mission & 3-Pillar Framework"}
-          </div> */}
-          <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-            {isMs ? "Kerja Kami" : "Our Work"}
-          </h2>
-          {/* <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-            {isMs
-              ? "Kami menggabungkan TNRM, pendidikan, dan pemulihan klinikal untuk membina kehidupan yang lebih selamat bagi haiwan dan komuniti."
-              : "We combine TNRM, education, and rehabilitation to create safer outcomes for animals and the community around them."}
-          </p> */}
-        </div>
+    <Section id="our-work" className="space-y-14">
+      <SectionHeader
+        title={isMs ? "Kerja Kami" : "Our Work"}
+        subtitle={
+          isMs
+            ? "Kerja kami berteraskan rawatan berperikemanusiaan, pendidikan, dan kewujudan bersama antara haiwan dan komuniti."
+            : "Our work focuses on humane care, education and coexistence between animals and communities."
+        }
+      />
 
-        {/* 3 Pillars Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {pillars.map((pillar, idx) => {
-            const Icon = pillar.icon;
-            return (
+        {/* Editorial rows: image and copy alternate sides, so each pillar gets a full row
+            rather than a third of one and the highlights fit without crushing the body. */}
+        <div className="space-y-14">
+          {pillars.map((pillar, idx) => (
+            <div key={idx} className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
               <div
-                key={idx}
-                className={`border ${pillar.accent} p-7 sm:p-8 rounded-3xl space-y-6 flex flex-col justify-between shadow-xs`}
+                className={`relative aspect-16/10 overflow-hidden rounded-card bg-primary-panel ${
+                  idx % 2 ? "lg:order-2" : ""
+                }`}
               >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-2xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${pillar.badgeColor}`}>
-                      {isMs ? pillar.tagMs : pillar.tagEn}
-                    </span>
-                    <div className="flex size-10 items-center justify-center bg-card border border-border rounded-xl">
-                      <Icon className="size-5 text-foreground" />
+                <Image
+                  src={pillar.image}
+                  alt={isMs ? pillar.altMs : pillar.altEn}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                />
+              </div>
+              <div className="space-y-4">
+                <p className="text-2xs font-bold uppercase tracking-wider text-primary-ink">
+                  {isMs ? pillar.categoryMs : pillar.categoryEn}
+                </p>
+                <h3 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                  {isMs ? pillar.titleMs : pillar.titleEn}
+                </h3>
+                <p className="text-base leading-relaxed text-muted-foreground">
+                  {isMs ? pillar.descMs : pillar.descEn}
+                </p>
+                <div className="space-y-2 pt-1">
+                  {(isMs ? pillar.highlightsMs : pillar.highlightsEn).map((item) => (
+                    <div key={item} className="flex items-start gap-2 text-sm font-medium text-foreground/90">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" />
+                      <span>{item}</span>
                     </div>
-                  </div>
-
-                  <h3 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
-                    {isMs ? pillar.titleMs : pillar.titleEn}
-                  </h3>
-
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {isMs ? pillar.descMs : pillar.descEn}
-                  </p>
-
-                  <div className="space-y-2 pt-2 border-t border-border/40">
-                    {(isMs ? pillar.highlightsMs : pillar.highlightsEn).map((item, hIdx) => (
-                      <div key={hIdx} className="flex items-start gap-2 text-xs text-foreground/90 font-medium">
-                        <CheckCircle2 className="size-3.5 text-primary shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-
-                <div className="pt-4 border-t border-border/60">
+                <div className="pt-2">
                   <Link
                     // From the pillar itself, not its position. Choosing by
                     // array index is how the TNRM card came to point at the
                     // adoption steps: reorder the array and every link after
                     // the change would silently point somewhere else.
                     href={pillar.href}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary-ink transition-colors"
                   >
-                    <span>{isMs ? "Ketahui Lebih Lanjut" : "Learn More"}</span>
+                    <span>{isMs ? "Lihat cara ini berfungsi" : "See how this works"}</span>
                     <ArrowRight className="size-3.5" />
                   </Link>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
-      </div>
-    </section>
+    </Section>
   );
 }
 
@@ -243,77 +211,100 @@ export function HomeQuickActionsSection() {
 
   const actions = [
     {
+      image:
+        "https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=900&q=80",
+      alt: isMs ? "Seekor anjing reskue yang ceria" : "A cheerful rescue dog outdoors",
       title: isMs ? "Adopsi" : "Adopt",
       description: isMs
         ? "Temui haiwan yang sedia untuk perumahan baharu dan hantar permohonan adopsi dengan mudah."
         : "Meet animals ready for a new home and apply to adopt in just a few steps.",
+      cta: isMs ? "Lihat Haiwan" : "See Animals",
       href: "/pets",
-      icon: Heart,
     },
     {
+      image:
+        "https://images.unsplash.com/photo-1494947665470-20322015e3a8?auto=format&fit=crop&w=900&q=80",
+      alt: isMs ? "Sukarelawan memegang tali beberapa ekor anjing" : "A volunteer walking several dogs on leads",
       title: isMs ? "Sukarelawan" : "Volunteer",
       description: isMs
         ? "Bantu di santuari, lawatan mingguan, dan aktiviti komuniti tanpa pengalaman terdahulu."
         : "Support the sanctuary through weekly care, walking, transport, and community events.",
+      cta: isMs ? "Sertai Kami" : "Get Involved",
       href: "/get-involved",
-      icon: Users,
     },
     {
+      image:
+        "https://images.unsplash.com/photo-1589924691995-400dc9ecc119?auto=format&fit=crop&w=900&q=80",
+      alt: isMs ? "Mangkuk makanan haiwan di atas lantai kayu" : "A bowl of food on a wooden floor beside a dog",
       title: isMs ? "Derma" : "Donate",
       description: isMs
         ? "Sokong makanan, ubat, operasi dan pemulihan klinikal untuk haiwan yang memerlukan."
         : "Fund food, treatment, surgery, and recovery costs for rescued animals in need.",
+      cta: isMs ? "Sokong HFS" : "Support HFS",
       href: "/donate",
-      icon: Package,
     },
     {
+      image:
+        "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=900&q=80",
+      alt: isMs ? "Kucing yang tenang sedang berehat di dalam rumah" : "A settled cat resting indoors",
       title: isMs ? "Taja" : "Sponsor",
       description: isMs
         ? "Taja pemulihan haiwan, rawatan veterinar, dan penjagaan jangka panjang setiap bulan."
         : "Sponsor ongoing care, treatment, and rehabilitation for animals who need longer-term support.",
+      cta: isMs ? "Taja Seekor Haiwan" : "Sponsor an Animal",
       href: "/needs",
-      icon: ShieldCheck,
     },
   ];
 
-  return (
-    <section className="border-t border-border bg-card py-14 sm:py-18">
-      <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto space-y-8">
-        <div className="max-w-2xl space-y-2">
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-            {isMs ? "Tindakan Pantas" : "Quick actions"}
-          </span>
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            {isMs ? "Bersama Kami Membantu Haiwan" : "Choose a way to help"}
-          </h2>
-        </div>
+  const [lead, second, third, fourth] = actions;
+  const big = [lead, third].filter(Boolean);
+  const small = [second, fourth].filter(Boolean);
+  const cardShell =
+    "group flex flex-col overflow-hidden rounded-card bg-work-panel transition-colors hover:bg-accent-subtle-strong";
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-          {actions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <Link
-                key={action.title}
-                href={action.href}
-                className="group flex h-full flex-col gap-4 rounded-2xl border border-border bg-background p-5 shadow-xs transition-colors hover:border-primary/40 hover:bg-muted/40"
-              >
-                <div className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                  <Icon className="size-5" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="font-heading text-xl font-bold text-foreground">{action.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">{action.description}</p>
-                </div>
-                <div className="mt-auto inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-foreground">
-                  {isMs ? "Lihat lagi" : "Learn more"}
-                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
-                </div>
+  const cardBody = (a: (typeof actions)[number], titleSize: string) => (
+    <div className="flex flex-1 flex-col gap-3 p-6 sm:p-7">
+      <h3 className={`font-heading ${titleSize} font-bold text-foreground`}>{a.title}</h3>
+      <p className="text-sm leading-relaxed text-muted-foreground">{a.description}</p>
+      <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-xs font-bold uppercase tracking-wider text-primary-ink">
+        {a.cta}
+        <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </div>
+  );
+
+  return (
+    <Section className="space-y-12">
+      <SectionHeader
+        title={isMs ? "Sertai kami membawa perubahan" : "Join us in making a difference"}
+        subtitle={
+          isMs
+            ? "Sama ada anda mengadopsi, menjadi sukarelawan, menderma atau menaja, setiap tindakan membantu mencipta kehidupan yang lebih baik."
+            : "Whether you adopt, volunteer, donate or sponsor, every action helps create better lives."
+        }
+      />
+
+        {/* Adopt and Donate take the two wide cells; Volunteer and Sponsor stack in the third
+            without an image, because at a third of the width a photograph arrives too small to
+            read as one and costs the copy the room it needs. */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {big.map((a) => (
+            <Link key={a.href} href={a.href} className={cardShell}>
+              <div className="relative aspect-4/3 w-full">
+                <Image src={a.image} alt={a.alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 33vw" />
+              </div>
+              {cardBody(a, "text-2xl")}
+            </Link>
+          ))}
+          <div className="flex flex-col gap-6">
+            {small.map((a) => (
+              <Link key={a.href} href={a.href} className={`${cardShell} flex-1`}>
+                {cardBody(a, "text-xl")}
               </Link>
-            );
-          })}
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+    </Section>
   );
 }
 
@@ -339,9 +330,10 @@ export function HomeQuickActionsSection() {
  * to the `en` dictionary, so a literal here could only ever be a third copy,
  * unreachable and free to drift.
  *
- * The heading, eyebrow and subtitle read from the dictionary too. They were
- * left inline at first, on the grounds that `home.howItWorksTitle`/`Subtitle`
- * hold different sentences rather than second copies — true, but it left half
+ * The heading reads from the dictionary too. It and the subtitle (since
+ * dropped) were left inline at first, on the grounds that
+ * `home.howItWorksTitle`/`Subtitle` held different sentences rather than
+ * second copies — true, but it left half
  * of one component translator-reachable and half not, which is the same
  * split-source defect one level down. Adopting the keys does change the
  * visible wording; this section had rendered nowhere since `1137d3e`, so there
@@ -351,72 +343,37 @@ export function HomeQuickActionsSection() {
 export function HomeProcessSection() {
   const { t } = useTypedTranslation();
 
-  const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey; icon: typeof FileText }[] = [
-    {
-      num: "01",
-      titleKey: "home.step1Title",
-      descKey: "home.step1Desc",
-      icon: FileText,
-    },
-    {
-      num: "02",
-      titleKey: "home.step2Title",
-      descKey: "home.step2Desc",
-      icon: Users,
-    },
-    {
-      num: "03",
-      titleKey: "home.step3Title",
-      descKey: "home.step3Desc",
-      icon: HomeIcon,
-    },
+  const steps: { num: string; titleKey: TranslationKey; descKey: TranslationKey }[] = [
+    { num: "01", titleKey: "home.step1Title", descKey: "home.step1Desc" },
+    { num: "02", titleKey: "home.step2Title", descKey: "home.step2Desc" },
+    { num: "03", titleKey: "home.step3Title", descKey: "home.step3Desc" },
   ];
 
   return (
-    <section id="how-it-works" className="border-t border-border bg-background py-14 sm:py-18 scroll-mt-24">
-      <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-        <div className="max-w-2xl mb-10">
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-muted-foreground">
-            {t("home.howItWorksEyebrow")}
-          </span>
-          <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1">
-            {t("home.howItWorksTitle")}
-          </h2>
-          <p className="text-base text-muted-foreground mt-2 leading-relaxed">
-            {t("home.howItWorksSubtitle")}
-          </p>
-        </div>
+    <Section id="how-it-works" className="scroll-mt-24">
+      <div className="space-y-10">
+        <SectionHeader title={t("home.howItWorksTitle")} />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div
-                key={step.num}
-                className="border border-border bg-card p-6 sm:p-7 relative flex flex-col justify-between rounded-2xl shadow-xs"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-2xl font-bold text-foreground">
-                      {step.num}
-                    </span>
-                    <div className="flex size-10 items-center justify-center bg-muted text-foreground rounded-xl">
-                      <Icon className="size-5" />
-                    </div>
-                  </div>
-                  <h3 className="font-heading text-lg font-bold tracking-tight text-foreground">
-                    {t(step.titleKey)}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {t(step.descKey)}
-                  </p>
-                </div>
+        {/* A vertical timeline, read top to bottom: each step's number sits on a rail that joins it
+            to the next, and the text runs full width beside it. */}
+        <ol>
+          {steps.map((step, idx) => (
+            <li key={step.num} className="relative flex gap-5 pb-10 last:pb-0 sm:gap-6">
+              {idx < steps.length - 1 && (
+                <span aria-hidden="true" className="absolute left-5 top-12 bottom-2 w-px -translate-x-1/2 bg-border" />
+              )}
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-sm font-bold text-primary-foreground">
+                {idx + 1}
+              </span>
+              <div className="space-y-2 pt-1.5">
+                <h3 className="font-heading text-xl font-bold tracking-tight text-foreground">{t(step.titleKey)}</h3>
+                <p className="text-base leading-relaxed text-muted-foreground">{t(step.descKey)}</p>
               </div>
-            );
-          })}
-        </div>
+            </li>
+          ))}
+        </ol>
       </div>
-    </section>
+    </Section>
   );
 }
 
@@ -451,17 +408,12 @@ export function HomeStandardsSection() {
   ];
 
   return (
-    <section id="mission" className="border-t border-border bg-card py-14 sm:py-18">
-      <div className="w-full px-6 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-start">
-          <div className="lg:col-span-5 space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-secondary text-secondary-foreground text-xs font-semibold border border-border rounded-md">
-              <ShieldCheck className="size-3.5 text-foreground" />
-              <span>{(isMs ? "Persatuan Berdaftar ROS Malaysia: " : "Malaysian Registered Society: ") + PUBLIC_ROS_REGISTRATION_NO}</span>
-            </div>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {isMs ? "Piawaian Kebajikan & Santuari Haiwan" : "Our Animal Welfare & Sanctuary Standards"}
-            </h2>
+    <Section id="mission">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-16">
+          <div className="lg:col-span-4 space-y-4">
+            <SectionHeader
+              title={isMs ? "Piawaian Kebajikan & Santuari Haiwan" : "Our Animal Welfare & Sanctuary Standards"}
+            />
             <p className="text-base text-muted-foreground leading-relaxed">
               {isMs
                 ? "Beroperasi di Petaling Jaya dan kampus Universiti Malaya sejak 2016, Hope for Strays menyelamat, memulihkan, dan mencari keluarga baru untuk anjing dan kucing terbiar dengan ketelusan klinikal penuh."
@@ -480,21 +432,19 @@ export function HomeStandardsSection() {
             </div>
           </div>
 
-          {/* Protocol Grid */}
-          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* A compliance statement reads more credibly as a document than as four tiles, and
+              the rules let each protocol run to whatever length it actually needs. */}
+          <dl className="lg:col-span-8">
             {shelterProtocols.map((protocol, idx) => (
-              <div key={idx} className="border border-border bg-background p-5 space-y-2 rounded-2xl shadow-xs">
-                <h3 className="font-heading text-base font-bold text-foreground">
-                  {protocol.title}
-                </h3>
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+              <div key={idx} className="grid grid-cols-1 gap-2 border-t border-border py-6 sm:grid-cols-3 sm:gap-8">
+                <dt className="font-heading text-base font-bold text-foreground">{protocol.title}</dt>
+                <dd className="text-sm leading-relaxed text-muted-foreground sm:col-span-2">
                   {protocol.description}
-                </p>
+                </dd>
               </div>
             ))}
-          </div>
+          </dl>
         </div>
-      </div>
-    </section>
+    </Section>
   );
 }

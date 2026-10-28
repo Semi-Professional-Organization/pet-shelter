@@ -57,7 +57,7 @@ export function PetExclusiveMediaPanel({ petId, petName }: PetExclusiveMediaPane
       className="space-y-8 rounded-3xl border border-border bg-card p-6 sm:p-8"
     >
       <div className="space-y-1">
-        <p className="text-2xs font-bold uppercase tracking-widest text-primary">
+        <p className="text-2xs font-bold uppercase tracking-widest text-primary-ink">
           {isMs ? "Untuk penaja" : "For sponsors"}
         </p>
         <h2
@@ -85,7 +85,7 @@ export function PetExclusiveMediaPanel({ petId, petName }: PetExclusiveMediaPane
         <div className="space-y-8">
           <div className="space-y-4">
             <h3 className="inline-flex items-center gap-2 font-heading text-base font-bold text-foreground">
-              <Images className="size-4 text-primary" aria-hidden />
+              <Images className="size-4 text-primary-ink" aria-hidden />
               {isMs ? "Album pemulihan resolusi tinggi" : "High-resolution recovery album"}
             </h3>
             {media.gallery.locked ? (
@@ -104,7 +104,7 @@ export function PetExclusiveMediaPanel({ petId, petName }: PetExclusiveMediaPane
 
           <div className="space-y-4">
             <h3 className="inline-flex items-center gap-2 font-heading text-base font-bold text-foreground">
-              <Film className="size-4 text-primary" aria-hidden />
+              <Film className="size-4 text-primary-ink" aria-hidden />
               {isMs ? "Diari video pemulihan" : "Rehabilitation video diary"}
             </h3>
             {media.videoDiary.locked ? (

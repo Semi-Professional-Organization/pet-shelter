@@ -64,7 +64,7 @@ const idsOf = (pets: readonly Pet[]) => pets.map((pet) => pet.id);
 /** Every animal the public grid may show, in fixture order — what "not filtering" looks like. */
 const PUBLIC_IDS = idsOf(GALLERY_PETS).filter((id) => id !== ARCHIVED_PET_ID);
 
-/** The seven filter fields as the hook reports them when nothing is being filtered. */
+/** The eight filter fields as the hook reports them when nothing is being filtered. */
 const NEUTRAL_FILTER_STATE = {
   searchQuery: "",
   selectedSpecies: "all",
@@ -73,6 +73,7 @@ const NEUTRAL_FILTER_STATE = {
   selectedSize: "all",
   selectedStatus: "all",
   selectedTrack: "all",
+  selectedPlacement: "all",
 } as const;
 
 describe("usePetGalleryController", () => {
@@ -96,9 +97,9 @@ describe("usePetGalleryController", () => {
   });
 
   describe("the URL as the source of truth (syncUrl: true)", () => {
-    it("reads all seven filters out of the query string", () => {
+    it("reads all eight filters out of the query string", () => {
       const { result } = renderController({
-        search: "search=Luna&species=dog&gender=Female&ageCategory=puppy_kitten&size=Small&status=Available&track=adoptable",
+        search: "search=Luna&species=dog&gender=Female&ageCategory=puppy_kitten&size=Small&status=Available&track=adoptable&type=adopt",
       });
 
       expect(result.current.state).toMatchObject({
@@ -109,7 +110,15 @@ describe("usePetGalleryController", () => {
         selectedSize: "Small",
         selectedStatus: "Available",
         selectedTrack: "adoptable",
+        selectedPlacement: "adopt",
       });
+    });
+
+    it("ignores a placement the gallery does not offer", () => {
+      const { result } = renderController({ search: "type=rehoming" });
+
+      expect(result.current.state.selectedPlacement).toBe("all");
+      expect(result.current.state.hasActiveFilters).toBe(false);
     });
 
     it("falls back to the neutral default for every filter the URL omits", () => {

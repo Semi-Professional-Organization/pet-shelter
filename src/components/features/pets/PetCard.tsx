@@ -5,10 +5,13 @@ import Image from "next/image";
 import { Info, Heart } from "lucide-react";
 import { Pet } from "@/types/pet";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { SHELTER_WHATSAPP_URL } from "@/lib/domain/shelterIdentity";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import {
   getPetStatusPresentation,
+  getPlacementOptions,
   getRehabStageLabel,
   getRehabProgressPercent,
 } from "@/lib/presentation/petStatusPresentation";
@@ -28,6 +31,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
   const { t, isMs } = useLanguage();
   const [imgSrc, setImgSrc] = useState(pet.image || FALLBACK_PET_IMAGE);
   const status = getPetStatusPresentation(pet.status);
+  const placement = getPlacementOptions(pet);
   const isAvailable = status.isAdoptable;
   // An animal who has gone home is not a support target: neither adoption nor sponsorship
   // applies. The card used to render a disabled button reading "Adopted" here — the dead
@@ -37,10 +41,10 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
   const rehabProgress = status.isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
 
   return (
-    <Card className="group flex h-full flex-col justify-between overflow-hidden border border-border bg-card transition-all duration-200 hover:border-foreground/40 hover:shadow-xs rounded-2xl">
+    <Card className="group flex h-full flex-col justify-between gap-0 py-0 ring-0 overflow-hidden bg-primary-panel transition-colors duration-200 hover:bg-accent-subtle-strong">
       <div>
         {/* Pet Image Container */}
-        <div className="relative aspect-4/3 w-full overflow-hidden bg-muted">
+        <div className="relative aspect-4/3 w-full overflow-hidden bg-work-ground">
           <Image
             src={imgSrc}
             alt={`${pet.name}, ${pet.breed}`}
@@ -50,7 +54,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           />
           
-          {/* Status Badge & Free Adoption Badge - WCAG AAA Compliant */}
+          {/* Status Badge - WCAG AAA Compliant */}
           <div className="absolute top-3 left-3 flex items-center gap-1.5">
             <span
               className={`${status.badgeClass} gap-1.5 px-3 py-1 text-xs`}
@@ -58,29 +62,22 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
               <PetStatusIcon tone={status.tone} className="size-3.5" />
               {t(status.labelKey, status.labelFallback)}
             </span>
-            {/* Withheld only while under care — an animal being rehomed is still a free
-                adoption whether or not an application is already pending on it. */}
-            {!status.isInRehabilitation && (
-              <span className="bg-primary/95 text-primary-foreground font-bold px-2.5 py-1 text-xs tracking-tight rounded-sm">
-                {t("common.freeAdoption", "Free Adoption")}
-              </span>
-            )}
           </div>
 
-          {/* Gender & Age Pill */}
-          <div className="absolute top-3 right-3 bg-black/85 px-3 py-1 text-xs font-semibold text-white">
-            {t(...genderLabelArgs(pet.gender))} • {pet.age}
+          {/* Gender Pill */}
+          <div className="absolute top-3 right-3 bg-black/85 px-3 py-1 text-xs font-semibold text-white rounded-full">
+            {t(...genderLabelArgs(pet.gender))}
           </div>
         </div>
 
         {/* Pet Name & Breed */}
-        <CardHeader className="p-5 pb-2">
+        <CardHeader className="p-6 pb-2">
           <div className="flex items-baseline justify-between gap-2">
             <h3 className="font-heading text-2xl font-bold tracking-tight text-foreground">
               {pet.name}
             </h3>
-            <span className="font-mono text-sm font-semibold text-muted-foreground">
-              {pet.weight}
+            <span className="shrink-0 text-sm font-semibold text-muted-foreground">
+              {pet.age}
             </span>
           </div>
           <p className="text-sm font-medium text-muted-foreground mt-0.5">
@@ -89,7 +86,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
         </CardHeader>
 
         {/* Description & Characteristic Tags */}
-        <CardContent className="p-5 pt-1 space-y-3">
+        <CardContent className="px-6 pt-1 pb-4 space-y-3">
           {/* Rehabilitation stage & recovery progress — only meaningful while under care. */}
           {rehabStage && (
             <div className="border border-care-accent/30 bg-care-surface p-3 space-y-2 rounded-lg">
@@ -147,18 +144,14 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
       </div>
 
       {/* Footer Actions */}
-      <CardFooter
-        className={`p-5 pt-0 border-t border-border/60 mt-3 grid gap-2.5 ${
-          isAlumni ? "grid-cols-1" : "grid-cols-2"
-        }`}
-      >
+      <CardFooter className="px-6 pb-6 pt-4 [.border-t]:pt-4 border-t border-border/60 flex flex-col-reverse gap-2.5">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onSelectPet(pet)}
-          className="w-full text-sm font-semibold py-2 focus-visible:ring-2 cursor-pointer"
+          className="w-full text-xs font-semibold uppercase tracking-wider px-5 py-2.5 focus-visible:ring-2 cursor-pointer rounded-xl"
         >
-          <Info className="size-4 mr-1" />
+          <Info className="size-3.5" />
           {t("common.details", "Details")}
         </Button>
 
@@ -170,15 +163,32 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
             - Pending: an application is already in review. The button stays, disabled, showing
               the status. That *is* a dead button, deliberately: it reports where the animal is
               in the queue, and removing it would make Pending indistinguishable from Available
-              at a glance. Change it here if that call is ever revisited. */}
+              at a glance. Change it here if that call is ever revisited.
+            - Needs socialising: offered for foster (getPlacementOptions). Interim, a WhatsApp
+              message, because applications cannot record "foster" until the type field exists. */}
         {isAlumni ? null : status.isInRehabilitation ? (
           <Button
             size="sm"
             onClick={() => (onSponsorPet ? onSponsorPet(pet) : onSelectPet(pet))}
-            className="w-full min-w-0 px-2 text-xs font-semibold py-2 focus-visible:ring-2 cursor-pointer"
+            className="w-full text-xs font-semibold uppercase tracking-wider px-5 py-2.5 focus-visible:ring-2 cursor-pointer rounded-xl"
           >
             {t("common.sponsorMe", "Sponsor Me")}
           </Button>
+        ) : placement.foster ? (
+          <a
+            href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
+              `Hi Hope for Strays, I would like to foster ${pet.name}.`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "w-full text-xs font-semibold uppercase tracking-wider px-5 py-2.5 focus-visible:ring-2 cursor-pointer rounded-xl"
+            )}
+          >
+            <Heart className="size-3.5" />
+            {t("petDetail.applyToFoster", "Apply to Foster")}
+          </a>
         ) : (
           <Button
             size="sm"
@@ -190,9 +200,9 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
                 onSelectPet(pet);
               }
             }}
-            className="w-full text-sm font-semibold py-2 focus-visible:ring-2 cursor-pointer"
+            className="w-full text-xs font-semibold uppercase tracking-wider px-5 py-2.5 focus-visible:ring-2 cursor-pointer rounded-xl"
           >
-            <Heart className="size-4 fill-current mr-1" />
+            <Heart className="size-3.5 fill-current" />
             {isAvailable ? t("common.apply", "Adopt") : t(status.labelKey, status.labelFallback)}
           </Button>
         )}

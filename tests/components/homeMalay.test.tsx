@@ -6,9 +6,9 @@ import {
   HomeGalleryLoading,
   HomeOurWorkSection,
   HomeProcessSection,
-  HomeViewAllPetsLink,
 } from "@/components/layout/HomeSections";
 import { BulletinFeed } from "@/components/features/bulletins/BulletinFeed";
+import { PetGallery } from "@/components/features/pets/PetGallery";
 import type { Bulletin, BulletinCategory } from "@/types/bulletin";
 import { renderWithLanguage } from "./support/render";
 
@@ -55,17 +55,6 @@ describe("Hero on the Malay site", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Coexistence through TNRM & Education")).not.toBeInTheDocument();
   });
-
-  it("translates the hero image's alt text", () => {
-    // Read from the alt attribute rather than by text: an image's alt is its
-    // accessible name, and `queryByText` cannot see it at all — which is how
-    // this string sat untranslated while a Malay test passed beside it.
-    renderWithLanguage(<Hero />, { language: "ms" });
-
-    const alts = screen.getAllByRole("img").map((img) => img.getAttribute("alt"));
-    expect(alts).toContain("Haiwan reskue menikmati kawasan santuari");
-    expect(alts).not.toContain("Rescued shelter animals enjoying sanctuary grounds");
-  });
 });
 
 describe("Home gallery chrome on the Malay site", () => {
@@ -77,7 +66,11 @@ describe("Home gallery chrome on the Malay site", () => {
   });
 
   it("translates the view-all link", () => {
-    renderWithLanguage(<HomeViewAllPetsLink />, { language: "ms" });
+    // The link sits in the featured gallery's own header, beside its heading.
+    renderWithLanguage(
+      <PetGallery initialPets={[]} featuredOnly showFilters={false} syncUrl={false} />,
+      { language: "ms" }
+    );
 
     expect(
       screen.getByRole("link", { name: /Lihat Semua Haiwan Sedia Diadopsi/i })
@@ -92,26 +85,21 @@ describe("BulletinFeed on the Malay site", () => {
   it("translates the home page's feed heading", () => {
     renderWithLanguage(<BulletinFeed bulletins={[bulletin()]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
-    expect(screen.getByText("Buletin Terkini")).toBeInTheDocument();
-    expect(screen.queryByText("Latest Bulletins")).not.toBeInTheDocument();
+    expect(screen.getByText("Dari pusat perlindungan")).toBeInTheDocument();
+    expect(screen.queryByText("From the shelter")).not.toBeInTheDocument();
     // The literal `page.tsx` used to pass in, which bypassed the key entirely.
     expect(screen.queryByText("Latest news and updates")).not.toBeInTheDocument();
   });
 
-  // The prop combinations the real call sites use, not a convenient one:
-  // `/bulletins` renders the plain feed and `/pets` renders it `compact`.
+  // The prop combination the real call site uses, not a convenient one:
+  // `/bulletins` renders the plain feed. (`/pets` rendered it `compact` until
+  // the animals page dropped its notices; pets-targeted ones list on `/bulletins`.)
   const siblingFeeds = [
     {
       titleKey: "bulletins.allNoticesTitle",
       props: {} as const,
       malay: "Semua Buletin",
       english: "All Bulletins",
-    },
-    {
-      titleKey: "bulletins.petsFeedTitle",
-      props: { compact: true } as const,
-      malay: "Buletin Adopsi & Klinik",
-      english: "Adoption & Clinic Bulletins",
     },
   ] as const;
 
@@ -236,9 +224,8 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     renderWithLanguage(<HomeProcessSection />);
 
     expect(
-      screen.getByRole("heading", { name: "Our Transparent Adoption Journey" })
+      screen.getByRole("heading", { name: "Application Steps" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Adoption Protocol")).toBeInTheDocument();
     expect(screen.getByText("Browse & Submit Application")).toBeInTheDocument();
     expect(screen.getByText("Meet & Socialize")).toBeInTheDocument();
     expect(screen.getByText("Finalize & Welcome Home")).toBeInTheDocument();
@@ -261,9 +248,8 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     renderWithLanguage(<HomeProcessSection />, { language: "ms" });
 
     expect(
-      screen.getByRole("heading", { name: "Proses Adopsi Telus & Mudah" })
+      screen.getByRole("heading", { name: "Langkah Permohonan" })
     ).toBeInTheDocument();
-    expect(screen.getByText("Protokol Adopsi Santuari")).toBeInTheDocument();
     expect(screen.getByText("Semak & Hantar Permohonan")).toBeInTheDocument();
     expect(screen.getByText("Sesi Suai Kenal & Interaksi")).toBeInTheDocument();
     expect(screen.getByText("Tandatangan Perjanjian & Bawa Pulang")).toBeInTheDocument();
@@ -273,8 +259,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText(/tanpa sebarang yuran adopsi komersial/)).toBeInTheDocument();
     expect(screen.queryByText(/yuran tersembunyi/)).not.toBeInTheDocument();
 
-    expect(screen.queryByText("Our Transparent Adoption Journey")).not.toBeInTheDocument();
-    expect(screen.queryByText("Adoption Protocol")).not.toBeInTheDocument();
+    expect(screen.queryByText("Application Steps")).not.toBeInTheDocument();
     expect(screen.queryByText("Browse & Submit Application")).not.toBeInTheDocument();
     expect(screen.queryByText("Meet & Socialize")).not.toBeInTheDocument();
     expect(screen.queryByText("Finalize & Welcome Home")).not.toBeInTheDocument();
@@ -320,7 +305,7 @@ describe("the home page's English is unchanged", () => {
   it("keeps the English copy on the English site", () => {
     renderWithLanguage(<BulletinFeed bulletins={[bulletin({ category: "clinic", isPinned: true })]} titleKey="home.bulletinsTitle" />);
 
-    expect(screen.getByText("Latest Bulletins")).toBeInTheDocument();
+    expect(screen.getByText("From the shelter")).toBeInTheDocument();
     expect(screen.getByText("Clinic / Vaccine")).toBeInTheDocument();
     expect(screen.getByText("Pinned")).toBeInTheDocument();
     expect(screen.queryByText("Disemat")).not.toBeInTheDocument();
