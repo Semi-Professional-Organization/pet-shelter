@@ -6,15 +6,20 @@ import { trainingKindFor, trainingKindsIn } from "@/lib/domain/petTraining";
 import type { QuizAnswers } from "@/types/match";
 import type { Pet } from "@/types/pet";
 
+const HOUSE_TRAINED_SPELLINGS = [
+  "House-Trained",
+  "House-trained",
+  "house trained",
+  "HOUSE_TRAINED",
+  "Housetrained",
+  "House\u2013Trained",
+  "House\u2011Trained",
+  "  House -  Trained ",
+];
+
 describe("trainingKindFor", () => {
   it.each([
-    ["House-Trained", "houseTrained"],
-    ["House-trained", "houseTrained"],
-    ["house trained", "houseTrained"],
-    ["HOUSE_TRAINED", "houseTrained"],
-    ["Housetrained", "houseTrained"],
-    ["House–Trained", "houseTrained"],
-    ["  House -  Trained ", "houseTrained"],
+    ...HOUSE_TRAINED_SPELLINGS.map((tag) => [tag, "houseTrained"]),
     ["Litter Box Trained", "litterBoxTrained"],
     ["litter-box-trained", "litterBoxTrained"],
     ["LitterBox Trained", "litterBoxTrained"],
@@ -36,6 +41,7 @@ describe("trainingKindFor", () => {
     "House-Trained, Leash Trained",
     "constructor",
     "toString",
+    null as unknown as string,
   ])(
     "leaves %j unmatched",
     (tag) => {
@@ -72,7 +78,7 @@ describe("match quiz house training", () => {
     calculatePetMatchScore({ ...rocky, tags, medical: { ...rocky.medical, specialNeeds: "" } }, firstTimer).experienceScore;
 
   it("rewards every spelling the Training row accepts", () => {
-    for (const tag of ["House-Trained", "House Trained", "housetrained"]) {
+    for (const tag of HOUSE_TRAINED_SPELLINGS) {
       expect(experienceFor([tag])).toBe(25);
     }
   });

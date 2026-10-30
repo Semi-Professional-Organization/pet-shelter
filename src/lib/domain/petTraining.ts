@@ -12,10 +12,10 @@ export type TrainingKind = (typeof TRAINING_KINDS)[number];
 
 // Each kind's own name is its tag key ("houseTrained" -> "housetrained"), so a new kind matches
 // without a second list. Aliases are the only extra entries.
-const KIND_BY_TAG_KEY: Record<string, TrainingKind> = {
-  ...Object.fromEntries(TRAINING_KINDS.map((kind) => [kind.toLowerCase(), kind])),
-  littertrained: "litterBoxTrained",
-};
+const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
+  ...TRAINING_KINDS.map((kind) => [kind.toLowerCase(), kind] as const),
+  ["littertrained", "litterBoxTrained"],
+]);
 
 // ceiling: matches a tag only when it spells one of the keys above once case, spaces,
 // hyphens, underscores and dashes are dropped, so "House-Trained", "house_trained" and
@@ -25,13 +25,13 @@ const KIND_BY_TAG_KEY: Record<string, TrainingKind> = {
 // Measured against the 10 pets in src/data/pets.json: all 6 training tags match, no other
 // tag does. Upgrade path: a tag table with fixed values (the unused PetTag model).
 function tagKey(tag: string): string {
-  return tag.toLowerCase().replace(/[\s_\-\u2013\u2014]+/g, "");
+  // String(): a NULL element in the tags column must not take the whole quiz or page down.
+  // \p{Pd} covers every Unicode dash and hyphen, including the non-breaking one Word pastes.
+  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\u2212]+/gu, "");
 }
 
 export function trainingKindFor(tag: string): TrainingKind | undefined {
-  const key = tagKey(tag);
-  // hasOwn, so a tag such as "constructor" cannot reach Object.prototype.
-  return Object.hasOwn(KIND_BY_TAG_KEY, key) ? KIND_BY_TAG_KEY[key] : undefined;
+  return KIND_BY_TAG_KEY.get(tagKey(tag));
 }
 
 /** The training a pet's tags record, once each, in display order. Absent means unknown, never "no". */

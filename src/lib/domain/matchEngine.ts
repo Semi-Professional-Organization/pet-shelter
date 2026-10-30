@@ -160,8 +160,10 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
   const isSenior = pet.ageCategory === "senior";
 
   if (answers.experience === "first_time") {
-    // ceiling: the temperament words are a substring test, so "Unfriendly" or "Uneasy" also
-    // count. House training goes through trainingKindFor, the same matcher as the pet page's
+    // ceiling: the temperament words are a substring test, so a negative tag such as
+    // "Unfriendly" or "Uneasy" also counts. No seed pet carries one; production tags were not
+    // checked. Upgrade path: match temperament through tag keys the way trainingKindFor does.
+    // House training goes through trainingKindFor, the same matcher as the pet page's
     // Training row, so the quiz and the page agree on which pets are house trained.
     if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || trainingKindFor(t) === "houseTrained") && !isSpecialNeeds) {
       experienceScore = 25;

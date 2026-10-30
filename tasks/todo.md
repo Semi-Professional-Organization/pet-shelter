@@ -15,6 +15,27 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Pet page: training icons (house, litter box, leash)
+
+**Branch:** `claude/pet-training-icons` · opened 2026-10-28, resumed 2026-10-30
+
+- **Done when:** the pet page shows a Training row with Lucide-spec `LitterBox` and `HouseCheck`
+  icons plus Lucide `Footprints`, for tagged training only, in English and Malay; all gates green.
+- **In scope:** the two icons, the shared tag matcher (`src/lib/domain/petTraining.ts`), the
+  row, translations, the match quiz's house-training check, tests.
+- **Not in scope:** the medical-list screen-reader gap, the PetTag table, schema changes, other
+  tag icons, the quiz's special-needs and temperament scoring (logged in `open/`).
+
+- [x] Icons, matcher, row, tests
+- [x] Three xhigh review rounds and their fixes
+
+## Review
+
+Not done, deliberately: hiding the training chips that now duplicate the row, the row in the
+gallery quick view, quiz points for litter box training, and removing the admin form's default
+"House-Trained" tag. Each is a question for the owner, not a fix. The Malay labels want a native
+speaker's check.
+
 # Home page: one light-blue accent, flat borderless cards
 
 **Branch:** `feature/frontend` · opened 2026-10-28 · on top of the owner's uncommitted WIP
