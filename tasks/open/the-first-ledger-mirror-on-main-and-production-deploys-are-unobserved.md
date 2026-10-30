@@ -17,9 +17,14 @@ change made. `node scripts/issue-groups.mjs` was not previewed.
 **Production deploys.** The newest commit on `main` at the time, `0b542f5` (#226), has no
 deployment and no commit status. The last Production deployment is `8490d68`, before the move.
 Either Vercel lost its Git link in the transfer or its Production Branch still says `master`. Until
-that is fixed, `ci.yml`'s "every main commit is a production deploy" is a statement of intent.
+that is fixed, `ci.yml`'s "every main commit is meant to be a production deploy" is only intent.
+
+**A recreated `master`.** Ruleset "Basic" protects only the default branch, so a clone made before
+the rename that pushes its local `master` recreates an unprotected branch, and if Vercel still
+deploys `master`, that push goes to production unreviewed. The owner can add a rule blocking the
+creation of `master`.
 
 **Settles when:** the first mirror run on `main` finishes green with every issue body linking the
 org repository on `main` (or a rerun clears a rate-limited first attempt), a dry run of
-`node scripts/issue-groups.mjs` reports in sync, and Vercel shows a
+`node scripts/issue-groups.mjs` reports in sync, creating `master` is blocked, and Vercel shows a
 Production deployment for a commit merged to `main` after the move.

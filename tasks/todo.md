@@ -26,7 +26,7 @@ running on merges and the SessionStart orient reported "no origin/master" in eve
 - [x] `orient.mjs` counts against `origin/main` only and points a clone made before the rename at
       the repair steps, now in CONTRIBUTING ("Clones made before the rename")
 - [x] `usage.mjs` counts the orient and merge commands under either name
-- [x] Workflows: ledger mirror on `main`; CI's push trigger keeps `master` (see the decision)
+- [x] Workflows: ledger mirror and CI's push trigger on `main` only (see the decision)
 - [x] Live docs: CLAUDE.md close-out, CONTRIBUTING, setup clone URL, COMMIT_MESSAGES, tasks/README
 
 ## Review
@@ -34,8 +34,8 @@ running on merges and the SessionStart orient reported "no origin/master" in eve
 Deliberately not done: `tasks/decisions/`, `tasks/archive/`, `tasks/lessons/` and `docs/archives/`
 keep `master`, because they record what was true then. `tasks/open/` entries keep it too, except
 the step-7 proposal, which quotes text meant for `CLAUDE.md`. The first mirror run on `main` will
-rewrite every ledger issue anyway (their links still name `fergeley/pet-shelter/blob/master`), and
-it was not dry-run: see `tasks/open/the-first-ledger-mirror-on-main-and-production-deploys-are-unobserved.md`.
+rewrite every ledger issue anyway (their links still name `fergeley/pet-shelter/blob/master`); it
+was previewed through `planSync` rather than run: see `tasks/open/the-first-ledger-mirror-on-main-and-production-deploys-are-unobserved.md`.
 The planned labelling guidance for AGENTS.md and CONTRIBUTING, and the issue forms, wait for their
 own PR. `scripts/lib/issueGroups/suggest.mjs` keeps `master` as a URL stopword without adding
 `main`, since `main` is also a content word; that heuristic is out of scope here.

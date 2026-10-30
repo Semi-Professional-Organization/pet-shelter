@@ -6,7 +6,7 @@ import { join } from "path";
 
 import { SECTIONS, checkBody, readHandoffs, readHeader, renderHandoff, slugOf } from "../../scripts/agent/handoff.mjs";
 import { main as ledger } from "../../scripts/agent/ledger.mjs";
-import { describeWhere, main as orient, orientLines, whereAmI } from "../../scripts/agent/orient.mjs";
+import { describeWhere, main as orient, orientLines, REPAIR_SECTION, whereAmI } from "../../scripts/agent/orient.mjs";
 import { SHOWN, main as recall, piecesOf, search, snippet } from "../../scripts/agent/recall.mjs";
 import { givenSession, hookEvent, resolveSession, sessionId } from "../../scripts/agent/transcript.mjs";
 
@@ -313,23 +313,28 @@ describe("orient", () => {
     const top = repo();
     const git = (...args: string[]) => execFileSync("git", args, { cwd: top });
     const commit = () => git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "c");
-    const flagged = 'this clone predates the rename of master to main; repair it with the steps in .github/CONTRIBUTING.md, "Clones made before the rename"';
+    const see = 'likely a clone from before the rename of master to main; see .github/CONTRIBUTING.md, "Clones made before the rename"';
     commit();
     // No remote at all: nothing to count against, nothing to repair.
     expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null, ahead: null });
+    // origin/main with no origin/HEAD, as a single-branch clone of main has: healthy.
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: 0, behind: 0 });
+    git("update-ref", "-d", "refs/remotes/origin/main");
     // A single-branch clone from before the rename: origin/master is frozen and origin/main never
     // arrives. Counting against origin/master would claim a fresh comparison it does not have.
     git("update-ref", "refs/remotes/origin/master", "HEAD");
     git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
     commit();
-    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: flagged, ahead: null, behind: null });
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: `origin/HEAD names origin/master, and there is no origin/main: ${see}`, ahead: null, behind: null });
     // A full clone, never pruned: origin/main arrives, origin/HEAD still names origin/master.
     commit();
     git("update-ref", "refs/remotes/origin/main", "HEAD");
+    const flagged = `origin/HEAD names origin/master: ${see}`;
     const w = whereAmI(top, { now: NOW })!;
     expect(w).toMatchObject({ base: "origin/main", repair: flagged, ahead: 0, behind: 0 });
     expect(orientLines(w, [])[2]).toBe(`git: ${flagged}`);
-    expect(describeWhere(w)).toMatch(/0 ahead and 0 behind `origin\/main`; \d+ uncommitted paths\. Note: this clone predates .*"Clones made before the rename"\.$/);
+    expect(describeWhere(w)).toMatch(/0 ahead and 0 behind `origin\/main`; \d+ uncommitted paths\. Note: origin\/HEAD names .*"Clones made before the rename"\.$/);
     // Pruned: origin/HEAD dangles, and is still flagged.
     git("update-ref", "-d", "refs/remotes/origin/master");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: flagged, ahead: 0, behind: 0 });
@@ -339,6 +344,10 @@ describe("orient", () => {
     // Repaired.
     git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: 0, behind: 0 });
+  });
+
+  it("points at a CONTRIBUTING section that exists", () => {
+    expect(readFileSync(join(__dirname, "../../.github/CONTRIBUTING.md"), "utf8")).toContain(`### ${REPAIR_SECTION}\n`);
   });
 
   it("names the hand-offs other sessions left, three at most, and the meter when run as the hook", () => {

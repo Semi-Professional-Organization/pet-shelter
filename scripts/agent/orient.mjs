@@ -1,7 +1,7 @@
 /**
  * `node scripts/agent.mjs orient`: where this session is. The SessionStart hook runs it as
  * `orient --brief --hook`, so a fresh session starts knowing its checkout, its branch against
- * the default branch, its uncommitted work and any hand-off waiting for it, without spending a call.
+ * `origin/main`, its uncommitted work and any hand-off waiting for it, without spending a call.
  *
  * This is the minimal orient of the agent-scripts plan's second pull request. Who else is working
  * here, open pull requests on your paths, the ledger read from the default branch and ports come with
@@ -46,13 +46,22 @@ function worktreeDirs(common) {
  */
 const BRANCH = "main";
 const MAIN = `refs/remotes/origin/${BRANCH}`;
-const REPAIR = `this clone predates the rename of master to ${BRANCH}; repair it with the steps in .github/CONTRIBUTING.md, "Clones made before the rename"`;
-function defaultBranch(cwd) {
-  // symbolic-ref, unlike rev-parse, still names the target of a dangling origin/HEAD. Full ref
-  // names, so a local branch that happens to be called `origin/main` is never taken for the remote.
+export const REPAIR_SECTION = "Clones made before the rename";
+/**
+ * The ahead/behind counts against `origin/main`, or null, and the repair line when `origin/HEAD`
+ * exists but `origin/main` is missing or not what it names. Full ref names, so a local branch that
+ * happens to be called `origin/main` is never taken for the remote. A missing `origin/main` shows
+ * as failed counts, so the healthy case costs one git call more than before the rename.
+ */
+function againstMain(cwd) {
+  const counts = git(cwd, ["rev-list", "--left-right", "--count", `${MAIN}...HEAD`]);
+  // symbolic-ref, unlike rev-parse, still names the target of a dangling origin/HEAD.
   const head = git(cwd, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
-  const present = git(cwd, ["rev-parse", "--verify", "--quiet", `${MAIN}^{commit}`]);
-  return { present: Boolean(present), repair: head && (!present || head !== MAIN) ? REPAIR : null };
+  const stale = head && (head !== MAIN || !counts);
+  const repair = stale
+    ? `origin/HEAD names ${head.replace("refs/remotes/", "")}${counts ? "" : `, and there is no origin/${BRANCH}`}: likely a clone from before the rename of master to ${BRANCH}; see .github/CONTRIBUTING.md, "${REPAIR_SECTION}"`
+    : null;
+  return { counts, repair };
 }
 
 /**
@@ -65,8 +74,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
   if (!top) return null;
   const gitDir = git(cwd, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const { present, repair } = defaultBranch(cwd);
-  const counts = present ? git(cwd, ["rev-list", "--left-right", "--count", `${MAIN}...HEAD`]) : null;
+  const { counts, repair } = againstMain(cwd);
   const [behind, ahead] = counts ? counts.split(/\s+/).map(Number) : [null, null];
   const status = git(cwd, ["status", "--porcelain"]);
   // Every checkout of a repository shares its remote refs, but each worktree writes its own
@@ -151,12 +159,12 @@ function hookSession(read) {
 
 const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 
-Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main
-(origin/HEAD in a clone without it) as of the last fetch (it never fetches), uncommitted paths, and
-hand-offs waiting in tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one
-git does not know, which silently resolves to the checkout above it. When origin/HEAD or a missing
-origin/main shows a clone made before the rename to main, it adds a line pointing at the repair
-steps (still a pass). Read-only.
+Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main as
+of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
+tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one git does not know,
+which silently resolves to the checkout above it. When origin/HEAD names something other than
+origin/main, or origin/main is missing, it adds a line pointing at the repair steps for a clone made
+before the rename to main (still a pass). Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
   --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,

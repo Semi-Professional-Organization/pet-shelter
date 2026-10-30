@@ -31,17 +31,20 @@ the Semi-Professional-Organization org. A clone made before then keeps tracking 
 `origin/master`, and orient says so when a session starts. Repair it once:
 
 ```bash
-git remote set-url origin https://github.com/Semi-Professional-Organization/pet-shelter.git
 git remote set-branches origin '*'   # only if `git config --get-all remote.origin.fetch` lacks a `*`
 git fetch origin --prune
 git remote set-head origin -a
-git branch -m master main            # only if you still have a local master
-git branch -u origin/main main
+git branch -m master main            # only if you still have a local master;
+git branch -u origin/main main       # then point it at origin/main
 ```
 
-The `set-branches` line is for single-branch and `--depth` clones, whose fetch names `master` alone
-and fails after the rename. It replaces every fetch line, so skip it in a full clone. In a fork,
-rename your fork's default branch on GitHub first; the same steps then apply with your fork's URL.
+Run these against the remote that is the org repository: `origin` in a direct clone, `upstream` in
+a fork set up as in step 1 (replace `origin` with `upstream`, and skip the last two lines, since your
+fork's own branches are yours to rename). The `set-branches` line is for single-branch and
+`--depth` clones, whose fetch names `master` alone and fails after the rename; it replaces every
+fetch line, so skip it in a full clone. An `origin` URL that still says `fergeley/pet-shelter` works
+through GitHub's redirect; `git remote set-url origin
+https://github.com/Semi-Professional-Organization/pet-shelter.git` makes it explicit.
 
 ### 2. Set Up Local Environment
 

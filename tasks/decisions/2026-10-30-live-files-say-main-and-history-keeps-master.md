@@ -16,12 +16,12 @@ was renamed from `master` to `main`. Four choices from the change that followed,
   command: three review rounds showed that the right command depends on how the clone was made
   (full, single-branch, extra refspecs), which orient cannot tell apart reliably. The literal is
   marked with a `ceiling:` in `scripts/agent/orient.mjs`.
-- **CI keeps `master` in its push trigger.** Nothing should push to `master` any more, but a clone
-  made before the rename that runs `git push` on its local `master` recreates the branch, which the
-  ruleset (it targets the default branch only) does not protect. A CI run on that push is the only
-  signal it happened, and it arrives after the fact: if Vercel's Production Branch still says
-  `master`, that push is an unreviewed production deploy. The guard is the owner's, in settings:
-  point Vercel at `main` and have the ruleset also block creating `master`. Drop `master` from the
-  trigger once both are done.
+- **CI's push trigger drops `master`.** Keeping it looked like a signal for a clone made before the
+  rename pushing its local `master` (which recreates the branch), but push runs share a group per
+  commit, so such a push of main's tip would cancel main's own run. The real guard is in settings:
+  ruleset "Basic" targets `~DEFAULT_BRANCH` (read over REST on 2026-10-28 and 2026-10-30, with
+  `rules/branches/main` listing all six checks), so a recreated `master` is unprotected, and only
+  blocking its creation, plus pointing Vercel at `main`, closes that. Both are owner steps, tracked
+  in `tasks/open/the-first-ledger-mirror-on-main-and-production-deploys-are-unobserved.md`.
 - **`suggest.mjs` keeps `master` as a URL stopword and does not add `main`.** `main` is also a
   content word in issue text, and the similarity heuristic was out of scope.
