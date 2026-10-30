@@ -38,17 +38,20 @@ git branch -m master main            # if you have a local master and no local m
 git branch -u origin/main main       # then point main at origin/main
 ```
 
-If you already have a local `main`, delete the stale local `master` (`git branch -d master`)
-instead of renaming it. The `set-branches` line is for single-branch and `--depth` clones, whose
+If you already have a local `main`, switch to it and delete the stale local `master`
+(`git switch main && git branch -d master`) instead of renaming it. The `set-branches` line is for single-branch and `--depth` clones, whose
 fetch names `master` alone and fails after the rename. It replaces every fetch line, so skip it in
 a full clone, and re-add any extra one you had (such as a `refs/pull/*` line) with
 `git remote set-branches --add` afterwards.
 
 In a fork set up as in step 1, `origin` is your fork. Rename its default branch to `main` on GitHub
 (Settings → General → Default branch) and then run the steps as written. For `upstream`, run the
-first three lines with `upstream` in place of `origin`. An `origin` URL that still says `fergeley/pet-shelter` works
-through GitHub's redirect; `git remote set-url origin
-https://github.com/Semi-Professional-Organization/pet-shelter.git` makes it explicit.
+first three lines with `upstream` in place of `origin`.
+
+Whichever remote points at the org repository (`origin` in a direct clone, `upstream` in a fork)
+may still say `fergeley/pet-shelter`. That works through GitHub's redirect;
+`git remote set-url <that remote> https://github.com/Semi-Professional-Organization/pet-shelter.git`
+makes it explicit. Never point a fork's `origin` at the org repository.
 
 ### 2. Set Up Local Environment
 

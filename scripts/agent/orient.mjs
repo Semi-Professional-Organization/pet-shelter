@@ -162,9 +162,9 @@ const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main as
 of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
 tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one git does not know,
-which silently resolves to the checkout above it. When origin/HEAD exists but names something other
+which silently resolves to the checkout above it. When origin/HEAD exists and names something other
 than origin/main, or origin/main is missing, it adds a line pointing at the repair steps for a clone
-made before the rename to main (still a pass). Read-only.
+made before the rename to main (still a pass). A clone with no origin/HEAD is not checked. Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
   --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,
