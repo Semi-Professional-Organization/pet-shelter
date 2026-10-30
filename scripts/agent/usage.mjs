@@ -323,7 +323,7 @@ const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
  * until 2026-10-28, so transcripts from before the rename still count.
  *
  * ceiling: matches the two names literally, not `origin/HEAD` or a future name; orient.mjs's
- * `defaultBranch` says what a rename edits.
+ * ceiling comment above `BRANCH` says what a rename edits.
  */
 const RUNS = Object.fromEntries(
   Object.entries({

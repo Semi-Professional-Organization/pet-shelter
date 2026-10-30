@@ -317,7 +317,7 @@ describe("orient", () => {
     commit();
     // No remote at all: nothing to count against, nothing to repair.
     expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null, ahead: null });
-    // origin/main with no origin/HEAD, as a single-branch clone of main has: healthy.
+    // origin/main with no origin/HEAD, as an actions/checkout or init-and-fetch clone has: healthy.
     git("update-ref", "refs/remotes/origin/main", "HEAD");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: 0, behind: 0 });
     git("update-ref", "-d", "refs/remotes/origin/main");
@@ -344,10 +344,14 @@ describe("orient", () => {
     // Repaired.
     git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: 0, behind: 0 });
+    // A branch with no commit yet cannot be counted, but nothing needs repair.
+    git("checkout", "-q", "--orphan", "gh-pages");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: null });
   });
 
   it("points at a CONTRIBUTING section that exists", () => {
-    expect(readFileSync(join(__dirname, "../../.github/CONTRIBUTING.md"), "utf8")).toContain(`### ${REPAIR_SECTION}\n`);
+    const headings = readFileSync(join(__dirname, "../../.github/CONTRIBUTING.md"), "utf8").split(/\r?\n/);
+    expect(headings).toContain(`### ${REPAIR_SECTION}`);
   });
 
   it("names the hand-offs other sessions left, three at most, and the meter when run as the hook", () => {

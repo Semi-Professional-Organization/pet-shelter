@@ -34,15 +34,19 @@ the Semi-Professional-Organization org. A clone made before then keeps tracking 
 git remote set-branches origin '*'   # only if `git config --get-all remote.origin.fetch` lacks a `*`
 git fetch origin --prune
 git remote set-head origin -a
-git branch -m master main            # only if you still have a local master;
-git branch -u origin/main main       # then point it at origin/main
+git branch -m master main            # if you have a local master and no local main yet
+git branch -u origin/main main       # then point main at origin/main
 ```
 
-Run these against the remote that is the org repository: `origin` in a direct clone, `upstream` in
-a fork set up as in step 1 (replace `origin` with `upstream`, and skip the last two lines, since your
-fork's own branches are yours to rename). The `set-branches` line is for single-branch and
-`--depth` clones, whose fetch names `master` alone and fails after the rename; it replaces every
-fetch line, so skip it in a full clone. An `origin` URL that still says `fergeley/pet-shelter` works
+If you already have a local `main`, delete the stale local `master` (`git branch -d master`)
+instead of renaming it. The `set-branches` line is for single-branch and `--depth` clones, whose
+fetch names `master` alone and fails after the rename. It replaces every fetch line, so skip it in
+a full clone, and re-add any extra one you had (such as a `refs/pull/*` line) with
+`git remote set-branches --add` afterwards.
+
+In a fork set up as in step 1, `origin` is your fork. Rename its default branch to `main` on GitHub
+(Settings → General → Default branch) and then run the steps as written. For `upstream`, run the
+first three lines with `upstream` in place of `origin`. An `origin` URL that still says `fergeley/pet-shelter` works
 through GitHub's redirect; `git remote set-url origin
 https://github.com/Semi-Professional-Organization/pet-shelter.git` makes it explicit.
 
