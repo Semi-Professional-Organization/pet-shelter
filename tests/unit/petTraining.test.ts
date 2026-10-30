@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import initialPetsData from "@/data/pets.json";
 import { calculatePetMatchScore } from "@/lib/domain/matchEngine";
-import { trainingKindFor, trainingKindsIn } from "@/lib/domain/petTraining";
+import { tagsWithoutTraining, trainingKindFor, trainingKindsIn } from "@/lib/domain/petTraining";
 import type { QuizAnswers } from "@/types/match";
 import type { Pet } from "@/types/pet";
 
@@ -67,6 +67,15 @@ describe("trainingKindsIn", () => {
   });
 });
 
+describe("tagsWithoutTraining", () => {
+  it("keeps every tag the Training row does not show, in order", () => {
+    expect(tagsWithoutTraining(["Playful", "House-Trained", "Gentle", "Leash Trained"])).toEqual([
+      "Playful",
+      "Gentle",
+    ]);
+  });
+});
+
 describe("match quiz house training", () => {
   // Rocky (pet-005) with his tags replaced and his special-needs note cleared: any
   // special-needs text, even a routine one, blocks the beginner score.
@@ -89,10 +98,13 @@ describe("match quiz house training", () => {
     expect(experienceFor([tag])).toBe(25);
   });
 
-  // Deliberate for now: litter box training shows on the page but earns no quiz points
-  // (tasks/open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md).
-  it("gives litter box training no beginner points", () => {
-    expect(experienceFor(["Litter Box Trained"])).toBeLessThan(25);
+  // The owner's call, 2026-10-30: litter box training is the cat's house training.
+  it("rewards litter box training like house training", () => {
+    expect(experienceFor(["Litter Box Trained"])).toBe(25);
+  });
+
+  it("does not reward leash training on its own", () => {
+    expect(experienceFor(["Leash Trained"])).toBeLessThan(25);
   });
 
   it("does not reward a tag the Training row leaves unmatched", () => {

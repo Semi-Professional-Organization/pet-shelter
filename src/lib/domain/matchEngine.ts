@@ -1,6 +1,9 @@
 import { Pet } from "@/types/pet";
 import { QuizAnswers, PetMatchResult, MatchScoreBreakdown } from "@/types/match";
-import { trainingKindFor } from "@/lib/domain/petTraining";
+import { trainingKindFor, type TrainingKind } from "@/lib/domain/petTraining";
+
+const isToiletTraining = (kind: TrainingKind | undefined) =>
+  kind === "houseTrained" || kind === "litterBoxTrained";
 
 /**
  * Evaluates compatibility between a prospective adopter's lifestyle and a rescue pet.
@@ -163,10 +166,10 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
     // ceiling: the temperament words are a substring test, so a negative tag such as
     // "Unfriendly" or "Uneasy" also counts. No seed pet carries one; production tags were not
     // checked. Upgrade path: match temperament through tag keys the way trainingKindFor does.
-    // House training goes through trainingKindFor, the same matcher as the pet page's
-    // Training row, so the two agree on which pets are house trained. Litter box training
-    // shows on the page but earns no points here (tasks/open, match-quiz entry).
-    if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || trainingKindFor(t) === "houseTrained") && !isSpecialNeeds) {
+    // Toilet training (house for dogs, litter box for cats, the owner's call on 2026-10-30)
+    // goes through trainingKindFor, the same matcher as the pet page's Training row, so the
+    // two agree. Leash training is not what makes a pet easy for a first-time owner.
+    if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || isToiletTraining(trainingKindFor(t))) && !isSpecialNeeds) {
       experienceScore = 25;
       reasons.push("Gentle & beginner-friendly demeanor makes them an easy first pet.");
     } else if (isSpecialNeeds) {

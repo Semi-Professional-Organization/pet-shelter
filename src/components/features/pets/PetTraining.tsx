@@ -18,31 +18,55 @@ const ICON_BY_TRAINING: Record<TrainingKind, LucideIcon> = {
   leashTrained: Footprints,
 };
 
+// Each variant copies the compatibility grid it sits under, which differ in size.
+const STYLES = {
+  page: {
+    wrapper: "space-y-3 pt-2",
+    heading: "text-xs font-bold uppercase tracking-wider text-foreground",
+    list: "grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center",
+    item: "border border-border bg-background p-3 rounded-xl",
+    icon: "size-4 mx-auto mb-1 text-muted-foreground",
+    label: "text-xs font-bold text-success-text",
+  },
+  dialog: {
+    wrapper: "space-y-3 border-t border-border pt-5",
+    heading: "text-sm font-bold uppercase tracking-wider text-foreground",
+    list: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-center",
+    item: "border border-border bg-background p-3.5 rounded-xl",
+    icon: "size-4.5 mx-auto mb-1.5 text-muted-foreground",
+    label: "text-sm font-bold text-success-text",
+  },
+} as const;
+
 /**
- * The pet page's Training row, built like the compatibility grid above it. Positive only:
- * it lists the training the tags record and renders nothing when there is none, because a
- * missing tag means unknown, not untrained.
+ * The Training row, on the pet page (`page`) and the gallery quick view (`dialog`). Positive
+ * only: it lists the training the tags record and renders nothing when there is none, because
+ * a missing tag means unknown, not untrained. The tag chips leave these tags out
+ * (`tagsWithoutTraining`), so each fact shows once.
  */
-export function PetTraining({ tags }: { tags: readonly string[] }) {
+export function PetTraining({ tags, variant = "page" }: { tags: readonly string[]; variant?: keyof typeof STYLES }) {
   const { t } = useTypedTranslation();
   const headingId = useId();
   const training = trainingKindsIn(tags);
   if (training.length === 0) return null;
 
+  const style = STYLES[variant];
+  const Heading = variant === "page" ? "h2" : "h3";
+
   return (
-    <div className="space-y-3 pt-2">
-      <h2 id={headingId} className="text-xs font-bold uppercase tracking-wider text-foreground">
+    <div className={style.wrapper}>
+      <Heading id={headingId} className={style.heading}>
         {t("petDetail.trainingTitle")}
-      </h2>
+      </Heading>
 
       {/* role="list": Safari drops list semantics from a list with list-style: none. */}
-      <ul role="list" aria-labelledby={headingId} className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+      <ul role="list" aria-labelledby={headingId} className={style.list}>
         {training.map((kind) => {
           const Icon = ICON_BY_TRAINING[kind];
           return (
-            <li key={kind} className="border border-border bg-background p-3 rounded-xl">
-              <Icon className="size-4 mx-auto mb-1 text-muted-foreground" />
-              <div className="text-xs font-bold text-success-text">{t(`petDetail.${kind}`)}</div>
+            <li key={kind} className={style.item}>
+              <Icon className={style.icon} />
+              <div className={style.label}>{t(`petDetail.${kind}`)}</div>
             </li>
           );
         })}

@@ -46,3 +46,8 @@ export function trainingKindsIn(tags: readonly string[]): TrainingKind[] {
   const present = new Set(tags.map(trainingKindFor));
   return TRAINING_KINDS.filter((kind) => present.has(kind));
 }
+
+/** The tags left to show as chips: training tags drop out, because the Training row shows them. */
+export function tagsWithoutTraining(tags: readonly string[]): string[] {
+  return tags.filter((tag) => trainingKindFor(tag) === undefined);
+}

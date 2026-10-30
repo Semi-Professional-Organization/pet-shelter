@@ -221,6 +221,18 @@ describe("PetDetailView", () => {
       expect(items[1].querySelector("svg")).toHaveClass("lucide-footprints");
     });
 
+    it("leaves training tags out of the chips, so each fact shows once", () => {
+      renderWithLanguage(
+        <PetDetailView
+          initialPet={makePet({ id: "pet-chips-under-test", tags: ["House-Trained", "Playful"] })}
+        />
+      );
+
+      expect(screen.getByText("Playful")).toBeInTheDocument();
+      expect(screen.queryByText("House-Trained")).not.toBeInTheDocument();
+      expect(within(trainingList()).getByText("House Trained")).toBeInTheDocument();
+    });
+
     it("renders nothing when no tag records training", () => {
       renderWithLanguage(
         <PetDetailView initialPet={makePet({ id: "pet-untrained-under-test", tags: ["Playful"] })} />

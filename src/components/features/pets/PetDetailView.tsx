@@ -38,6 +38,7 @@ import { getRehabStageLabel, getRehabProgressPercent, getPlacementOptions } from
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
 import { PetStatusIcon } from "./PetStatusIcon";
 import { PetTraining } from "./PetTraining";
+import { tagsWithoutTraining } from "@/lib/domain/petTraining";
 import { usePetDetailViewController, PetDetailTab } from "@/hooks/usePetDetailViewController";
 import { formatMYR } from "@/lib/domain/money";
 
@@ -398,7 +399,7 @@ export function PetDetailView(props: PetDetailViewProps) {
               <div id="panel-about" role="tabpanel" aria-labelledby="tab-about" className="space-y-6">
                 {/* Characteristic Tags */}
                 <div className="flex flex-wrap gap-1.5">
-                  {pet.tags.map((tag, idx) => (
+                  {tagsWithoutTraining(pet.tags).map((tag, idx) => (
                     <span
                   key={idx}
                   className="bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"

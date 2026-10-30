@@ -32,10 +32,11 @@ Record active multi-step work streams below.
 
 ## Review
 
-Not done, deliberately: the owner's questions in
-`open/pet-training-row-owner-questions.md` (duplicate chips, quick view, Malay wording) and
-the older quiz scoring problems in
-`open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md`.
+The owner's answers (2026-10-30) are built: training chips hidden, the row in the gallery quick
+view, litter box training earns quiz points. Not done, deliberately: the older quiz scoring
+problems in `open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md` and the tag
+matching split in `open/free-text-pet-tags-are-matched-two-different-ways.md`. The Malay labels
+are unchecked by a native speaker.
 
 # Home page: one light-blue accent, flat borderless cards
 

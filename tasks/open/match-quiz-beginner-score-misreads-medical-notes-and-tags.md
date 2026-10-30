@@ -13,9 +13,7 @@ its scope, in `calculatePetMatchScore` (`src/lib/domain/matchEngine.ts`, experie
 - **Temperament words are substrings.** `/gentle|friendly|easy/i` matches "Unfriendly",
   "Uneasy" and "Not gentle", so a pet tagged that way scores 25 with the reason "Gentle &
   beginner-friendly demeanor".
-- **The reason names temperament even when only house training matched.**
-- **Litter box training earns nothing.** A cat with a green "Litter Box Trained" badge scores
-  20 where a house-trained dog scores 25. Whether it should is the owner's call.
+- **The reason names temperament even when only house or litter box training matched.**
 
-**Settles when:** the owner decides how the experience score should read medical notes and
-litter box training, and the quiz is changed (or this is closed as accepted).
+**Settles when:** the owner decides how the experience score should read medical notes, and
+the quiz is changed (or this is closed as accepted).

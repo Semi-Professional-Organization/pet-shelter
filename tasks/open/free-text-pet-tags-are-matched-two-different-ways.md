@@ -13,8 +13,7 @@ A NULL element in the `tags` column (written by SQL or an import, bypassing zod)
 one place that could drop it for every reader.
 
 Related, same root: gallery search (`petSearch.ts`) substring-matches raw tags, so searching
-the label the row shows ("house trained") misses pets tagged "House-Trained"; training appears twice on the About tab (the raw chip and the Training row),
-the litter box icon is a cat even on a dog's page, and combined tags such as
+the label the row shows ("house trained") misses pets tagged "House-Trained"; the litter box icon is a cat even on a dog's page, and combined tags such as
 "House-Trained, Leash Trained" match nothing.
 
 **Settles when:** tags that carry meaning get one shared key helper, or move to structured fields
