@@ -3,15 +3,17 @@
 **Status:** open · opened 2026-10-30
 
 `trainingKindFor` (`src/lib/domain/petTraining.ts`) ignores case, spaces, underscores, every dash
-and invisible format characters, while `needsSocialising` (`src/lib/presentation/petStatusPresentation.ts`) only trims and
-folds case. So "house_trained" gets a Training row but "needs-socialising" is offered for
+and pasted invisible characters, while `needsSocialising` (`src/lib/presentation/petStatusPresentation.ts`) only trims and
+folds case, and `statusKey` (`src/lib/server/petMappers.ts`) folds case, spaces and
+underscores but not dashes. So "house_trained" gets a Training row but "needs-socialising" is offered for
 adoption instead of foster. Both guess meaning from a free-text field the admin form edits.
 
 A NULL element in the `tags` column (written by SQL or an import, bypassing zod) still throws in
 `needsSocialising`, `petSearch` and `adminPetFilters`; the read mapper (`petMappers.ts`) is the
 one place that could drop it for every reader.
 
-Related, same root: training appears twice on the About tab (the raw chip and the Training row),
+Related, same root: gallery search (`petSearch.ts`) substring-matches raw tags, so searching
+the label the row shows ("house trained") misses pets tagged "House-Trained"; training appears twice on the About tab (the raw chip and the Training row),
 the litter box icon is a cat even on a dog's page, and combined tags such as
 "House-Trained, Leash Trained" match nothing.
 

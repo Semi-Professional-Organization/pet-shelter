@@ -205,8 +205,7 @@ describe("PetDetailView", () => {
   });
 
   describe("training row", () => {
-    const trainingList = () =>
-      screen.getByRole("heading", { name: /^training$/i }).parentElement!.querySelector("ul")!;
+    const trainingList = () => screen.getByRole("list", { name: /^training$/i });
 
     it("lists the recorded training once each, in display order", () => {
       renderWithLanguage(

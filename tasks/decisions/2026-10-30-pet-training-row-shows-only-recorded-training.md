@@ -5,7 +5,8 @@
 The Training row on the pet detail page lists house, litter box and leash training only when a
 tag records it, and renders nothing otherwise. It never says "No": a missing tag means nobody
 recorded it, not that the animal is untrained. Tags match on a key that ignores case, spaces,
-underscores, every Unicode dash, the minus sign and invisible format characters; qualified or combined tags ("Mostly house-trained",
+underscores, every Unicode dash, the minus sign and the invisible characters
+word processors paste (soft hyphen, zero-width space); qualified or combined tags ("Mostly house-trained",
 "House-Trained, Leash Trained") match nothing rather than being guessed at.
 
 The match quiz uses the same matcher in place of its old substring test `/house-trained/i`.

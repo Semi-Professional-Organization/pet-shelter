@@ -23,16 +23,18 @@ const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
 // "Housetrained" all match. Anything else stays a plain tag rather than being guessed at:
 // synonyms ("Housebroken"), qualified tags ("House trained?", "Mostly house-trained") and
 // combined tags ("House-Trained, Leash Trained") get no Training row and no quiz points.
-// Also unmatched: trailing punctuation ("House-trained."), full-width letters and emoji
-// variation selectors (no NFKC normalisation). Measured against the 10 pets in src/data/pets.json: all 6 training tags match, no other
+// Also unmatched: trailing punctuation ("House-trained."), full-width letters (NFKC would
+// fold them) and emoji variation selectors. Measured against the 10 pets in src/data/pets.json: all 6 training tags match, no other
 // tag does. Only English tags match: a Malay tag such as "Terlatih Tandas" gets no row.
 // Upgrade path: a tag table with fixed values (the unused PetTag model).
 function tagKey(tag: string): string {
   // String() keeps a NULL tag element from throwing here; other tag readers still throw on
   // one (see tasks/open/free-text-pet-tags-are-matched-two-different-ways.md).
-  // \p{Pd} is every Unicode dash and hyphen, \p{Cf} the invisible ones Word pastes (soft
-  // hyphen, zero-width space), \u2212 the minus sign.
-  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\p{Cf}\u2212]+/gu, "");
+  // \p{Pd} is every Unicode dash and hyphen and \u2212 the minus sign. The rest are the
+  // invisible characters Word and web pages paste: soft hyphen, zero-width space and joiners,
+  // word joiner, BOM. Not all of \p{Cf}: that would also drop bidi overrides, so a tag shown
+  // reversed would still count.
+  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\u2212\u00AD\u200B-\u200D\u2060\uFEFF]+/gu, "");
 }
 
 export function trainingKindFor(tag: string): TrainingKind | undefined {

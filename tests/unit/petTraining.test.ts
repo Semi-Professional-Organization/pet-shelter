@@ -43,6 +43,7 @@ describe("trainingKindFor", () => {
     "House-Trained, Leash Trained",
     "constructor",
     "toString",
+    "House\u202ETrained",
     null as unknown as string,
   ])(
     "leaves %j unmatched",
@@ -79,10 +80,14 @@ describe("match quiz house training", () => {
   const experienceFor = (tags: string[]) =>
     calculatePetMatchScore({ ...rocky, tags, medical: { ...rocky.medical, specialNeeds: "" } }, firstTimer).experienceScore;
 
-  it("rewards every spelling the Training row accepts", () => {
-    for (const tag of HOUSE_TRAINED_SPELLINGS) {
-      expect(experienceFor([tag])).toBe(25);
-    }
+  it.each(HOUSE_TRAINED_SPELLINGS)("rewards %j, which the Training row accepts", (tag) => {
+    expect(experienceFor([tag])).toBe(25);
+  });
+
+  // Deliberate for now: litter box training shows on the page but earns no quiz points
+  // (tasks/open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md).
+  it("gives litter box training no beginner points", () => {
+    expect(experienceFor(["Litter Box Trained"])).toBeLessThan(25);
   });
 
   it("does not reward a tag the Training row leaves unmatched", () => {
