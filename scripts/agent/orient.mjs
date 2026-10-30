@@ -29,16 +29,22 @@ function worktreeDirs(common) {
 }
 
 /**
- * The remote default branch `cwd` compares against: `origin/HEAD` when it resolves, else
- * `origin/main`. Read rather than written down, because the default branch was renamed from
- * `master` to `main` on 2026-10-28 and a literal left every session comparing against a ref that
- * no longer exists. A clone made before the rename can keep an `origin/HEAD` that still names
- * `origin/master`, so the name only counts once it resolves; `git remote set-head origin -a`
- * repairs such a clone.
+ * The remote default branch `cwd` compares against, and what `origin/HEAD` names when that
+ * disagrees. The default branch was renamed from `master` to `main` on 2026-10-28, and a clone made
+ * before it keeps an `origin/HEAD` naming `origin/master`: plain `git fetch` neither prunes that
+ * ref nor moves `origin/HEAD`, so it still resolves, frozen at the rename. `origin/main` therefore
+ * wins whenever it exists, and `origin/HEAD` is only the fallback for a clone that has no
+ * `origin/main`.
+ *
+ * ceiling: knows one remote, `origin`, and one name, `main`; the next rename edits MAIN here and
+ * the `(?:master|main)` alternatives in usage.mjs. A stale `origin/HEAD` is reported, not repaired
+ * (`git remote set-head origin -a` does that), because orient is read-only.
  */
+const MAIN = "origin/main";
 export function defaultBranch(cwd) {
-  const named = git(cwd, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
-  return named && git(cwd, ["rev-parse", "--verify", "--quiet", `${named}^{commit}`]) ? named : "origin/main";
+  const head = git(cwd, ["rev-parse", "--abbrev-ref", "origin/HEAD"]);
+  if (!git(cwd, ["rev-parse", "--verify", "--quiet", `${MAIN}^{commit}`])) return { base: head ?? MAIN, stale: null };
+  return { base: MAIN, stale: head && head !== MAIN ? head : null };
 }
 
 /**
@@ -51,7 +57,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
   if (!top) return null;
   const gitDir = git(cwd, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const base = defaultBranch(cwd);
+  const { base, stale } = defaultBranch(cwd);
   const counts = git(cwd, ["rev-list", "--left-right", "--count", `${base}...HEAD`]);
   const [behind, ahead] = counts ? counts.split(/\s+/).map(Number) : [null, null];
   const status = git(cwd, ["status", "--porcelain"]);
@@ -74,6 +80,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
     branch: git(cwd, ["branch", "--show-current"]) || null,
     head: git(cwd, ["rev-parse", "--short", "HEAD"]),
     base,
+    staleHead: stale,
     ahead,
     behind,
     uncommitted: status ? status.split("\n").filter(Boolean).length : 0,
@@ -109,6 +116,9 @@ export function orientLines(w, handoffs, options = {}) {
       ? `git: no ${w.base} to compare with; ${w.uncommitted} uncommitted paths`
       : `git: ${w.ahead} ahead and ${w.behind} behind ${w.base} ${fetched}; ${w.uncommitted} uncommitted paths`,
   );
+  if (w.staleHead) {
+    lines.push(`git: origin/HEAD still names ${w.staleHead}, not ${w.base}; repair this clone with: git remote set-head origin -a`);
+  }
   const waiting = handoffs.filter((h) => !session || h.session !== session);
   for (const h of waiting.slice(0, 3)) {
     lines.push(`hand-off: ${h.file} "${h.title}", from session ${(h.session ?? "unknown").slice(0, 8)}${h.opened ? ` on ${h.opened}` : ""}`);
@@ -134,10 +144,11 @@ function hookSession(read) {
 
 const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 
-Where this session is: main checkout or worktree, branch and HEAD, ahead and behind the default
-branch (origin/HEAD, else origin/main) as of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
-tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one git does not know,
-which silently resolves to the checkout above it. Read-only.
+Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main
+(origin/HEAD in a clone without it) as of the last fetch (it never fetches), uncommitted paths, and
+hand-offs waiting in tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one
+git does not know, which silently resolves to the checkout above it, and when origin/HEAD still
+names the pre-rename branch. Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
   --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,

@@ -254,8 +254,8 @@ Before hitting "Create Pull Request", verify:
 Vercel's preview status is not one of them: Vercel decides whether to deploy a commit by who wrote
 it, so it may never report on a pull request that Dependabot opens. No approval is required.
 Nobody can push, force-push or delete `main` directly, maintainers included. The rule is the
-repository ruleset "Basic" (Settings → Rules → Rulesets), active with all six checks and targeting the default branch (`master` until 2026-10-28, when it
-was renamed `main`); how it was verified is in
+repository ruleset "Basic" (Settings → Rules → Rulesets), active with all six checks and targeting the default branch (`master` until 2026-10-28, when
+it was renamed `main`); how it was verified is in
 [`tasks/decisions/2026-10-21-the-master-ruleset-is-on-and-does-not-block-green-pull-requests.md`](../tasks/decisions/2026-10-21-the-master-ruleset-is-on-and-does-not-block-green-pull-requests.md).
 The reasons are in
 [`tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md`](../tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md).

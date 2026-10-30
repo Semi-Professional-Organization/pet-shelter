@@ -321,6 +321,9 @@ const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
  * HEAD..origin/main` check belongs to merge only; the orient listing of the default branch's new
  * commits is `git log --oneline main..origin/main`. Both accept `master`, the default branch's name
  * until 2026-10-28, so transcripts from before the rename still count.
+ *
+ * ceiling: matches the two names literally, not `origin/HEAD` or a future name; orient.mjs's
+ * `defaultBranch` says what a rename edits.
  */
 const RUNS = Object.fromEntries(
   Object.entries({

@@ -30,11 +30,14 @@ running on merges and the SessionStart orient reported "no origin/master" in eve
 
 ## Review
 
-Deliberately not done: `tasks/decisions/`, `tasks/archive/`, `tasks/lessons/`, `docs/archives/`
-and the `tasks/open/` entries keep `master`, because they record what was true then, and editing a
-`tasks/open/` file rewrites its public issue. The "Labelling issues" section and the issue forms
-wait for their own PR. `ledger-issues.mjs` and `issue-groups.mjs` could not be dry-run from the
-cloud session (they call GraphQL through `gh repo view`); the first push to `main` runs the mirror.
+Deliberately not done: `tasks/decisions/`, `tasks/archive/`, `tasks/lessons/` and `docs/archives/`
+keep `master`, because they record what was true then. `tasks/open/` entries keep it too, except
+the step-7 proposal, which quotes text meant for `CLAUDE.md`. The first mirror run on `main` will
+rewrite every ledger issue anyway (their links still name `fergeley/pet-shelter/blob/master`), and
+it was not dry-run: see `tasks/open/the-first-ledger-mirror-on-main-and-production-deploys-are-unobserved.md`.
+The planned labelling guidance for AGENTS.md and CONTRIBUTING, and the issue forms, wait for their
+own PR. `scripts/lib/issueGroups/suggest.mjs` keeps `master` as a URL stopword without adding
+`main`, since `main` is also a content word; that heuristic is out of scope here.
 
 # Home page: one light-blue accent, flat borderless cards
 

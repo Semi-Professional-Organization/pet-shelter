@@ -10,7 +10,7 @@
  *
  * Usage:
  *   node scripts/issue-groups.mjs                       # dry run of your working copy: change nothing
- *   node scripts/issue-groups.mjs --apply               # make GitHub match the file on origin/main
+ *   node scripts/issue-groups.mjs --apply               # make GitHub match the file on the default branch
  *   node scripts/issue-groups.mjs --suggest             # propose a group for each ungrouped issue
  *   node scripts/issue-groups.mjs --suggest --evaluate  # measure those proposals on the file itself
  *

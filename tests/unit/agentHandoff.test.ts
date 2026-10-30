@@ -289,6 +289,7 @@ describe("orient", () => {
     branch: "main",
     head: "abc1234",
     base: "origin/main",
+    staleHead: null,
     ahead: 2,
     behind: 5,
     uncommitted: 3,
@@ -308,17 +309,27 @@ describe("orient", () => {
     ]);
   });
 
-  it("compares against origin/HEAD when it resolves, and origin/main when it does not", () => {
+  it("compares against origin/main, warning when origin/HEAD still names the pre-rename branch", () => {
     const top = repo();
-    const at = (ref: string) => execFileSync("git", ["update-ref", ref, "HEAD"], { cwd: top });
-    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "c"], { cwd: top });
-    expect(whereAmI(top, { now: NOW })?.base).toBe("origin/main");
-    at("refs/remotes/origin/trunk");
-    execFileSync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk"], { cwd: top });
-    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/trunk", ahead: 0, behind: 0 });
-    // A clone from before the master-to-main rename keeps an origin/HEAD naming a pruned ref.
-    execFileSync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master"], { cwd: top });
-    at("refs/remotes/origin/main");
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: top });
+    const commit = () => git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "c");
+    commit();
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", staleHead: null, ahead: null });
+    // No origin/main: origin/HEAD is the fallback.
+    git("update-ref", "refs/remotes/origin/trunk", "HEAD");
+    git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/trunk", staleHead: null, ahead: 0, behind: 0 });
+    // A clone from before the rename, never pruned: origin/master still resolves, frozen behind.
+    git("update-ref", "refs/remotes/origin/master", "HEAD");
+    git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+    commit();
+    commit();
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    const w = whereAmI(top, { now: NOW });
+    expect(w).toMatchObject({ base: "origin/main", staleHead: "origin/master", ahead: 0, behind: 0 });
+    expect(orientLines(w!, [])[2]).toBe("git: origin/HEAD still names origin/master, not origin/main; repair this clone with: git remote set-head origin -a");
+    // Pruned: origin/HEAD dangles, and origin/main still wins.
+    git("update-ref", "-d", "refs/remotes/origin/master");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", ahead: 0, behind: 0 });
   });
 
