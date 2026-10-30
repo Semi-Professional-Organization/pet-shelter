@@ -6,7 +6,7 @@ import { join } from "path";
 
 import { SECTIONS, checkBody, readHandoffs, readHeader, renderHandoff, slugOf } from "../../scripts/agent/handoff.mjs";
 import { main as ledger } from "../../scripts/agent/ledger.mjs";
-import { main as orient, orientLines, whereAmI } from "../../scripts/agent/orient.mjs";
+import { describeWhere, main as orient, orientLines, whereAmI } from "../../scripts/agent/orient.mjs";
 import { SHOWN, main as recall, piecesOf, search, snippet } from "../../scripts/agent/recall.mjs";
 import { givenSession, hookEvent, resolveSession, sessionId } from "../../scripts/agent/transcript.mjs";
 
@@ -313,7 +313,7 @@ describe("orient", () => {
     const top = repo();
     const git = (...args: string[]) => execFileSync("git", args, { cwd: top });
     const commit = () => git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "c");
-    const sethead = "origin/HEAD names origin/master, not origin/main; repair with: git remote set-head origin -a";
+    const sethead = "origin/HEAD names origin/master, not origin/main; repair with `git remote set-head origin -a`";
     commit();
     // No remote at all: nothing to repair.
     expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null, ahead: null });
@@ -323,9 +323,12 @@ describe("orient", () => {
     commit();
     expect(whereAmI(top, { now: NOW })).toMatchObject({
       base: "origin/master",
-      repair: "this clone has no origin/main; repair with: git remote set-branches origin main && git fetch origin && git remote set-head origin -a",
+      repair: "this clone has no origin/main; repair with `git remote set-branches origin main && git fetch origin && git remote set-head origin -a`",
       ahead: 1,
     });
+    // A full clone that has not fetched since the rename: a fetch is enough, and set-branches would narrow it.
+    git("config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*");
+    expect(whereAmI(top, { now: NOW })?.repair).toBe("this clone has no origin/main; repair with `git fetch origin && git remote set-head origin -a`");
     // A full clone, never pruned: origin/main arrives and wins over the frozen origin/master.
     commit();
     git("update-ref", "refs/remotes/origin/main", "HEAD");
@@ -335,6 +338,10 @@ describe("orient", () => {
     // Pruned: origin/HEAD dangles, origin/main still wins, and the repair line stays.
     git("update-ref", "-d", "refs/remotes/origin/master");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: sethead, ahead: 0, behind: 0 });
+    expect(describeWhere(whereAmI(top, { now: NOW })!)).toMatch(/0 ahead and 0 behind `origin\/main`; \d+ uncommitted paths\. To repair the clone: origin\/HEAD names origin\/master, not origin\/main; repair with `git remote set-head origin -a`\.$/);
+    // A local branch named origin/main is not the remote one.
+    git("branch", "origin/main", "HEAD~2");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", ahead: 0, behind: 0 });
     // Repaired.
     git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
     expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null });

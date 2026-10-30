@@ -12,7 +12,7 @@ branch cannot reach.
    Whether its titles pass the `Commit messages` check without an edit is reasoned from its
    source code, in
    `tasks/decisions/2026-10-20-dependabot-updates-actions-weekly-and-npm-only-for-security.md`.
-   Trigger: `gh pr list --repo fergeley/pet-shelter --author app/dependabot --state all --json title`
+   Trigger: `gh pr list --repo Semi-Professional-Organization/pet-shelter --author app/dependabot --state all --json title`
    lists a title starting `ci(deps): Bump`.
    Known edge, accepted: a security update for a long scoped package name can run past the
    72-character subject limit, and a failed style lookup gives a lowercase `bump`. Either fails
@@ -23,7 +23,7 @@ branch cannot reach.
    second attempt in the same workflow run would collide with the first one's artifact, and
    `overwrite: true` is what should prevent that.
    Trigger: after a re-run of `Playwright golden paths`,
-   `gh api repos/fergeley/pet-shelter/actions/runs/<run id>/artifacts` lists one
+   `gh api repos/Semi-Professional-Organization/pet-shelter/actions/runs/<run id>/artifacts` lists one
    `playwright-report` and the job is green.
 
 **Settles when:** each has been observed once. Delete the item that settles; delete the entry when

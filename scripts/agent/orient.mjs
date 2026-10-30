@@ -37,6 +37,9 @@ function worktreeDirs(common) {
  * all. So `origin/main` wins whenever it exists, `origin/HEAD` is only the fallback without it, and
  * either disagreement adds a repair line.
  *
+ * Refs are compared by full name, so a local branch that happens to be called `origin/main` is
+ * never mistaken for the remote one.
+ *
  * ceiling: knows one remote, `origin`, and one name, `main`. A fork whose own default is still
  * `master` gets a repair line that fails there, and a clone with no `origin/HEAD` gets none; a
  * local `master` still tracking `origin/master` is not checked. The next rename edits BRANCH here
@@ -44,19 +47,25 @@ function worktreeDirs(common) {
  * repairs.
  */
 const BRANCH = "main";
-const MAIN = `origin/${BRANCH}`;
+const REMOTES = "refs/remotes/";
+const MAIN = `${REMOTES}origin/${BRANCH}`;
+const short = (ref) => ref.slice(REMOTES.length);
 function defaultBranch(cwd) {
   // symbolic-ref, unlike rev-parse, still names the target of a dangling origin/HEAD.
-  const head = git(cwd, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  const head = git(cwd, ["symbolic-ref", "--quiet", `${REMOTES}origin/HEAD`]);
+  const sethead = "`git remote set-head origin -a`";
   if (git(cwd, ["rev-parse", "--verify", "--quiet", `${MAIN}^{commit}`])) {
-    return { base: MAIN, repair: head && head !== MAIN ? `origin/HEAD names ${head}, not ${MAIN}; repair with: git remote set-head origin -a` : null };
+    return { base: MAIN, repair: head && head !== MAIN ? `origin/HEAD names ${short(head)}, not ${short(MAIN)}; repair with ${sethead}` : null };
   }
   if (!head) return { base: MAIN, repair: null };
   const resolves = git(cwd, ["rev-parse", "--verify", "--quiet", `${head}^{commit}`]);
-  // set-branches as well as fetch: a single-branch clone's refspec names only the old branch, so a
-  // one-off fetch of the new one would never update again.
-  const fix = `git remote set-branches origin ${BRANCH} && git fetch origin && git remote set-head origin -a`;
-  return { base: resolves ? head : MAIN, repair: `this clone has no ${MAIN}; repair with: ${fix}` };
+  // A full clone's wildcard refspec only needs a fetch. A single-branch clone's names the old
+  // branch alone, so it needs set-branches too: a one-off fetch of the new branch would never update
+  // again, and `--add` would keep the old name, which makes every fetch fail. Plain set-branches
+  // would narrow a full clone, so it is offered only where no refspec is a wildcard.
+  const full = (git(cwd, ["config", "--get-all", "remote.origin.fetch"]) ?? "").includes("*");
+  const fix = `\`${full ? "" : `git remote set-branches origin ${BRANCH} && `}git fetch origin && git remote set-head origin -a\``;
+  return { base: resolves ? head : MAIN, repair: `this clone has no ${short(MAIN)}; repair with ${fix}` };
 }
 
 /**
@@ -91,7 +100,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
     worktree: Boolean(gitDir && common && slashed(gitDir) !== slashed(common)),
     branch: git(cwd, ["branch", "--show-current"]) || null,
     head: git(cwd, ["rev-parse", "--short", "HEAD"]),
-    base,
+    base: short(base),
     repair,
     ahead,
     behind,
@@ -104,7 +113,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
 /** One sentence about the checkout, for a hand-off's header. */
 export function describeWhere(w) {
   const against = w.ahead === null ? `no \`${w.base}\` to compare with` : `${w.ahead} ahead and ${w.behind} behind \`${w.base}\``;
-  const repair = w.repair ? ` The counts may be stale: ${w.repair}.` : "";
+  const repair = w.repair ? ` To repair the clone: ${w.repair}.` : "";
   return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.${repair}`;
 }
 

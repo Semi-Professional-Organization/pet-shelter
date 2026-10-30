@@ -16,6 +16,9 @@ was renamed from `master` to `main`. Four choices from the change that followed,
 - **CI keeps `master` in its push trigger.** Nothing should push to `master` any more, but a clone
   made before the rename that runs `git push` on its local `master` recreates the branch, which the
   ruleset (it targets the default branch only) does not protect. A CI run on that push is the only
-  signal it happened. Drop `master` from the trigger once the ruleset also blocks creating it.
+  signal it happened, and it arrives after the fact: if Vercel's Production Branch still says
+  `master`, that push is an unreviewed production deploy. The guard is the owner's, in settings:
+  point Vercel at `main` and have the ruleset also block creating `master`. Drop `master` from the
+  trigger once both are done.
 - **`suggest.mjs` keeps `master` as a URL stopword and does not add `main`.** `main` is also a
   content word in issue text, and the similarity heuristic was out of scope.

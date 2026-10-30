@@ -12,11 +12,10 @@ permissions:
 
 # A new push to a pull request supersedes the run in flight on it. Playwright and the jsdom suite
 # are the slow jobs, and there is no value in finishing them for a commit that has already been
-# replaced. A push to main is never cancelled: every main commit is meant to be a production deploy
-# (tasks/open/the-first-ledger-mirror-on-main-and-production-deploys-are-unobserved.md), and while
-# the default branch (then master) shared one group, 13 of 100 of its runs were cancelled by the
-# next merge, leaving those deploys with no verdict. Keying main runs on the commit gives each one
-# its own group.
+# replaced. A push to main is never cancelled: every main commit is meant to be a production
+# deploy, and while the default branch (then master) shared one group, 13 of 100 of its runs were
+# cancelled by the next merge, leaving those deploys with no verdict. Keying main runs on the
+# commit gives each one its own group.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
