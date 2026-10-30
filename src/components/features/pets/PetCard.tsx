@@ -1,8 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
-import { Info, Heart } from "lucide-react";
+import {
+  Info,
+  Heart,
+  House,
+  Dog,
+  Baby,
+  Box,
+  Sofa,
+  Volleyball,
+  Zap,
+  Fence,
+  Ban,
+  Cat,
+  PawPrint,
+  Users,
+  Armchair,
+  Footprints,
+  User,
+  Building2,
+  Hourglass,
+  Feather,
+  BatteryLow,
+  HandHeart,
+  Stethoscope,
+  HeartHandshake,
+  ShieldCheck,
+  VolumeX,
+  Sprout,
+  type LucideIcon,
+} from "lucide-react";
 import { Pet } from "@/types/pet";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -27,6 +57,109 @@ interface PetCardProps {
 
 const FALLBACK_PET_IMAGE = "https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=800&q=80";
 
+/**
+ * Icons for the characteristic tags staff use today, matched case-insensitively. Tags are free
+ * text (`tags: z.array(z.string())`), so any tag not listed here keeps its text chip.
+ * ceiling: a hand-kept list; a new tag gets an icon only when someone adds it here.
+ */
+const TAG_ICONS: Record<string, LucideIcon> = {
+  "house-trained": House,
+  "good with dogs": Dog,
+  "good with cats": Cat,
+  "good with kids": Baby,
+  "litter box trained": Box,
+  "indoor only": Sofa,
+  "quiet indoors": Armchair,
+  playful: Volleyball,
+  "high energy": Zap,
+  "low energy": BatteryLow,
+  "needs fenced compound": Fence,
+  "no cats": Ban,
+  kitten: PawPrint,
+  puppy: PawPrint,
+  senior: Hourglass,
+  social: Users,
+  independent: User,
+  quiet: VolumeX,
+  gentle: Feather,
+  "leash trained": Footprints,
+  "apartment friendly": Building2,
+  "in foster care": HandHeart,
+  "needs socialising": Sprout,
+  "under veterinary care": Stethoscope,
+  "sponsor needed": HeartHandshake,
+  "tnrm intake": ShieldCheck,
+};
+
+/**
+ * One icon tag, with its name in a label centred above the icon while the pointer is on it.
+ *
+ * The label is portalled to `body` at fixed coordinates, so the card's `overflow-hidden` cannot
+ * clip it at either edge. WCAG 1.4.13 asks hover content to be hoverable, dismissible and
+ * persistent: leaving the icon closes it only after a short grace, which the label's own hover
+ * cancels, so the pointer can cross onto it; Escape closes it; nothing else does. It is
+ * `aria-hidden` because the `sr-only` name already gives screen readers the tag. Touch screens
+ * (`pointer-coarse`) show the name inline instead and never open it.
+ */
+function TagIcon({ tag, Icon }: { tag: string; Icon: LucideIcon }) {
+  const ref = useRef<HTMLLIElement>(null);
+  const closing = useRef<number | undefined>(undefined);
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
+
+  const open = () => {
+    window.clearTimeout(closing.current);
+    if (window.matchMedia?.("(pointer: coarse)").matches) return;
+    const r = ref.current?.getBoundingClientRect();
+    if (r) setAt({ x: r.left + r.width / 2, y: r.top });
+  };
+  const close = () => {
+    window.clearTimeout(closing.current);
+    closing.current = window.setTimeout(() => setAt(null), 150);
+  };
+
+  useEffect(() => {
+    if (!at) return;
+    const dismiss = (e: KeyboardEvent) => e.key === "Escape" && setAt(null);
+    const hide = () => setAt(null);
+    window.addEventListener("keydown", dismiss);
+    window.addEventListener("scroll", hide, { passive: true });
+    return () => {
+      window.removeEventListener("keydown", dismiss);
+      window.removeEventListener("scroll", hide);
+    };
+  }, [at]);
+  useEffect(() => () => window.clearTimeout(closing.current), []);
+
+  return (
+    <li
+      ref={ref}
+      onMouseEnter={open}
+      onMouseLeave={close}
+      className="flex items-center gap-1.5 rounded-md bg-primary-panel p-1.5 text-primary-ink pointer-coarse:px-2.5"
+    >
+      <Icon className="size-4 shrink-0" aria-hidden="true" />
+      <span className="sr-only pointer-coarse:not-sr-only pointer-coarse:text-xs pointer-coarse:font-semibold">
+        {tag}
+      </span>
+      {at &&
+        createPortal(
+          <span
+            aria-hidden="true"
+            onMouseEnter={open}
+            onMouseLeave={close}
+            style={{ left: at.x, top: at.y }}
+            className="fixed z-50 -translate-x-1/2 -translate-y-full pb-1.5"
+          >
+            <span className="block whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-semibold text-background shadow-brand-sm">
+              {tag}
+            </span>
+          </span>,
+          document.body
+        )}
+    </li>
+  );
+}
+
 export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardProps) {
   const { t, isMs } = useLanguage();
   const [imgSrc, setImgSrc] = useState(pet.image || FALLBACK_PET_IMAGE);
@@ -41,7 +174,7 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
   const rehabProgress = status.isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
 
   return (
-    <Card className="group flex h-full flex-col justify-between gap-0 py-0 ring-0 overflow-hidden bg-primary-panel transition-colors duration-200 hover:bg-accent-subtle-strong">
+    <Card className="group flex h-full flex-col justify-between gap-0 py-0 ring-0 overflow-hidden bg-work-panel transition-colors duration-200 hover:bg-accent-subtle-strong">
       <div>
         {/* Pet Image Container */}
         <div className="relative aspect-4/3 w-full overflow-hidden bg-work-ground">
@@ -126,20 +259,29 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
             </div>
           )}
 
-          <p className="text-sm text-foreground/90 leading-relaxed line-clamp-2">
+          <p className="text-sm text-foreground/90 leading-relaxed line-clamp-4">
             {pet.description}
           </p>
 
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {pet.tags.map((tag, idx) => (
-              <span
-                key={idx}
-                className="bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          {/* A known tag is its icon, named on hover by a label centred above it; touch
+              screens have no hover, so there the name shows beside the icon. Screen readers always get
+              the name. See `TagIcon` for the hover label. */}
+          <ul className="flex flex-wrap items-center gap-1.5 pt-1">
+            {pet.tags.map((tag, idx) => {
+              const Icon = TAG_ICONS[tag.trim().toLowerCase()];
+              if (!Icon) {
+                return (
+                  <li
+                    key={idx}
+                    className="bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"
+                  >
+                    {tag}
+                  </li>
+                );
+              }
+              return <TagIcon key={idx} tag={tag} Icon={Icon} />;
+            })}
+          </ul>
         </CardContent>
       </div>
 
