@@ -127,7 +127,7 @@ and the harness refuses every later command there until the session re-enters it
 Never copy `.env.local` anywhere.
 
 - Hash `prisma/schema.prisma`, `scripts/check-drift.ts` and `scripts/lib/sqlSafety.ts` in the main
-  checkout against master's. The diff is taken against whatever branch that checkout holds.
+  checkout against `origin/main`'s. The diff is taken against whatever branch that checkout holds.
 - Inventory every object that live code touches, not only the portal's: `sponsors`,
   `pet_sponsorships` (with `displayOnWall`, the `userId` index and FK), `donations`,
   `receipt_sequences`, `audit_logs`, #39's `adoption_applications` columns, and anything added since.

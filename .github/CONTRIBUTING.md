@@ -24,6 +24,25 @@ cd pet-shelter
 git remote add upstream https://github.com/Semi-Professional-Organization/pet-shelter.git
 ```
 
+### Clones made before the rename
+
+The default branch was renamed from `master` to `main` on 2026-10-28, when the repository moved to
+the Semi-Professional-Organization org. A clone made before then keeps tracking a frozen
+`origin/master`, and orient says so when a session starts. Repair it once:
+
+```bash
+git remote set-url origin https://github.com/Semi-Professional-Organization/pet-shelter.git
+git remote set-branches origin '*'   # only if `git config --get-all remote.origin.fetch` lacks a `*`
+git fetch origin --prune
+git remote set-head origin -a
+git branch -m master main            # only if you still have a local master
+git branch -u origin/main main
+```
+
+The `set-branches` line is for single-branch and `--depth` clones, whose fetch names `master` alone
+and fails after the rename. It replaces every fetch line, so skip it in a full clone. In a fork,
+rename your fork's default branch on GitHub first; the same steps then apply with your fork's URL.
+
 ### 2. Set Up Local Environment
 
 Follow the setup guide in [`SETUP_AND_INSTALL.md`](SETUP_AND_INSTALL.md):

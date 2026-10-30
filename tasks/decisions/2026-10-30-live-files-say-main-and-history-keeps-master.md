@@ -9,10 +9,13 @@ was renamed from `master` to `main`. Four choices from the change that followed,
   `docs/archives/` and the `tasks/open/` entries record what was true when written, so about 100
   files still say `master` on purpose. The one exception is the step-7 proposal in `tasks/open/`,
   whose quoted text is meant to be pasted into `CLAUDE.md`.
-- **Orient prefers `origin/main` over `origin/HEAD`.** `origin/HEAD` is the general answer, but in a
-  clone made before the rename it still names a frozen `origin/master`, and plain `git fetch` never
-  moves it. Trusting it reported a wrong and growing ahead/behind in every session. The literal is
-  marked with a `ceiling:` in `scripts/agent/orient.mjs`, and a repair line names the fix.
+- **Orient counts against `origin/main` only, not `origin/HEAD`.** `origin/HEAD` is the general
+  answer, but in a clone made before the rename it still names a frozen `origin/master`, and plain
+  `git fetch` never moves it. Trusting it reported a wrong and growing ahead/behind in every
+  session. Such a clone gets one line pointing at the repair steps in CONTRIBUTING rather than a
+  command: three review rounds showed that the right command depends on how the clone was made
+  (full, single-branch, extra refspecs), which orient cannot tell apart reliably. The literal is
+  marked with a `ceiling:` in `scripts/agent/orient.mjs`.
 - **CI keeps `master` in its push trigger.** Nothing should push to `master` any more, but a clone
   made before the rename that runs `git push` on its local `master` recreates the branch, which the
   ruleset (it targets the default branch only) does not protect. A CI run on that push is the only

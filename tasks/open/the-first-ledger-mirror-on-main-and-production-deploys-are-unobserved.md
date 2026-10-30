@@ -8,10 +8,11 @@ became `main`. Two things that should happen on every merge to `main` have not b
 **The ledger mirror.** `.github/workflows/ledger-issues.yml` listened on `master` until the pull
 request that adds this entry, so no mirror run has used the new repository name or branch. Every
 ledger issue still links `fergeley/pet-shelter/blob/master/…`, so the first run rewrites the body of
-all of them (about 70 edits) plus any new entries, one after another. Neither
-`node scripts/ledger-issues.mjs` nor `node scripts/issue-groups.mjs` could be dry-run from the cloud
-session that made the change: both call `gh repo view`, which goes through GraphQL, and GraphQL is
-blocked there. The plan was not previewed.
+all of them, one after another. The scripts themselves could not run from the cloud session that
+made the change (both call GraphQL, which is blocked there), so the plan was previewed instead by
+feeding `planSync` the branch's entries and the ledger issues read over REST: 69 updates and 7
+creates. 67 of the updates change only the link; #127 and #155 also take the wording edits that
+change made. `node scripts/issue-groups.mjs` was not previewed.
 
 **Production deploys.** The newest commit on `main` at the time, `0b542f5` (#226), has no
 deployment and no commit status. The last Production deployment is `8490d68`, before the move.
@@ -19,5 +20,6 @@ Either Vercel lost its Git link in the transfer or its Production Branch still s
 that is fixed, `ci.yml`'s "every main commit is a production deploy" is a statement of intent.
 
 **Settles when:** the first mirror run on `main` finishes green with every issue body linking the
-org repository on `main` (or a rerun clears a rate-limited first attempt), and Vercel shows a
+org repository on `main` (or a rerun clears a rate-limited first attempt), a dry run of
+`node scripts/issue-groups.mjs` reports in sync, and Vercel shows a
 Production deployment for a commit merged to `main` after the move.

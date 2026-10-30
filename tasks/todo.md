@@ -23,8 +23,8 @@ The repository moved to the Semi-Professional-Organization org on 2026-10-28 and
 branch became `main`. Live code and instructions still said `master`, so the ledger mirror stopped
 running on merges and the SessionStart orient reported "no origin/master" in every session.
 
-- [x] `orient.mjs` compares against `origin/main`, falls back to `origin/HEAD` only in a clone
-      without it, and prints a repair line for a clone made before the rename
+- [x] `orient.mjs` counts against `origin/main` only and points a clone made before the rename at
+      the repair steps, now in CONTRIBUTING ("Clones made before the rename")
 - [x] `usage.mjs` counts the orient and merge commands under either name
 - [x] Workflows: ledger mirror on `main`; CI's push trigger keeps `master` (see the decision)
 - [x] Live docs: CLAUDE.md close-out, CONTRIBUTING, setup clone URL, COMMIT_MESSAGES, tasks/README

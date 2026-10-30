@@ -15,7 +15,7 @@
  *   node scripts/issue-groups.mjs --suggest --evaluate  # measure those proposals on the file itself
  *
  * `--apply` reads the file from the default branch after a fetch, never the working copy, so a stale
- * or unmerged checkout cannot undo what master holds. It records each parent's number in the working
+ * or unmerged checkout cannot undo what the default branch holds. It records each parent's number in the working
  * copy's file for you to commit; until then a parent is found by its label and marker. It finishes by
  * reading GitHub again and planning again: that plan must be empty, or it says what is left and fails.
  *
