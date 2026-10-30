@@ -233,6 +233,15 @@ describe("PetDetailView", () => {
       expect(within(trainingList()).getByText("House Trained")).toBeInTheDocument();
     });
 
+    it("renders no empty chip row when every tag is training", () => {
+      renderWithLanguage(
+        <PetDetailView initialPet={makePet({ id: "pet-all-training-under-test", tags: ["House-Trained"] })} />
+      );
+
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.querySelector(".flex-wrap")).toBeNull();
+    });
+
     it("renders nothing when no tag records training", () => {
       renderWithLanguage(
         <PetDetailView initialPet={makePet({ id: "pet-untrained-under-test", tags: ["Playful"] })} />

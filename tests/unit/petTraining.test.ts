@@ -109,16 +109,17 @@ describe("match quiz house training", () => {
     expect(experienceFor(["Litter Box Trained"])).toBe(25);
   });
 
-  it("names training, not temperament, when training is the only reason", () => {
+  it("names the recorded training as the reason", () => {
     const reasons = (tags: string[]) =>
       calculatePetMatchScore({ ...rocky, tags, medical: { ...rocky.medical, specialNeeds: "" } }, firstTimer)
         .reasons;
-    expect(reasons(["Litter Box Trained"])).toContain(
-      "Already house or litter box trained, which makes them an easy first pet."
-    );
-    expect(reasons(["Gentle", "House-Trained"])).toContain(
-      "Gentle & beginner-friendly demeanor makes them an easy first pet."
-    );
+    const temperament = "Gentle & beginner-friendly demeanor makes them an easy first pet.";
+    expect(reasons(["Litter Box Trained"])).toContain("Already litter box trained, which makes them an easy first pet.");
+    expect(reasons(["Litter Box Trained"])).not.toContain(temperament);
+    // A substring match such as "Unfriendly" must not outrank the exact training match.
+    expect(reasons(["Unfriendly", "House-Trained"])).toContain("Already house trained, which makes them an easy first pet.");
+    expect(reasons(["Unfriendly", "House-Trained"])).not.toContain(temperament);
+    expect(reasons(["Gentle"])).toContain(temperament);
   });
 
   it("does not reward leash training on its own", () => {

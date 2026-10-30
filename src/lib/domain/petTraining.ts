@@ -1,6 +1,7 @@
 /**
  * Which training a pet's free-text tags record, for the Training row (pet page and gallery
- * quick view), the tag chips it replaces, and the match quiz. Domain, not presentation, because the quiz scoring needs it. React-free: the icons live in
+ * quick view), the tag chips it replaces, and the match quiz. Domain, not presentation,
+ * because the quiz scoring needs it. React-free: the icons live in
  * `components/features/pets/PetTraining.tsx`, the same split as `PetStatusIcon`.
  *
  * Each kind is also its key under `petDetail` in the translation dictionaries.

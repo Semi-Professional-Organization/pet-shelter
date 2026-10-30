@@ -166,14 +166,18 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
     // Toilet training (house or litter box, either species; the owner's call on 2026-10-30)
     // goes through trainingKindFor, the same matcher as the Training row, so the two agree.
     // Leash training is not what makes a pet easy for a first-time owner.
+    // The training reason wins: it comes from an exact tag match, the temperament one from a
+    // substring test that also matches "Unfriendly".
     const hasEasyTemperament = pet.tags.some((t) => /gentle|friendly|easy/i.test(t));
-    const isToiletTrained = pet.tags.some((t) => isToiletTraining(trainingKindFor(t)));
-    if ((hasEasyTemperament || isToiletTrained) && !isSpecialNeeds) {
+    const toiletTraining = pet.tags.map(trainingKindFor).find(isToiletTraining);
+    if ((hasEasyTemperament || toiletTraining) && !isSpecialNeeds) {
       experienceScore = 25;
       reasons.push(
-        hasEasyTemperament
-          ? "Gentle & beginner-friendly demeanor makes them an easy first pet."
-          : "Already house or litter box trained, which makes them an easy first pet."
+        toiletTraining === "houseTrained"
+          ? "Already house trained, which makes them an easy first pet."
+          : toiletTraining === "litterBoxTrained"
+            ? "Already litter box trained, which makes them an easy first pet."
+            : "Gentle & beginner-friendly demeanor makes them an easy first pet."
       );
     } else if (isSpecialNeeds) {
       experienceScore = 12;
