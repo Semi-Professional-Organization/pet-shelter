@@ -21,7 +21,7 @@ git clone https://github.com/YOUR_GITHUB_USERNAME/pet-shelter.git
 cd pet-shelter
 
 # Add upstream remote to stay synced with main repo
-git remote add upstream https://github.com/fergeley/pet-shelter.git
+git remote add upstream https://github.com/Semi-Professional-Organization/pet-shelter.git
 ```
 
 ### 2. Set Up Local Environment
@@ -246,26 +246,26 @@ Before hitting "Create Pull Request", verify:
 - Request re-review after addressing feedback
 - Polite disagreement is okay—explain your reasoning clearly
 
-### Merging into `master`
+### Merging into `main`
 
-`master` takes changes only through a pull request, squash-merged, once six checks pass:
+`main` takes changes only through a pull request, squash-merged, once six checks pass:
 `Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
 `Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`.
 Vercel's preview status is not one of them: Vercel decides whether to deploy a commit by who wrote
 it, so it may never report on a pull request that Dependabot opens. No approval is required.
-Nobody can push, force-push or delete `master` directly, maintainers included. The rule is the
-repository ruleset "Basic" (Settings → Rules → Rulesets), active with all six checks; how it was
-verified is in
+Nobody can push, force-push or delete `main` directly, maintainers included. The rule is the
+repository ruleset "Basic" (Settings → Rules → Rulesets), active with all six checks and targeting the default branch (`master` until 2026-10-28, when it
+was renamed `main`); how it was verified is in
 [`tasks/decisions/2026-10-21-the-master-ruleset-is-on-and-does-not-block-green-pull-requests.md`](../tasks/decisions/2026-10-21-the-master-ruleset-is-on-and-does-not-block-green-pull-requests.md).
 The reasons are in
 [`tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md`](../tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md).
 
 - **Renaming a CI job renames its check.** The rename cannot merge until the ruleset requires the
-  new name, so update the ruleset just before merging it, then merge `master` into any other open
+  new name, so update the ruleset just before merging it, then merge `main` into any other open
   pull request so that it reports the new name too.
 - **When a check is down rather than red** (a GitHub or Vercel outage), a maintainer can set the
   ruleset's enforcement to Disabled, merge, and set it back to Active. Merging a red pull request
-  is not that case: it is how `master` broke twice in September 2026.
+  is not that case: it is how the default branch broke twice in September 2026.
 
 ---
 

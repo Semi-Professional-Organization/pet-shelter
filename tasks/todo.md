@@ -15,6 +15,27 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Default branch renamed: master to main
+
+**Branch:** `claude/default-branch-main` · opened 2026-10-30
+
+The repository moved to the Semi-Professional-Organization org on 2026-10-28 and its default
+branch became `main`. Live code and instructions still said `master`, so the ledger mirror stopped
+running on merges and the SessionStart orient reported "no origin/master" in every session.
+
+- [x] `orient.mjs` reads the default branch (`origin/HEAD` if it resolves, else `origin/main`)
+- [x] `usage.mjs` counts the orient and merge commands under either name
+- [x] Workflows: ledger mirror on `main`; CI push trigger drops `master`
+- [x] Live docs: CLAUDE.md close-out, CONTRIBUTING, setup clone URL, COMMIT_MESSAGES, tasks/README
+
+## Review
+
+Deliberately not done: `tasks/decisions/`, `tasks/archive/`, `tasks/lessons/`, `docs/archives/`
+and the `tasks/open/` entries keep `master`, because they record what was true then, and editing a
+`tasks/open/` file rewrites its public issue. The "Labelling issues" section and the issue forms
+wait for their own PR. `ledger-issues.mjs` and `issue-groups.mjs` could not be dry-run from the
+cloud session (they call GraphQL through `gh repo view`); the first push to `main` runs the mirror.
+
 # Home page: one light-blue accent, flat borderless cards
 
 **Branch:** `feature/frontend` · opened 2026-10-28 · on top of the owner's uncommitted WIP

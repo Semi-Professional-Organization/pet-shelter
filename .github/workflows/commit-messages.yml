@@ -45,7 +45,7 @@ jobs:
         # cannot meet the 72-column wrap. Its title is the same text as its commit subject, and
         # the next step still checks that. The skip goes by who opened the pull request, so a
         # commit a person adds to such a branch goes unaudited as well. Squash merging discards
-        # those commits too, and the subject that reaches master is the title.
+        # those commits too, and the subject that reaches main is the title.
         if: github.event.pull_request.user.login != 'dependabot[bot]'
         # The base branch name goes through the environment for the same reason the title does
         # below: a branch name may contain characters the shell would act on.
@@ -53,7 +53,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: node scripts/commit-msg.mjs --audit --strict --verbose --first-parent "origin/$BASE_REF..HEAD"
       # This repository squash-merges, so the commits linted above are discarded,
-      # and the subject that reaches master is the pull request title (or, for a
+      # and the subject that reaches main is the pull request title (or, for a
       # one-commit pull request, that commit's subject, which the step above checks).
       # The title was the one message the standard did not govern: e622249 landed
       # on master failing both subject-length and capitalize.

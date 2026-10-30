@@ -255,6 +255,9 @@ describe("agent usage: command classes", () => {
     // git's global options are skipped, so the subcommand still names the call.
     expect(commandClass("Bash", "git --no-pager log")).toBe("git log");
     expect(families("Bash", "git --no-pager log HEAD..origin/master")).toEqual(["merge"]);
+    expect(families("Bash", "git --no-pager log HEAD..origin/main")).toEqual(["merge"]);
+    expect(families("Bash", "git merge-base HEAD origin/main")).toEqual(["merge"]);
+    expect(families("Bash", "git log --oneline main..origin/main")).toEqual(["orient"]);
     // Separators and npm flags do not hide the verb.
     expect(commandClass("Bash", "npm run typecheck; echo done")).toBe("npm run typecheck");
     expect(commandClass("Bash", "npm run -s test")).toBe("npm run test");

@@ -1,10 +1,10 @@
 /**
  * `node scripts/agent.mjs orient`: where this session is. The SessionStart hook runs it as
  * `orient --brief --hook`, so a fresh session starts knowing its checkout, its branch against
- * `origin/master`, its uncommitted work and any hand-off waiting for it, without spending a call.
+ * the default branch, its uncommitted work and any hand-off waiting for it, without spending a call.
  *
  * This is the minimal orient of the agent-scripts plan's second pull request. Who else is working
- * here, open pull requests on your paths, the ledger read from `origin/master` and ports come with
+ * here, open pull requests on your paths, the ledger read from the default branch and ports come with
  * the full one, in a later pull request.
  *
  * Read-only: it runs git, never fetches, and reads `tasks/open/HANDOFF-*.md`.
@@ -29,6 +29,19 @@ function worktreeDirs(common) {
 }
 
 /**
+ * The remote default branch `cwd` compares against: `origin/HEAD` when it resolves, else
+ * `origin/main`. Read rather than written down, because the default branch was renamed from
+ * `master` to `main` on 2026-10-28 and a literal left every session comparing against a ref that
+ * no longer exists. A clone made before the rename can keep an `origin/HEAD` that still names
+ * `origin/master`, so the name only counts once it resolves; `git remote set-head origin -a`
+ * repairs such a clone.
+ */
+export function defaultBranch(cwd) {
+  const named = git(cwd, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  return named && git(cwd, ["rev-parse", "--verify", "--quiet", `${named}^{commit}`]) ? named : "origin/main";
+}
+
+/**
  * The checkout `cwd` is in, or null outside a git repository. `stray` is set when `cwd` is a
  * `.claude/worktrees/<name>` folder git does not know as a worktree, so it silently resolves to
  * the checkout above it; whatever a session there edits lands in that checkout.
@@ -38,7 +51,8 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
   if (!top) return null;
   const gitDir = git(cwd, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const counts = git(cwd, ["rev-list", "--left-right", "--count", "origin/master...HEAD"]);
+  const base = defaultBranch(cwd);
+  const counts = git(cwd, ["rev-list", "--left-right", "--count", `${base}...HEAD`]);
   const [behind, ahead] = counts ? counts.split(/\s+/).map(Number) : [null, null];
   const status = git(cwd, ["status", "--porcelain"]);
   // Every checkout of a repository shares its remote refs, but each worktree writes its own
@@ -59,6 +73,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
     worktree: Boolean(gitDir && common && slashed(gitDir) !== slashed(common)),
     branch: git(cwd, ["branch", "--show-current"]) || null,
     head: git(cwd, ["rev-parse", "--short", "HEAD"]),
+    base,
     ahead,
     behind,
     uncommitted: status ? status.split("\n").filter(Boolean).length : 0,
@@ -69,7 +84,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
 
 /** One sentence about the checkout, for a hand-off's header. */
 export function describeWhere(w) {
-  const against = w.ahead === null ? "no `origin/master` to compare with" : `${w.ahead} ahead and ${w.behind} behind \`origin/master\``;
+  const against = w.ahead === null ? `no \`${w.base}\` to compare with` : `${w.ahead} ahead and ${w.behind} behind \`${w.base}\``;
   return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.`;
 }
 
@@ -91,8 +106,8 @@ export function orientLines(w, handoffs, options = {}) {
   const fetched = w.fetchedMinutesAgo === null ? "never fetched" : `as of the last fetch, ${ago(w.fetchedMinutesAgo)} ago`;
   lines.push(
     w.ahead === null
-      ? `git: no origin/master to compare with; ${w.uncommitted} uncommitted paths`
-      : `git: ${w.ahead} ahead and ${w.behind} behind origin/master ${fetched}; ${w.uncommitted} uncommitted paths`,
+      ? `git: no ${w.base} to compare with; ${w.uncommitted} uncommitted paths`
+      : `git: ${w.ahead} ahead and ${w.behind} behind ${w.base} ${fetched}; ${w.uncommitted} uncommitted paths`,
   );
   const waiting = handoffs.filter((h) => !session || h.session !== session);
   for (const h of waiting.slice(0, 3)) {
@@ -119,8 +134,8 @@ function hookSession(read) {
 
 const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 
-Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/master
-as of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
+Where this session is: main checkout or worktree, branch and HEAD, ahead and behind the default
+branch (origin/HEAD, else origin/main) as of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
 tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one git does not know,
 which silently resolves to the checkout above it. Read-only.
 

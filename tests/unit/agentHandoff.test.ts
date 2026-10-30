@@ -129,7 +129,7 @@ describe("ledger handoff", () => {
     const text = readFileSync(join(top, "tasks", "open", "HANDOFF-context-meter.md"), "utf8");
     expect(text).toContain("\r\n");
     expect(text).toContain(`- **From session:** \`${SESSION}\``);
-    expect(text).toMatch(/- \*\*Where:\*\* `.*` on `main` at `no commit`; no `origin\/master` to compare with; \d+ uncommitted paths\./);
+    expect(text).toMatch(/- \*\*Where:\*\* `.*` on `main` at `no commit`; no `origin\/main` to compare with; \d+ uncommitted paths\./);
     expect(text).toContain("- **Context at hand-off:** 300K tokens on claude-opus-5-5.");
     expect(text).toContain("## Commands and results\r\n\r\nCommands and results goes here.");
     expect(text).toContain("opened 2026-10-21");
@@ -286,8 +286,9 @@ describe("orient", () => {
   const where = {
     top: "D:/repo",
     worktree: false,
-    branch: "master",
+    branch: "main",
     head: "abc1234",
+    base: "origin/main",
     ahead: 2,
     behind: 5,
     uncommitted: 3,
@@ -296,15 +297,29 @@ describe("orient", () => {
   };
   const handoff = (n: number, session: string) => ({ file: `tasks/open/HANDOFF-h${n}.md`, title: `H${n}`, session, opened: "2026-10-21" });
 
-  it("says where the session is, against origin/master as last fetched", () => {
+  it("says where the session is, against the default branch as last fetched", () => {
     expect(orientLines(where, [])).toEqual([
-      "orient: PASS main checkout D:/repo on master at abc1234",
-      "git: 2 ahead and 5 behind origin/master as of the last fetch, 90 minutes ago; 3 uncommitted paths",
+      "orient: PASS main checkout D:/repo on main at abc1234",
+      "git: 2 ahead and 5 behind origin/main as of the last fetch, 90 minutes ago; 3 uncommitted paths",
     ]);
     expect(orientLines({ ...where, worktree: true, branch: null, ahead: null }, [])).toEqual([
       "orient: PASS worktree D:/repo on a detached HEAD at abc1234",
-      "git: no origin/master to compare with; 3 uncommitted paths",
+      "git: no origin/main to compare with; 3 uncommitted paths",
     ]);
+  });
+
+  it("compares against origin/HEAD when it resolves, and origin/main when it does not", () => {
+    const top = repo();
+    const at = (ref: string) => execFileSync("git", ["update-ref", ref, "HEAD"], { cwd: top });
+    execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "c"], { cwd: top });
+    expect(whereAmI(top, { now: NOW })?.base).toBe("origin/main");
+    at("refs/remotes/origin/trunk");
+    execFileSync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk"], { cwd: top });
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/trunk", ahead: 0, behind: 0 });
+    // A clone from before the master-to-main rename keeps an origin/HEAD naming a pruned ref.
+    execFileSync("git", ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master"], { cwd: top });
+    at("refs/remotes/origin/main");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", ahead: 0, behind: 0 });
   });
 
   it("names the hand-offs other sessions left, three at most, and the meter when run as the hook", () => {

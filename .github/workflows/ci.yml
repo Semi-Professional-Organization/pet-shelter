@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [main]
   pull_request:
 
 # Read-only for every job. The repository default is read-only as well, but a workflow that states
@@ -12,9 +12,10 @@ permissions:
 
 # A new push to a pull request supersedes the run in flight on it. Playwright and the jsdom suite
 # are the slow jobs, and there is no value in finishing them for a commit that has already been
-# replaced. A push to master is never cancelled: every master commit is a production deploy, and
-# while master shared one group, 13 of 100 master runs were cancelled by the next merge, leaving
-# those deploys with no verdict. Keying master runs on the commit gives each one its own group.
+# replaced. A push to main is never cancelled: every main commit is a production deploy, and while
+# the default branch (then master) shared one group, 13 of 100 of its runs were cancelled by the
+# next merge, leaving those deploys with no verdict. Keying main runs on the commit gives each one
+# its own group.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
