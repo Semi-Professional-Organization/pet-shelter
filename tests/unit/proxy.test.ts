@@ -50,7 +50,8 @@ describe("Proxy route guard", () => {
 
     it("sends a malformed or tampered cookie to sign in", () => {
       const valid = sessionFor(ROLES.SUPER_ADMIN);
-      const tampered = `${valid.slice(0, -2)}ff`;
+      // Flip the last hex character; a fixed suffix is a no-op when the signature already ends in it.
+      const tampered = `${valid.slice(0, -1)}${valid.endsWith("a") ? "b" : "a"}`;
 
       expect(sentToSignIn(proxy(request("/admin/members", "not-a-token")))).toBe(true);
       expect(sentToSignIn(proxy(request("/admin/members", tampered)))).toBe(true);
