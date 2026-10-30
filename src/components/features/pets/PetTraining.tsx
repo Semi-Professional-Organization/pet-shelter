@@ -1,11 +1,13 @@
+"use client";
+
 import { Footprints, type LucideIcon } from "lucide-react";
 
 import { HouseCheck, LitterBox } from "@/components/icons/pet-icons";
 import { useTypedTranslation } from "@/components/providers/LanguageProvider";
-import { trainingKindsIn, type TrainingKind } from "@/lib/presentation/petTraining";
+import { trainingKindsIn, type TrainingKind } from "@/lib/domain/petTraining";
 
 /**
- * Kept out of `lib/presentation/petTraining.ts` for the reason `PetStatusIcon` gives: that
+ * Kept out of `lib/domain/petTraining.ts` for the reason `PetStatusIcon` gives: that
  * module stays React-free. The exhaustive `Record` means a new kind fails the typecheck
  * here until it has an icon.
  */
@@ -31,7 +33,8 @@ export function PetTraining({ tags }: { tags: readonly string[] }) {
         {t("petDetail.trainingTitle")}
       </h2>
 
-      <ul className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+      {/* role="list": Safari drops list semantics from a list with list-style: none. */}
+      <ul role="list" className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
         {training.map((kind) => {
           const Icon = ICON_BY_TRAINING[kind];
           return (

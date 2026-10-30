@@ -1,6 +1,6 @@
 import { Pet } from "@/types/pet";
 import { QuizAnswers, PetMatchResult, MatchScoreBreakdown } from "@/types/match";
-import { trainingKindFor } from "@/lib/presentation/petTraining";
+import { trainingKindFor } from "@/lib/domain/petTraining";
 
 /**
  * Evaluates compatibility between a prospective adopter's lifestyle and a rescue pet.
@@ -160,6 +160,9 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
   const isSenior = pet.ageCategory === "senior";
 
   if (answers.experience === "first_time") {
+    // ceiling: the temperament words are a substring test, so "Unfriendly" or "Uneasy" also
+    // count. House training goes through trainingKindFor, the same matcher as the pet page's
+    // Training row, so the quiz and the page agree on which pets are house trained.
     if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || trainingKindFor(t) === "houseTrained") && !isSpecialNeeds) {
       experienceScore = 25;
       reasons.push("Gentle & beginner-friendly demeanor makes them an easy first pet.");
