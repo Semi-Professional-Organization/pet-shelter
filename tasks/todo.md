@@ -27,13 +27,14 @@ Record active multi-step work streams below.
   tag icons, the quiz's special-needs and temperament scoring (logged in `open/`).
 
 - [x] Icons, matcher, row, tests
-- [x] Five xhigh review rounds and the fixes for rounds 1 to 4 (round 5: no in-scope bug)
+- [x] Seven xhigh review rounds and their fixes. Stopped at round 7: the last rounds found only
+  pasted-Unicode edge cases beyond the ceiling, wording, and the out-of-scope items in `open/`
 
 ## Review
 
 Not done, deliberately: the owner's questions in
-`open/pet-training-row-owner-questions.md` (admin form default tag, duplicate chips, quick view,
-Malay wording) and the older quiz scoring problems in
+`open/pet-training-row-owner-questions.md` (duplicate chips, quick view, Malay wording) and
+the older quiz scoring problems in
 `open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md`.
 
 # Home page: one light-blue accent, flat borderless cards

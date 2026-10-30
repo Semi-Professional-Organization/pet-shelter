@@ -10,8 +10,9 @@ word processors paste (soft hyphen, zero-width space); qualified or combined tag
 "House-Trained, Leash Trained") match nothing rather than being guessed at.
 
 The match quiz uses the same matcher in place of its old substring test `/house-trained/i`.
-That narrows it ("Not House-Trained" and "Mostly house-trained", "Fully House-Trained" and
-"House-trained." no longer earn beginner points)
+That narrows it ("Not House-Trained" and "Mostly house-trained", "Fully House-Trained",
+"House-trained." and combined tags such as "House-Trained, Leash Trained" no longer earn
+beginner points)
 and widens it ("House Trained", "Housetrained", "house_trained" now do).
 
 The custom `HouseCheck` icon means house trained only. The adoption home check or home visit

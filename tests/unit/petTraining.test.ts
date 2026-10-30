@@ -16,6 +16,7 @@ const HOUSE_TRAINED_SPELLINGS = [
   "House\u2011Trained",
   "House\u2212Trained",
   "House\u00ADTrained",
+  ...["\u200B", "\u200C", "\u200D", "\u200E", "\u200F", "\u2060", "\uFEFF"].map((c) => `House-Trained${c}`),
   "  House -  Trained ",
 ];
 
@@ -81,6 +82,10 @@ describe("match quiz house training", () => {
     calculatePetMatchScore({ ...rocky, tags, medical: { ...rocky.medical, specialNeeds: "" } }, firstTimer).experienceScore;
 
   it.each(HOUSE_TRAINED_SPELLINGS)("rewards %j, which the Training row accepts", (tag) => {
+    expect(experienceFor([tag])).toBe(25);
+  });
+
+  it.each(["Gentle", "Friendly", "Easy-going"])("still rewards the temperament tag %j", (tag) => {
     expect(experienceFor([tag])).toBe(25);
   });
 

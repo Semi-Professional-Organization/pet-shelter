@@ -19,7 +19,7 @@ const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
 ]);
 
 // ceiling: matches a tag only when it spells one of the keys above once case, spaces,
-// underscores, dashes and invisible format characters are dropped, so "House-Trained", "house_trained" and
+// underscores, dashes and the pasted invisible characters below are dropped, so "House-Trained", "house_trained" and
 // "Housetrained" all match. Anything else stays a plain tag rather than being guessed at:
 // synonyms ("Housebroken"), qualified tags ("House trained?", "Mostly house-trained") and
 // combined tags ("House-Trained, Leash Trained") get no Training row and no quiz points.
@@ -30,11 +30,11 @@ const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
 function tagKey(tag: string): string {
   // String() keeps a NULL tag element from throwing here; other tag readers still throw on
   // one (see tasks/open/free-text-pet-tags-are-matched-two-different-ways.md).
-  // \p{Pd} is every Unicode dash and hyphen and \u2212 the minus sign. The rest are the
-  // invisible characters Word and web pages paste: soft hyphen, zero-width space and joiners,
-  // word joiner, BOM. Not all of \p{Cf}: that would also drop bidi overrides, so a tag shown
-  // reversed would still count.
-  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\u2212\u00AD\u200B-\u200D\u2060\uFEFF]+/gu, "");
+  // \s covers the BOM. \p{Pd} is every Unicode dash and hyphen and \u2212 the minus sign. The
+  // rest are the invisible characters Word and web pages paste: soft hyphen, zero-width space
+  // and joiners, left-to-right and right-to-left marks, word joiner. Not all of \p{Cf}: that
+  // would also drop bidi overrides, so a tag shown reversed would still count.
+  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\u2212\u00AD\u200B-\u200F\u2060]+/gu, "");
 }
 
 export function trainingKindFor(tag: string): TrainingKind | undefined {
