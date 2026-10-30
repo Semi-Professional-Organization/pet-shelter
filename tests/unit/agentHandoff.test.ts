@@ -289,7 +289,7 @@ describe("orient", () => {
     branch: "main",
     head: "abc1234",
     base: "origin/main",
-    staleHead: null,
+    repair: null,
     ahead: 2,
     behind: 5,
     uncommitted: 3,
@@ -309,28 +309,35 @@ describe("orient", () => {
     ]);
   });
 
-  it("compares against origin/main, warning when origin/HEAD still names the pre-rename branch", () => {
+  it("compares against origin/main, and says how to repair a clone from before the rename", () => {
     const top = repo();
     const git = (...args: string[]) => execFileSync("git", args, { cwd: top });
     const commit = () => git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "c");
+    const sethead = "origin/HEAD names origin/master, not origin/main; repair with: git remote set-head origin -a";
     commit();
-    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", staleHead: null, ahead: null });
-    // No origin/main: origin/HEAD is the fallback.
-    git("update-ref", "refs/remotes/origin/trunk", "HEAD");
-    git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk");
-    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/trunk", staleHead: null, ahead: 0, behind: 0 });
-    // A clone from before the rename, never pruned: origin/master still resolves, frozen behind.
+    // No remote at all: nothing to repair.
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null, ahead: null });
+    // A single-branch clone from before the rename: origin/master resolves, frozen, and origin/main never arrives.
     git("update-ref", "refs/remotes/origin/master", "HEAD");
     git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
     commit();
+    expect(whereAmI(top, { now: NOW })).toMatchObject({
+      base: "origin/master",
+      repair: "this clone has no origin/main; fetch it with: git fetch origin main:refs/remotes/origin/main",
+      ahead: 1,
+    });
+    // A full clone, never pruned: origin/main arrives and wins over the frozen origin/master.
     commit();
     git("update-ref", "refs/remotes/origin/main", "HEAD");
     const w = whereAmI(top, { now: NOW });
-    expect(w).toMatchObject({ base: "origin/main", staleHead: "origin/master", ahead: 0, behind: 0 });
-    expect(orientLines(w!, [])[2]).toBe("git: origin/HEAD still names origin/master, not origin/main; repair this clone with: git remote set-head origin -a");
-    // Pruned: origin/HEAD dangles, and origin/main still wins.
+    expect(w).toMatchObject({ base: "origin/main", repair: sethead, ahead: 0, behind: 0 });
+    expect(orientLines(w!, [])[2]).toBe(`git: ${sethead}`);
+    // Pruned: origin/HEAD dangles, origin/main still wins, and the repair line stays.
     git("update-ref", "-d", "refs/remotes/origin/master");
-    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", ahead: 0, behind: 0 });
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: sethead, ahead: 0, behind: 0 });
+    // Repaired.
+    git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null });
   });
 
   it("names the hand-offs other sessions left, three at most, and the meter when run as the hook", () => {

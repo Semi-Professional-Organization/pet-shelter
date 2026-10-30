@@ -29,22 +29,28 @@ function worktreeDirs(common) {
 }
 
 /**
- * The remote default branch `cwd` compares against, and what `origin/HEAD` names when that
- * disagrees. The default branch was renamed from `master` to `main` on 2026-10-28, and a clone made
- * before it keeps an `origin/HEAD` naming `origin/master`: plain `git fetch` neither prunes that
- * ref nor moves `origin/HEAD`, so it still resolves, frozen at the rename. `origin/main` therefore
- * wins whenever it exists, and `origin/HEAD` is only the fallback for a clone that has no
- * `origin/main`.
+ * The remote default branch `cwd` compares against, and how to repair a clone that disagrees with
+ * it. The default branch was renamed from `master` to `main` on 2026-10-28. A clone made before
+ * that keeps an `origin/HEAD` naming `origin/master`: plain `git fetch` neither moves it nor prunes
+ * `origin/master`, which stays resolvable and frozen at the rename, and `git fetch --prune` leaves
+ * `origin/HEAD` dangling. A single-branch clone (any `--depth` clone) never gets `origin/main` at
+ * all. So `origin/main` wins whenever it exists, `origin/HEAD` is only the fallback without it, and
+ * either disagreement adds a repair line.
  *
- * ceiling: knows one remote, `origin`, and one name, `main`; the next rename edits MAIN here and
- * the `(?:master|main)` alternatives in usage.mjs. A stale `origin/HEAD` is reported, not repaired
- * (`git remote set-head origin -a` does that), because orient is read-only.
+ * ceiling: knows one remote, `origin`, and one name, `main`; a fork whose own default is still
+ * `master` is told to repair what is not broken. The next rename edits MAIN here and the
+ * `(?:master|main)` alternatives in usage.mjs. Orient is read-only, so it reports and never repairs.
  */
 const MAIN = "origin/main";
-export function defaultBranch(cwd) {
-  const head = git(cwd, ["rev-parse", "--abbrev-ref", "origin/HEAD"]);
-  if (!git(cwd, ["rev-parse", "--verify", "--quiet", `${MAIN}^{commit}`])) return { base: head ?? MAIN, stale: null };
-  return { base: MAIN, stale: head && head !== MAIN ? head : null };
+function defaultBranch(cwd) {
+  // symbolic-ref, unlike rev-parse, still names the target of a dangling origin/HEAD.
+  const head = git(cwd, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
+  if (git(cwd, ["rev-parse", "--verify", "--quiet", `${MAIN}^{commit}`])) {
+    return { base: MAIN, repair: head && head !== MAIN ? `origin/HEAD names ${head}, not ${MAIN}; repair with: git remote set-head origin -a` : null };
+  }
+  if (!head) return { base: MAIN, repair: null };
+  const resolves = git(cwd, ["rev-parse", "--verify", "--quiet", `${head}^{commit}`]);
+  return { base: resolves ? head : MAIN, repair: `this clone has no ${MAIN}; fetch it with: git fetch origin main:refs/remotes/origin/main` };
 }
 
 /**
@@ -57,7 +63,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
   if (!top) return null;
   const gitDir = git(cwd, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const { base, stale } = defaultBranch(cwd);
+  const { base, repair } = defaultBranch(cwd);
   const counts = git(cwd, ["rev-list", "--left-right", "--count", `${base}...HEAD`]);
   const [behind, ahead] = counts ? counts.split(/\s+/).map(Number) : [null, null];
   const status = git(cwd, ["status", "--porcelain"]);
@@ -80,7 +86,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
     branch: git(cwd, ["branch", "--show-current"]) || null,
     head: git(cwd, ["rev-parse", "--short", "HEAD"]),
     base,
-    staleHead: stale,
+    repair,
     ahead,
     behind,
     uncommitted: status ? status.split("\n").filter(Boolean).length : 0,
@@ -116,9 +122,7 @@ export function orientLines(w, handoffs, options = {}) {
       ? `git: no ${w.base} to compare with; ${w.uncommitted} uncommitted paths`
       : `git: ${w.ahead} ahead and ${w.behind} behind ${w.base} ${fetched}; ${w.uncommitted} uncommitted paths`,
   );
-  if (w.staleHead) {
-    lines.push(`git: origin/HEAD still names ${w.staleHead}, not ${w.base}; repair this clone with: git remote set-head origin -a`);
-  }
+  if (w.repair) lines.push(`git: ${w.repair}`);
   const waiting = handoffs.filter((h) => !session || h.session !== session);
   for (const h of waiting.slice(0, 3)) {
     lines.push(`hand-off: ${h.file} "${h.title}", from session ${(h.session ?? "unknown").slice(0, 8)}${h.opened ? ` on ${h.opened}` : ""}`);
@@ -147,8 +151,8 @@ const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main
 (origin/HEAD in a clone without it) as of the last fetch (it never fetches), uncommitted paths, and
 hand-offs waiting in tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one
-git does not know, which silently resolves to the checkout above it, and when origin/HEAD still
-names the pre-rename branch. Read-only.
+git does not know, which silently resolves to the checkout above it, and when origin/HEAD or a
+missing origin/main shows a clone made before the rename to main. Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
   --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,

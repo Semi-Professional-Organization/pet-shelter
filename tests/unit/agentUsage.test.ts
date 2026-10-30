@@ -257,6 +257,8 @@ describe("agent usage: command classes", () => {
     expect(families("Bash", "git --no-pager log HEAD..origin/master")).toEqual(["merge"]);
     expect(families("Bash", "git --no-pager log HEAD..origin/main")).toEqual(["merge"]);
     expect(families("Bash", "git merge-base HEAD origin/main")).toEqual(["merge"]);
+    expect(families("Bash", "git merge-base HEAD origin/maintenance")).toEqual([]);
+    expect(families("Bash", "git log HEAD..origin/main-old")).toEqual([]);
     expect(families("Bash", "git log --oneline main..origin/main")).toEqual(["orient"]);
     // Separators and npm flags do not hide the verb.
     expect(commandClass("Bash", "npm run typecheck; echo done")).toBe("npm run typecheck");

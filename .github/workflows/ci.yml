@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
 
 # Read-only for every job. The repository default is read-only as well, but a workflow that states

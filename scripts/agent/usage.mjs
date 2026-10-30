@@ -328,9 +328,9 @@ const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
 const RUNS = Object.fromEntries(
   Object.entries({
     gates: String.raw`(?:(?:${NPX})?tsc\b.*--noEmit|(?:${NPX})?next\s+build\b)`,
-    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (?:master|main)\.\.origin\/(?:master|main)|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+(?:-\S+\s+)*tasks[\\/](?:open|lessons|decisions))`,
+    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (?:master|main)\.\.origin\/(?:master|main)(?![\w./-])|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+(?:-\S+\s+)*tasks[\\/](?:open|lessons|decisions))`,
     ledger: String.raw`(?:ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](?:todo\.md|open|lessons|decisions)`,
-    merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/(?:master|main)|log\b.*HEAD\.\.origin\/(?:master|main))`,
+    merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/(?:master|main)(?![\w./-])|log\b.*HEAD\.\.origin\/(?:master|main)(?![\w./-]))`,
     pr: String.raw`gh\s+(?:pr\s+(?:checks|view)|run\s+(?:view|watch|list)|api\s+\S*(?:commits\/\S+\/status|deployments))`,
     ports: String.raw`(?:Get-NetTCPConnection|Test-NetConnection|netstat|lsof\s+-i|Stop-Process|taskkill|Get-CimInstance\s+Win32_Process)`,
   }).map(([name, pattern]) => [name, new RegExp(COMMAND_START + pattern)]),

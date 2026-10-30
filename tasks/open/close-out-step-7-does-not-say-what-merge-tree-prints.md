@@ -5,7 +5,7 @@
 Step 7 of the close-out in `CLAUDE.md` tells every session to run
 `git merge-tree --write-tree --name-only HEAD origin/main` as a dry-run merge check. On a clean
 merge, the first line it prints is a 40-character hash — and nothing says what kind of object that
-is. It is the **tree** the merge would produce. It is not a commit, and it is not `master`.
+is. It is the **tree** the merge would produce. It is not a commit, and it is not the default branch.
 
 That has already caused a public error. During PR #42 the hash `6d32df9` was quoted to another
 session as "master", repeated in good faith, and written into a ledger entry as the commit where
