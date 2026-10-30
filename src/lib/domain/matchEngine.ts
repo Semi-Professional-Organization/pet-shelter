@@ -164,7 +164,8 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
     // "Unfriendly" or "Uneasy" also counts. No seed pet carries one; production tags were not
     // checked. Upgrade path: match temperament through tag keys the way trainingKindFor does.
     // House training goes through trainingKindFor, the same matcher as the pet page's
-    // Training row, so the quiz and the page agree on which pets are house trained.
+    // Training row, so the two agree on which pets are house trained. Litter box training
+    // shows on the page but earns no points here (tasks/open, match-quiz entry).
     if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || trainingKindFor(t) === "houseTrained") && !isSpecialNeeds) {
       experienceScore = 25;
       reasons.push("Gentle & beginner-friendly demeanor makes them an easy first pet.");

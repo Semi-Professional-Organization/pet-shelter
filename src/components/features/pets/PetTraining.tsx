@@ -39,7 +39,7 @@ export function PetTraining({ tags }: { tags: readonly string[] }) {
           const Icon = ICON_BY_TRAINING[kind];
           return (
             <li key={kind} className="border border-border bg-background p-3 rounded-xl">
-              <Icon className="size-4 mx-auto mb-1 text-muted-foreground" aria-hidden="true" />
+              <Icon className="size-4 mx-auto mb-1 text-muted-foreground" />
               <div className="text-xs font-bold text-success-text">{t(`petDetail.${kind}`)}</div>
             </li>
           );

@@ -8,9 +8,9 @@ recorded it, not that the animal is untrained. Tags match on a key that ignores 
 underscores and dashes; qualified or combined tags ("Mostly house-trained",
 "House-Trained, Leash Trained") match nothing rather than being guessed at.
 
-The match quiz uses the same matcher, which narrows its old substring test
-`/house-trained/i`: "Not House-Trained" no longer earns beginner points, and neither does
-"Mostly house-trained".
+The match quiz uses the same matcher in place of its old substring test `/house-trained/i`.
+That narrows it ("Not House-Trained" and "Mostly house-trained" no longer earn beginner points)
+and widens it ("House Trained", "Housetrained", "house_trained" now do).
 
 The custom `HouseCheck` icon means house trained only. The adoption home check or home visit
 needs an icon of its own.

@@ -228,7 +228,7 @@ The canonical shape of an action — each step is a different layer:
 
 | ID | Layer | Location |
 |---|---|---|
-| **L-F1** | Design primitives | `src/components/ui/` (shadcn `base-sera`, `@base-ui/react`) · `src/app/globals.css` · Tailwind v4 / PostCSS · `components.json` |
+| **L-F1** | Design primitives | `src/components/ui/` (shadcn `base-sera`, `@base-ui/react`) · `src/components/icons/` (custom Lucide-spec icons) · `src/app/globals.css` · Tailwind v4 / PostCSS · `components.json` |
 | **L-F2** | Feature components | `src/components/features/{pets,adoptions,bulletins,donations}` · `src/components/admin/` · `src/components/layout/` |
 | **L-F3** | Client controllers | `src/hooks/use*Controller.ts` (9 files) · `src/components/providers/` (Theme, Language) |
 | **L-F4** | Client stores | `src/lib/client/{petStore,applicationStore,settingsStore,sponsorshipStore,adminAuth}.ts` — plus `imageOptimization.ts`. The directory means **browser-only**, not "localStorage hook" — the guard enforces *where code may run*, mirroring `src/lib/server/`, which likewise holds non-Prisma catalogs. `tests/unit/layerBoundaries.test.ts` forbids any non-client module importing them |

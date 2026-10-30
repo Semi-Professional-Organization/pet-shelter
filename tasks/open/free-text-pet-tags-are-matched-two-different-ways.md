@@ -7,6 +7,10 @@ dash, while `needsSocialising` (`src/lib/presentation/petStatusPresentation.ts`)
 folds case. So "house_trained" gets a Training row but "needs-socialising" is offered for
 adoption instead of foster. Both guess meaning from a free-text field the admin form edits.
 
+A NULL element in the `tags` column (written by SQL or an import, bypassing zod) still throws in
+`needsSocialising`, `petSearch` and `adminPetFilters`; the read mapper (`petMappers.ts`) is the
+one place that could drop it for every reader.
+
 Related, same root: training appears twice on the About tab (the raw chip and the Training row),
 the litter box icon is a cat even on a dog's page, and combined tags such as
 "House-Trained, Leash Trained" match nothing.

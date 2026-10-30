@@ -14,6 +14,8 @@ const HOUSE_TRAINED_SPELLINGS = [
   "Housetrained",
   "House\u2013Trained",
   "House\u2011Trained",
+  "House\u2212Trained",
+  "House\u00ADTrained",
   "  House -  Trained ",
 ];
 

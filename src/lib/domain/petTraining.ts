@@ -18,16 +18,19 @@ const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
 ]);
 
 // ceiling: matches a tag only when it spells one of the keys above once case, spaces,
-// hyphens, underscores and dashes are dropped, so "House-Trained", "house_trained" and
+// underscores, dashes and invisible format characters are dropped, so "House-Trained", "house_trained" and
 // "Housetrained" all match. Anything else stays a plain tag rather than being guessed at:
 // synonyms ("Housebroken"), qualified tags ("House trained?", "Mostly house-trained") and
 // combined tags ("House-Trained, Leash Trained") get no Training row and no quiz points.
 // Measured against the 10 pets in src/data/pets.json: all 6 training tags match, no other
-// tag does. Upgrade path: a tag table with fixed values (the unused PetTag model).
+// tag does. Only English tags match: a Malay tag such as "Terlatih Tandas" gets no row.
+// Upgrade path: a tag table with fixed values (the unused PetTag model).
 function tagKey(tag: string): string {
-  // String(): a NULL element in the tags column must not take the whole quiz or page down.
-  // \p{Pd} covers every Unicode dash and hyphen, including the non-breaking one Word pastes.
-  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\u2212]+/gu, "");
+  // String() keeps a NULL tag element from throwing here; other tag readers still throw on
+  // one (see tasks/open/free-text-pet-tags-are-matched-two-different-ways.md).
+  // \p{Pd} is every Unicode dash and hyphen, \p{Cf} the invisible ones Word pastes (soft
+  // hyphen, zero-width space), \u2212 the minus sign.
+  return String(tag).toLowerCase().replace(/[\s_\p{Pd}\p{Cf}\u2212]+/gu, "");
 }
 
 export function trainingKindFor(tag: string): TrainingKind | undefined {
