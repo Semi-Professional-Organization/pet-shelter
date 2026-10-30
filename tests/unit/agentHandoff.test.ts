@@ -323,7 +323,7 @@ describe("orient", () => {
     commit();
     expect(whereAmI(top, { now: NOW })).toMatchObject({
       base: "origin/master",
-      repair: "this clone has no origin/main; fetch it with: git fetch origin main:refs/remotes/origin/main",
+      repair: "this clone has no origin/main; repair with: git remote set-branches origin main && git fetch origin && git remote set-head origin -a",
       ahead: 1,
     });
     // A full clone, never pruned: origin/main arrives and wins over the frozen origin/master.

@@ -26,7 +26,7 @@ Kept because each one will recur in the next brief written the same way.
    column quoted entries from 2026-09-03/04. The 2026-09-09 re-measure, which lists no statement
    for `sponsors`, `donations` or `receipt_sequences`, reached master through #37 at
    2026-09-10T23:54+08:00. This brief was committed at 00:30 on the #36 branch, which lacked it,
-   and still counted "12 destructive drift lines". Write "recorded state" from `origin/master`'s
+   and still counted "12 destructive drift lines". Write "recorded state" from `origin/main`'s
    ledger, fetched at the time of writing.
 2. **Its inventory predated #39.** `2026-09-08_adoption_application_milestones_additive.sql` adds
    nine `adoption_applications` columns and a unique index that every application read and write
@@ -109,8 +109,9 @@ The procedure as revised. It was not exercised on 2026-09-16, because the apply 
 
 ### 0. Claim, base, and fences
 
-- In a new worktree, `git fetch`, then `git merge-base --is-ancestor HEAD origin/master` must
-  succeed and `git rev-parse HEAD origin/master` should print one hash twice.
+- In a new worktree, `git fetch`, then `git merge-base --is-ancestor HEAD origin/main` must
+  succeed and `git rev-parse HEAD origin/main` should print one hash twice (`master` until the
+  2026-10-28 rename).
   `.claude/settings.json` pins `worktree.baseRef: head`, so the worktree starts at the main
   checkout's HEAD, which on 2026-09-16 was a feature branch beside master, and `git status -sb`
   cannot see that. See

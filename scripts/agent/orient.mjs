@@ -37,11 +37,14 @@ function worktreeDirs(common) {
  * all. So `origin/main` wins whenever it exists, `origin/HEAD` is only the fallback without it, and
  * either disagreement adds a repair line.
  *
- * ceiling: knows one remote, `origin`, and one name, `main`; a fork whose own default is still
- * `master` is told to repair what is not broken. The next rename edits MAIN here and the
- * `(?:master|main)` alternatives in usage.mjs. Orient is read-only, so it reports and never repairs.
+ * ceiling: knows one remote, `origin`, and one name, `main`. A fork whose own default is still
+ * `master` gets a repair line that fails there, and a clone with no `origin/HEAD` gets none; a
+ * local `master` still tracking `origin/master` is not checked. The next rename edits BRANCH here
+ * and the `(?:master|main)` alternatives in usage.mjs. Orient is read-only: it reports, never
+ * repairs.
  */
-const MAIN = "origin/main";
+const BRANCH = "main";
+const MAIN = `origin/${BRANCH}`;
 function defaultBranch(cwd) {
   // symbolic-ref, unlike rev-parse, still names the target of a dangling origin/HEAD.
   const head = git(cwd, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"]);
@@ -50,7 +53,10 @@ function defaultBranch(cwd) {
   }
   if (!head) return { base: MAIN, repair: null };
   const resolves = git(cwd, ["rev-parse", "--verify", "--quiet", `${head}^{commit}`]);
-  return { base: resolves ? head : MAIN, repair: `this clone has no ${MAIN}; fetch it with: git fetch origin main:refs/remotes/origin/main` };
+  // set-branches as well as fetch: a single-branch clone's refspec names only the old branch, so a
+  // one-off fetch of the new one would never update again.
+  const fix = `git remote set-branches origin ${BRANCH} && git fetch origin && git remote set-head origin -a`;
+  return { base: resolves ? head : MAIN, repair: `this clone has no ${MAIN}; repair with: ${fix}` };
 }
 
 /**
@@ -98,7 +104,8 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
 /** One sentence about the checkout, for a hand-off's header. */
 export function describeWhere(w) {
   const against = w.ahead === null ? `no \`${w.base}\` to compare with` : `${w.ahead} ahead and ${w.behind} behind \`${w.base}\``;
-  return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.`;
+  const repair = w.repair ? ` The counts may be stale: ${w.repair}.` : "";
+  return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.${repair}`;
 }
 
 /**
@@ -151,8 +158,9 @@ const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main
 (origin/HEAD in a clone without it) as of the last fetch (it never fetches), uncommitted paths, and
 hand-offs waiting in tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one
-git does not know, which silently resolves to the checkout above it, and when origin/HEAD or a
-missing origin/main shows a clone made before the rename to main. Read-only.
+git does not know, which silently resolves to the checkout above it. When origin/HEAD or a missing
+origin/main shows a clone made before the rename to main, it adds a repair line (still a pass).
+Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
   --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,
