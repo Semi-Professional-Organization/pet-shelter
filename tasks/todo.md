@@ -19,14 +19,17 @@ Record active multi-step work streams below.
 
 **Branch:** `claude/pet-training-icons` · opened 2026-10-28, resumed 2026-10-30
 
-- **Done when:** the pet page shows a Training row with Lucide-spec `LitterBox` and `HouseCheck`
-  icons plus Lucide `Footprints`, for tagged training only, in English and Malay; all gates green.
+- **Done when:** the pet page and the gallery quick view show a Training row with Lucide-spec
+  `LitterBox` and `HouseCheck` icons plus Lucide `Footprints`, for tagged training only, in
+  English and Malay, with those tags gone from the chips; all gates green.
 - **In scope:** the two icons, the shared tag matcher (`src/lib/domain/petTraining.ts`), the
-  row, translations, the match quiz's house-training check, tests.
+  row in both views, hiding training chips there, translations, the match quiz's house and
+  litter box training check and its reason text, tests.
 - **Not in scope:** the medical-list screen-reader gap, the PetTag table, schema changes, other
   tag icons, the quiz's special-needs and temperament scoring (logged in `open/`).
 
 - [x] Icons, matcher, row, tests
+- [x] Owner's answers (2026-10-30): chips hidden, quick view row, litter box quiz points
 - [x] Seven xhigh review rounds and their fixes. Stopped at round 7: the last rounds found only
   pasted-Unicode edge cases beyond the ceiling, wording, and the out-of-scope items in `open/`
 
@@ -34,9 +37,11 @@ Record active multi-step work streams below.
 
 The owner's answers (2026-10-30) are built: training chips hidden, the row in the gallery quick
 view, litter box training earns quiz points. Not done, deliberately: the older quiz scoring
-problems in `open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md` and the tag
-matching split in `open/free-text-pet-tags-are-matched-two-different-ways.md`. The Malay labels
-are unchecked by a native speaker.
+problems in `open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md`, the tag
+matching split in `open/free-text-pet-tags-are-matched-two-different-ways.md`, the Malay labels
+(`open/malay-training-labels-are-unchecked.md`) and the quick view's photo bug found on the way
+(`open/gallery-quick-view-shows-the-fallback-photo.md`). Gallery cards keep their training chips:
+they have no Training row, so the chips are not redundant there.
 
 # Home page: one light-blue accent, flat borderless cards
 

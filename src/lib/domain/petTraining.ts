@@ -1,6 +1,6 @@
 /**
- * Which training a pet's free-text tags record, for the pet page's Training row and the match
- * quiz. Domain, not presentation, because the quiz scoring needs it. React-free: the icons live in
+ * Which training a pet's free-text tags record, for the Training row (pet page and gallery
+ * quick view), the tag chips it replaces, and the match quiz. Domain, not presentation, because the quiz scoring needs it. React-free: the icons live in
  * `components/features/pets/PetTraining.tsx`, the same split as `PetStatusIcon`.
  *
  * Each kind is also its key under `petDetail` in the translation dictionaries.
@@ -9,6 +9,11 @@
 export const TRAINING_KINDS = ["houseTrained", "litterBoxTrained", "leashTrained"] as const;
 
 export type TrainingKind = (typeof TRAINING_KINDS)[number];
+
+/** House or litter box training: what the match quiz counts toward an easy first pet. */
+export function isToiletTraining(kind: TrainingKind | undefined): boolean {
+  return kind === "houseTrained" || kind === "litterBoxTrained";
+}
 
 // Each kind's own name is its tag key ("houseTrained" -> "housetrained"), so a new kind matches
 // without a second list. Aliases are the only extra entries. That makes the kind names a data

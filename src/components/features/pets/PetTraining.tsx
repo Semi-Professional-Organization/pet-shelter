@@ -21,6 +21,7 @@ const ICON_BY_TRAINING: Record<TrainingKind, LucideIcon> = {
 // Each variant copies the compatibility grid it sits under, which differ in size.
 const STYLES = {
   page: {
+    headingTag: "h2",
     wrapper: "space-y-3 pt-2",
     heading: "text-xs font-bold uppercase tracking-wider text-foreground",
     list: "grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center",
@@ -29,6 +30,7 @@ const STYLES = {
     label: "text-xs font-bold text-success-text",
   },
   dialog: {
+    headingTag: "h3",
     wrapper: "space-y-3 border-t border-border pt-5",
     heading: "text-sm font-bold uppercase tracking-wider text-foreground",
     list: "grid grid-cols-2 sm:grid-cols-4 gap-3 text-center",
@@ -51,7 +53,7 @@ export function PetTraining({ tags, variant = "page" }: { tags: readonly string[
   if (training.length === 0) return null;
 
   const style = STYLES[variant];
-  const Heading = variant === "page" ? "h2" : "h3";
+  const Heading = style.headingTag;
 
   return (
     <div className={style.wrapper}>

@@ -68,6 +68,11 @@ describe("trainingKindsIn", () => {
 });
 
 describe("tagsWithoutTraining", () => {
+  it("keeps qualified, combined and negated tags as chips, since the row does not show them", () => {
+    const kept = ["Mostly house-trained", "House-Trained, Leash Trained", "Not House Trained"];
+    expect(tagsWithoutTraining([...kept, "Litter Trained"])).toEqual(kept);
+  });
+
   it("keeps every tag the Training row does not show, in order", () => {
     expect(tagsWithoutTraining(["Playful", "House-Trained", "Gentle", "Leash Trained"])).toEqual([
       "Playful",
@@ -98,9 +103,22 @@ describe("match quiz house training", () => {
     expect(experienceFor([tag])).toBe(25);
   });
 
-  // The owner's call, 2026-10-30: litter box training is the cat's house training.
+  // The owner's call, 2026-10-30: litter box training counts like house training, whatever
+  // the species (Rocky is a dog).
   it("rewards litter box training like house training", () => {
     expect(experienceFor(["Litter Box Trained"])).toBe(25);
+  });
+
+  it("names training, not temperament, when training is the only reason", () => {
+    const reasons = (tags: string[]) =>
+      calculatePetMatchScore({ ...rocky, tags, medical: { ...rocky.medical, specialNeeds: "" } }, firstTimer)
+        .reasons;
+    expect(reasons(["Litter Box Trained"])).toContain(
+      "Already house or litter box trained, which makes them an easy first pet."
+    );
+    expect(reasons(["Gentle", "House-Trained"])).toContain(
+      "Gentle & beginner-friendly demeanor makes them an easy first pet."
+    );
   });
 
   it("does not reward leash training on its own", () => {

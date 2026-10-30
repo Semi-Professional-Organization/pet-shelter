@@ -1,9 +1,6 @@
 import { Pet } from "@/types/pet";
 import { QuizAnswers, PetMatchResult, MatchScoreBreakdown } from "@/types/match";
-import { trainingKindFor, type TrainingKind } from "@/lib/domain/petTraining";
-
-const isToiletTraining = (kind: TrainingKind | undefined) =>
-  kind === "houseTrained" || kind === "litterBoxTrained";
+import { isToiletTraining, trainingKindFor } from "@/lib/domain/petTraining";
 
 /**
  * Evaluates compatibility between a prospective adopter's lifestyle and a rescue pet.
@@ -166,12 +163,18 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
     // ceiling: the temperament words are a substring test, so a negative tag such as
     // "Unfriendly" or "Uneasy" also counts. No seed pet carries one; production tags were not
     // checked. Upgrade path: match temperament through tag keys the way trainingKindFor does.
-    // Toilet training (house for dogs, litter box for cats, the owner's call on 2026-10-30)
-    // goes through trainingKindFor, the same matcher as the pet page's Training row, so the
-    // two agree. Leash training is not what makes a pet easy for a first-time owner.
-    if (pet.tags.some((t) => /gentle|friendly|easy/i.test(t) || isToiletTraining(trainingKindFor(t))) && !isSpecialNeeds) {
+    // Toilet training (house or litter box, either species; the owner's call on 2026-10-30)
+    // goes through trainingKindFor, the same matcher as the Training row, so the two agree.
+    // Leash training is not what makes a pet easy for a first-time owner.
+    const hasEasyTemperament = pet.tags.some((t) => /gentle|friendly|easy/i.test(t));
+    const isToiletTrained = pet.tags.some((t) => isToiletTraining(trainingKindFor(t)));
+    if ((hasEasyTemperament || isToiletTrained) && !isSpecialNeeds) {
       experienceScore = 25;
-      reasons.push("Gentle & beginner-friendly demeanor makes them an easy first pet.");
+      reasons.push(
+        hasEasyTemperament
+          ? "Gentle & beginner-friendly demeanor makes them an easy first pet."
+          : "Already house or litter box trained, which makes them an easy first pet."
+      );
     } else if (isSpecialNeeds) {
       experienceScore = 12;
       cautions.push("Requires special medical or dietary attention — shelter staff can guide you through routines.");
