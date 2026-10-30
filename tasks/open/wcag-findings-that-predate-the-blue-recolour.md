@@ -17,8 +17,8 @@ Measured with Playwright against the dev server; details in that session's audit
   (`aria-expanded` + `aria-controls`, Escape returns focus to the trigger) is the fix.
 - **Logo alt repeats the link text** — WCAG 1.1.1, low. `alt="Hope for Strays"` inside a link that
   already says it; use `alt=""`.
-- **Carousel region is unnamed; its arrows and several header labels are English-only** — WCAG
-  4.1.2 / 3.1.2, low. "Previous slide", "Next slide", "Open Navigation Menu", the theme and
+- **Carousel arrows and several header labels are English-only** — WCAG 3.1.2, low. (The home
+  carousel region is named by its heading since 2026-10-29, `aria-labelledby` in `BulletinFeed`.) "Previous slide", "Next slide", "Open Navigation Menu", the theme and
   language toggles. The new notice dots are translated (`bulletins.goToNotice`).
 
 **Settles when:** each item is fixed or consciously accepted by the owner.

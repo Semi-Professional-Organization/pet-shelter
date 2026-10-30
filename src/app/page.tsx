@@ -34,8 +34,11 @@ export default async function HomePage() {
     // rather than throwing — to no notices when the database is down, to the
     // launch notices when the table does not exist yet (see
     // `mayServeFixtureAfter`) — so a slow or failing feed cannot take the home
-    // page down over one section.
-    getPublicBulletins("home", 4),
+    // page down over one section. No limit: the carousel holds every home
+    // notice, and its marks show a window of five that follows the reader.
+    // ceiling: every notice is a slide in one payload; fine to a few dozen, take
+    // a limit again (or page the carousel) if the feed outgrows that.
+    getPublicBulletins("home"),
   ]);
 
   // Staff-curated figures overlaid on the FE-02 baseline. See src/lib/domain/metrics.ts
@@ -58,7 +61,6 @@ export default async function HomePage() {
           <BulletinFeed
             bulletins={bulletins}
             titleKey="home.bulletinsTitle"
-            subtitleKey="home.bulletinsSubtitle"
             layout="carousel"
           />
         </div>

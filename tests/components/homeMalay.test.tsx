@@ -85,8 +85,8 @@ describe("BulletinFeed on the Malay site", () => {
   it("translates the home page's feed heading", () => {
     renderWithLanguage(<BulletinFeed bulletins={[bulletin()]} titleKey="home.bulletinsTitle" />, { language: "ms" });
 
-    expect(screen.getByText("Dari pusat perlindungan")).toBeInTheDocument();
-    expect(screen.queryByText("From the shelter")).not.toBeInTheDocument();
+    expect(screen.getByText("Kemas Kini Terkini")).toBeInTheDocument();
+    expect(screen.queryByText("Latest Updates")).not.toBeInTheDocument();
     // The literal `page.tsx` used to pass in, which bypassed the key entirely.
     expect(screen.queryByText("Latest news and updates")).not.toBeInTheDocument();
   });
@@ -224,7 +224,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     renderWithLanguage(<HomeProcessSection />);
 
     expect(
-      screen.getByRole("heading", { name: "Application Steps" })
+      screen.getByRole("heading", { name: "How to Adopt" })
     ).toBeInTheDocument();
     expect(screen.getByText("Browse & Submit Application")).toBeInTheDocument();
     expect(screen.getByText("Meet & Socialize")).toBeInTheDocument();
@@ -248,7 +248,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     renderWithLanguage(<HomeProcessSection />, { language: "ms" });
 
     expect(
-      screen.getByRole("heading", { name: "Langkah Permohonan" })
+      screen.getByRole("heading", { name: "Cara Adopsi" })
     ).toBeInTheDocument();
     expect(screen.getByText("Semak & Hantar Permohonan")).toBeInTheDocument();
     expect(screen.getByText("Sesi Suai Kenal & Interaksi")).toBeInTheDocument();
@@ -259,7 +259,7 @@ describe("HomeProcessSection, the remounted #how-it-works anchor", () => {
     expect(screen.getByText(/tanpa sebarang yuran adopsi komersial/)).toBeInTheDocument();
     expect(screen.queryByText(/yuran tersembunyi/)).not.toBeInTheDocument();
 
-    expect(screen.queryByText("Application Steps")).not.toBeInTheDocument();
+    expect(screen.queryByText("How to Adopt")).not.toBeInTheDocument();
     expect(screen.queryByText("Browse & Submit Application")).not.toBeInTheDocument();
     expect(screen.queryByText("Meet & Socialize")).not.toBeInTheDocument();
     expect(screen.queryByText("Finalize & Welcome Home")).not.toBeInTheDocument();
@@ -305,7 +305,7 @@ describe("the home page's English is unchanged", () => {
   it("keeps the English copy on the English site", () => {
     renderWithLanguage(<BulletinFeed bulletins={[bulletin({ category: "clinic", isPinned: true })]} titleKey="home.bulletinsTitle" />);
 
-    expect(screen.getByText("From the shelter")).toBeInTheDocument();
+    expect(screen.getByText("Latest Updates")).toBeInTheDocument();
     expect(screen.getByText("Clinic / Vaccine")).toBeInTheDocument();
     expect(screen.getByText("Pinned")).toBeInTheDocument();
     expect(screen.queryByText("Disemat")).not.toBeInTheDocument();

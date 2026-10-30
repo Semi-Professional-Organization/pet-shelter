@@ -7,6 +7,10 @@ import {
   ArrowRight,
   Loader2,
   CheckCircle2,
+  Heart,
+  HandHeart,
+  HandCoins,
+  HeartHandshake,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { useLanguage, useTypedTranslation } from "@/components/providers/LanguageProvider";
@@ -139,69 +143,64 @@ export function HomeOurWorkSection() {
   ];
 
   return (
-    <Section id="our-work" className="space-y-14">
-      <SectionHeader
-        title={isMs ? "Kerja Kami" : "Our Work"}
-        subtitle={
-          isMs
-            ? "Kerja kami berteraskan rawatan berperikemanusiaan, pendidikan, dan kewujudan bersama antara haiwan dan komuniti."
-            : "Our work focuses on humane care, education and coexistence between animals and communities."
-        }
-      />
+    <Section id="our-work">
+      <div className="space-y-10">
+        <SectionHeader title={isMs ? "Apa Yang Kami Lakukan" : "What We Do"} />
 
-        {/* Editorial rows: image and copy alternate sides, so each pillar gets a full row
-            rather than a third of one and the highlights fit without crushing the body. */}
-        <div className="space-y-14">
-          {pillars.map((pillar, idx) => (
-            <div key={idx} className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
-              <div
-                className={`relative aspect-16/10 overflow-hidden rounded-card bg-primary-panel ${
-                  idx % 2 ? "lg:order-2" : ""
-                }`}
-              >
-                <Image
-                  src={pillar.image}
-                  alt={isMs ? pillar.altMs : pillar.altEn}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
-              </div>
-              <div className="space-y-4">
-                <p className="text-2xs font-bold uppercase tracking-wider text-primary-ink">
-                  {isMs ? pillar.categoryMs : pillar.categoryEn}
-                </p>
-                <h3 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                  {isMs ? pillar.titleMs : pillar.titleEn}
-                </h3>
-                <p className="text-base leading-relaxed text-muted-foreground">
-                  {isMs ? pillar.descMs : pillar.descEn}
-                </p>
-                <div className="space-y-2 pt-1">
-                  {(isMs ? pillar.highlightsMs : pillar.highlightsEn).map((item) => (
-                    <div key={item} className="flex items-start gap-2 text-sm font-medium text-foreground/90">
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
+          {/* Editorial rows: image and copy alternate sides, so each pillar gets a full row
+              rather than a third of one and the highlights fit without crushing the body. */}
+          <div className="space-y-14">
+            {pillars.map((pillar, idx) => (
+              <div key={idx} className="grid grid-cols-1 items-center gap-8 lg:grid-cols-2 lg:gap-14">
+                <div
+                  className={`relative aspect-16/10 overflow-hidden rounded-card bg-primary-panel ${
+                    idx % 2 ? "lg:order-2" : ""
+                  }`}
+                >
+                  <Image
+                    src={pillar.image}
+                    alt={isMs ? pillar.altMs : pillar.altEn}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
                 </div>
-                <div className="pt-2">
-                  <Link
-                    // From the pillar itself, not its position. Choosing by
-                    // array index is how the TNRM card came to point at the
-                    // adoption steps: reorder the array and every link after
-                    // the change would silently point somewhere else.
-                    href={pillar.href}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary-ink transition-colors"
-                  >
-                    <span>{isMs ? "Lihat cara ini berfungsi" : "See how this works"}</span>
-                    <ArrowRight className="size-3.5" />
-                  </Link>
+                <div className="space-y-4">
+                  <p className="text-2xs font-bold uppercase tracking-wider text-primary-ink">
+                    {isMs ? pillar.categoryMs : pillar.categoryEn}
+                  </p>
+                  <h3 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                    {isMs ? pillar.titleMs : pillar.titleEn}
+                  </h3>
+                  <p className="text-base leading-relaxed text-muted-foreground">
+                    {isMs ? pillar.descMs : pillar.descEn}
+                  </p>
+                  <div className="space-y-2 pt-1">
+                    {(isMs ? pillar.highlightsMs : pillar.highlightsEn).map((item) => (
+                      <div key={item} className="flex items-start gap-2 text-sm font-medium text-foreground/90">
+                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary-ink" />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-2">
+                    <Link
+                      // From the pillar itself, not its position. Choosing by
+                      // array index is how the TNRM card came to point at the
+                      // adoption steps: reorder the array and every link after
+                      // the change would silently point somewhere else.
+                      href={pillar.href}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-foreground hover:text-primary-ink transition-colors"
+                    >
+                      <span>{isMs ? "Lihat cara ini berfungsi" : "See how this works"}</span>
+                      <ArrowRight className="size-3.5" />
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+      </div>
     </Section>
   );
 }
@@ -220,6 +219,7 @@ export function HomeQuickActionsSection() {
         : "Meet animals ready for a new home and apply to adopt in just a few steps.",
       cta: isMs ? "Lihat Haiwan" : "See Animals",
       href: "/pets",
+      icon: Heart,
     },
     {
       image:
@@ -231,6 +231,7 @@ export function HomeQuickActionsSection() {
         : "Support the sanctuary through weekly care, walking, transport, and community events.",
       cta: isMs ? "Sertai Kami" : "Get Involved",
       href: "/get-involved",
+      icon: HandHeart,
     },
     {
       image:
@@ -242,6 +243,7 @@ export function HomeQuickActionsSection() {
         : "Fund food, treatment, surgery, and recovery costs for rescued animals in need.",
       cta: isMs ? "Sokong HFS" : "Support HFS",
       href: "/donate",
+      icon: HandCoins,
     },
     {
       image:
@@ -253,6 +255,7 @@ export function HomeQuickActionsSection() {
         : "Sponsor ongoing care, treatment, and rehabilitation for animals who need longer-term support.",
       cta: isMs ? "Taja Seekor Haiwan" : "Sponsor an Animal",
       href: "/needs",
+      icon: HeartHandshake,
     },
   ];
 
@@ -264,7 +267,12 @@ export function HomeQuickActionsSection() {
 
   const cardBody = (a: (typeof actions)[number], titleSize: string) => (
     <div className="flex flex-1 flex-col gap-3 p-6 sm:p-7">
-      <h3 className={`font-heading ${titleSize} font-bold text-foreground`}>{a.title}</h3>
+      {/* The same icons the navbar uses for these actions: Heart for Adopt, HeartHandshake for
+          Sponsor. Decorative — the title names the card. */}
+      <div className="flex items-center gap-2.5">
+        <a.icon className="size-5 shrink-0 text-primary-ink" aria-hidden="true" />
+        <h3 className={`font-heading ${titleSize} font-bold text-foreground`}>{a.title}</h3>
+      </div>
       <p className="text-sm leading-relaxed text-muted-foreground">{a.description}</p>
       <span className="mt-auto inline-flex items-center gap-1.5 pt-2 text-xs font-bold uppercase tracking-wider text-primary-ink">
         {a.cta}
@@ -274,36 +282,31 @@ export function HomeQuickActionsSection() {
   );
 
   return (
-    <Section className="space-y-12">
-      <SectionHeader
-        title={isMs ? "Sertai kami membawa perubahan" : "Join us in making a difference"}
-        subtitle={
-          isMs
-            ? "Sama ada anda mengadopsi, menjadi sukarelawan, menderma atau menaja, setiap tindakan membantu mencipta kehidupan yang lebih baik."
-            : "Whether you adopt, volunteer, donate or sponsor, every action helps create better lives."
-        }
-      />
+    <Section>
+      <div className="space-y-10">
+        <SectionHeader title={isMs ? "Cara Anda Boleh Membantu" : "How You Can Help"} />
 
-        {/* Adopt and Donate take the two wide cells; Volunteer and Sponsor stack in the third
-            without an image, because at a third of the width a photograph arrives too small to
-            read as one and costs the copy the room it needs. */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          {big.map((a) => (
-            <Link key={a.href} href={a.href} className={cardShell}>
-              <div className="relative aspect-4/3 w-full">
-                <Image src={a.image} alt={a.alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 33vw" />
-              </div>
-              {cardBody(a, "text-2xl")}
-            </Link>
-          ))}
-          <div className="flex flex-col gap-6">
-            {small.map((a) => (
-              <Link key={a.href} href={a.href} className={`${cardShell} flex-1`}>
-                {cardBody(a, "text-xl")}
+          {/* Adopt and Donate take the two wide cells; Volunteer and Sponsor stack in the third
+              without an image, because at a third of the width a photograph arrives too small to
+              read as one and costs the copy the room it needs. */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {big.map((a) => (
+              <Link key={a.href} href={a.href} className={cardShell}>
+                <div className="relative aspect-4/3 w-full">
+                  <Image src={a.image} alt={a.alt} fill className="object-cover" sizes="(max-width: 1024px) 100vw, 33vw" />
+                </div>
+                {cardBody(a, "text-2xl")}
               </Link>
             ))}
+            <div className="flex flex-col gap-6">
+              {small.map((a) => (
+                <Link key={a.href} href={a.href} className={`${cardShell} flex-1`}>
+                  {cardBody(a, "text-xl")}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+      </div>
     </Section>
   );
 }
@@ -412,7 +415,7 @@ export function HomeStandardsSection() {
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12 lg:gap-16">
           <div className="lg:col-span-4 space-y-4">
             <SectionHeader
-              title={isMs ? "Piawaian Kebajikan & Santuari Haiwan" : "Our Animal Welfare & Sanctuary Standards"}
+              title={isMs ? "Piawaian Penjagaan Kami" : "Our Care Standards"}
             />
             <p className="text-base text-muted-foreground leading-relaxed">
               {isMs

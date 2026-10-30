@@ -49,7 +49,7 @@ section padding, not from gaps or dividers.
 
 | Between | Spacing |
 |---|---|
-| Section header → content | `space-y-10` to `space-y-14` on an inner `<div>` inside `Section` (`space-y-12` is the default) — never on `Section` itself, see §8.3 |
+| Section header → content | `space-y-10` (40px) on an inner `<div>` inside `Section`, the same on every band — never on `Section` itself, see §8.3. A header with controls beside it (the carousel arrows, a view-all link) is one row, and the 40px is measured from that row |
 | Editorial rows (image + copy) | `space-y-14` |
 | Card grid gutters | `gap-6` |
 | Two-column split (image/copy) | `gap-8 lg:gap-14` |
@@ -72,7 +72,7 @@ size. The one blue in type is `text-primary-ink`, and only in the roles marked b
 | **Section H2** | `text-3xl sm:text-4xl lg:text-5xl` | 30 → 36 → 48 | via `SectionHeader`, never by hand |
 | **Editorial H3** | `text-2xl sm:text-3xl` | 24 → 30 | image/copy rows |
 | **Card title** | `text-2xl` (wide card) or `text-xl` (narrow card) | 24 / 20 | |
-| **Lead paragraph** | `text-base sm:text-lg leading-relaxed text-muted-foreground` | 16 → 18 | under H1/H2 |
+| **Lead paragraph** | `text-base sm:text-lg leading-relaxed text-muted-foreground` | 16 → 18 | under the H1. Home section H2s carry **no subtitle**: the title says what the section is |
 | **Body** | `text-base leading-relaxed text-muted-foreground` | 16 | editorial copy |
 | **Card body** | `text-sm leading-relaxed text-muted-foreground` | 14 | |
 | **Bullet / highlight** | `text-sm font-medium text-foreground/90` | 14 | with a `size-4 text-primary-ink` icon |
@@ -139,7 +139,7 @@ const panel = "rounded-card bg-work-panel p-6 sm:p-7";
 | Property | Value |
 |---|---|
 | Radius | `rounded-card` (0.75rem) — the named card shape, so `Card` and hand-built panels agree |
-| Surface | `bg-work-panel` — white on the cream band. `bg-primary-panel` (pale blue) is the one alternative, used by `PetCard` |
+| Surface | `bg-work-panel` — white on the cream band, for every card including `PetCard`. `bg-primary-panel` (pale blue) is for image placeholders only |
 | Edge | none. No `border`, no `ring`, no rainbow of per-card accent borders |
 | Elevation | none |
 | Padding | `p-6 sm:p-7` (24 → 28px) |
@@ -230,5 +230,6 @@ Recorded so a new page copies the intent, not the drift.
    panel; they have not been moved to §5 yet.
 3. **`<Section className="space-y-…">` spaces nothing.** `Section` puts `className` on the outer
    `<section>`, but renders children inside its own inner `<div>`, so a `space-y-*` there applies
-   to one child. Home's `our-work` and "Join us" sections pass spacing that way; `how-it-works`
-   wraps its children in a `<div className="space-y-10">`, which is the pattern that works (§1).
+   to one child. Every home section now wraps its children in a `<div className="space-y-10">`,
+   the pattern that works (§1); before 2026-10-29 two of them passed spacing to `Section` and their
+   title touched their content once the subtitles were removed.
