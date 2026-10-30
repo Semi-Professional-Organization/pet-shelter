@@ -27,14 +27,14 @@ Record active multi-step work streams below.
   tag icons, the quiz's special-needs and temperament scoring (logged in `open/`).
 
 - [x] Icons, matcher, row, tests
-- [x] Three xhigh review rounds and their fixes
+- [x] Five xhigh review rounds and the fixes for rounds 1 to 4 (round 5: no in-scope bug)
 
 ## Review
 
-Not done, deliberately: hiding the training chips that now duplicate the row, the row in the
-gallery quick view, quiz points for litter box training, and removing the admin form's default
-"House-Trained" tag. Each is a question for the owner, not a fix. The Malay labels want a native
-speaker's check.
+Not done, deliberately: the owner's questions in
+`open/pet-training-row-owner-questions.md` (admin form default tag, duplicate chips, quick view,
+Malay wording) and the older quiz scoring problems in
+`open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md`.
 
 # Home page: one light-blue accent, flat borderless cards
 

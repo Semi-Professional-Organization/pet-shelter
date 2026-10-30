@@ -217,6 +217,9 @@ describe("PetDetailView", () => {
 
       const items = within(trainingList()).getAllByRole("listitem");
       expect(items.map((li) => li.textContent)).toEqual(["House Trained", "Leash Trained"]);
+      // Each kind keeps its own icon: a swap in the icon map would otherwise pass unnoticed.
+      expect(items[0].querySelector("svg")).toHaveClass("lucide-house-check");
+      expect(items[1].querySelector("svg")).toHaveClass("lucide-footprints");
     });
 
     it("renders nothing when no tag records training", () => {
@@ -235,6 +238,7 @@ describe("PetDetailView", () => {
 
       expect(screen.getByRole("heading", { name: /^latihan$/i })).toBeInTheDocument();
       expect(screen.getByText("Terlatih Guna Kotak Pasir")).toBeInTheDocument();
+      expect(screen.getByRole("list", { name: /^latihan$/i }).querySelector("svg")).toHaveClass("lucide-litter-box");
     });
   });
 

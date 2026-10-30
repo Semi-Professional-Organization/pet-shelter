@@ -11,7 +11,8 @@ export const TRAINING_KINDS = ["houseTrained", "litterBoxTrained", "leashTrained
 export type TrainingKind = (typeof TRAINING_KINDS)[number];
 
 // Each kind's own name is its tag key ("houseTrained" -> "housetrained"), so a new kind matches
-// without a second list. Aliases are the only extra entries.
+// without a second list. Aliases are the only extra entries. That makes the kind names a data
+// contract: renaming one changes which stored tags match, so add the old name as an alias.
 const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
   ...TRAINING_KINDS.map((kind) => [kind.toLowerCase(), kind] as const),
   ["littertrained", "litterBoxTrained"],
@@ -22,7 +23,8 @@ const KIND_BY_TAG_KEY = new Map<string, TrainingKind>([
 // "Housetrained" all match. Anything else stays a plain tag rather than being guessed at:
 // synonyms ("Housebroken"), qualified tags ("House trained?", "Mostly house-trained") and
 // combined tags ("House-Trained, Leash Trained") get no Training row and no quiz points.
-// Measured against the 10 pets in src/data/pets.json: all 6 training tags match, no other
+// Also unmatched: trailing punctuation ("House-trained."), full-width letters and emoji
+// variation selectors (no NFKC normalisation). Measured against the 10 pets in src/data/pets.json: all 6 training tags match, no other
 // tag does. Only English tags match: a Malay tag such as "Terlatih Tandas" gets no row.
 // Upgrade path: a tag table with fixed values (the unused PetTag model).
 function tagKey(tag: string): string {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Footprints, type LucideIcon } from "lucide-react";
 
 import { HouseCheck, LitterBox } from "@/components/icons/pet-icons";
@@ -24,17 +25,18 @@ const ICON_BY_TRAINING: Record<TrainingKind, LucideIcon> = {
  */
 export function PetTraining({ tags }: { tags: readonly string[] }) {
   const { t } = useTypedTranslation();
+  const headingId = useId();
   const training = trainingKindsIn(tags);
   if (training.length === 0) return null;
 
   return (
     <div className="space-y-3 pt-2">
-      <h2 className="text-xs font-bold uppercase tracking-wider text-foreground">
+      <h2 id={headingId} className="text-xs font-bold uppercase tracking-wider text-foreground">
         {t("petDetail.trainingTitle")}
       </h2>
 
       {/* role="list": Safari drops list semantics from a list with list-style: none. */}
-      <ul role="list" className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+      <ul role="list" aria-labelledby={headingId} className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
         {training.map((kind) => {
           const Icon = ICON_BY_TRAINING[kind];
           return (

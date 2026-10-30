@@ -2,8 +2,8 @@
 
 **Status:** open · opened 2026-10-30
 
-`trainingKindFor` (`src/lib/domain/petTraining.ts`) ignores case, spaces, underscores and every
-dash, while `needsSocialising` (`src/lib/presentation/petStatusPresentation.ts`) only trims and
+`trainingKindFor` (`src/lib/domain/petTraining.ts`) ignores case, spaces, underscores, every dash
+and invisible format characters, while `needsSocialising` (`src/lib/presentation/petStatusPresentation.ts`) only trims and
 folds case. So "house_trained" gets a Training row but "needs-socialising" is offered for
 adoption instead of foster. Both guess meaning from a free-text field the admin form edits.
 
