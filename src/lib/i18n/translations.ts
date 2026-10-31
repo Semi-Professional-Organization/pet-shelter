@@ -151,6 +151,10 @@ export interface TranslationDictionary {
     noCats: string;
     kidSafe: string;
     adultsOnly: string;
+    trainingTitle: string;
+    houseTrained: string;
+    litterBoxTrained: string;
+    leashTrained: string;
     sanctuaryLocationHours: string;
     sanctuaryAddress: string;
     applyToAdopt: string;
@@ -511,6 +515,10 @@ export const translations: Record<Language, TranslationDictionary> = {
       noCats: "No Cats",
       kidSafe: "Kid-Safe",
       adultsOnly: "Adults Only",
+      trainingTitle: "Training",
+      houseTrained: "House Trained",
+      litterBoxTrained: "Litter Box Trained",
+      leashTrained: "Leash Trained",
       sanctuaryLocationHours: "Sanctuary Location & Visiting Hours",
       sanctuaryAddress: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Open Tue–Sun: 10:00 AM – 5:00 PM",
       applyToAdopt: "Apply to Adopt",
@@ -874,6 +882,10 @@ export const translations: Record<Language, TranslationDictionary> = {
       noCats: "Tidak Sesuai",
       kidSafe: "Mesra Kanak-kanak",
       adultsOnly: "Dewasa Sahaja",
+      trainingTitle: "Latihan",
+      houseTrained: "Terlatih Tandas",
+      litterBoxTrained: "Terlatih Guna Kotak Pasir",
+      leashTrained: "Terlatih Berjalan Bertali",
       sanctuaryLocationHours: "Lokasi Pusat Perlindungan & Waktu Lawatan",
       sanctuaryAddress: "No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor • Buka Sel–Ahad: 10:00 PG – 5:00 PTG",
       applyToAdopt: "Mohon untuk Adopsi",

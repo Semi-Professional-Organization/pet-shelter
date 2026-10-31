@@ -39,6 +39,37 @@ describe("PetCard", () => {
       }
     );
   });
+
+  describe("training tags", () => {
+    it.each([
+      ["House-Trained", "lucide-house-check"],
+      ["House Trained", "lucide-house-check"],
+      ["Litter Trained", "lucide-litter-box"],
+      ["leash_trained", "lucide-footprints"],
+    ])("draws %j with the Training row's icon, not a text chip", (tag, iconClass) => {
+      // The card's own TAG_ICONS matched only one exact spelling per tag and used other icons,
+      // so a card and the quick view it opens disagreed on the same pet.
+      const { container } = renderCard({ tags: [tag] });
+
+      expect(container.querySelector(`svg.${iconClass}`)).not.toBeNull();
+      expect(container.querySelector("li.bg-secondary")).toBeNull();
+    });
+
+    it("names a training icon as the Training row does, not by the raw tag", () => {
+      renderCard({ tags: ["leash_trained"] });
+
+      expect(screen.getByText("Leash Trained")).toBeTruthy();
+      expect(screen.queryByText("leash_trained")).toBeNull();
+    });
+
+    it("keeps other known tags on their own icons, and unknown ones as chips", () => {
+      // "constructor" names an Object.prototype property, which a plain lookup would render.
+      const { container } = renderCard({ tags: ["Playful", "constructor"] });
+
+      expect(container.querySelector("svg.lucide-volleyball")).not.toBeNull();
+      expect(screen.getByText("constructor").closest("li")?.querySelector("svg")).toBeNull();
+    });
+  });
 });
 
 // The card's primary action follows getPlacementOptions: adopt for an available animal, foster

@@ -37,6 +37,8 @@ import {
 import { getRehabStageLabel, getRehabProgressPercent, getPlacementOptions } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
 import { PetStatusIcon } from "./PetStatusIcon";
+import { PetTraining } from "./PetTraining";
+import { tagsWithoutTraining } from "@/lib/domain/petTraining";
 import { usePetDetailViewController, PetDetailTab } from "@/hooks/usePetDetailViewController";
 import { formatMYR } from "@/lib/domain/money";
 
@@ -72,6 +74,7 @@ export function PetDetailView(props: PetDetailViewProps) {
 
   const isInRehabilitation = statusPresentation.isInRehabilitation;
   const placement = getPlacementOptions(pet);
+  const chipTags = tagsWithoutTraining(pet.tags);
   const rehabStage = isInRehabilitation ? getRehabStageLabel(pet, isMs) : undefined;
   const rehabProgress = isInRehabilitation ? getRehabProgressPercent(pet) : undefined;
   // Newest first, and never mutate the array the store handed us.
@@ -396,16 +399,18 @@ export function PetDetailView(props: PetDetailViewProps) {
             {activeTab === "about" && (
               <div id="panel-about" role="tabpanel" aria-labelledby="tab-about" className="space-y-6">
                 {/* Characteristic Tags */}
-                <div className="flex flex-wrap gap-1.5">
-                  {pet.tags.map((tag, idx) => (
-                    <span
-                  key={idx}
-                  className="bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                {chipTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {chipTags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {/* Rescue Story & Description */}
                 <div className="space-y-3">
@@ -460,6 +465,8 @@ export function PetDetailView(props: PetDetailViewProps) {
                     </div>
                   </div>
                 </div>
+
+                <PetTraining tags={pet.tags} />
               </div>
             )}
 

@@ -14,6 +14,8 @@ import { Pet } from "@/types/pet";
 import { getPetStatusPresentation } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
 import { PetStatusIcon } from "./PetStatusIcon";
+import { PetTraining } from "./PetTraining";
+import { tagsWithoutTraining } from "@/lib/domain/petTraining";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +45,7 @@ export function PetDetailDialog({
   const { t, isMs } = useLanguage();
   const [imgSrc, setImgSrc] = useState(pet?.image || FALLBACK_PET_IMAGE);
   if (!pet) return null;
+  const chipTags = tagsWithoutTraining(pet.tags);
 
   const status = getPetStatusPresentation(pet.status);
   const isAvailable = status.isAdoptable;
@@ -104,16 +107,18 @@ export function PetDetailDialog({
         <div className="p-6 sm:p-7 space-y-6">
           
           {/* Tags */}
-          <div className="flex flex-wrap gap-2">
-            {pet.tags.map((tag, idx) => (
-              <span
-                key={idx}
-                className="bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          {chipTags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {chipTags.map((tag, idx) => (
+                <span
+                  key={idx}
+                  className="bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground border border-border rounded-md"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Rescue Story / Background */}
           <div className="space-y-2 border-t border-border pt-5">
@@ -178,6 +183,8 @@ export function PetDetailDialog({
               </div>
             </div>
           </div>
+
+          <PetTraining tags={pet.tags} variant="dialog" />
 
           {/* Intake Date & Fee for mobile */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4 text-sm text-muted-foreground">

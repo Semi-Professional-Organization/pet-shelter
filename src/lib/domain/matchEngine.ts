@@ -1,5 +1,6 @@
 import { Pet } from "@/types/pet";
 import { QuizAnswers, PetMatchResult, MatchScoreBreakdown } from "@/types/match";
+import { isToiletTraining, trainingKindFor } from "@/lib/domain/petTraining";
 
 /**
  * Evaluates compatibility between a prospective adopter's lifestyle and a rescue pet.
@@ -159,9 +160,25 @@ export function calculatePetMatchScore(pet: Pet, answers: QuizAnswers): MatchSco
   const isSenior = pet.ageCategory === "senior";
 
   if (answers.experience === "first_time") {
-    if (pet.tags.some((t) => /gentle|house-trained|friendly|easy/i.test(t)) && !isSpecialNeeds) {
+    // ceiling: the temperament words are a substring test, so a negative tag such as
+    // "Unfriendly" or "Uneasy" also counts. No seed pet carries one; production tags were not
+    // checked. Upgrade path: match temperament through tag keys the way trainingKindFor does.
+    // Toilet training (house or litter box, either species; the owner's call on 2026-10-30)
+    // goes through trainingKindFor, the same matcher as the Training row, so the two agree.
+    // Leash training is not what makes a pet easy for a first-time owner.
+    // The training reason wins: it comes from an exact tag match, the temperament one from a
+    // substring test that also matches "Unfriendly".
+    const hasEasyTemperament = pet.tags.some((t) => /gentle|friendly|easy/i.test(t));
+    const toiletTraining = pet.tags.map(trainingKindFor).find(isToiletTraining);
+    if ((hasEasyTemperament || toiletTraining) && !isSpecialNeeds) {
       experienceScore = 25;
-      reasons.push("Gentle & beginner-friendly demeanor makes them an easy first pet.");
+      reasons.push(
+        toiletTraining === "houseTrained"
+          ? "Already house trained, which makes them an easy first pet."
+          : toiletTraining === "litterBoxTrained"
+            ? "Already litter box trained, which makes them an easy first pet."
+            : "Gentle & beginner-friendly demeanor makes them an easy first pet."
+      );
     } else if (isSpecialNeeds) {
       experienceScore = 12;
       cautions.push("Requires special medical or dietary attention — shelter staff can guide you through routines.");
