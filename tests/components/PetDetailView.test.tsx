@@ -204,6 +204,64 @@ describe("PetDetailView", () => {
     });
   });
 
+  describe("training row", () => {
+    const trainingList = () => screen.getByRole("list", { name: /^training$/i });
+
+    it("lists the recorded training once each, in display order", () => {
+      renderWithLanguage(
+        <PetDetailView
+          initialPet={makePet({ id: "pet-training-under-test", tags: ["Leash Trained", "House-trained", "House-Trained"] })}
+        />
+      );
+
+      const items = within(trainingList()).getAllByRole("listitem");
+      expect(items.map((li) => li.textContent)).toEqual(["House Trained", "Leash Trained"]);
+      // Each kind keeps its own icon: a swap in the icon map would otherwise pass unnoticed.
+      expect(items[0].querySelector("svg")).toHaveClass("lucide-house-check");
+      expect(items[1].querySelector("svg")).toHaveClass("lucide-footprints");
+    });
+
+    it("leaves training tags out of the chips, so each fact shows once", () => {
+      renderWithLanguage(
+        <PetDetailView
+          initialPet={makePet({ id: "pet-chips-under-test", tags: ["House-Trained", "Playful"] })}
+        />
+      );
+
+      expect(screen.getByText("Playful")).toBeInTheDocument();
+      expect(screen.queryByText("House-Trained")).not.toBeInTheDocument();
+      expect(within(trainingList()).getByText("House Trained")).toBeInTheDocument();
+    });
+
+    it("renders no empty chip row when every tag is training", () => {
+      renderWithLanguage(
+        <PetDetailView initialPet={makePet({ id: "pet-all-training-under-test", tags: ["House-Trained"] })} />
+      );
+
+      const panel = screen.getByRole("tabpanel");
+      expect(panel.querySelector(".flex-wrap")).toBeNull();
+    });
+
+    it("renders nothing when no tag records training", () => {
+      renderWithLanguage(
+        <PetDetailView initialPet={makePet({ id: "pet-untrained-under-test", tags: ["Playful"] })} />
+      );
+
+      expect(screen.queryByRole("heading", { name: /^training$/i })).not.toBeInTheDocument();
+    });
+
+    it("labels the training in Malay", () => {
+      renderWithLanguage(
+        <PetDetailView initialPet={makePet({ id: "pet-training-ms-under-test", tags: ["Litter Box Trained"] })} />,
+        { language: "ms" }
+      );
+
+      expect(screen.getByRole("heading", { name: /^latihan$/i })).toBeInTheDocument();
+      expect(screen.getByText("Terlatih Guna Kotak Pasir")).toBeInTheDocument();
+      expect(screen.getByRole("list", { name: /^latihan$/i }).querySelector("svg")).toHaveClass("lucide-litter-box");
+    });
+  });
+
   describe("status-dependent content", () => {
     it("counts published updates on the updates tab", () => {
       renderView();

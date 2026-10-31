@@ -15,6 +15,37 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Pet page: training icons (house, litter box, leash)
+
+**Branch:** `claude/pet-training-icons` · opened 2026-10-28, resumed 2026-10-30
+
+- **Done when:** the pet page and the gallery quick view show a Training row with Lucide-spec
+  `LitterBox` and `HouseCheck` icons plus Lucide `Footprints`, for tagged training only, in
+  English and Malay, with those tags gone from the chips; all gates green.
+- **In scope:** the two icons, the shared tag matcher (`src/lib/domain/petTraining.ts`), the
+  row in both views, hiding training chips there, translations, the match quiz's house and
+  litter box training check and its reason text, tests.
+- **Not in scope:** the medical-list screen-reader gap, the PetTag table, schema changes, other
+  tag icons, the quiz's special-needs and temperament scoring (logged in `open/`).
+
+- [x] Icons, matcher, row, tests
+- [x] Owner's answers (2026-10-30): chips hidden, quick view row, litter box quiz points
+- [x] Seven xhigh review rounds and their fixes. Stopped at round 7: the last rounds found only
+  pasted-Unicode edge cases beyond the ceiling, wording, and the out-of-scope items in `open/`
+- [x] Rounds 8-9 on the owner's follow-ups. Round 10 (after merging main, PR #233) found the
+  gallery card's new tag icons (#232) drew training tags with other icons and stricter matching;
+  the card now uses `trainingKindFor` and `ICON_BY_TRAINING`
+
+## Review
+
+The owner's answers (2026-10-30) are built: training chips hidden, the row in the gallery quick
+view, litter box training earns quiz points. Not done, deliberately: the older quiz scoring
+problems in `open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md`, the tag
+matching split in `open/free-text-pet-tags-are-matched-two-different-ways.md`, the Malay labels
+(`open/malay-training-labels-are-unchecked.md`) and the quick view's photo bug found on the way
+(`open/gallery-quick-view-shows-the-fallback-photo.md`). Gallery cards have no Training row; the
+merge of #232 gave them tag icons, and their training tags now share the row's matcher and icons.
+
 # Default branch renamed: master to main
 
 **Branch:** `claude/default-branch-main` · opened 2026-10-30
