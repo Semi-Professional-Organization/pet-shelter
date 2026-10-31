@@ -1,4 +1,6 @@
-import { createLucideIcon } from "lucide-react";
+import { createLucideIcon, Footprints, type LucideIcon } from "lucide-react";
+
+import type { TrainingKind } from "@/lib/domain/petTraining";
 
 /**
  * Shelter icons that no open icon set provides, drawn to Lucide's icon specification
@@ -31,3 +33,14 @@ export const HouseCheck = createLucideIcon("house-check", [
   ["path", { d: "M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", key: "house" }],
   ["path", { d: "m9 14 2 2 4-4", key: "check" }],
 ]);
+
+/**
+ * The icon for each training kind, shared by the Training row and gallery cards so both draw a
+ * kind the same way. In this plain module, not a "use client" component file, so any module can
+ * read it. The exhaustive `Record` means a new kind fails the typecheck here until it has an icon.
+ */
+export const ICON_BY_TRAINING: Record<TrainingKind, LucideIcon> = {
+  houseTrained: HouseCheck,
+  litterBoxTrained: LitterBox,
+  leashTrained: Footprints,
+};

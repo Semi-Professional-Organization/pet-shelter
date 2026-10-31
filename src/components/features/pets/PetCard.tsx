@@ -43,9 +43,9 @@ import {
   getRehabProgressPercent,
 } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
+import { ICON_BY_TRAINING } from "@/components/icons/pet-icons";
 import { trainingKindFor } from "@/lib/domain/petTraining";
 import { PetStatusIcon } from "./PetStatusIcon";
-import { ICON_BY_TRAINING } from "./PetTraining";
 
 interface PetCardProps {
   pet: Pet;
@@ -267,7 +267,13 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
           <ul className="flex flex-wrap items-center gap-1.5 pt-1">
             {pet.tags.map((tag, idx) => {
               const training = trainingKindFor(tag);
-              const Icon = training ? ICON_BY_TRAINING[training] : TAG_ICONS[tag.trim().toLowerCase()];
+              // Object.hasOwn: a tag such as "constructor" would otherwise find Object.prototype's.
+              const key = tag.trim().toLowerCase();
+              const Icon = training
+                ? ICON_BY_TRAINING[training]
+                : Object.hasOwn(TAG_ICONS, key)
+                  ? TAG_ICONS[key]
+                  : undefined;
               if (!Icon) {
                 return (
                   <li
@@ -278,7 +284,9 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
                   </li>
                 );
               }
-              return <TagIcon key={idx} tag={tag} Icon={Icon} />;
+              // A training tag is named as the Training row names it, in the current language.
+              const label = training ? t(`petDetail.${training}`) : tag;
+              return <TagIcon key={idx} tag={label} Icon={Icon} />;
             })}
           </ul>
         </CardContent>

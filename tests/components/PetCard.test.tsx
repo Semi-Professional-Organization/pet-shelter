@@ -54,6 +54,21 @@ describe("PetCard", () => {
       expect(container.querySelector(`svg.${iconClass}`)).not.toBeNull();
       expect(container.querySelector("li.bg-secondary")).toBeNull();
     });
+
+    it("names a training icon as the Training row does, not by the raw tag", () => {
+      renderCard({ tags: ["leash_trained"] });
+
+      expect(screen.getByText("Leash Trained")).toBeTruthy();
+      expect(screen.queryByText("leash_trained")).toBeNull();
+    });
+
+    it("keeps other known tags on their own icons, and unknown ones as chips", () => {
+      // "constructor" names an Object.prototype property, which a plain lookup would render.
+      const { container } = renderCard({ tags: ["Playful", "constructor"] });
+
+      expect(container.querySelector("svg.lucide-volleyball")).not.toBeNull();
+      expect(screen.getByText("constructor").closest("li")?.querySelector("svg")).toBeNull();
+    });
   });
 });
 
