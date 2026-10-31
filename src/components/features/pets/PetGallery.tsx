@@ -122,12 +122,13 @@ export function PetGallery({
   }[selectedPlacement === "adopt" || selectedPlacement === "foster" ? selectedPlacement : "all"];
   const isPageTitle = !title && !featuredOnly;
   const displayTitle = title || (featuredOnly ? t("home.availableTitle") : placementCopy.title);
-  const displaySubtitle = subtitle || (featuredOnly ? t("home.availableSubtitle") : placementCopy.subtitle);
+  // The home row is titled plainly enough to stand alone, so it carries no subtitle.
+  const displaySubtitle = subtitle || (featuredOnly ? undefined : placementCopy.subtitle);
 
   return (
     <section className="w-full">
       {/* Header */}
-      <div className={`flex flex-col sm:flex-row justify-between gap-4 ${featuredOnly ? "mb-12 sm:items-end" : "mb-6 sm:items-baseline"}`}>
+      <div className={`flex flex-col sm:flex-row justify-between gap-4 ${featuredOnly ? "mb-10 sm:items-end" : "mb-6 sm:items-baseline"}`}>
         <SectionHeader title={displayTitle} subtitle={displaySubtitle} as={isPageTitle ? "h1" : "h2"} />
 
         {/* Actions & Pet Counter */}

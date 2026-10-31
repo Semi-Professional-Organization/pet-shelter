@@ -38,9 +38,11 @@ const METRIC_PRESENTATION: Record<HomeMetricIcon, { icon: typeof ShieldCheck }> 
 
 const COUNT_UP_MS = 1100;
 
+// The top pair sits above the headline; from lg to xl the ring area is too short for them now that
+// the impact strip shares the first screen, so they would land behind "Coexistence". They return at xl.
 const HERO_ANIMALS = [
-  { src: "/cutouts/cat-png-17.png", className: "h-32 w-24", style: { left: "20%", top: "7%" }, delay: "0s" },
-  { src: "/cutouts/cat-png-6.png", className: "h-28 w-24", style: { right: "20%", top: "7%" }, delay: "-1.2s" },
+  { src: "/cutouts/cat-png-17.png", className: "h-32 w-24 max-xl:hidden", style: { left: "20%", top: "7%" }, delay: "0s" },
+  { src: "/cutouts/cat-png-6.png", className: "h-28 w-24 max-xl:hidden", style: { right: "20%", top: "7%" }, delay: "-1.2s" },
   { src: "/cutouts/dog-png-30.png", className: "h-36 w-28", style: { left: "7%", top: "28%" }, delay: "-2.4s" },
   { src: "/cutouts/dog-png-18.png", className: "h-32 w-24", style: { right: "7%", top: "28%" }, delay: "-3.6s" },
   { src: "/cutouts/cat-png-28.png", className: "h-28 w-24", style: { left: "7%", bottom: "14%" }, delay: "-4.8s" },
@@ -143,80 +145,76 @@ export function Hero({ metrics }: HeroProps = {}) {
 
   return (
     <>
-      <section className="relative flex min-h-[calc(100dvh-4rem)] items-center overflow-hidden bg-work-ground">
-        <div className="pointer-events-none absolute inset-0 z-0 hidden lg:block" aria-hidden="true">
-          {HERO_ANIMALS.map((animal) => (
-            <Image
-              key={animal.src}
-              src={animal.src}
-              alt=""
-              width={320}
-              height={476}
-              className={`hero-animal-float absolute object-contain drop-shadow-xl ${animal.className}`}
-              style={{ ...animal.style, animationDelay: animal.delay }}
-            />
-          ))}
-        </div>
-        <div className="relative w-full px-6 py-12 sm:px-8 lg:px-12">
-          <div className="relative z-10 mx-auto max-w-2xl space-y-6 text-center">
-            <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.15]">
-              {t("hero.tnrmHeadline")}
-            </h1>
+      {/* The first screen holds the hero and the impact strip together, so the figures are seen
+          without scrolling. The cut-outs are positioned inside the upper area only, which keeps
+          the ring from drifting over the five-card row beneath it. */}
+      <section className="relative flex min-h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-work-ground">
+        <div className="relative flex flex-1 items-center">
+          <div className="pointer-events-none absolute inset-0 z-0 hidden lg:block" aria-hidden="true">
+            {HERO_ANIMALS.map((animal) => (
+              <Image
+                key={animal.src}
+                src={animal.src}
+                alt=""
+                width={320}
+                height={476}
+                className={`hero-animal-float absolute object-contain drop-shadow-xl ${animal.className}`}
+                style={{ ...animal.style, animationDelay: animal.delay }}
+              />
+            ))}
+          </div>
+          <div className="relative w-full px-6 py-12 sm:px-8 lg:px-12">
+            <div className="relative z-10 mx-auto max-w-2xl space-y-6 text-center">
+              <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.15]">
+                {t("hero.tnrmHeadline")}
+              </h1>
 
-            <p className="mx-auto text-base sm:text-lg text-muted-foreground leading-relaxed">
-              {isMs
-                ? "Hope for Strays ialah organisasi kebajikan haiwan komuniti yang memberi tumpuan kepada keseimbangan hidup bersama manusia dan haiwan. Kami menjalankan TNRM, pendidikan komuniti, dan pemulihan klinikal."
-                : "Hope for Strays is a community-led animal welfare organisation focused on peaceful coexistence between people and animals. We work through TNRM, public education, and clinical rehabilitation."}
-            </p>
+              <p className="mx-auto text-base sm:text-lg text-muted-foreground leading-relaxed">
+                {isMs
+                  ? "Hope for Strays ialah organisasi kebajikan haiwan komuniti yang memberi tumpuan kepada keseimbangan hidup bersama manusia dan haiwan. Kami menjalankan TNRM, pendidikan komuniti, dan pemulihan klinikal."
+                  : "Hope for Strays is a community-led animal welfare organisation focused on peaceful coexistence between people and animals. We work through TNRM, public education, and clinical rehabilitation."}
+              </p>
 
-            <div className="flex justify-center pt-1">
-              <Link
-                href="/pets"
-                className={buttonVariants({
-                  size: "lg",
-                  className: "gap-2 px-6 text-sm font-bold tracking-wide rounded-xl shadow-xs focus-visible:ring-2",
-                })}
-              >
-                <Heart className="size-4 fill-current" />
-                {isMs ? "Lihat Haiwan Reskue" : "Meet Our Animals"}
-                <ArrowRight className="size-4 ml-0.5" />
-              </Link>
-            </div>
+              <div className="flex justify-center pt-1">
+                <Link
+                  href="/pets"
+                  className={buttonVariants({
+                    size: "lg",
+                    className: "gap-2 px-6 text-sm font-bold tracking-wide rounded-xl shadow-xs focus-visible:ring-2",
+                  })}
+                >
+                  <Heart className="size-4 fill-current" />
+                  {isMs ? "Lihat Haiwan Reskue" : "Meet Our Animals"}
+                  <ArrowRight className="size-4 ml-0.5" />
+                </Link>
+              </div>
 
-            <div className="grid grid-cols-4 gap-3 pt-8 lg:hidden" aria-hidden="true">
-              {HERO_ANIMALS.map((animal) => (
-                <Image
-                  key={animal.src}
-                  src={animal.src}
-                  alt=""
-                  width={320}
-                  height={476}
-                  className="hero-animal-float h-28 w-full object-contain drop-shadow-lg sm:h-36"
-                  style={{ animationDelay: animal.delay }}
-                />
-              ))}
+              <div className="grid grid-cols-4 gap-3 pt-8 lg:hidden" aria-hidden="true">
+                {HERO_ANIMALS.map((animal) => (
+                  <Image
+                    key={animal.src}
+                    src={animal.src}
+                    alt=""
+                    width={320}
+                    height={476}
+                    className="hero-animal-float h-28 w-full object-contain drop-shadow-lg sm:h-36"
+                    style={{ animationDelay: animal.delay }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Impact Showcase Strip (FE-02). Staff edit these figures at /admin/transparency, so
-          they sit in a band of their own beneath the hero rather than inside the cut-out ring,
-          where the composition has no room for a five-card row. */}
-      <div className="bg-work-ground px-6 pb-16 sm:px-8 sm:pb-20 lg:px-12">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-4">
-            <span className="text-2xs font-bold uppercase tracking-widest text-muted-foreground">
-              {isMs ? "Kerja yang sedang berjalan" : "Work already underway"}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {/* Impact Showcase Strip (FE-02). Staff edit these figures at /admin/transparency. */}
+        <div className="relative z-10 px-6 pb-10 sm:px-8 lg:px-12">
+          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {impactStats.map((stat) => (
               <ImpactStatCard key={stat.key} metric={stat} isMs={isMs} />
             ))}
           </div>
         </div>
-      </div>
+      </section>
     </>
   );
 }

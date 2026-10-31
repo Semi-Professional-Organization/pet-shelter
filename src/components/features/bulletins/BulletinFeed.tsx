@@ -69,29 +69,46 @@ export function BulletinFeed({
   layout = "grid",
   compact = false,
 }: BulletinFeedProps) {
+  // A fixed id rather than `useId`, which a Server Component cannot call; the carousel region
+  // takes its accessible name from this heading.
+  const headingId = `bulletins-${titleKey.replace(/\W+/g, "-")}`;
+  const heading = (
+    <div className="space-y-3">
+      <h2 id={headingId} className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+        <Translated k={titleKey} />
+      </h2>
+      {subtitleKey && (
+        <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
+          <Translated k={subtitleKey} />
+        </p>
+      )}
+    </div>
+  );
+  const carousel = bulletins.length > 0 && layout === "carousel";
+
   return (
     <section className="w-full">
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 mb-6">
-        <div className="space-y-3">
-          <h2 className="font-heading text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-            <Translated k={titleKey} />
-          </h2>
-          {subtitleKey && (
-            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-              <Translated k={subtitleKey} />
-            </p>
-          )}
+      {!carousel && (
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 mb-6">
+          {heading}
         </div>
-      </div>
+      )}
 
-      {bulletins.length > 0 && layout === "carousel" ? (
+      {carousel ? (
         /* One story at a time. The frame holds only the image; the copy sits on the page
            ground beneath it, so this is not a rounded box like everything around it.
-           Embla gives touch dragging for free, so the arrows are not the only way through. */
-        <Carousel opts={{ loop: bulletins.length > 1 }} className="w-full">
-          <div className="mb-5 flex items-center justify-end gap-2">
-            <CarouselPrevious variant="default" className="static translate-y-0 size-9" />
-            <CarouselNext variant="default" className="static translate-y-0 size-9" />
+           Embla gives touch dragging for free, so the arrows are not the only way through.
+           The arrows share the title's row, so the title sits the same 40px above its content
+           as every other home section's does. The row wraps, so on a narrow phone with four notices
+           the controls drop under the title instead of pushing the page sideways (WCAG 1.4.10). */
+        <Carousel opts={{ loop: bulletins.length > 1 }} className="w-full" aria-labelledby={headingId}>
+          <div className="mb-10 flex flex-wrap items-end justify-between gap-3">
+            {heading}
+            <div className="flex shrink-0 items-center gap-2">
+              {bulletins.length > 1 && <BulletinCarouselDots total={bulletins.length} />}
+              <CarouselPrevious variant="default" className="static translate-y-0 size-9" />
+              <CarouselNext variant="default" className="static translate-y-0 size-9" />
+            </div>
           </div>
           <CarouselContent>
             {bulletins.map((bulletin) => {
@@ -143,7 +160,6 @@ export function BulletinFeed({
               );
             })}
           </CarouselContent>
-          {bulletins.length > 1 && <BulletinCarouselDots total={bulletins.length} />}
         </Carousel>
       ) : bulletins.length > 0 && layout === "lead" ? (
         (() => {

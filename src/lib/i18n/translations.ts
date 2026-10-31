@@ -86,9 +86,7 @@ export interface TranslationDictionary {
   };
   home: {
     bulletinsTitle: string;
-    bulletinsSubtitle: string;
     availableTitle: string;
-    availableSubtitle: string;
     viewAllPets: string;
     galleryLoading: string;
     howItWorksTitle: string;
@@ -451,13 +449,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       tnrmHeadline: "Coexistence through TNRM & Education",
     },
     home: {
-      bulletinsTitle: "From the shelter",
-      bulletinsSubtitle: "Rescue updates, clinic notes, and news from the sanctuary.",
+      bulletinsTitle: "Latest Updates",
       availableTitle: "Adoptable Animals",
-      availableSubtitle: "Rescued dogs, cats and kittens waiting for a home right now.",
       viewAllPets: "View All Adoptable Pets",
       galleryLoading: "Loading rescue animals...",
-      howItWorksTitle: "Application Steps",
+      howItWorksTitle: "How to Adopt",
       step1Title: "Browse & Submit Application",
       step1Desc: "Browse our dogs and cats online or visit our sanctuary, then submit a short application. We check basic home suitability — landed vs high-rise pet guidelines, safe fencing, and household agreement.",
       step2Title: "Meet & Socialize",
@@ -820,13 +816,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       tnrmHeadline: "Kewujudan Bersama melalui TNRM & Pendidikan",
     },
     home: {
-      bulletinsTitle: "Dari pusat perlindungan",
-      bulletinsSubtitle: "Kemas kini penyelamatan, nota klinik dan berita dari santuari.",
+      bulletinsTitle: "Kemas Kini Terkini",
       availableTitle: "Haiwan Sedia Diadopsi",
-      availableSubtitle: "Anjing, kucing dan anak kucing reskue yang sedang menanti rumah baharu.",
       viewAllPets: "Lihat Semua Haiwan Sedia Diadopsi",
       galleryLoading: "Memuatkan haiwan reskue...",
-      howItWorksTitle: "Langkah Permohonan",
+      howItWorksTitle: "Cara Adopsi",
       step1Title: "Semak & Hantar Permohonan",
       step1Desc: "Lihat profil anjing & kucing reskue kami secara dalam talian atau kunjungi santuari kami. Hantar borang ringkas — kami menyemak kesesuaian asas kediaman anda (pagar selamat, garis panduan bangunan bertingkat, persetujuan isi rumah).",
       step2Title: "Sesi Suai Kenal & Interaksi",
