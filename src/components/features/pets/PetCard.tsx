@@ -6,10 +6,8 @@ import Image from "next/image";
 import {
   Info,
   Heart,
-  House,
   Dog,
   Baby,
-  Box,
   Sofa,
   Volleyball,
   Zap,
@@ -19,7 +17,6 @@ import {
   PawPrint,
   Users,
   Armchair,
-  Footprints,
   User,
   Building2,
   Hourglass,
@@ -46,7 +43,9 @@ import {
   getRehabProgressPercent,
 } from "@/lib/presentation/petStatusPresentation";
 import { genderLabelArgs } from "@/lib/presentation/petLabels";
+import { trainingKindFor } from "@/lib/domain/petTraining";
 import { PetStatusIcon } from "./PetStatusIcon";
+import { ICON_BY_TRAINING } from "./PetTraining";
 
 interface PetCardProps {
   pet: Pet;
@@ -61,13 +60,13 @@ const FALLBACK_PET_IMAGE = "https://images.unsplash.com/photo-1543466835-00a7907
  * Icons for the characteristic tags staff use today, matched case-insensitively. Tags are free
  * text (`tags: z.array(z.string())`), so any tag not listed here keeps its text chip.
  * ceiling: a hand-kept list; a new tag gets an icon only when someone adds it here.
+ * Training tags are not listed: they go through `trainingKindFor` and `ICON_BY_TRAINING`, so a
+ * card shows the same icon, for the same spellings, as the Training row in the views it opens.
  */
 const TAG_ICONS: Record<string, LucideIcon> = {
-  "house-trained": House,
   "good with dogs": Dog,
   "good with cats": Cat,
   "good with kids": Baby,
-  "litter box trained": Box,
   "indoor only": Sofa,
   "quiet indoors": Armchair,
   playful: Volleyball,
@@ -82,7 +81,6 @@ const TAG_ICONS: Record<string, LucideIcon> = {
   independent: User,
   quiet: VolumeX,
   gentle: Feather,
-  "leash trained": Footprints,
   "apartment friendly": Building2,
   "in foster care": HandHeart,
   "needs socialising": Sprout,
@@ -268,7 +266,8 @@ export function PetCard({ pet, onSelectPet, onAdoptPet, onSponsorPet }: PetCardP
               the name. See `TagIcon` for the hover label. */}
           <ul className="flex flex-wrap items-center gap-1.5 pt-1">
             {pet.tags.map((tag, idx) => {
-              const Icon = TAG_ICONS[tag.trim().toLowerCase()];
+              const training = trainingKindFor(tag);
+              const Icon = training ? ICON_BY_TRAINING[training] : TAG_ICONS[tag.trim().toLowerCase()];
               if (!Icon) {
                 return (
                   <li

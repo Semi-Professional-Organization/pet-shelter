@@ -18,7 +18,8 @@ and widens it ("House Trained", "Housetrained", "house_trained" now do).
 The owner settled three follow-ups on 2026-10-30: training tags drop out of the tag chips
 (`tagsWithoutTraining`) so each fact shows once, the gallery quick view shows the row too, and
 litter box training earns the quiz's first-time-owner points like house training. Leash
-training does not. Gallery cards keep their training chips, because they have no Training row.
+training does not. Gallery cards have no Training row. Since #232 they draw known tags as
+icons, and their training tags use the same matcher and icons as the row (`ICON_BY_TRAINING`).
 The Malay labels are tracked in `open/malay-training-labels-are-unchecked.md`.
 
 The custom `HouseCheck` icon means house trained only. The adoption home check or home visit

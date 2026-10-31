@@ -32,6 +32,9 @@ Record active multi-step work streams below.
 - [x] Owner's answers (2026-10-30): chips hidden, quick view row, litter box quiz points
 - [x] Seven xhigh review rounds and their fixes. Stopped at round 7: the last rounds found only
   pasted-Unicode edge cases beyond the ceiling, wording, and the out-of-scope items in `open/`
+- [x] Rounds 8-9 on the owner's follow-ups. Round 10 (after merging main, PR #233) found the
+  gallery card's new tag icons (#232) drew training tags with other icons and stricter matching;
+  the card now uses `trainingKindFor` and `ICON_BY_TRAINING`
 
 ## Review
 
@@ -40,8 +43,8 @@ view, litter box training earns quiz points. Not done, deliberately: the older q
 problems in `open/match-quiz-beginner-score-misreads-medical-notes-and-tags.md`, the tag
 matching split in `open/free-text-pet-tags-are-matched-two-different-ways.md`, the Malay labels
 (`open/malay-training-labels-are-unchecked.md`) and the quick view's photo bug found on the way
-(`open/gallery-quick-view-shows-the-fallback-photo.md`). Gallery cards keep their training chips:
-they have no Training row, so the chips are not redundant there.
+(`open/gallery-quick-view-shows-the-fallback-photo.md`). Gallery cards have no Training row; the
+merge of #232 gave them tag icons, and their training tags now share the row's matcher and icons.
 
 # Home page: one light-blue accent, flat borderless cards
 

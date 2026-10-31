@@ -39,6 +39,22 @@ describe("PetCard", () => {
       }
     );
   });
+
+  describe("training tags", () => {
+    it.each([
+      ["House-Trained", "lucide-house-check"],
+      ["House Trained", "lucide-house-check"],
+      ["Litter Trained", "lucide-litter-box"],
+      ["leash_trained", "lucide-footprints"],
+    ])("draws %j with the Training row's icon, not a text chip", (tag, iconClass) => {
+      // The card's own TAG_ICONS matched only one exact spelling per tag and used other icons,
+      // so a card and the quick view it opens disagreed on the same pet.
+      const { container } = renderCard({ tags: [tag] });
+
+      expect(container.querySelector(`svg.${iconClass}`)).not.toBeNull();
+      expect(container.querySelector("li.bg-secondary")).toBeNull();
+    });
+  });
 });
 
 // The card's primary action follows getPlacementOptions: adopt for an available animal, foster

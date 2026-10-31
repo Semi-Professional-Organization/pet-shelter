@@ -10,9 +10,9 @@ import { trainingKindsIn, type TrainingKind } from "@/lib/domain/petTraining";
 /**
  * Kept out of `lib/domain/petTraining.ts` for the reason `PetStatusIcon` gives: that
  * module stays React-free. The exhaustive `Record` means a new kind fails the typecheck
- * here until it has an icon.
+ * here until it has an icon. Gallery cards use it too, so both show the same icon.
  */
-const ICON_BY_TRAINING: Record<TrainingKind, LucideIcon> = {
+export const ICON_BY_TRAINING: Record<TrainingKind, LucideIcon> = {
   houseTrained: HouseCheck,
   litterBoxTrained: LitterBox,
   leashTrained: Footprints,
