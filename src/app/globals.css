@@ -571,26 +571,6 @@
   }
 }
 
-@keyframes hero-animal-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(1deg);
-  }
-}
-
-.hero-animal-float {
-  animation: hero-animal-float 6s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-animal-float {
-    animation: none;
-  }
-}
-
 /* ==========================================================================
    3. COMPONENTS — the recurring shells, expressed once.
    --------------------------------------------------------------------------

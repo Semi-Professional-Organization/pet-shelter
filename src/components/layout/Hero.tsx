@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Heart,
   ArrowRight,
@@ -37,19 +36,6 @@ const METRIC_PRESENTATION: Record<HomeMetricIcon, { icon: typeof ShieldCheck }> 
 };
 
 const COUNT_UP_MS = 1100;
-
-// The top pair sits above the headline; from lg to xl the ring area is too short for them now that
-// the impact strip shares the first screen, so they would land behind "Coexistence". They return at xl.
-const HERO_ANIMALS = [
-  { src: "/cutouts/cat-png-17.png", className: "h-32 w-24 max-xl:hidden", style: { left: "20%", top: "7%" }, delay: "0s" },
-  { src: "/cutouts/cat-png-6.png", className: "h-28 w-24 max-xl:hidden", style: { right: "20%", top: "7%" }, delay: "-1.2s" },
-  { src: "/cutouts/dog-png-30.png", className: "h-36 w-28", style: { left: "7%", top: "28%" }, delay: "-2.4s" },
-  { src: "/cutouts/dog-png-18.png", className: "h-32 w-24", style: { right: "7%", top: "28%" }, delay: "-3.6s" },
-  { src: "/cutouts/cat-png-28.png", className: "h-28 w-24", style: { left: "7%", bottom: "14%" }, delay: "-4.8s" },
-  { src: "/cutouts/dog-png-22.png", className: "h-24 w-28", style: { right: "7%", bottom: "14%" }, delay: "-6s" },
-  { src: "/cutouts/dog-png-14.png", className: "h-40 w-28", style: { left: "22%", bottom: "4%" }, delay: "-7.2s" },
-  { src: "/cutouts/cat-png-20.png", className: "h-36 w-24", style: { right: "22%", bottom: "4%" }, delay: "-8.4s" },
-] as const;
 
 /**
  * Counts a figure up from zero, as progressive enhancement.
@@ -146,23 +132,11 @@ export function Hero({ metrics }: HeroProps = {}) {
   return (
     <>
       {/* The first screen holds the hero and the impact strip together, so the figures are seen
-          without scrolling. The cut-outs are positioned inside the upper area only, which keeps
-          the ring from drifting over the five-card row beneath it. */}
+          without scrolling. The ring of animal cut-outs is gone again, as in 3835a0c: its PNGs are
+          kept out of git by `*.png`, so a deploy served them as 404s, and the shelter has no rights
+          to them. Hero images return through an admin editor once the shelter has its own. */}
       <section className="relative flex min-h-[calc(100dvh-4rem)] flex-col overflow-hidden bg-work-ground">
         <div className="relative flex flex-1 items-center">
-          <div className="pointer-events-none absolute inset-0 z-0 hidden lg:block" aria-hidden="true">
-            {HERO_ANIMALS.map((animal) => (
-              <Image
-                key={animal.src}
-                src={animal.src}
-                alt=""
-                width={320}
-                height={476}
-                className={`hero-animal-float absolute object-contain drop-shadow-xl ${animal.className}`}
-                style={{ ...animal.style, animationDelay: animal.delay }}
-              />
-            ))}
-          </div>
           <div className="relative w-full px-6 py-12 sm:px-8 lg:px-12">
             <div className="relative z-10 mx-auto max-w-2xl space-y-6 text-center">
               <h1 className="font-heading text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.15]">
@@ -187,20 +161,6 @@ export function Hero({ metrics }: HeroProps = {}) {
                   {isMs ? "Lihat Haiwan Reskue" : "Meet Our Animals"}
                   <ArrowRight className="size-4 ml-0.5" />
                 </Link>
-              </div>
-
-              <div className="grid grid-cols-4 gap-3 pt-8 lg:hidden" aria-hidden="true">
-                {HERO_ANIMALS.map((animal) => (
-                  <Image
-                    key={animal.src}
-                    src={animal.src}
-                    alt=""
-                    width={320}
-                    height={476}
-                    className="hero-animal-float h-28 w-full object-contain drop-shadow-lg sm:h-36"
-                    style={{ animationDelay: animal.delay }}
-                  />
-                ))}
               </div>
             </div>
           </div>
