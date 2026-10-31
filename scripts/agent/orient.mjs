@@ -1,10 +1,10 @@
 /**
  * `node scripts/agent.mjs orient`: where this session is. The SessionStart hook runs it as
  * `orient --brief --hook`, so a fresh session starts knowing its checkout, its branch against
- * `origin/master`, its uncommitted work and any hand-off waiting for it, without spending a call.
+ * `origin/main`, its uncommitted work and any hand-off waiting for it, without spending a call.
  *
  * This is the minimal orient of the agent-scripts plan's second pull request. Who else is working
- * here, open pull requests on your paths, the ledger read from `origin/master` and ports come with
+ * here, open pull requests on your paths, the ledger read from the default branch and ports come with
  * the full one, in a later pull request.
  *
  * Read-only: it runs git, never fetches, and reads `tasks/open/HANDOFF-*.md`.
@@ -29,6 +29,42 @@ function worktreeDirs(common) {
 }
 
 /**
+ * The default branch every session compares against, and whether this clone still predates its
+ * rename from `master` to `main` on 2026-10-28. A clone made before then keeps an `origin/HEAD`
+ * naming `origin/master`: plain `git fetch` neither moves it nor prunes `origin/master`, which stays
+ * resolvable and frozen at the rename, `git fetch --prune` leaves it dangling, and a single-branch
+ * (any `--depth`) clone never gets `origin/main` at all. Counting against that frozen ref would print
+ * a wrong and growing ahead/behind, so only `origin/main` is ever counted against, and a clone
+ * where it is missing or `origin/HEAD` names something else is pointed at the repair steps. Those
+ * live in CONTRIBUTING rather than here, because the right commands depend on how the clone was
+ * made, which one line cannot tell apart reliably (review rounds 3 to 5 of this change).
+ *
+ * ceiling: knows one remote, `origin`, and one name, `main`. A clone with no `origin/HEAD` and no
+ * `origin/main` is not flagged. The next rename edits BRANCH and the repair line here, the
+ * `(?:master|main)` alternatives in usage.mjs and the CONTRIBUTING section. Read-only: it reports,
+ * never repairs.
+ */
+const BRANCH = "main";
+const MAIN = `refs/remotes/origin/${BRANCH}`;
+export const REPAIR_SECTION = "Clones made before the rename";
+/**
+ * The ahead/behind counts against `origin/main`, or null, and the repair line when `origin/HEAD`
+ * exists but `origin/main` is missing or not what it names. Full ref names, so a local branch that
+ * happens to be called `origin/main` is never taken for the remote. Counts also fail on a branch
+ * with no commit yet, so only then is `origin/main` itself looked up.
+ */
+function againstMain(cwd) {
+  const counts = git(cwd, ["rev-list", "--left-right", "--count", `${MAIN}...HEAD`]);
+  // symbolic-ref, unlike rev-parse, still names the target of a dangling origin/HEAD.
+  const head = git(cwd, ["symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"]);
+  const missing = Boolean(head) && !counts && !git(cwd, ["rev-parse", "--verify", "--quiet", `${MAIN}^{commit}`]);
+  const repair = head && (head !== MAIN || missing)
+    ? `origin/HEAD names ${head.replace("refs/remotes/", "")}${missing ? `, and there is no origin/${BRANCH}` : ""}: likely a clone from before the rename of master to ${BRANCH}; see .github/CONTRIBUTING.md, "${REPAIR_SECTION}"`
+    : null;
+  return { counts, repair };
+}
+
+/**
  * The checkout `cwd` is in, or null outside a git repository. `stray` is set when `cwd` is a
  * `.claude/worktrees/<name>` folder git does not know as a worktree, so it silently resolves to
  * the checkout above it; whatever a session there edits lands in that checkout.
@@ -38,7 +74,7 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
   if (!top) return null;
   const gitDir = git(cwd, ["rev-parse", "--path-format=absolute", "--git-dir"]);
   const common = git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-  const counts = git(cwd, ["rev-list", "--left-right", "--count", "origin/master...HEAD"]);
+  const { counts, repair } = againstMain(cwd);
   const [behind, ahead] = counts ? counts.split(/\s+/).map(Number) : [null, null];
   const status = git(cwd, ["status", "--porcelain"]);
   // Every checkout of a repository shares its remote refs, but each worktree writes its own
@@ -59,6 +95,8 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
     worktree: Boolean(gitDir && common && slashed(gitDir) !== slashed(common)),
     branch: git(cwd, ["branch", "--show-current"]) || null,
     head: git(cwd, ["rev-parse", "--short", "HEAD"]),
+    base: `origin/${BRANCH}`,
+    repair,
     ahead,
     behind,
     uncommitted: status ? status.split("\n").filter(Boolean).length : 0,
@@ -69,8 +107,9 @@ export function whereAmI(cwd, { now = Date.now(), platform = process.platform } 
 
 /** One sentence about the checkout, for a hand-off's header. */
 export function describeWhere(w) {
-  const against = w.ahead === null ? "no `origin/master` to compare with" : `${w.ahead} ahead and ${w.behind} behind \`origin/master\``;
-  return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.`;
+  const against = w.ahead === null ? `no \`${w.base}\` to compare with` : `${w.ahead} ahead and ${w.behind} behind \`${w.base}\``;
+  const repair = w.repair ? ` Note: ${w.repair}.` : "";
+  return `\`${w.top}\` on ${w.branch ? `\`${w.branch}\`` : "a detached HEAD"} at \`${w.head ?? "no commit"}\`; ${against}; ${w.uncommitted} uncommitted paths.${repair}`;
 }
 
 /**
@@ -91,9 +130,10 @@ export function orientLines(w, handoffs, options = {}) {
   const fetched = w.fetchedMinutesAgo === null ? "never fetched" : `as of the last fetch, ${ago(w.fetchedMinutesAgo)} ago`;
   lines.push(
     w.ahead === null
-      ? `git: no origin/master to compare with; ${w.uncommitted} uncommitted paths`
-      : `git: ${w.ahead} ahead and ${w.behind} behind origin/master ${fetched}; ${w.uncommitted} uncommitted paths`,
+      ? `git: no ${w.base} to compare with; ${w.uncommitted} uncommitted paths`
+      : `git: ${w.ahead} ahead and ${w.behind} behind ${w.base} ${fetched}; ${w.uncommitted} uncommitted paths`,
   );
+  if (w.repair) lines.push(`git: ${w.repair}`);
   const waiting = handoffs.filter((h) => !session || h.session !== session);
   for (const h of waiting.slice(0, 3)) {
     lines.push(`hand-off: ${h.file} "${h.title}", from session ${(h.session ?? "unknown").slice(0, 8)}${h.opened ? ` on ${h.opened}` : ""}`);
@@ -119,10 +159,12 @@ function hookSession(read) {
 
 const HELP = `usage: node scripts/agent.mjs orient [--brief] [--hook]
 
-Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/master
-as of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
+Where this session is: main checkout or worktree, branch and HEAD, ahead and behind origin/main as
+of the last fetch (it never fetches), uncommitted paths, and hand-offs waiting in
 tasks/open/HANDOFF-*.md. It warns when the folder is a .claude/worktrees/ one git does not know,
-which silently resolves to the checkout above it. Read-only.
+which silently resolves to the checkout above it. When origin/HEAD exists and names something other
+than origin/main, or origin/main is missing, it adds a line pointing at the repair steps for a clone
+made before the rename to main (still a pass). A clone with no origin/HEAD is not checked. Read-only.
 
   --brief  the short form a session starts with; until the full orient lands it is the only one
   --hook   as the SessionStart hook in .claude/settings.json runs it: the hook event on stdin,

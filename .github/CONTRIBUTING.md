@@ -21,8 +21,37 @@ git clone https://github.com/YOUR_GITHUB_USERNAME/pet-shelter.git
 cd pet-shelter
 
 # Add upstream remote to stay synced with main repo
-git remote add upstream https://github.com/fergeley/pet-shelter.git
+git remote add upstream https://github.com/Semi-Professional-Organization/pet-shelter.git
 ```
+
+### Clones made before the rename
+
+The default branch was renamed from `master` to `main` on 2026-10-28, when the repository moved to
+the Semi-Professional-Organization org. A clone made before then keeps tracking a frozen
+`origin/master`, and orient says so when a session starts. Repair it once:
+
+```bash
+git remote set-branches origin '*'   # only if `git config --get-all remote.origin.fetch` lacks a `*`
+git fetch origin --prune
+git remote set-head origin -a
+git branch -m master main            # if you have a local master and no local main yet
+git branch -u origin/main main       # then point main at origin/main
+```
+
+If you already have a local `main`, switch to it and delete the stale local `master`
+(`git switch main && git branch -d master`) instead of renaming it. The `set-branches` line is for single-branch and `--depth` clones, whose
+fetch names `master` alone and fails after the rename. It replaces every fetch line, so skip it in
+a full clone, and re-add any extra one you had (such as a `refs/pull/*` line) with
+`git remote set-branches --add` afterwards.
+
+In a fork set up as in step 1, `origin` is your fork. Rename its default branch to `main` on GitHub
+(Settings → General → Default branch) and then run the steps as written. For `upstream`, run the
+first three lines with `upstream` in place of `origin`.
+
+Whichever remote points at the org repository (`origin` in a direct clone, `upstream` in a fork)
+may still say `fergeley/pet-shelter`. That works through GitHub's redirect;
+`git remote set-url <that remote> https://github.com/Semi-Professional-Organization/pet-shelter.git`
+makes it explicit. Never point a fork's `origin` at the org repository.
 
 ### 2. Set Up Local Environment
 
@@ -246,26 +275,26 @@ Before hitting "Create Pull Request", verify:
 - Request re-review after addressing feedback
 - Polite disagreement is okay—explain your reasoning clearly
 
-### Merging into `master`
+### Merging into `main`
 
-`master` takes changes only through a pull request, squash-merged, once six checks pass:
+`main` takes changes only through a pull request, squash-merged, once six checks pass:
 `Static & architecture analysis`, `Production build`, `Unit, integration & component tests`,
 `Strict persistence against Postgres`, `Playwright golden paths` and `Commit messages`.
 Vercel's preview status is not one of them: Vercel decides whether to deploy a commit by who wrote
 it, so it may never report on a pull request that Dependabot opens. No approval is required.
-Nobody can push, force-push or delete `master` directly, maintainers included. The rule is the
-repository ruleset "Basic" (Settings → Rules → Rulesets), active with all six checks; how it was
-verified is in
+Nobody can push, force-push or delete `main` directly, maintainers included. The rule is the
+repository ruleset "Basic" (Settings → Rules → Rulesets), active with all six checks on the
+default branch (`master` until 2026-10-28, when it was renamed `main`); how it was verified is in
 [`tasks/decisions/2026-10-21-the-master-ruleset-is-on-and-does-not-block-green-pull-requests.md`](../tasks/decisions/2026-10-21-the-master-ruleset-is-on-and-does-not-block-green-pull-requests.md).
 The reasons are in
 [`tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md`](../tasks/decisions/2026-10-20-master-merges-only-green-squashed-pull-requests.md).
 
 - **Renaming a CI job renames its check.** The rename cannot merge until the ruleset requires the
-  new name, so update the ruleset just before merging it, then merge `master` into any other open
+  new name, so update the ruleset just before merging it, then merge `main` into any other open
   pull request so that it reports the new name too.
 - **When a check is down rather than red** (a GitHub or Vercel outage), a maintainer can set the
   ruleset's enforcement to Disabled, merge, and set it back to Active. Merging a red pull request
-  is not that case: it is how `master` broke twice in September 2026.
+  is not that case: it is how the default branch broke twice in September 2026.
 
 ---
 
