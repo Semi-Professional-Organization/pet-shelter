@@ -63,7 +63,7 @@ same path, and git merges the directories without a merge driver, a lock, or a p
 - **Live kill conditions go in `open/` before the spike runs and are immutable.** A post-hoc edit
   is an automatic DIED.
 - **`open/` is mirrored to public GitHub issues** labelled `ledger`, by CI on every push to
-  `master` (`.github/workflows/ledger-issues.yml`); `npm run ledger:issues` previews the plan. The
+  `main` (`.github/workflows/ledger-issues.yml`); `npm run ledger:issues` previews the plan. The
   file is the source: an issue's description is overwritten from it, deleting an entry closes its
   issue, and `CLAIM-*` files are never mirrored. So write an entry as something the public will
   read. Why: `decisions/2026-09-18-ledger-issues-are-a-one-way-mirror.md`.

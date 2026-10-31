@@ -17,7 +17,7 @@ This guide walks new developers through setting up the pet-shelter application l
 ## Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/fergeley/pet-shelter.git
+git clone https://github.com/Semi-Professional-Organization/pet-shelter.git
 cd pet-shelter
 ```
 

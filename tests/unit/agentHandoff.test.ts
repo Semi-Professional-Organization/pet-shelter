@@ -6,7 +6,7 @@ import { join } from "path";
 
 import { SECTIONS, checkBody, readHandoffs, readHeader, renderHandoff, slugOf } from "../../scripts/agent/handoff.mjs";
 import { main as ledger } from "../../scripts/agent/ledger.mjs";
-import { main as orient, orientLines, whereAmI } from "../../scripts/agent/orient.mjs";
+import { describeWhere, main as orient, orientLines, REPAIR_SECTION, whereAmI } from "../../scripts/agent/orient.mjs";
 import { SHOWN, main as recall, piecesOf, search, snippet } from "../../scripts/agent/recall.mjs";
 import { givenSession, hookEvent, resolveSession, sessionId } from "../../scripts/agent/transcript.mjs";
 
@@ -129,7 +129,7 @@ describe("ledger handoff", () => {
     const text = readFileSync(join(top, "tasks", "open", "HANDOFF-context-meter.md"), "utf8");
     expect(text).toContain("\r\n");
     expect(text).toContain(`- **From session:** \`${SESSION}\``);
-    expect(text).toMatch(/- \*\*Where:\*\* `.*` on `main` at `no commit`; no `origin\/master` to compare with; \d+ uncommitted paths\./);
+    expect(text).toMatch(/- \*\*Where:\*\* `.*` on `main` at `no commit`; no `origin\/main` to compare with; \d+ uncommitted paths\./);
     expect(text).toContain("- **Context at hand-off:** 300K tokens on claude-opus-5-5.");
     expect(text).toContain("## Commands and results\r\n\r\nCommands and results goes here.");
     expect(text).toContain("opened 2026-10-21");
@@ -286,8 +286,10 @@ describe("orient", () => {
   const where = {
     top: "D:/repo",
     worktree: false,
-    branch: "master",
+    branch: "main",
     head: "abc1234",
+    base: "origin/main",
+    repair: null,
     ahead: 2,
     behind: 5,
     uncommitted: 3,
@@ -296,15 +298,60 @@ describe("orient", () => {
   };
   const handoff = (n: number, session: string) => ({ file: `tasks/open/HANDOFF-h${n}.md`, title: `H${n}`, session, opened: "2026-10-21" });
 
-  it("says where the session is, against origin/master as last fetched", () => {
+  it("says where the session is, against the default branch as last fetched", () => {
     expect(orientLines(where, [])).toEqual([
-      "orient: PASS main checkout D:/repo on master at abc1234",
-      "git: 2 ahead and 5 behind origin/master as of the last fetch, 90 minutes ago; 3 uncommitted paths",
+      "orient: PASS main checkout D:/repo on main at abc1234",
+      "git: 2 ahead and 5 behind origin/main as of the last fetch, 90 minutes ago; 3 uncommitted paths",
     ]);
     expect(orientLines({ ...where, worktree: true, branch: null, ahead: null }, [])).toEqual([
       "orient: PASS worktree D:/repo on a detached HEAD at abc1234",
-      "git: no origin/master to compare with; 3 uncommitted paths",
+      "git: no origin/main to compare with; 3 uncommitted paths",
     ]);
+  });
+
+  it("counts against origin/main only, and flags a clone made before the rename", () => {
+    const top = repo();
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: top });
+    const commit = () => git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "c");
+    const see = 'likely a clone from before the rename of master to main; see .github/CONTRIBUTING.md, "Clones made before the rename"';
+    commit();
+    // No remote at all: nothing to count against, nothing to repair.
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: null, ahead: null });
+    // origin/main with no origin/HEAD, as an actions/checkout or init-and-fetch clone has: healthy.
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: 0, behind: 0 });
+    git("update-ref", "-d", "refs/remotes/origin/main");
+    // A single-branch clone from before the rename: origin/master is frozen and origin/main never
+    // arrives. Counting against origin/master would claim a fresh comparison it does not have.
+    git("update-ref", "refs/remotes/origin/master", "HEAD");
+    git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master");
+    commit();
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ base: "origin/main", repair: `origin/HEAD names origin/master, and there is no origin/main: ${see}`, ahead: null, behind: null });
+    // A full clone, never pruned: origin/main arrives, origin/HEAD still names origin/master.
+    commit();
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    const flagged = `origin/HEAD names origin/master: ${see}`;
+    const w = whereAmI(top, { now: NOW })!;
+    expect(w).toMatchObject({ base: "origin/main", repair: flagged, ahead: 0, behind: 0 });
+    expect(orientLines(w, [])[2]).toBe(`git: ${flagged}`);
+    expect(describeWhere(w)).toMatch(/0 ahead and 0 behind `origin\/main`; \d+ uncommitted paths\. Note: origin\/HEAD names .*"Clones made before the rename"\.$/);
+    // Pruned: origin/HEAD dangles, and is still flagged.
+    git("update-ref", "-d", "refs/remotes/origin/master");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: flagged, ahead: 0, behind: 0 });
+    // A local branch named origin/main is not the remote one.
+    git("branch", "origin/main", "HEAD~2");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ ahead: 0, behind: 0 });
+    // Repaired.
+    git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: 0, behind: 0 });
+    // A branch with no commit yet cannot be counted, but nothing needs repair.
+    git("checkout", "-q", "--orphan", "gh-pages");
+    expect(whereAmI(top, { now: NOW })).toMatchObject({ repair: null, ahead: null });
+  });
+
+  it("points at a CONTRIBUTING section that exists", () => {
+    const headings = readFileSync(join(__dirname, "../../.github/CONTRIBUTING.md"), "utf8").split(/\r?\n/);
+    expect(headings).toContain(`### ${REPAIR_SECTION}`);
   });
 
   it("names the hand-offs other sessions left, three at most, and the meter when run as the hook", () => {

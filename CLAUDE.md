@@ -71,7 +71,7 @@ what each returned — announcing "done" without them is not a close.
    rewrite the file — it holds other sessions' streams below yours, and a full-file write deletes
    them. Record what was deliberately *not* done and why: the omissions are the part nobody can
    reconstruct from the code.
-6. **`/code-review` the whole diff against `origin/master` before opening or merging a PR —
+6. **`/code-review` the whole diff against `origin/main` before opening or merging a PR —
    including every commit that fixed an earlier review's findings.** A fix round is new code that
    nobody has reviewed, written in a hurry, and it is where the last three defects in this repo's
    history were: `tasks/lessons/2026-09-08-a-security-fix-needs-an-adversarial-pass-of-its-own-and-its-tests-ar.md`
@@ -88,12 +88,12 @@ what each returned — announcing "done" without them is not a close.
    consecutive rounds with no in-scope correctness finding. At round 8, or sooner if in-scope
    findings are not falling, stop and ask the owner. Only the owner widens scope. Why: the first
    agent-scripts PR ran 25 rounds, most of them on shell spellings a measurement did not need.
-7. **Merge-check against current `origin/master`, then commit and push.** `git fetch origin
-   master`, then `git merge-tree --write-tree --name-only HEAD origin/master` — a dry run that
+7. **Merge-check against current `origin/main`, then commit and push.** `git fetch origin
+   main`, then `git merge-tree --write-tree --name-only HEAD origin/main` — a dry run that
    touches no ref and no working tree. A conflicted PR gets no CI run at all, so resolve before
    opening one. **A clean result is not the end of the check:** git detects conflicts per *path*,
-   so if master restructured something your branch also restructured under different names, both
-   copies merge silently. Read `git log HEAD..origin/master` for anything that overlaps your
+   so if main restructured something your branch also restructured under different names, both
+   copies merge silently. Read `git log HEAD..origin/main` for anything that overlaps your
    work. **If you then merge, and the merge touched `prisma/`, run `npm run db:generate` before
    re-running step 1** — the generated client is untracked, so a schema change arrives without its
    types and `typecheck` fails in files you never opened. Messages checked with

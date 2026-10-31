@@ -162,7 +162,7 @@ merging the base *into* a feature branch never dilutes the result.
 
 The same job lints the pull request's title, which becomes the squash-merge subject. It lives in
 `.github/workflows/commit-messages.yml` rather than `ci.yml` so that editing the title reruns it:
-`Commit messages` is a required check for merging into `master`, and a result for a title the pull
+`Commit messages` is a required check for merging into `main`, and a result for a title the pull
 request no longer has would either block the merge or wave the wrong subject through. Pull requests
 that Dependabot opens skip the commit audit, because their bodies quote release notes, but not the
 title check.

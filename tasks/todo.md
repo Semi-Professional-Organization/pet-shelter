@@ -15,6 +15,31 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Default branch renamed: master to main
+
+**Branch:** `claude/default-branch-main` · opened 2026-10-30
+
+The repository moved to the Semi-Professional-Organization org on 2026-10-28 and its default
+branch became `main`. Live code and instructions still said `master`, so the ledger mirror stopped
+running on merges and the SessionStart orient reported "no origin/master" in every session.
+
+- [x] `orient.mjs` counts against `origin/main` only and points a clone made before the rename at
+      the repair steps, now in CONTRIBUTING ("Clones made before the rename")
+- [x] `usage.mjs` counts the orient and merge commands under either name
+- [x] Workflows: ledger mirror and CI's push trigger on `main` only (see the decision)
+- [x] Live docs: CLAUDE.md close-out, CONTRIBUTING, setup clone URL, COMMIT_MESSAGES, tasks/README
+
+## Review
+
+Deliberately not done: `tasks/decisions/`, `tasks/archive/`, `tasks/lessons/` and `docs/archives/`
+keep `master`, because they record what was true then. `tasks/open/` entries keep it too, except
+the step-7 proposal, which quotes text meant for `CLAUDE.md`. The first mirror run on `main` will
+rewrite every ledger issue anyway (their links still name `fergeley/pet-shelter/blob/master`); it
+was previewed through `planSync` rather than run: see `tasks/open/the-first-ledger-mirror-on-main-and-production-deploys-are-unobserved.md`.
+The planned labelling guidance for AGENTS.md and CONTRIBUTING, and the issue forms, wait for their
+own PR. `scripts/lib/issueGroups/suggest.mjs` keeps `master` as a URL stopword without adding
+`main`, since `main` is also a content word; that heuristic is out of scope here.
+
 # Home page: one light-blue accent, flat borderless cards
 
 **Branch:** `feature/frontend` · opened 2026-10-28 · on top of the owner's uncommitted WIP

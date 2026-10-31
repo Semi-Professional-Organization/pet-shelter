@@ -318,15 +318,19 @@ const NPX = String.raw`npx\s+(?:-\S+\s+)*`;
 
 /**
  * The family commands, each matched only where a command starts. The `git log …
- * HEAD..origin/master` check belongs to merge only; the orient listing of master's new commits
- * is `git log --oneline master..origin/master`.
+ * HEAD..origin/main` check belongs to merge only; the orient listing of the default branch's new
+ * commits is `git log --oneline main..origin/main`. Both accept `master`, the default branch's name
+ * until 2026-10-28, so transcripts from before the rename still count.
+ *
+ * ceiling: matches the two names literally, not `origin/HEAD` or a future name; orient.mjs's
+ * ceiling comment above `BRANCH` says what a rename edits.
  */
 const RUNS = Object.fromEntries(
   Object.entries({
     gates: String.raw`(?:(?:${NPX})?tsc\b.*--noEmit|(?:${NPX})?next\s+build\b)`,
-    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline master\.\.origin\/master|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+(?:-\S+\s+)*tasks[\\/](?:open|lessons|decisions))`,
+    orient: String.raw`(?:git\s+(?:worktree list|branch -a|branch --list|rev-parse --show-toplevel|log --oneline (?:master|main)\.\.origin\/(?:master|main)(?![\w./-])|fetch)|gh\s+pr\s+list|ls\s+-la\s+\.git\/\S*lock|(?:ls|dir|Get-ChildItem)\s+(?:-\S+\s+)*tasks[\\/](?:open|lessons|decisions))`,
     ledger: String.raw`(?:ls|dir|Get-ChildItem|cat|head|tail|sed -n|awk|grep|Get-Content|Select-String)\s.*tasks[\\/](?:todo\.md|open|lessons|decisions)`,
-    merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/master|log\b.*HEAD\.\.origin\/master)`,
+    merge: String.raw`git\s+(?:merge-tree|merge-base\s+HEAD\s+origin\/(?:master|main)(?![\w./-])|log\b.*HEAD\.\.origin\/(?:master|main)(?![\w./-]))`,
     pr: String.raw`gh\s+(?:pr\s+(?:checks|view)|run\s+(?:view|watch|list)|api\s+\S*(?:commits\/\S+\/status|deployments))`,
     ports: String.raw`(?:Get-NetTCPConnection|Test-NetConnection|netstat|lsof\s+-i|Stop-Process|taskkill|Get-CimInstance\s+Win32_Process)`,
   }).map(([name, pattern]) => [name, new RegExp(COMMAND_START + pattern)]),
