@@ -51,6 +51,8 @@ export default defineConfig({
 
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // Fail the run when a test only passes on its retry so flakiness is visible on CI (#145).
+  failOnFlakyTests: !!process.env.CI,
 
   // One worker: the specs share a single database and a single shelter
   // catalogue, so a parallel admin mutation would change what a public spec
