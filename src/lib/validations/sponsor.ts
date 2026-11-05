@@ -30,7 +30,7 @@ export const sponsorRegistrationSchema = z.object({
     .string()
     .trim()
     .toUpperCase()
-    .regex(RECEIPT_NUMBER_PATTERN, "Enter a receipt number in the form HFS-DON-202608-0001"),
+    .regex(RECEIPT_NUMBER_PATTERN, "Enter a donation reference in the form HFS-DON-202608-0001"),
   displayOnWall: z.boolean().default(false),
 });
 

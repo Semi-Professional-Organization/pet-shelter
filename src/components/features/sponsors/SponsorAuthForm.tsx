@@ -149,7 +149,7 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
           <>
             <div className="space-y-1.5">
               <Label htmlFor="sponsorReceipt" className="text-xs font-semibold">
-                {isMs ? "Nombor resit derma *" : "Donation receipt number *"}
+                {isMs ? "Nombor rujukan derma *" : "Donation reference number *"}
               </Label>
               <Input
                 id="sponsorReceipt"

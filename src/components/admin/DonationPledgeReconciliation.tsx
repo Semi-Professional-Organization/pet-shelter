@@ -34,8 +34,8 @@ const DONATION_PLEDGE_QUEUE: ReconciliationQueueSource = {
     <>
       Confirm a transfer has landed to send the donor&apos;s acknowledgement. Match the{" "}
       <span className="font-mono font-semibold">HFS-GFT</span> reference against your bank
-      statement — a pledge reference is not a donation record number, and no record exists for
-      these gifts until you confirm one here. Dismiss a gift that no transfer ever backed.
+      statement — a pledge reference is not a donation record number, and no donation record
+      exists for these gifts until you confirm one here. Dismiss a gift that no transfer ever backed.
     </>
   ),
   plural: "gifts",

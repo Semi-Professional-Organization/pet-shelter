@@ -31,6 +31,13 @@ Record active multi-step work streams below.
 
 - [x] Code, copy and tests
 - [x] Docs, runbook, P2, ledger
+- [x] Review round 1: fixed the Terms page's "registered non-profit" line, the society name and
+  "Registrar of Societies" still printed in the five placeholder report PDFs, the TNRM runbook's
+  "LHDN tax exemption reference" on certificates, the donor failure copy and sponsor sign-in
+  "receipt number" label, "reconciled as receipt" errors, a false "Nothing was recorded" notice,
+  the impact strip's empty third column, and the guard (one walk, case-insensitive, now covers
+  `.json` and the report PDFs). Logged in `open/admin-donation-export-loose-ends.md`: tax fields
+  in the export DTO and audit JSON (#251), the notice timer and tone (pre-existing)
 
 ## Review
 

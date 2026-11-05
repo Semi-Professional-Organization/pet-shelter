@@ -14,34 +14,58 @@ const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
 const SRC = join(ROOT, "src");
 const OWNER = "src/lib/domain/shelterIdentity.ts";
 
-function walk(dir: string, out: string[] = []): string[] {
+const PUBLIC_REPORTS = join(ROOT, "public", "reports");
+
+function walk(dir: string, accept: RegExp, out: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
-    if (statSync(full).isDirectory()) walk(full, out);
-    else if (/\.tsx?$/.test(full)) out.push(full);
+    if (statSync(full).isDirectory()) walk(full, accept, out);
+    else if (accept.test(full)) out.push(full);
   }
   return out;
 }
 
+interface SourceLine {
+  at: string;
+  repoPath: string;
+  text: string;
+}
+
+let cachedLines: SourceLine[] | undefined;
+
 /**
- * Every `repoPath:line` under src/ whose text matches `pattern`, skipping shelterIdentity.ts
- * unless `includeOwner` is set.
+ * Every line of every `.ts`, `.tsx` and `.json` file under src/, plus the placeholder report
+ * PDFs under public/reports (uncompressed, so their text is greppable), read once per run.
+ *
+ * Walking src/ synchronously costs ~6s under full-suite parallel load and once failed as a
+ * timeout rather than an assertion, so the walk is shared by every guard below rather than
+ * repeated per pattern. The tier's `testTimeout` in vitest.config.mts covers it; do not re-add a
+ * per-test timeout here.
  */
-function offendersOutsideOwner(
-  pattern: RegExp,
-  { includeOwner = false }: { includeOwner?: boolean } = {}
-): string[] {
-  const offenders: string[] = [];
-  for (const file of walk(SRC)) {
+function sourceLines(): SourceLine[] {
+  if (cachedLines) return cachedLines;
+  const files = [...walk(SRC, /\.(tsx?|json)$/), ...walk(PUBLIC_REPORTS, /\.pdf$/)];
+  cachedLines = files.flatMap((file) => {
     const repoPath = relative(ROOT, file).split(sep).join("/");
-    if (repoPath === OWNER && !includeOwner) continue;
-    readFileSync(file, "utf8")
+    return readFileSync(file, file.endsWith(".pdf") ? "latin1" : "utf8")
       .split("\n")
-      .forEach((line, index) => {
-        if (pattern.test(line)) offenders.push(`${repoPath}:${index + 1}`);
-      });
-  }
-  return offenders;
+      .map((text, index) => ({ at: `${repoPath}:${index + 1}`, repoPath, text }));
+  });
+  return cachedLines;
+}
+
+/** Every `repoPath:line` in a `.ts`/`.tsx` file under src/, outside shelterIdentity.ts, matching `pattern`. */
+function offendersOutsideOwner(pattern: RegExp): string[] {
+  return sourceLines()
+    .filter((l) => /\.tsx?$/.test(l.repoPath) && l.repoPath !== OWNER && pattern.test(l.text))
+    .map((l) => l.at);
+}
+
+/** Every `repoPath:line` in src/ (code and data) or the report PDFs matching `pattern`. */
+function offendersAnywhere(pattern: RegExp): string[] {
+  return sourceLines()
+    .filter((l) => pattern.test(l.text))
+    .map((l) => l.at);
 }
 
 describe("registration claims the shelter cannot back", () => {
@@ -54,32 +78,31 @@ describe("registration claims the shelter cannot back", () => {
   /** ROS registration numbers and the LHDN approval reference, in any spelling. */
   const STATUTORY_LITERAL = /PPM-\d{3}-\d{2}-\d{8}|LHDN\.\d{2}\/\d{2}\/\d{2}/;
 
-  /** Names and statute references that assert a registered society or tax relief. */
-  const SOCIETY_CLAIM = /Persatuan|Pertubuhan Kebajikan|44\(6\)/;
+  /**
+   * Names, registries and statute references that assert a registered society or tax relief.
+   * Case-insensitive, so "persatuan" and "PERTUBUHAN KEBAJIKAN" count too. A bare "LHDN",
+   * "ROS" or "tax-deductible" is not matched: the site says plainly that it is *not* a tax
+   * receipt, and history comments name what was removed.
+   */
+  const SOCIETY_CLAIM =
+    /Persatuan|Pertubuhan Kebajikan|Pendaftar Pertubuhan|Registrar of Societies|44\(6\)/i;
 
-  /** The `accountHolder:` lines of the dictionary, wherever they sit in the file (#252). */
-  const ACCOUNT_HOLDER_LINES = new Set(
-    readFileSync(join(SRC, "lib", "i18n", "translations.ts"), "utf8")
-      .split("\n")
-      .flatMap((line, index) =>
-        /^\s*accountHolder:/.test(line) ? [`src/lib/i18n/translations.ts:${index + 1}`] : []
-      )
-  );
+  /**
+   * `donations.accountHolder` is the bank account's own name, a banking fact the owner is
+   * confirming with the shelter (#252). It is the one exception, and only until then.
+   */
+  const isAccountHolder = (at: string) =>
+    at.startsWith("src/lib/i18n/translations.ts:") &&
+    /^\s*accountHolder:/.test(
+      sourceLines().find((l) => l.at === at)?.text ?? ""
+    );
 
-  // Walks the whole src/ tree synchronously, which costs ~6s under full-suite parallel load and
-  // once failed as a timeout rather than an assertion. The tier's `testTimeout` in
-  // vitest.config.mts covers it; do not re-add a per-test timeout here.
-  it("prints no ROS number or LHDN reference anywhere under src/", () => {
-    expect(offendersOutsideOwner(STATUTORY_LITERAL, { includeOwner: true })).toEqual([]);
+  it("prints no ROS number or LHDN reference in src/ or the report PDFs", () => {
+    expect(offendersAnywhere(STATUTORY_LITERAL)).toEqual([]);
   });
 
-  it("names no society and cites no tax-relief section anywhere under src/", () => {
-    // `donations.accountHolder` is the bank account's own name, a banking fact the owner is
-    // confirming with the shelter (#252). It is the one exception, and only until then.
-    const offenders = offendersOutsideOwner(SOCIETY_CLAIM, { includeOwner: true }).filter(
-      (at) => !ACCOUNT_HOLDER_LINES.has(at)
-    );
-    expect(offenders).toEqual([]);
+  it("names no society and cites no tax-relief section in src/ or the report PDFs", () => {
+    expect(offendersAnywhere(SOCIETY_CLAIM).filter((at) => !isAccountHolder(at))).toEqual([]);
   });
 });
 

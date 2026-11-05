@@ -45,7 +45,7 @@
    - Sponsors may request a 30-minute supervised visit session during weekend sanctuary visiting hours (Tue–Sun, 10:00 AM – 5:00 PM).
    - Require 48 hours prior notice via WhatsApp to ensure caregiver availability and animal comfort.
 3. **Certificate of Sponsorship**:
-   - Automatically generated with the donor's name, dedicated pet's name, photo, and official LHDN tax exemption reference.
+   - Automatically generated with the donor's name, dedicated pet's name and photo. It is a recognition certificate, not a tax receipt: the shelter holds no LHDN approval (#239).
 
 ---
 

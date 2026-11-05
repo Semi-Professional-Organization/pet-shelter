@@ -525,7 +525,7 @@ export async function rejectDonationPledgeAction(
   if (outcome.status === "already_reconciled") {
     return {
       success: false,
-      error: `Gift ${ref.data} has already been reconciled as receipt ${outcome.receiptNumber} and cannot be dismissed`,
+      error: `Gift ${ref.data} has already been reconciled as record ${outcome.receiptNumber} and cannot be dismissed`,
     };
   }
   if (outcome.status === "not_pending") {

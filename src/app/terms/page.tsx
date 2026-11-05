@@ -40,7 +40,7 @@ export default function TermsOfServicePage() {
           <section className="space-y-3">
             <h2 className="font-heading text-xl font-bold text-foreground">1. Non-Commercial Welfare Commitment</h2>
             <p>
-              Hope for Strays operates as a registered non-profit sanctuary under Malaysian law. We do not breed, sell, or commercially broker companion animals. Every animal in our care is rehomed on the basis of animal welfare, suitability of living premises, and lifelong household compatibility.
+              Hope for Strays is an animal rescue in Selangor. We do not breed, sell, or commercially broker companion animals. Every animal in our care is rehomed on the basis of animal welfare, suitability of living premises, and lifelong household compatibility.
             </p>
           </section>
 

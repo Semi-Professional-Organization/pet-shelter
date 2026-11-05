@@ -539,7 +539,7 @@ export async function rejectPetSponsorshipAction(
   if (outcome.status === "already_reconciled") {
     return {
       success: false,
-      error: `Pledge ${ref.data} has already been reconciled as receipt ${outcome.receiptNumber} and cannot be dismissed`,
+      error: `Pledge ${ref.data} has already been reconciled as record ${outcome.receiptNumber} and cannot be dismissed`,
     };
   }
   if (outcome.status === "not_pending") {

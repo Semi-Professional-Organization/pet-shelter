@@ -80,13 +80,17 @@ function expectBefore(earlier: Element, later: Element) {
   ).not.toBe(0);
 }
 
-async function expectSafeTransferFailure(recordKind: "pledge" | "receipt") {
+async function expectSafeTransferFailure(recordKind: "pledge" | "gift") {
   const message = await screen.findByText(
     new RegExp(
-      `could not confirm that a ${recordKind} was ${recordKind === "pledge" ? "recorded" : "issued"}`,
+      recordKind === "pledge"
+        ? "could not confirm that a pledge was recorded"
+        : "could not confirm that your gift was recorded",
       "i",
     ),
   );
+  // The shelter issues no receipts (#239), so the failure must not imply one was due.
+  expect(message).not.toHaveTextContent(/receipt/i);
 
   expect(message).not.toHaveTextContent(/nothing has been charged/i);
   expect(message).toHaveTextContent(/contact the shelter/i);
@@ -154,7 +158,7 @@ describe("SponsorshipModal checkout contract", () => {
       const user = await fillRequiredDonorDetails();
       await user.click(submissionButton());
 
-      await expectSafeTransferFailure("receipt");
+      await expectSafeTransferFailure("gift");
       expect(
         screen.queryByText(/nothing has been charged/i),
       ).not.toBeInTheDocument();
