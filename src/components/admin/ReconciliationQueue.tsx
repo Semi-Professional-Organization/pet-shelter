@@ -291,7 +291,7 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
       if (result.success) {
         await removeResolvedRow(row.pledgeRef);
         setRowNotice(
-          `${row.pledgeRef} for ${row.supporterName} was dismissed. No donation was recorded; the reason is in the audit log.`
+          `${row.pledgeRef} for ${row.supporterName} was dismissed, and the dismissal is in the audit log. No donation was recorded.`
         );
         setIntent(null);
         setDismissReason("");

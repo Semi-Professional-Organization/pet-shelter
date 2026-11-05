@@ -210,6 +210,7 @@ describe("SponsorshipReconciliation copy", () => {
 
     // The second step, which used to read "Issue receipt".
     await user.click(confirmButton);
+    expect(await screen.findByRole("button", { name: /record donation/i })).toBeInTheDocument();
     expect(container).not.toHaveTextContent(claim);
   });
 });

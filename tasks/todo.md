@@ -38,6 +38,13 @@ Record active multi-step work streams below.
   the impact strip's empty third column, and the guard (one walk, case-insensitive, now covers
   `.json` and the report PDFs). Logged in `open/admin-donation-export-loose-ends.md`: tax fields
   in the export DTO and audit JSON (#251), the notice timer and tone (pre-existing)
+- [x] Review round 2: no logic finding, so the loop stops (two rounds in a row with none). Fixed
+  the guard's missing "registered non-profit" phrases and added its `ceiling:` (probed: reverting
+  each of eight fixed files makes it fail), the runbook's account-name source, the dismiss
+  notice's reason claim, the one-stat strip, the sponsor sign-in label (now "donation record
+  number", as the admin screens say), "once filed", the notifications page's "Receipts", and a
+  superseded-facts banner on tutorials 03 to 05. Declined: the schema's Donation doc comment
+  (#251 rewrites that model), the hard-coded CSV cell index in tests (works; style)
 
 ## Review
 

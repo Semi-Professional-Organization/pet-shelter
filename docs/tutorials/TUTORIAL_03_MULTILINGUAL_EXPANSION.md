@@ -1,5 +1,11 @@
 # Guided Tutorial 03: Multi-Language Expansion (Adding Mandarin & Tamil)
 
+> **Superseded facts (2026-11-05).** This tutorial was written when the shelter was believed to
+> be a registered society with LHDN Subsection 44(6) approval. It is neither (#239). The ROS
+> numbers, LHDN reference and society name below are not real, the site issues no tax receipts,
+> and none of them may be copied into `src/`, where `tests/unit/shelterIdentity.test.ts` rejects
+> them.
+
 **Target Feature**: Expand the zero-dependency localization engine from bilingual (`en` & `ms`) to a 4-language platform supporting **Malaysian Simplified Chinese (`zh-MY`)** and **Tamil (`ta-MY`)** with strict compile-time key parity.  
 **Skill Focus**: TypeScript Indexed Dictionaries, React Context State, and Accessible UI Switchers.
 

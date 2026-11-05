@@ -12,6 +12,9 @@ site makes to the public.
   a donor NRIC. The receipt feature was never live, so production rows should hold none. Belongs
   with #251, which drops the columns: drop the DTO fields in the same change, and decide whether
   old audit `details` need redacting on read.
+- **The schema still describes a tax receipt.** `prisma/schema.prisma`'s `Donation` doc calls
+  each row "an issued LHDN Section 44(6) tax-deductible donation receipt" and points at
+  constants `shelterIdentity.ts` no longer has. #251 rewrites that model; fix the comment there.
 - **A truncation warning can disappear.** Every transient export notice in
   `src/hooks/useAuditLogController.ts` starts an uncancelled 4s timer that clears the notice. A
   timer from an earlier export can clear the incomplete-export warning that is meant to stay.

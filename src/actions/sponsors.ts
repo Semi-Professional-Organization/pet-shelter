@@ -121,7 +121,7 @@ export async function registerSponsorAction(
     return {
       success: false,
       error:
-        "That donation reference does not match this email address. Check the acknowledgement email we sent you when your transfer was confirmed.",
+        "That donation record number does not match this email address. Check the acknowledgement email we sent you when your transfer was confirmed.",
     };
   }
 

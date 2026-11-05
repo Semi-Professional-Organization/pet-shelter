@@ -75,7 +75,8 @@ The form rejects amounts below RM 5.00.
 ## 6. Changing payment details
 
 - **QR codes**: `/admin/settings`, DuitNow QR section.
-- **Bank account name** shown on `/donate` (`donations.accountHolder` in
-  `src/lib/i18n/translations.ts`): being confirmed with the shelter under #252. Do not change it
-  until the shelter confirms the name on the account.
+- **Bank account name**: `/donate` (`DonationWidget.tsx`) and the sponsorship modal
+  (`SponsorshipModal.tsx`) both show "Hope for Strays" as the beneficiary. The name on the
+  account itself is being confirmed with the shelter under #252, which will also settle the
+  unused `donations.accountHolder` dictionary key.
 - **Sponsorship tiers**: `SPONSORSHIP_TIERS` in `src/lib/domain/sponsorshipTiers.ts`.

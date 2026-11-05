@@ -241,8 +241,8 @@ export function NotificationPreferencesClient() {
         </div>
 
         <p className="text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border">
-          Receipts, adoption application updates and other messages you specifically asked
-          for are not affected by these settings.
+          Donation acknowledgements, adoption application updates and other messages you
+          specifically asked for are not affected by these settings.
         </p>
       </CardContent>
     </Card>

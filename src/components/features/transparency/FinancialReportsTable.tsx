@@ -26,8 +26,8 @@ export function FinancialReportsTable({
       <div className="rounded-2xl border border-border bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">
           {isMs
-            ? "Penyata kewangan yang telah diaudit akan disenaraikan di sini selepas difailkan."
-            : "Audited financial statements will be listed here once filed."}
+            ? "Penyata kewangan akan disenaraikan di sini selepas diterbitkan."
+            : "Financial statements will be listed here once published."}
         </p>
       </div>
     );

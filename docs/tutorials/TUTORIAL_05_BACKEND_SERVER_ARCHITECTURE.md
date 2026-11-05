@@ -1,5 +1,11 @@
 # Backend Server Engineer Masterclass: TNRM, Rehabilitation & Sponsorship Engine
 
+> **Superseded facts (2026-11-05).** This tutorial was written when the shelter was believed to
+> be a registered society with LHDN Subsection 44(6) approval. It is neither (#239). The ROS
+> numbers, LHDN reference and society name below are not real, the site issues no tax receipts,
+> and none of them may be copied into `src/`, where `tests/unit/shelterIdentity.test.ts` rejects
+> them.
+
 **Role Track**: **Backend Server Engineer (You)**  
 **Target Milestone**: Building the core data models, server actions, in-memory dual-layer store, and validation engine for **Hope For Strays UM** (*Coexistence through TNRM & Education*).
 

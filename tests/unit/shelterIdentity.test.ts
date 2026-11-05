@@ -85,24 +85,32 @@ describe("registration claims the shelter cannot back", () => {
    * receipt, and history comments name what was removed.
    */
   const SOCIETY_CLAIM =
-    /Persatuan|Pertubuhan Kebajikan|Pendaftar Pertubuhan|Registrar of Societies|44\(6\)/i;
+    /Persatuan|Pertubuhan Kebajikan|Pendaftar Pertubuhan|Registrar of Societies|44\(6\)|registered (?:non-?profit|charity|NGO)|haiwan berdaftar/i;
+
+  // ceiling: a phrase list, so it catches the spellings that shipped before 2026-11-05 (every
+  // phrase above was live in src/ or a report PDF) and their case variants, not synonyms or
+  // a new wording. The PDF half reads raw bytes, so it sees only uncompressed text written as
+  // one string, which is how the placeholder reports are built; a real, compressed or kerned
+  // statement added to public/reports needs a text extractor here instead. Accuracy is measured
+  // by the probe in the #249/#250 PR: reverting any one of those files makes this fail.
 
   /**
    * `donations.accountHolder` is the bank account's own name, a banking fact the owner is
    * confirming with the shelter (#252). It is the one exception, and only until then.
    */
-  const isAccountHolder = (at: string) =>
-    at.startsWith("src/lib/i18n/translations.ts:") &&
-    /^\s*accountHolder:/.test(
-      sourceLines().find((l) => l.at === at)?.text ?? ""
-    );
+  const isAccountHolder = (l: SourceLine) =>
+    l.repoPath === "src/lib/i18n/translations.ts" &&
+    /^\s*accountHolder: "Pertubuhan Kebajikan Hope for Strays",$/.test(l.text);
 
   it("prints no ROS number or LHDN reference in src/ or the report PDFs", () => {
     expect(offendersAnywhere(STATUTORY_LITERAL)).toEqual([]);
   });
 
-  it("names no society and cites no tax-relief section in src/ or the report PDFs", () => {
-    expect(offendersAnywhere(SOCIETY_CLAIM).filter((at) => !isAccountHolder(at))).toEqual([]);
+  it("names no society and claims no registration in src/ or the report PDFs", () => {
+    const offenders = sourceLines()
+      .filter((l) => SOCIETY_CLAIM.test(l.text) && !isAccountHolder(l))
+      .map((l) => l.at);
+    expect(offenders).toEqual([]);
   });
 });
 
