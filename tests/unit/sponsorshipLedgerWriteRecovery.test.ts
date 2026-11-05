@@ -71,11 +71,6 @@ const storedRow = {
   createdAt: new Date("2026-09-14T12:00:00.000Z"),
 };
 
-const ISSUER = {
-  taxDeductibleRef: "TEST-TAX-REFERENCE",
-  shelterRegistrationNo: "TEST-REGISTRATION",
-};
-
 function foreignKeyViolation(): Error & { code: string } {
   return Object.assign(new Error("Foreign key constraint failed"), { code: "P2003" });
 }
@@ -139,7 +134,7 @@ describe("persistent sponsorship write recovery", () => {
     const { settleSponsorship } = await import("@/lib/server/sponsorshipLedger");
 
     await expect(
-      settleSponsorship(draft.pledgeRef, ISSUER, "current-coordinator@example.com")
+      settleSponsorship(draft.pledgeRef, "current-coordinator@example.com")
     ).resolves.toEqual({
       status: "already_reconciled",
       receiptNumber: "HFS-DON-202609-0042",
@@ -156,7 +151,7 @@ describe("persistent sponsorship write recovery", () => {
     const { settleSponsorship } = await import("@/lib/server/sponsorshipLedger");
 
     await expect(
-      settleSponsorship(draft.pledgeRef, ISSUER, "current-coordinator@example.com")
+      settleSponsorship(draft.pledgeRef, "current-coordinator@example.com")
     ).rejects.toBe(uncertainty);
   });
 
@@ -167,7 +162,7 @@ describe("persistent sponsorship write recovery", () => {
     const { settleSponsorship } = await import("@/lib/server/sponsorshipLedger");
 
     await expect(
-      settleSponsorship(draft.pledgeRef, ISSUER, "current-coordinator@example.com")
+      settleSponsorship(draft.pledgeRef, "current-coordinator@example.com")
     ).rejects.toBe(uncertainty);
   });
 
@@ -178,7 +173,7 @@ describe("persistent sponsorship write recovery", () => {
     const { settleSponsorship } = await import("@/lib/server/sponsorshipLedger");
 
     await expect(
-      settleSponsorship(draft.pledgeRef, ISSUER, "current-coordinator@example.com")
+      settleSponsorship(draft.pledgeRef, "current-coordinator@example.com")
     ).rejects.toBe(uncertainty);
   });
 });

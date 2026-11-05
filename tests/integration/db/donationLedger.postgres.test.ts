@@ -11,10 +11,6 @@ import {
 } from "@/lib/server/donationLedger";
 import { senFromInteger } from "@/lib/domain/money";
 import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  STATUTORY_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
-import {
   requireDatabaseUrl,
   assertDatabaseReachable,
   cleanProbeLedger,
@@ -45,8 +41,6 @@ function draft(overrides: Partial<DonationDraft> = {}): DonationDraft {
     currency: "MYR",
     frequency: "one_time",
     paymentMethod: "duitnow_qr",
-    taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-    shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
     ...overrides,
   };
 }
@@ -163,8 +157,8 @@ describe("donation ledger against real PostgreSQL", () => {
           currency: "MYR",
           frequency: "one_time",
           paymentMethod: "duitnow_qr",
-          taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-          shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
+          taxDeductibleRef: "",
+          shelterRegistrationNo: "",
           issuedAt: PROBE_INSTANT,
         },
       })
@@ -187,11 +181,10 @@ describe("donation ledger against real PostgreSQL", () => {
     expect(fetched?.amountSen).toBe(123_456);
   });
 
-  it("round-trips optional and snapshot columns through the read path", async () => {
+  it("round-trips optional columns and writes no tax snapshot on a new row", async () => {
     const record = await issueDonationReceipt(
       draft({
         donorPhone: "+60 12-345 6789",
-        taxIdOrIc: "880101-14-5523",
         targetPetName: "Tuah",
         notes: "In honour of a very good dog.",
       }),
@@ -201,12 +194,14 @@ describe("donation ledger against real PostgreSQL", () => {
     const fetched = await findDonationByReceiptNumber(record.receiptNumber);
     expect(fetched).toMatchObject({
       donorPhone: "+60 12-345 6789",
-      taxIdOrIc: "880101-14-5523",
       targetPetName: "Tuah",
       notes: "In honour of a very good dog.",
-      taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-      shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
+      // The shelter is not a registered society (#239): a new row carries no ROS or
+      // LHDN identifier and no donor tax number.
+      taxDeductibleRef: "",
+      shelterRegistrationNo: "",
     });
+    expect(fetched?.taxIdOrIc).toBeUndefined();
 
     // Columns the schema declares nullable must come back as undefined rather than
     // null, so a persisted DonationRecord matches the in-memory branch exactly.

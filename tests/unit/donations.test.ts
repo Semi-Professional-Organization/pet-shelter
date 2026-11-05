@@ -5,10 +5,6 @@ import { sendDonationReceiptEmail } from "@/lib/email";
 import { getAuditLogs } from "@/lib/domain/auditLog";
 import { listDonations } from "@/lib/server/donationLedger";
 import { findDonationPledgeByRef } from "@/lib/server/donationPledgeLedger";
-import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  STATUTORY_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
 
 describe("Donation & Sponsorship Validation Schema", () => {
   it("should validate a standard donation pledge successfully", () => {
@@ -92,7 +88,6 @@ describe("Donation Server Action (submitDonationPledgeAction)", () => {
       amountMYR: 250,
       frequency: "one_time",
       targetPetName: "Barnaby",
-      taxIdOrIc: "880419-14-5567",
       notes: "Wishing Barnaby a speedy recovery!",
       paymentMethod: "duitnow_qr",
     });
@@ -170,10 +165,7 @@ describe("Donation Receipt Transactional Email Dispatcher", () => {
       frequency: "one_time" as const,
       paymentMethod: "duitnow_qr" as const,
       targetPetName: "Luna",
-      taxIdOrIc: "910101-10-1234",
       notes: "Thanks for taking care of Luna!",
-      taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-      shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
     };
 
     const emailResult = await sendDonationReceiptEmail(mockReceipt);
@@ -289,12 +281,12 @@ describe("Donation persistence (the pledge table is the system of record until r
 });
 
 /**
- * The form has always rendered the tax identifier with a required marker while the
- * schema accepted its absence, so a donor could be handed a receipt that announces
- * itself as tax-deductible and carries nothing to deduct against. `wantsTaxReceipt`
- * is what makes the marker true, and these pin the three states it has.
+ * The shelter is not a registered society and cannot issue a tax receipt (owner,
+ * 2026-11-05; #239), so the form no longer asks for an NRIC and the pledge no
+ * longer stores one. A client built before that change may still send the old
+ * fields; they must be dropped, not stored and not rejected.
  */
-describe("LHDN Section 44(6) relief is opt-in, and opting in requires an identifier", () => {
+describe("a gift collects no tax identifier", () => {
   const pledge = {
     donorName: "Nurul Huda binti Ahmad",
     donorEmail: "nurul.huda@example.com",
@@ -305,72 +297,33 @@ describe("LHDN Section 44(6) relief is opt-in, and opting in requires an identif
     frequency: "one_time" as const,
     paymentMethod: "duitnow_qr" as const,
   };
+  const staleFields = { wantsTaxReceipt: true, taxIdOrIc: "920512-10-5432" };
 
-  it("rejects a claimed receipt with no tax identifier, naming the field", () => {
-    const result = donationPledgeSchema.safeParse({ ...pledge, wantsTaxReceipt: true });
-
-    expect(result.success).toBe(false);
-    const issue = result.error!.issues[0];
-    expect(issue.path).toEqual(["taxIdOrIc"]);
-    expect(issue.message).toMatch(/NRIC, passport or SSM number is required/);
-  });
-
-  it("rejects a whitespace-only identifier, which a trim check would otherwise pass", () => {
-    const result = donationPledgeSchema.safeParse({
-      ...pledge,
-      wantsTaxReceipt: true,
-      taxIdOrIc: "   ",
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error!.issues[0].path).toEqual(["taxIdOrIc"]);
-  });
-
-  it("accepts a claimed receipt that carries one", () => {
-    const result = donationPledgeSchema.safeParse({
-      ...pledge,
-      wantsTaxReceipt: true,
-      taxIdOrIc: "920512-10-5432",
-    });
+  it("strips the retired relief fields instead of parsing them", () => {
+    const result = donationPledgeSchema.safeParse({ ...pledge, ...staleFields });
 
     expect(result.success).toBe(true);
-    expect(result.data!.taxIdOrIc).toBe("920512-10-5432");
+    expect(result.data).not.toHaveProperty("taxIdOrIc");
+    expect(result.data).not.toHaveProperty("wantsTaxReceipt");
   });
 
-  it("still accepts a gift that declines relief, with no identifier at all", () => {
-    const result = donationPledgeSchema.safeParse({ ...pledge, wantsTaxReceipt: false });
-    expect(result.success).toBe(true);
-  });
+  it("records a stale client's gift without storing its tax identifier", async () => {
+    const result = await submitDonationPledgeAction({ ...pledge, ...staleFields });
 
-  it("leaves every pre-existing caller working — the flag is optional, not defaulted", () => {
-    // `DonationPledgeInput` is `z.infer`, the schema's *output* type, where a
-    // `.default()` field is required. Had this been `.default(false)`, every existing
-    // call site would have stopped compiling for a flag it has no opinion about.
-    const result = donationPledgeSchema.safeParse(pledge);
-
-    expect(result.success).toBe(true);
-    expect(result.data!.wantsTaxReceipt).toBeUndefined();
-  });
-
-  it("records a gift that declined relief — the pledge queue stays complete", async () => {
-    const result = await submitDonationPledgeAction({ ...pledge, wantsTaxReceipt: false });
-
-    // Declining relief must not create a gift the shelter never recorded: the
-    // ledger is the shelter's record of money received, not of claims made. What
-    // changed in 2026-09-22 is *when* the receipt half of that record is written.
     expect(result.success).toBe(true);
     expect(result.data!.pledgeRef).toMatch(/^HFS-GFT-\d{8}-\d{6}$/);
 
     const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
+    expect(stored).toBeDefined();
     expect(stored?.taxIdOrIc).toBeUndefined();
     expect(await listDonations()).toHaveLength(0);
   });
 
   it("hands the donor the message, not a serialised ZodError", async () => {
-    const result = await submitDonationPledgeAction({ ...pledge, wantsTaxReceipt: true });
+    const result = await submitDonationPledgeAction({ ...pledge, donorEmail: "not-an-email" });
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/NRIC, passport or SSM number is required/);
+    expect(result.error).toMatch(/valid email address/);
     // The regression this guards: `err.message` on a Zod 4 error is JSON.
     expect(result.error).not.toMatch(/^\s*\[/);
     expect(await listDonations()).toHaveLength(0);

@@ -15,10 +15,6 @@ import {
 } from "@/lib/server/donationLedger";
 import { senFromInteger } from "@/lib/domain/money";
 import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  STATUTORY_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
-import {
   requireDatabaseUrl,
   assertDatabaseReachable,
   cleanProbeLedger,
@@ -41,10 +37,13 @@ import {
 
 const SCOPE = receiptScopeFor(PROBE_INSTANT);
 
-const ISSUER = {
-  taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-  shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
-};
+/**
+ * Gives a pending row the NRIC a pledge made before 2026-11-05 could carry. The
+ * ledger no longer accepts one (#239), but such rows can still be in production.
+ */
+async function seedLegacyTaxId(pledgeRef: string): Promise<void> {
+  await prisma.petSponsorship.update({ where: { pledgeRef }, data: { taxIdOrIc: "880101-14-5523" } });
+}
 
 let serial = 0;
 
@@ -132,7 +131,7 @@ describe("sponsorship ledger against real PostgreSQL", () => {
     const settled = await recordSponsorshipPledge(draft(), {
       now: new Date("2999-01-01T04:00:00.000Z"),
     });
-    await settleSponsorship(settled.pledgeRef, ISSUER, "probe@x", { now: sameInstant });
+    await settleSponsorship(settled.pledgeRef, "probe@x", { now: sameInstant });
 
     // The tiebreak is `id`, in the database's own ordering of that column — asked of
     // Postgres rather than assumed, because text collation decides it, not JavaScript.
@@ -149,9 +148,8 @@ describe("sponsorship ledger against real PostgreSQL", () => {
   });
 
   it("lists a pending commitment without reading the supporter's tax identifier", async () => {
-    const record = await recordSponsorshipPledge(draft({ taxIdOrIc: "880101-14-5523" }), {
-      now: PROBE_INSTANT,
-    });
+    const record = await recordSponsorshipPledge(draft(), { now: PROBE_INSTANT });
+    await seedLegacyTaxId(record.pledgeRef);
 
     // The control: the column holds a value, so a queue read that fetched it would
     // hand it back. Without this the assertion below could not fail.
@@ -170,11 +168,12 @@ describe("sponsorship ledger against real PostgreSQL", () => {
 
   it("settles a pledge as one unit: the receipt and the ACTIVE row commit together", async () => {
     const record = await recordSponsorshipPledge(
-      draft({ taxIdOrIc: "880101-14-5523", notes: "For Tuah, with love" }),
+      draft({ notes: "For Tuah, with love" }),
       { now: PROBE_INSTANT }
     );
+    await seedLegacyTaxId(record.pledgeRef);
 
-    const outcome = await settleSponsorship(record.pledgeRef, ISSUER, "coordinator@example.test", {
+    const outcome = await settleSponsorship(record.pledgeRef, "coordinator@example.test", {
       now: PROBE_INSTANT,
     });
     expect(outcome.status).toBe("reconciled");
@@ -189,10 +188,12 @@ describe("sponsorship ledger against real PostgreSQL", () => {
       donorEmail: "probe@example.test",
       amountSen: 5_000,
       targetPetName: "Probe Pet",
-      taxIdOrIc: "880101-14-5523",
+      // A legacy pledge's NRIC is not copied, and no ROS or LHDN identifier is
+      // stamped: the shelter is not a registered society (#239).
+      taxIdOrIc: null,
       notes: "For Tuah, with love",
-      taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-      shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
+      taxDeductibleRef: "",
+      shelterRegistrationNo: "",
     });
 
     const row = await prisma.petSponsorship.findUnique({ where: { pledgeRef: record.pledgeRef } });
@@ -213,7 +214,7 @@ describe("sponsorship ledger against real PostgreSQL", () => {
     // serial back. Only a real server can show that; the memory branch models it.
     const outcomes = await Promise.all(
       Array.from({ length: 4 }, (_, i) =>
-        settleSponsorship(record.pledgeRef, ISSUER, `coordinator-${i}@example.test`, {
+        settleSponsorship(record.pledgeRef, `coordinator-${i}@example.test`, {
           now: PROBE_INSTANT,
         })
       )
@@ -241,7 +242,7 @@ describe("sponsorship ledger against real PostgreSQL", () => {
 
     // The losers' serials rolled back, so the next receipt in the series is 2, not 5.
     const next = await recordSponsorshipPledge(draft(), { now: PROBE_INSTANT });
-    const settledNext = await settleSponsorship(next.pledgeRef, ISSUER, "probe@x", {
+    const settledNext = await settleSponsorship(next.pledgeRef, "probe@x", {
       now: PROBE_INSTANT,
     });
     expect(settledNext.status === "reconciled" && settledNext.donation.sequenceValue).toBe(2);
@@ -266,7 +267,7 @@ describe("sponsorship ledger against real PostgreSQL", () => {
       status: "not_pending",
       currentStatus: "CANCELLED",
     });
-    expect(await settleSponsorship(record.pledgeRef, ISSUER, "probe@x", { now: PROBE_INSTANT })).toEqual(
+    expect(await settleSponsorship(record.pledgeRef, "probe@x", { now: PROBE_INSTANT })).toEqual(
       { status: "not_pending", currentStatus: "CANCELLED" }
     );
 
@@ -346,7 +347,7 @@ describe("sponsorship ledger against real PostgreSQL", () => {
 
   it("refuses to dismiss a pledge that already carries a receipt", async () => {
     const record = await recordSponsorshipPledge(draft(), { now: PROBE_INSTANT });
-    const settled = await settleSponsorship(record.pledgeRef, ISSUER, "probe@x", {
+    const settled = await settleSponsorship(record.pledgeRef, "probe@x", {
       now: PROBE_INSTANT,
     });
     expect(settled.status).toBe("reconciled");
@@ -358,7 +359,7 @@ describe("sponsorship ledger against real PostgreSQL", () => {
       status: "already_reconciled",
       receiptNumber: number,
     });
-    expect(await settleSponsorship(record.pledgeRef, ISSUER, "probe@x")).toEqual({
+    expect(await settleSponsorship(record.pledgeRef, "probe@x")).toEqual({
       status: "already_reconciled",
       receiptNumber: number,
     });

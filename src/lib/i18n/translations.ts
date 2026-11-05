@@ -298,7 +298,6 @@ export interface TranslationDictionary {
     donorNameLabel: string;
     donorEmailLabel: string;
     donorPhoneLabel: string;
-    donorIcLabel: string;
     donorNotesLabel: string;
     bankTransferTitle: string;
     bankName: string;
@@ -662,12 +661,9 @@ export const translations: Record<Language, TranslationDictionary> = {
       taxReliefNoticeDesc: "Provide your name and email so we can confirm your pledge.",
       dedicateLabel: "Dedicate or Sponsor a Specific Pet (Optional)",
       dedicatePlaceholder: "e.g. For Bella's surgery recovery / Milo's care",
-      donorNameLabel: "Donor Full Name *",
-      donorEmailLabel: "Email Address (to receive e-Receipt) *",
-      donorPhoneLabel: "Phone Number (WhatsApp receipt updates)",
-      // No baked-in "*": this field is required only when the donor asks for a
-      // Section 44(6) receipt, so the marker is rendered from that state instead.
-      donorIcLabel: "Malaysian IC / Passport / SSM Company No.",
+      donorNameLabel: "Donor Full Name",
+      donorEmailLabel: "Email Address",
+      donorPhoneLabel: "Phone Number (WhatsApp updates)",
       donorNotesLabel: "Special Message / Donor Wishes (Optional)",
       bankTransferTitle: "Direct Bank Transfer (Maybank)",
       bankName: "Maybank Berhad",
@@ -677,7 +673,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       copiedBtn: "Copied!",
       duitNowScanTitle: "DuitNow National QR Pay",
       duitNowInstructions: "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app.",
-      pledgeBtn: "Complete Donation Pledge & Generate e-Receipt",
+      pledgeBtn: "Complete Donation Pledge",
       pledgeProcessing: "Recording Pledge...",
       receiptTitle: "Official Donation e-Receipt",
       receiptSubtitle: "Approved Under Subsection 44(6) Income Tax Act 1967 • Ref: {taxRef}",
@@ -1027,10 +1023,9 @@ export const translations: Record<Language, TranslationDictionary> = {
       taxReliefNoticeDesc: "Sila masukkan nama dan emel anda supaya kami boleh mengesahkan ikrar anda.",
       dedicateLabel: "Dedikasikan atau Taja Haiwan Tertentu (Pilihan)",
       dedicatePlaceholder: "cth. Untuk pemulihan pembedahan Bella / penjagaan Milo",
-      donorNameLabel: "Nama Penuh Penderma *",
-      donorEmailLabel: "Alamat E-mel (untuk penerimaan e-Resit) *",
+      donorNameLabel: "Nama Penuh Penderma",
+      donorEmailLabel: "Alamat E-mel",
       donorPhoneLabel: "Nombor Telefon (makluman WhatsApp)",
-      donorIcLabel: "No. Kad Pengenalan / Pasport / No. SSM Syarikat",
       donorNotesLabel: "Mesej Khas / Harapan Penderma (Pilihan)",
       bankTransferTitle: "Pindahan Bank Terus (Maybank)",
       bankName: "Maybank Berhad",
@@ -1040,7 +1035,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       copiedBtn: "Disalin!",
       duitNowScanTitle: "DuitNow QR Kebangsaan",
       duitNowInstructions: "Imbas menggunakan Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, atau mana-mana aplikasi perbankan Malaysia.",
-      pledgeBtn: "Sempurnakan Ikrar Sumbangan & Jana e-Resit",
+      pledgeBtn: "Sempurnakan Ikrar Sumbangan",
       pledgeProcessing: "Merekodkan Ikrar Sumbangan...",
       receiptTitle: "e-Resit Sumbangan Rasmi",
       receiptSubtitle: "Diluluskan Di Bawah Subseksyen 44(6) Akta Cukai Pendapatan 1967 • No. Rujukan: {taxRef}",

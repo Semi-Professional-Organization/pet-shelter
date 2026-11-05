@@ -147,8 +147,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
     donorName,
     donorEmail,
     donorPhone,
-    wantsTaxReceipt,
-    taxIdOrIc,
     notes,
     copiedBank,
     isProcessing,
@@ -167,8 +165,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
     setDonorName,
     setDonorEmail,
     setDonorPhone,
-    setWantsTaxReceipt,
-    setTaxIdOrIc,
     setNotes,
     handleCopyMaybank,
     handleCompleteDonation,
@@ -449,41 +445,17 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                   <ShieldCheck className="size-4 text-success-accent shrink-0" />
                   <span>
                     {targetPet
-                      ? "Receipt issuance waits until a coordinator verifies the transfer."
-                      : "An official receipt is issued for every recorded gift; tax relief is optional below."}
+                      ? "We email an acknowledgement once a coordinator verifies the transfer."
+                      : "We email an acknowledgement once a coordinator verifies the transfer. It is not a tax receipt."}
                   </span>
                 </div>
               </div>
 
-              {/* 3. Supporter information and optional tax-relief details */}
+              {/* 3. Supporter information */}
               <div className="space-y-4">
                 <label className="text-xs font-bold uppercase tracking-wider text-foreground block">
                   4. Supporter Details
                 </label>
-
-                <div className="tone-soft tone-info flex items-start gap-3 rounded-xl border p-4">
-                  <input
-                    type="checkbox"
-                    id="sponsorshipWantsTaxReceipt"
-                    checked={wantsTaxReceipt}
-                    onChange={(event) => setWantsTaxReceipt(event.target.checked)}
-                    aria-describedby="sponsorshipTaxReceiptHint"
-                    className="mt-0.5 size-4.5 accent-primary cursor-pointer"
-                  />
-                  <div className="space-y-0.5">
-                    <label
-                      htmlFor="sponsorshipWantsTaxReceipt"
-                      className="text-sm font-bold cursor-pointer"
-                    >
-                      I want an official tax-exemption receipt (Subsection 44(6) ITA 1967)
-                    </label>
-                    <p id="sponsorshipTaxReceiptHint" className="text-xs">
-                      {targetPet
-                        ? "Requires your NRIC, passport or SSM number. Your receipt is issued only after the shelter verifies the transfer."
-                        : "Requires your NRIC, passport or SSM number. Untick to give without a tax identifier - an official receipt is still issued, but it cannot be claimed."}
-                    </p>
-                  </div>
-                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -502,7 +474,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="donorEmail" className="text-xs font-semibold">
-                      Email Address (For confirmation and receipt) <span className="text-destructive">*</span>
+                      Email Address (For confirmation) <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="donorEmail"
@@ -514,7 +486,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="donorPhone" className="text-xs font-semibold">
                       WhatsApp / Mobile Phone (Optional)
                     </Label>
@@ -524,24 +496,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                       placeholder="012-345 6789"
                       value={donorPhone}
                       onChange={(e) => setDonorPhone(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="taxIdOrIc" className="text-xs font-semibold">
-                      NRIC / Passport / SSM No.
-                      {wantsTaxReceipt && <span className="text-destructive"> *</span>}
-                    </Label>
-                    <Input
-                      id="taxIdOrIc"
-                      required={wantsTaxReceipt}
-                      disabled={!wantsTaxReceipt}
-                      maxLength={30}
-                      placeholder="e.g. 920512-10-5432 / 202101012345"
-                      value={taxIdOrIc}
-                      onChange={(e) => setTaxIdOrIc(e.target.value)}
-                      aria-describedby="sponsorshipTaxReceiptHint"
-                      className="font-mono disabled:opacity-50"
                     />
                   </div>
 
@@ -613,7 +567,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                   follow-up with the shelter.
                 </p>
                 <p className="text-xs font-semibold leading-relaxed">
-                  Receipt issuance follows only after a coordinator verifies the transfer against
+                  We email you an acknowledgement once a coordinator verifies the transfer against
                   the shelter bank statement, usually within two working days.
                 </p>
               </div>
@@ -693,8 +647,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
               <p className="text-xs text-muted-foreground">
                 Status: <strong className="text-foreground">Pending payment verification</strong>.
-                This acknowledgement is not a receipt and cannot be filed for tax relief. Your
-                official Section 44(6) receipt is emailed once the transfer is confirmed.
+                This is not a receipt and cannot be filed for tax relief.
               </p>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">

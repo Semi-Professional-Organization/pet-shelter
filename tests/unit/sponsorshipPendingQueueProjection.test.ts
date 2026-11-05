@@ -116,10 +116,12 @@ describe("the Prisma branch of the pending read", () => {
 });
 
 describe("the in-memory branch of the pending read", () => {
-  it("returns the Prisma branch's shape, and leaves the stored pledge whole", async () => {
+  it("returns the Prisma branch's shape, and stores no smuggled NRIC", async () => {
     expect(isLedgerPersistent()).toBe(false);
 
-    await recordSponsorshipPledge({
+    // The draft type no longer accepts an NRIC (#239). A wider object can still
+    // carry one past the type checker, so smuggle it in with `Object.assign`.
+    await recordSponsorshipPledge(Object.assign({
       petId: null,
       petName: "Kopi",
       sponsorName: "Tan Wei Ling",
@@ -130,18 +132,13 @@ describe("the in-memory branch of the pending read", () => {
       amountSen: senFromInteger(5000),
       paymentMethod: "duitnow_qr",
       pledgeRef: "HFS-PLG-MEMORY-000001",
-      taxIdOrIc: TAX_ID,
-    });
-    // The control: the store holds the identifier, so a queue that passed its rows
-    // straight through would hand it back.
-    expect((await findSponsorshipByPledgeRef("HFS-PLG-MEMORY-000001"))?.taxIdOrIc).toBe(TAX_ID);
+    } as const, { taxIdOrIc: TAX_ID }));
+    // Not stored at all: the memory branch drops it, as the Postgres insert does.
+    expect(await findSponsorshipByPledgeRef("HFS-PLG-MEMORY-000001")).toBeDefined();
+    expect((await findSponsorshipByPledgeRef("HFS-PLG-MEMORY-000001"))?.taxIdOrIc).toBeUndefined();
 
     const [record] = await listPendingSponsorships();
     expect(record.pledgeRef).toBe("HFS-PLG-MEMORY-000001");
     expect(record.taxIdOrIc).toBeUndefined();
-
-    // Left out of the queue's copy, not deleted from the pledge: settling it later
-    // prints the identifier on the statutory receipt.
-    expect((await findSponsorshipByPledgeRef("HFS-PLG-MEMORY-000001"))?.taxIdOrIc).toBe(TAX_ID);
   });
 });

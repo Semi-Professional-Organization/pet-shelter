@@ -9,7 +9,6 @@ import {
   type DonationDraft,
   type DonationRecord,
 } from "@/lib/server/donationLedger";
-import type { StatutoryIssuerIdentity } from "@/lib/domain/shelterIdentity";
 import type { SponsorshipTierId } from "@/types/sponsorship";
 import { formatMYR, Sen, senFromInteger } from "@/lib/domain/money";
 import {
@@ -71,9 +70,13 @@ export interface SponsorshipRecord {
   notes?: string;
 }
 
+/**
+ * `taxIdOrIc` is read back from pledges made before 2026-11-05 and never taken
+ * from a new one: the shelter cannot issue a tax receipt (#239).
+ */
 export type SponsorshipDraft = Omit<
   SponsorshipRecord,
-  "id" | "status" | "receiptNumber" | "createdAt"
+  "id" | "status" | "receiptNumber" | "createdAt" | "taxIdOrIc"
 >;
 
 export class SponsorshipWriteError extends Error {
@@ -133,6 +136,9 @@ export async function recordSponsorshipPledge(
     memorySerial += 1;
     const record: SponsorshipRecord = {
       ...draft,
+      // Overrides a wider object's field too, so memory mode stores no NRIC, as
+      // the Postgres insert does not.
+      taxIdOrIc: undefined,
       id: `mem-spn-${String(memorySerial).padStart(6, "0")}`,
       status: "PENDING_PAYMENT",
       receiptNumber: null,
@@ -157,7 +163,6 @@ export async function recordSponsorshipPledge(
     paymentMethod: draft.paymentMethod,
     status: "PENDING_PAYMENT",
     pledgeRef: draft.pledgeRef,
-    taxIdOrIc: draft.taxIdOrIc ?? null,
     notes: draft.notes ?? null,
     createdAt: when,
   };
@@ -375,7 +380,7 @@ export type SettleOutcome =
   | Exclude<ReconcileOutcome, { status: "reconciled" }>;
 
 /**
- * Confirms a pledge and issues its Section 44(6) receipt as one unit of work.
+ * Confirms a pledge and issues its numbered acknowledgement as one unit of work.
  *
  * Guard first, draw second, write third, all inside the transaction that draws the
  * serial. The conditional `PENDING_PAYMENT → ACTIVE` update takes the row lock; a
@@ -389,7 +394,6 @@ export type SettleOutcome =
  */
 export async function settleSponsorship(
   pledgeRef: string,
-  issuer: StatutoryIssuerIdentity,
   reconciledBy: string,
   options?: { now?: Date }
 ): Promise<SettleOutcome> {
@@ -405,7 +409,7 @@ export async function settleSponsorship(
     // The guard, the draw and the write with no await between them. In a
     // single-threaded process that is the whole transaction, and it is why
     // `issueReceiptInMemory` is synchronous.
-    const donation = issueReceiptInMemory(receiptDraftFor(current, issuer), when);
+    const donation = issueReceiptInMemory(receiptDraftFor(current), when);
     const record: SponsorshipRecord = {
       ...current,
       status: "ACTIVE",
@@ -425,7 +429,7 @@ export async function settleSponsorship(
       if (guard.status === "not_found") return guard;
       if (guard.status === "not_pending") return settledOutcome(guard.record);
 
-      const donation = await drawAndInsert(tx, receiptDraftFor(guard.record, issuer), when);
+      const donation = await drawAndInsert(tx, receiptDraftFor(guard.record), when);
       const row = await tx.petSponsorship.update({
         where: { pledgeRef },
         data: { receiptNumber: donation.receiptNumber },
@@ -457,15 +461,11 @@ export async function settleSponsorship(
 }
 
 /** The receipt a commitment earns, snapshotting what the pledge recorded. */
-function receiptDraftFor(
-  record: SponsorshipRecord,
-  issuer: StatutoryIssuerIdentity
-): DonationDraft {
+function receiptDraftFor(record: SponsorshipRecord): DonationDraft {
   return {
     donorName: record.sponsorName,
     donorEmail: record.sponsorEmail,
     donorPhone: record.sponsorPhone,
-    taxIdOrIc: record.taxIdOrIc,
     tierId: record.tierId as SponsorshipTierId,
     tierName: record.tierName,
     amountSen: record.amountSen,
@@ -474,8 +474,6 @@ function receiptDraftFor(
     paymentMethod: record.paymentMethod,
     targetPetName: record.petName,
     notes: record.notes,
-    taxDeductibleRef: issuer.taxDeductibleRef,
-    shelterRegistrationNo: issuer.shelterRegistrationNo,
   };
 }
 
@@ -683,8 +681,8 @@ export async function listPendingSponsorships(take = 200): Promise<SponsorshipRe
         )
         .slice(0, take)
         // The same shape as the Postgres branch, whose `select` leaves the tax
-        // identifier out. A copy, never a delete: the stored pledge still needs it
-        // for the receipt `settleSponsorship` prints.
+        // identifier out. Memory rows stopped carrying one on 2026-11-05 (#239);
+        // this keeps the projection explicit rather than relying on that.
         .map((row) => ({ ...row, taxIdOrIc: undefined }))
     );
   }
@@ -871,8 +869,8 @@ interface SponsorshipRow {
   receiptNumber: string | null;
   /**
    * Optional so a read may leave it out of its `select`, as the coordinator queue
-   * does — see `listPendingSponsorships`. The receipt path must not: `settleSponsorship`
-   * copies it onto the statutory receipt from the row it locks.
+   * does — see `listPendingSponsorships`. Only pledges made before 2026-11-05 carry
+   * one, and since then nothing copies it onto an acknowledgement.
    */
   taxIdOrIc?: string | null;
   notes: string | null;

@@ -11,7 +11,7 @@ import {
 } from "@/lib/presentation/emailTokens";
 import { getApplicationStatusPresentation } from "@/lib/presentation/applicationStatusPresentation";
 import { escapeHtml } from "@/lib/presentation/escapeHtml";
-import { isTaxClaimable, SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
+import { SHELTER_PHONE_DISPLAY } from "@/lib/domain/shelterIdentity";
 
 export interface EmailResult {
   success: boolean;
@@ -613,20 +613,31 @@ ${SHELTER_NAME}
   });
 }
 
-/** The payment rails a donation can arrive on, read off the receipt that renders them. */
-type PaymentMethod = DonationReceipt["paymentMethod"];
+/**
+ * What the acknowledgement email renders: a `DonationReceipt` without the donor's tax
+ * identifier or the issuer's ROS and LHDN snapshots. The shelter is not a registered
+ * society (owner, 2026-11-05; #239), so the type leaves no field a tax claim could be
+ * printed from, even for an old row that still carries one.
+ */
+export type DonationAcknowledgement = Omit<
+  DonationReceipt,
+  "taxIdOrIc" | "taxDeductibleRef" | "shelterRegistrationNo"
+>;
+
+/** The payment rails a donation can arrive on, read off the acknowledgement that renders them. */
+type PaymentMethod = DonationAcknowledgement["paymentMethod"];
 
 /**
- * Payment-rail labels for the statutory Sec 44(6) receipt.
+ * Payment-rail labels for the donation acknowledgement.
  *
- * Exhaustive by construction. Keyed off `DonationReceipt["paymentMethod"]` — the exact union the
+ * Exhaustive by construction. Keyed off `DonationAcknowledgement["paymentMethod"]` — the exact union the
  * templates below render — so a fourth rail added to that type fails the build here rather than
  * silently receipting the donation as something it was not. A card donation was previously
  * receipted as a bank transfer in the HTML half; see
  * docs/archives/tasks/URGENT_RECEIPT_EMAIL_CORRECTNESS.md.
  *
  * `online_banking` deliberately does not name a bank: the receipt carries no bank field, so the
- * old "(Maybank)" in the plain-text half was an unverifiable claim on a tax document.
+ * old "(Maybank)" in the plain-text half was an unverifiable claim.
  */
 /** The subset of a sponsorship pledge the welcome mail renders. */
 export interface SponsorshipWelcomeInput {
@@ -648,12 +659,19 @@ const PAYMENT_RAIL_LABELS: Record<PaymentMethod, string> = {
 };
 
 /**
- * 5. Sends an official receipt whose tax-filing status follows its donor identifier.
+ * 5. Thanks a donor once a coordinator has matched their transfer.
+ *
+ * A plain acknowledgement, not a tax receipt. Until 2026-11-05 this mail was an
+ * "official" tax-exempt receipt carrying the shelter's ROS number and an LHDN
+ * reference, but the shelter is not a registered society and holds neither (#239).
+ * It now states only what the shelter knows: the money arrived, how much, and its
+ * reference. The single "not a tax receipt" line is there for donors who were told
+ * at checkout, before that date, that a tax receipt would follow.
  */
 export async function sendDonationReceiptEmail(
-  receipt: DonationReceipt
+  receipt: DonationAcknowledgement
 ): Promise<EmailResult> {
-  // Single source of truth for every value both halves of this receipt state. The plain-text and
+  // Single source of truth for every value both halves of this mail state. The plain-text and
   // HTML bodies below read from here and never re-derive a value of their own — one field resolved
   // twice, by hand, in two languages is exactly what let the two halves disagree about how the
   // donor paid.
@@ -663,78 +681,62 @@ export async function sendDonationReceiptEmail(
     amount: `RM ${receipt.amountMYR.toFixed(2)}`,
     paymentRail: PAYMENT_RAIL_LABELS[receipt.paymentMethod],
     donorPhone: receipt.donorPhone ?? "",
-    taxIdOrIc: receipt.taxIdOrIc ?? "",
     targetPetName: receipt.targetPetName ?? "",
     notes: receipt.notes ?? "",
-    // Whether this document may call itself deductible. Resolved once, here, for the
-    // same reason every other field is: the two halves stated the payment rail
-    // differently once already, and a receipt that claims relief in the HTML and
-    // disclaims it in the plain text would be a worse version of that bug.
-    claimable: isTaxClaimable(receipt),
+    notice:
+      "This email acknowledges your gift. It is not a tax receipt and cannot be used to claim tax relief. Reply to this email if you have any questions.",
   };
 
-  const subject = `🐾 Official Donation Receipt: ${fields.amount} - ${receipt.receiptNumber} (${SHELTER_NAME})`;
+  const subject = `🐾 Thank you, we received your gift of ${fields.amount} - ${receipt.receiptNumber} (${SHELTER_NAME})`;
 
   const plainText = `
-${fields.claimable ? "OFFICIAL DONATION RECEIPT & TAX DEDUCTION DOSSIER" : "OFFICIAL DONATION RECEIPT"}
+DONATION RECEIVED: THANK YOU
 ===================================================
 ${SHELTER_NAME}
 ${SHELTER_ADDRESS}
 Phone: ${SHELTER_PHONE} | Email: ${SHELTER_EMAIL}
-Registrar of Societies (PPM): ${receipt.shelterRegistrationNo}
-${fields.claimable ? `LHDN Tax Exemption Reference: ${receipt.taxDeductibleRef}` : ""}
 
-Receipt No: ${receipt.receiptNumber}
-Date Issued: ${receipt.date}
+Reference: ${receipt.receiptNumber}
+Date: ${receipt.date}
 Contribution Frequency: ${fields.frequencyLabel}
 
 DONOR INFORMATION:
-- Issued To: ${receipt.donorName}
+- Name: ${receipt.donorName}
 - Email: ${receipt.donorEmail}
-${fields.donorPhone ? `- Phone: ${fields.donorPhone}\n` : ""}${fields.taxIdOrIc ? `- NRIC / Passport / SSM: ${fields.taxIdOrIc}\n` : ""}
+${fields.donorPhone ? `- Phone: ${fields.donorPhone}\n` : ""}
 SPONSORSHIP ALLOCATION:
 - Allocation: ${receipt.tierName}
 ${fields.targetPetName ? `- Dedicated Animal: ${fields.targetPetName}\n` : ""}- Payment Rail: ${fields.paymentRail}
 ${fields.notes ? `- Donor Message: "${fields.notes}"\n` : ""}
-TOTAL CONTRIBUTION RECEIVED: ${fields.amount}
+TOTAL RECEIVED: ${fields.amount}
 
-${
-    fields.claimable
-      ? "* Under Subsection 44(6) of the Income Tax Act 1967 (Malaysia), donations to Pertubuhan Kebajikan Hope for Strays are eligible for income tax deductions."
-      : "* This receipt carries no NRIC, passport or SSM number, so it cannot be filed against a tax return. Contact the shelter before filing if you need tax documentation."
-  }
-* This receipt is computer-generated and valid without signature.
+* ${fields.notice}
 
 Thank you for your life-saving generosity and support of our shelter animals!
   `.trim();
 
   const html = wrapEmailHtml(`
     <div style="border-bottom: 2px solid ${EMAIL_RECEIPT.ink}; padding-bottom: 16px; margin-bottom: 20px;">
-      <span class="badge badge-success">${fields.claimable ? "Official Tax-Exempt e-Receipt" : "Official Donation Receipt"}</span>
+      <span class="badge badge-success">Donation Received</span>
       <h2 style="margin: 8px 0 4px 0; font-size: 22px; color: ${EMAIL_RECEIPT.ink};">Thank You for Your Generous Contribution!</h2>
       <p style="margin: 0; font-size: 13px; color: ${EMAIL_RECEIPT.inkMuted};">
-        Receipt Reference: <strong style="font-family: monospace; color: ${EMAIL_RECEIPT.ink};">${receipt.receiptNumber}</strong> &bull; Date: ${receipt.date}
+        Reference: <strong style="font-family: monospace; color: ${EMAIL_RECEIPT.ink};">${receipt.receiptNumber}</strong> &bull; Date: ${receipt.date}
       </p>
     </div>
 
     <p>Dear <strong>${escapeHtml(receipt.donorName)}</strong>,</p>
-    <p>We gratefully acknowledge receipt of your gift of <strong style="font-size: 16px; color: ${EMAIL_RECEIPT.ink};">${fields.amount}</strong> (${fields.frequencyLabel}) to <strong>${SHELTER_NAME}</strong>.</p>
+    <p>We have received your gift of <strong style="font-size: 16px; color: ${EMAIL_RECEIPT.ink};">${fields.amount}</strong> (${fields.frequencyLabel}) to <strong>${SHELTER_NAME}</strong>.</p>
 
     <div class="card" style="background:${EMAIL_RECEIPT.paper}; border-left: 4px solid ${EMAIL_RECEIPT.inkAccent}; padding: 18px; margin: 20px 0;">
       <table style="width:100%; font-size: 13px; border-collapse: collapse;">
         <tr>
-          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint}; width: 40%;"><strong>Issued To:</strong></td>
+          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint}; width: 40%;"><strong>Donor:</strong></td>
           <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_RECEIPT.ink};">${escapeHtml(receipt.donorName)}</td>
         </tr>
         <tr>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Email / Contact:</strong></td>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.ink};">${escapeHtml(receipt.donorEmail)} ${fields.donorPhone ? `(${escapeHtml(fields.donorPhone)})` : ""}</td>
         </tr>
-        ${fields.taxIdOrIc ? `
-        <tr>
-          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Tax ID / NRIC / SSM:</strong></td>
-          <td style="padding: 4px 0; font-family: monospace; font-weight: 600; color: ${EMAIL_RECEIPT.ink};">${escapeHtml(fields.taxIdOrIc)}</td>
-        </tr>` : ""}
         <tr>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Allocation Fund:</strong></td>
           <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_RECEIPT.ink};">${escapeHtml(receipt.tierName)}</td>
@@ -761,14 +763,7 @@ Thank you for your life-saving generosity and support of our shelter animals!
     </div>
 
     <div style="background:${EMAIL_RECEIPT.panel}; padding: 14px; border-radius: 6px; font-size: 12px; color: ${EMAIL_RECEIPT.inkSoft}; margin: 20px 0; line-height: 1.5; border: 1px solid ${EMAIL_RECEIPT.rule};">
-      <strong>${fields.claimable ? "Malaysian Tax Deduction Information" : "Receipt filing status"}:</strong><br/>
-      Official Shelter Registration No: <strong>${receipt.shelterRegistrationNo}</strong><br/>
-      ${fields.claimable ? `LHDN Inland Revenue Board Tax Exemption Reference: <strong>${receipt.taxDeductibleRef}</strong><br/>` : ""}
-      ${
-        fields.claimable
-          ? "<em>* This computer-generated receipt is valid for personal or corporate tax filing in Malaysia under Section 44(6) of the Income Tax Act 1967.</em>"
-          : "<em>* This receipt carries no NRIC, passport or SSM number, so it cannot be filed against a tax return. Contact the shelter before filing if you need tax documentation.</em>"
-      }
+      <em>* ${fields.notice}</em>
     </div>
 
     <p style="font-size: 14px; color: ${EMAIL_BRAND.mutedForeground};">
@@ -803,7 +798,7 @@ Thank you for your life-saving generosity and support of our shelter animals!
  *
  * Deliberately not a tax document. The commitment has not been reconciled
  * against the shelter's bank statement, so this acknowledges it, carries the
- * supporter's badge, and states plainly when the official receipt follows.
+ * supporter's badge, and states plainly when the acknowledgement follows.
  * Sending a numbered receipt here would hand someone a filing document for a
  * transfer that may never arrive — see `reconcilePetSponsorshipAction`.
  *
@@ -850,8 +845,7 @@ ${pledge.reconciliationNotice}
 Please quote ${pledge.pledgeRef} in your transfer description so our coordinator
 can match your payment quickly.
 
-IMPORTANT: This confirms your sponsorship pledge; it is not a receipt. Your
-official receipt is issued separately once your payment has been reconciled.
+IMPORTANT: This confirms your sponsorship pledge; it is not a receipt.
 
 With gratitude,
 The ${SHELTER_NAME} Team
@@ -920,8 +914,7 @@ The ${SHELTER_NAME} Team
 
     <div style="background:${EMAIL_BRAND.muted}; padding: 14px; border-radius: 6px; font-size: 12px; color: ${EMAIL_BRAND.mutedForeground}; margin: 20px 0; line-height: 1.5;">
       <em>
-        This confirms your sponsorship pledge and is <strong>not</strong> a receipt. Your official
-        receipt is issued separately once your payment has been reconciled.
+        This confirms your sponsorship pledge and is <strong>not</strong> a receipt.
       </em>
     </div>
 
@@ -962,13 +955,12 @@ export interface DonationPledgeEmailInput {
  * ## This is not a receipt, and says so in both halves
  *
  * Until 2026-09-22 the donation form sent `sendDonationReceiptEmail` immediately,
- * so a supporter who had sent no money received an official Section 44(6) document
- * with a live `HFS-DON-*` number on it. This mail replaces that one at submission
- * time. The receipt still exists and is still sent — from
+ * so a supporter who had sent no money received an official tax document with a
+ * live `HFS-DON-*` number on it. This mail replaces that one at submission time.
+ * The acknowledgement still exists and is still sent — from
  * `reconcileDonationPledgeAction`, once a coordinator has matched the transfer.
  *
- * Nothing here passes through `isTaxClaimable`, because there is no receipt to ask
- * the question about. Both halves disclaim the tax status explicitly rather than
+ * Both halves disclaim the tax status explicitly rather than
  * merely omitting it: a donor who has had a tax document from this shelter before
  * will otherwise assume this is one, and file it.
  *
@@ -1024,9 +1016,7 @@ Please quote ${pledge.pledgeRef} in your transfer description so our coordinator
 can match your payment quickly.
 
 IMPORTANT: This email confirms that we recorded your pledge. It is NOT a receipt
-and it carries no receipt number, so it cannot be used to claim tax relief. Your
-official Section 44(6) receipt is issued and emailed separately, once your
-payment has been reconciled.
+and it cannot be used to claim tax relief.
 
 With gratitude,
 The ${SHELTER_NAME} Team
@@ -1084,10 +1074,8 @@ The ${SHELTER_NAME} Team
 
     <div style="background:${EMAIL_BRAND.muted}; padding: 14px; border-radius: 6px; font-size: 12px; color: ${EMAIL_BRAND.mutedForeground}; margin: 20px 0; line-height: 1.5;">
       <em>
-        This email confirms that we recorded your pledge. It is <strong>not</strong> a receipt, it
-        carries no receipt number, and it cannot be used to claim tax relief. Your official
-        Section 44(6) receipt is issued and emailed separately once your payment has been
-        reconciled.
+        This email confirms that we recorded your pledge. It is <strong>not</strong> a receipt,
+        and it cannot be used to claim tax relief.
       </em>
     </div>
 

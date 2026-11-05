@@ -4,14 +4,13 @@ export interface DonorDetails {
   name: string;
   email: string;
   phone?: string;
-  taxIdOrIc?: string;
 }
 
 /**
  * The pledge journey on `/donate`, through to its acknowledgement.
  *
  * There is no receipt at the end of this page any more: a general gift is
- * recorded as pending and its LHDN receipt is issued from `/admin/donations`
+ * recorded as pending and its acknowledgement is sent from `/admin/donations`
  * once a coordinator confirms the transfer.
  */
 export class DonatePage {
@@ -56,13 +55,6 @@ export class DonatePage {
     await this.page.getByLabel(/full name/i).first().fill(details.name);
     await this.page.getByLabel(/email/i).first().fill(details.email);
     if (details.phone) await this.page.getByPlaceholder("012-345 6789").fill(details.phone);
-    if (details.taxIdOrIc) {
-      // The identifier field is disabled until the donor asks for Section 44(6)
-      // relief, and Playwright's `fill()` waits for an enabled element — so without
-      // this click the step does not fail, it hangs until the test times out.
-      await this.page.locator("#widgetWantsTaxReceipt").check();
-      await this.page.getByPlaceholder(/920512-10-5432/).fill(details.taxIdOrIc);
-    }
   }
 
   /** The running total the widget shows beside the tier grid. */

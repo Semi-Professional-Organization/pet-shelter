@@ -11,7 +11,6 @@ import {
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { findSponsorshipTier } from "@/lib/domain/sponsorshipTiers";
-import { currentIssuerIdentity } from "@/lib/domain/shelterIdentity";
 import { formatMYR, ringgitFromSen, senFromRinggit } from "@/lib/domain/money";
 import {
   PetSponsorshipSummary,
@@ -92,7 +91,7 @@ async function resolveCheckoutSponsorId(sponsorEmail: string): Promise<string | 
  * sponsorship is a standing commitment settled by bank transfer, and at this
  * point nothing has checked a bank statement — the supporter was shown a
  * DuitNow QR and told us they paid. So this returns a pledge reference and a
- * welcome email, and the Section 44(6) receipt waits for
+ * welcome email, and the numbered acknowledgement waits for
  * `reconcilePetSponsorshipAction`.
  */
 export async function createPetSponsorshipAction(
@@ -182,7 +181,6 @@ export async function createPetSponsorshipAction(
       paymentMethod: validated.paymentMethod,
       displayOnWall: validated.displayOnWall,
       pledgeRef,
-      taxIdOrIc: validated.taxIdOrIc?.trim() || undefined,
       notes: validated.notes?.trim() || undefined,
     });
   } catch (err) {
@@ -337,8 +335,9 @@ export type ReconcileSponsorshipResult =
 /**
  * Server Action: a coordinator confirms the transfer for a pledge has landed.
  *
- * This is the only path that turns a commitment into a statutory document. The
- * receipt is drawn through `settleSponsorship`, from the same gapless per-month
+ * This is the only path that turns a commitment into a numbered acknowledgement
+ * (not a tax receipt: the shelter is not a registered society, #239). The
+ * number is drawn through `settleSponsorship`, from the same gapless per-month
  * series as every other receipt, *inside the transaction* that moves the pledge to
  * `ACTIVE`. Two coordinators confirming at once therefore produce one receipt, and
  * the one who lost is handed the number that exists. Until 2026-09-14 this action
@@ -366,7 +365,7 @@ export async function reconcilePetSponsorshipAction(
 
   let outcome;
   try {
-    outcome = await settleSponsorship(ref.data, currentIssuerIdentity(), session.email);
+    outcome = await settleSponsorship(ref.data, session.email);
   } catch (err) {
     if (err instanceof ReceiptIssuanceError) {
       // The ledger folds every failure inside the transaction into this one error,
@@ -426,9 +425,9 @@ export async function reconcilePetSponsorshipAction(
       // it — which every other reader uses — left the money column reading zero on
       // a document filed with LHDN.
       //
-      // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. It is
-      // an NRIC; it lives on the `Donation` row, where the statutory export reads
-      // it, and is not copied into `AuditLog.metadata`. See
+      // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. Since
+      // 2026-11-05 no new row carries one (#239), and an NRIC on a legacy row is
+      // never copied into `AuditLog.metadata`. See
       // `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
       sponsorName: record.sponsorName,
       sponsorEmail: record.sponsorEmail,
@@ -462,10 +461,7 @@ export async function reconcilePetSponsorshipAction(
     frequency: donation.frequency,
     paymentMethod: donation.paymentMethod,
     targetPetName: donation.targetPetName,
-    taxIdOrIc: donation.taxIdOrIc,
     notes: donation.notes,
-    taxDeductibleRef: donation.taxDeductibleRef,
-    shelterRegistrationNo: donation.shelterRegistrationNo,
   };
   scheduleAfterResponse(() => sendDonationReceiptEmail(receipt));
 

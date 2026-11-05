@@ -170,8 +170,6 @@ function draft(overrides: Partial<DonationDraft> = {}): DonationDraft {
     currency: "MYR",
     frequency: "one_time",
     paymentMethod: "duitnow_qr",
-    taxDeductibleRef: "LHDN.01/35/42/51/179-6.4912",
-    shelterRegistrationNo: "PPM-021-10-18082021",
     ...overrides,
   };
 }
@@ -252,15 +250,18 @@ describe("offline mode (no DATABASE_URL)", () => {
     expect(receipt.receiptNumber).toBe("HFS-DON-202608-0001");
   });
 
-  it("preserves the amount as exact sen and the snapshotted issuer identity", async () => {
+  it("preserves the amount as exact sen and stamps no ROS or LHDN identifier", async () => {
     vi.stubEnv("DATABASE_URL", "");
     const receipt = await issueDonationReceipt(
-      draft({ amountSen: senFromRinggit("19.90"), shelterRegistrationNo: "PPM-XXX" }),
+      draft({ amountSen: senFromRinggit("19.90") }),
       { now: AUGUST }
     );
 
     expect(receipt.amountSen).toBe(1990);
-    expect(receipt.shelterRegistrationNo).toBe("PPM-XXX");
+    // The shelter is not a registered society (#239): new rows assert nothing.
+    expect(receipt.shelterRegistrationNo).toBe("");
+    expect(receipt.taxDeductibleRef).toBe("");
+    expect(receipt.taxIdOrIc).toBeUndefined();
     expect(receipt.issuedAt).toBe(AUGUST.toISOString());
   });
 });

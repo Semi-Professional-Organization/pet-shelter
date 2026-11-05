@@ -82,8 +82,8 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
         <p className="text-sm text-muted-foreground">
           {isRegister
             ? isMs
-              ? "Sudah menaja haiwan rescue? Gunakan nombor resit daripada e-Resit penajaan itu untuk menuntut sejarah penajaan anda."
-              : "Sponsored a rescue? Use the receipt number from that sponsorship's e-Receipt to claim your sponsorship history."
+              ? "Sudah menaja haiwan rescue? Gunakan nombor rujukan HFS-DON daripada e-mel yang kami hantar selepas pemindahan penajaan itu disahkan untuk menuntut sejarah penajaan anda."
+              : "Sponsored a rescue? Use the HFS-DON reference from the email we sent once that sponsorship's transfer was confirmed to claim your sponsorship history."
             : isMs
               ? "Akses rescue anda, taraf penajaan dan kandungan eksklusif."
               : "Access your rescues, sponsorship standing and exclusive content."}
@@ -162,8 +162,8 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
               <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                 <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
                 {isMs
-                  ? "Terdapat di bahagian atas e-Resit yang kami hantar selepas anda menderma."
-                  : "Found at the top of the e-Receipt we emailed you after your donation."}
+                  ? "Terdapat di bahagian atas e-mel pengesahan yang kami hantar selepas pemindahan anda disahkan."
+                  : "Found at the top of the acknowledgement we emailed you once your transfer was confirmed."}
               </p>
             </div>
 

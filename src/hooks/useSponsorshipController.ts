@@ -31,8 +31,8 @@ export interface UseSponsorshipControllerProps {
  *
  * `donation_receipt` was the general-gift arm until 2026-09-22, when the donation
  * form stopped issuing an official `HFS-DON-*` number from a supporter's word that
- * they had paid. Both lanes now end at a claim reference, and the Section 44(6)
- * receipt is issued from the coordinator's queue in `/admin/donations`. The two
+ * they had paid. Both lanes now end at a claim reference, and the acknowledgement
+ * is sent from the coordinator's queue in `/admin/donations`. The two
  * arms remain distinct because the money lands in two tables and the two
  * references are drawn from different series.
  */
@@ -60,8 +60,6 @@ export function useSponsorshipController({
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
-  const [wantsTaxReceipt, setWantsTaxReceipt] = useState(false);
-  const [taxIdOrIc, setTaxIdOrIc] = useState("");
   const [notes, setNotes] = useState("");
   const [copiedBank, setCopiedBank] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -114,13 +112,6 @@ export function useSponsorshipController({
       return;
     }
 
-    if (wantsTaxReceipt && !taxIdOrIc.trim()) {
-      setErrorMessage(
-        "Your NRIC, passport or SSM number is required for a tax-exemption receipt."
-      );
-      return;
-    }
-
     setIsProcessing(true);
 
     try {
@@ -136,7 +127,6 @@ export function useSponsorshipController({
           amountMYR: finalAmount,
           frequency,
           paymentMethod,
-          taxIdOrIc: wantsTaxReceipt ? taxIdOrIc.trim() || undefined : undefined,
           notes: notes.trim() || undefined,
         });
 
@@ -162,8 +152,6 @@ export function useSponsorshipController({
         tierName: isCustomTier ? "Custom Rescue Donation" : selectedTier.name,
         amountMYR: finalAmount,
         frequency,
-        wantsTaxReceipt,
-        taxIdOrIc: wantsTaxReceipt ? taxIdOrIc.trim() || undefined : undefined,
         notes: notes.trim() || undefined,
         paymentMethod,
       });
@@ -202,8 +190,6 @@ export function useSponsorshipController({
     setDonorName("");
     setDonorEmail("");
     setDonorPhone("");
-    setWantsTaxReceipt(false);
-    setTaxIdOrIc("");
     setNotes("");
     setErrorMessage(null);
   };
@@ -218,8 +204,6 @@ export function useSponsorshipController({
       donorName,
       donorEmail,
       donorPhone,
-      wantsTaxReceipt,
-      taxIdOrIc,
       notes,
       copiedBank,
       isProcessing,
@@ -238,8 +222,6 @@ export function useSponsorshipController({
       setDonorName,
       setDonorEmail,
       setDonorPhone,
-      setWantsTaxReceipt,
-      setTaxIdOrIc,
       setNotes,
       handleCopyMaybank,
       handleCompleteDonation,

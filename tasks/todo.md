@@ -15,6 +15,47 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Stop issuing tax receipts (#248)
+
+**Branch:** `claude/stop-issuing-tax-receipts` · opened 2026-11-05
+
+- **Done when:** no form, ledger write, action, email or export claims tax deductibility or LHDN
+  approval for a new donation or sponsorship; tests assert it for the action, the email and the
+  CSV. The ROS number and society names still shown in the modal's bank block and the sponsor
+  certificate are #249; the transparency sample stat is #250.
+- **In scope:** both forms' opt-in and NRIC field, both validators, the pledge and donation
+  ledgers' drafts, both reconcile actions, the acknowledgement and pledge emails, the
+  reconciliation notice, #50 §2 (double asterisk), tests.
+- **Not in scope:** the identity constants and sponsorship receipt block (#249), admin export
+  and audit labels, transparency stat, print styles (#250), the stored columns (#251), the bank
+  account name (#252).
+
+- [x] Forms, validators, ledgers, actions, emails
+- [x] Tests, including the email's no-claim assertion and the stale-client strip
+- [x] Decision entry; #50's last item fixed, so its `open/` file is deleted
+- [x] Review round 1: the CSV export back-filled LHDN/ROS into new rows' empty cells; leftover
+  modal, button, certificate and sponsor sign-in copy; e2e page object; memory-mode parity.
+  Declined: the modal's ROS line and transparency stat (#249, #250), and merging the two
+  acknowledgement DTO builders (pre-existing duplication, not this change)
+- [x] Review round 2: no logic finding. Fixed the remaining "official receipt" copy on the staff
+  reconciliation screens and modal, the duplicated promise in the pledge emails, stale comments,
+  the empty grid cell left by the removed field. Logged the payload-builder duplication in
+  `open/`. Declined again: admin export labels (#250), certificate ROS line and dead receipt
+  translation keys (#249)
+- [x] Review round 3: no logic finding, so the loop stops (two rounds in a row). Fixed the
+  modal's repeated next step, the #239 entry's "still live" heading and two overclaiming
+  comments. Left for #250: the queue's "Issue receipt" button and "Receipts issued" panel
+  (component tests pin that wording), the export's LHDN headers and filename, and
+  `docs/runbooks/RUNBOOK_DONATION_AND_LHDN_TAX_RECEIPTS.md`, which still tells staff gifts are
+  deductible. Left for #249: the certificate and modal ROS line, dead `receipt*` translation keys
+
+## Review
+
+Deliberately kept: the `HFS-DON-*` series and the `Donation` row at reconciliation (the record
+that money arrived), the `DONATION_RECEIPT` email template name and `DonationReceiptEmail` audit
+entity (renaming them changes how old audit rows read, which is #250's call), and `taxIdOrIc` on
+record types, because rows written before 2026-11-05 may still carry one.
+
 # Pet page: training icons (house, litter box, leash)
 
 **Branch:** `claude/pet-training-icons` · opened 2026-10-28, resumed 2026-10-30

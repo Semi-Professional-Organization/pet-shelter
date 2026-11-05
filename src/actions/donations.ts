@@ -16,7 +16,6 @@ import { checkRateLimit } from "@/lib/security/rateLimit";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { sendDonationPledgeEmail, sendDonationReceiptEmail } from "@/lib/email";
 import { findSponsorshipTier } from "@/lib/domain/sponsorshipTiers";
-import { currentIssuerIdentity } from "@/lib/domain/shelterIdentity";
 import { formatMYR, ringgitFromSen, senFromRinggit } from "@/lib/domain/money";
 import { generateGiftRef } from "@/lib/domain/donationPledge";
 import { reconciliationNotice } from "@/lib/domain/petSponsorship";
@@ -164,14 +163,13 @@ export async function submitDonationPledgeAction(
       optionalText(validated.tierName) ?? matchedTier?.name ?? "Custom Rescue Donation";
 
     // 3. Record the claim. `senFromRinggit` rejects sub-sen precision outright
-    //    rather than rounding an amount that will appear on a tax document later.
+    //    rather than rounding an amount that will appear on an acknowledgement later.
     let record: DonationPledgeRecord;
     try {
       record = await recordDonationPledge({
         donorName: validated.donorName.trim(),
         donorEmail: validated.donorEmail.trim().toLowerCase(),
         donorPhone: optionalText(validated.donorPhone),
-        taxIdOrIc: optionalText(validated.taxIdOrIc),
         tierId: validated.tierId,
         tierName,
         amountSen: senFromRinggit(validated.amountMYR),
@@ -222,20 +220,17 @@ export async function submitDonationPledgeAction(
     const pledge = toPledgeDTO(record);
 
     // 5. Email dispatch stays non-blocking: the pledge is already durable, so a
-    //    Resend outage must not fail a gift that was genuinely recorded. The
-    //    acknowledgement is tax-neutral — it says in both halves that it is not a
-    //    receipt — because `isTaxClaimable` gates the claim copy on a receipt that
-    //    does not exist yet.
+    //    Resend outage must not fail a gift that was genuinely recorded.
     scheduleAfterResponse(() => sendDonationPledgeEmail(pledge));
 
     return { success: true, data: pledge };
   } catch (err: unknown) {
     // A ZodError's `.message` is `JSON.stringify(issues)`. Returning it put a JSON
     // array in front of the donor, which was survivable only because every rule the
-    // form could break was already blocked by a `required` attribute. The
-    // `wantsTaxReceipt` rule is conditional, so the browser cannot express it and
-    // this path became reachable in ordinary use. Surface the first issue's message,
-    // which is written for the donor, rather than the serialised error.
+    // form could break was already blocked by a `required` attribute, and a rule
+    // the browser cannot express would make this path reachable. Surface the first
+    // issue's message, which is written for the donor, rather than the serialised
+    // error.
     if (err instanceof ZodError) {
       return {
         success: false,
@@ -354,8 +349,9 @@ export type ReconcileDonationPledgeResult =
 /**
  * Server Action: a coordinator confirms the transfer for a gift has landed.
  *
- * **This is the only path that turns a general gift into a statutory document.**
- * The receipt is drawn through `settleDonationPledge`, from the same gapless
+ * **This is the only path that turns a general gift into a numbered acknowledgement**
+ * (not a tax receipt: the shelter is not a registered society, #239). The
+ * number is drawn through `settleDonationPledge`, from the same gapless
  * per-month series as every other receipt, *inside the transaction* that moves the
  * pledge to `ACTIVE`. Two coordinators confirming at once therefore produce one
  * receipt, and the one who lost is handed the number that exists rather than
@@ -387,7 +383,7 @@ export async function reconcileDonationPledgeAction(
 
   let outcome;
   try {
-    outcome = await settleDonationPledge(ref.data, currentIssuerIdentity(), session.email);
+    outcome = await settleDonationPledge(ref.data, session.email);
   } catch (err) {
     if (err instanceof ReceiptIssuanceError) {
       // The ledger folds every failure inside the transaction into this one error,
@@ -444,10 +440,10 @@ export async function reconcileDonationPledgeAction(
       frequency: donation.frequency,
       paymentMethod: donation.paymentMethod,
       targetPetName: donation.targetPetName,
-      // No `taxIdOrIc`, on purpose, and the same as the sponsorship lane. The
-      // identifier is an NRIC; it lives on the `Donation` row, which is where the
-      // statutory export reads it, and copying it into `AuditLog.metadata` stores
-      // personal data a second time in a table with a different retention story.
+      // No `taxIdOrIc`, on purpose, and the same as the sponsorship lane. Since
+      // 2026-11-05 no new row carries one (#239), but an NRIC on a legacy row must
+      // still never be copied into `AuditLog.metadata`, which would store personal
+      // data a second time in a table with a different retention story.
       // See `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
     },
   });

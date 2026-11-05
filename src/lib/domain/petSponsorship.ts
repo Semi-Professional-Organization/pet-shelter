@@ -132,9 +132,9 @@ export function reconciliationNotice(frequency: string, paymentMethod: string): 
   }
 
   const base =
-    "Your official receipt is issued once our coordinator matches your transfer against the shelter's bank statement, usually within 2 working days.";
+    "We email you an acknowledgement once our coordinator matches your transfer against the shelter's bank statement, usually within 2 working days.";
 
   return frequency === "monthly"
-    ? `${base} This pledge and its receipt cover one transfer only. Contact the shelter before setting up a standing instruction for later monthly transfers.`
+    ? `${base} This pledge and its acknowledgement cover one transfer only. Contact the shelter before setting up a standing instruction for later monthly transfers.`
     : base;
 }

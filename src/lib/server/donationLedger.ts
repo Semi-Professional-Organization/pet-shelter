@@ -5,7 +5,12 @@ import type { SponsorshipTierId } from "@/types/sponsorship";
 import { registerStateReset } from "@/lib/stateResets";
 
 /**
- * Persistence for issued LHDN tax receipts.
+ * Persistence for donation acknowledgements: the numbered record that money arrived.
+ *
+ * The shelter is not a registered society and holds no tax-deductible approval
+ * (owner, 2026-11-05; #239), so nothing written here is a tax document. Rows
+ * issued before that date still carry the ROS and LHDN identifiers they were
+ * snapshotted with; new rows write them empty, and #251 decides the columns' fate.
  *
  * ## Why this is not a dual-layer repository
  *
@@ -17,7 +22,7 @@ import { registerStateReset } from "@/lib/stateResets";
  * A donation is not reference data. It is a record that an external event occurred:
  * money moved. There cannot be a fixture for an event that has not happened yet, so
  * "fall back to the fixture" has no meaning here, and swallowing a failed write
- * would hand a donor an official, tax-deductible receipt number for a record that
+ * would hand a donor an acknowledgement number for a record that
  * exists nowhere durable. That is the failure this module refuses to have.
  *
  * The fallback is therefore replaced by an explicitly **declared mode**, chosen by
@@ -64,11 +69,31 @@ export interface DonationRecord {
   issuedAt: string;
 }
 
-/** Everything a caller supplies. The ledger owns id, numbering, and timestamp. */
+/**
+ * Everything a caller supplies. The ledger owns id, numbering, and timestamp.
+ *
+ * The tax identifier and the two issuer snapshots are not suppliable: they are
+ * read back from rows issued before 2026-11-05 and never written to a new one,
+ * so no caller can put a tax claim on a new acknowledgement.
+ */
 export type DonationDraft = Omit<
   DonationRecord,
-  "id" | "receiptNumber" | "sequenceScope" | "sequenceValue" | "issuedAt"
+  | "id"
+  | "receiptNumber"
+  | "sequenceScope"
+  | "sequenceValue"
+  | "issuedAt"
+  | "taxIdOrIc"
+  | "taxDeductibleRef"
+  | "shelterRegistrationNo"
 >;
+
+/**
+ * What a new row stores in the retired `taxDeductibleRef` and
+ * `shelterRegistrationNo` columns. They are `NOT NULL` until #251's migration
+ * drops them, and an empty string is the one value that asserts nothing.
+ */
+const RETIRED_ISSUER_SNAPSHOT = "";
 
 export class ReceiptIssuanceError extends Error {
   readonly cause?: unknown;
@@ -169,6 +194,11 @@ export function issueReceiptInMemory(draft: DonationDraft, when: Date): Donation
 
   const record: DonationRecord = {
     ...draft,
+    // Overrides a wider object's fields too, so memory mode stores no tax number
+    // or issuer snapshot, as the Postgres insert does not.
+    taxIdOrIc: undefined,
+    taxDeductibleRef: RETIRED_ISSUER_SNAPSHOT,
+    shelterRegistrationNo: RETIRED_ISSUER_SNAPSHOT,
     id: `mem-don-${String(memorySeq).padStart(6, "0")}`,
     receiptNumber: formatReceiptNumber(scope, serial),
     sequenceScope: scope,
@@ -288,7 +318,6 @@ export async function drawAndInsert(
       donorName: draft.donorName,
       donorEmail: draft.donorEmail,
       donorPhone: draft.donorPhone ?? null,
-      taxIdOrIc: draft.taxIdOrIc ?? null,
       tierId: draft.tierId,
       tierName: draft.tierName,
       amountSen: draft.amountSen,
@@ -297,8 +326,8 @@ export async function drawAndInsert(
       paymentMethod: draft.paymentMethod,
       targetPetName: draft.targetPetName ?? null,
       notes: draft.notes ?? null,
-      taxDeductibleRef: draft.taxDeductibleRef,
-      shelterRegistrationNo: draft.shelterRegistrationNo,
+      taxDeductibleRef: RETIRED_ISSUER_SNAPSHOT,
+      shelterRegistrationNo: RETIRED_ISSUER_SNAPSHOT,
       issuedAt: when,
     },
   });
