@@ -19,8 +19,10 @@ Record active multi-step work streams below.
 
 **Branch:** `claude/stop-issuing-tax-receipts` · opened 2026-11-05
 
-- **Done when:** no code path can produce text claiming tax deductibility, ROS registration or
-  LHDN approval for a new donation or sponsorship; a test asserts it for the action and the email.
+- **Done when:** no form, ledger write, action, email or export claims tax deductibility or LHDN
+  approval for a new donation or sponsorship; tests assert it for the action, the email and the
+  CSV. The ROS number and society names still shown in the modal's bank block and the sponsor
+  certificate are #249; the transparency sample stat is #250.
 - **In scope:** both forms' opt-in and NRIC field, both validators, the pledge and donation
   ledgers' drafts, both reconcile actions, the acknowledgement and pledge emails, the
   reconciliation notice, #50 §2 (double asterisk), tests.
@@ -31,6 +33,10 @@ Record active multi-step work streams below.
 - [x] Forms, validators, ledgers, actions, emails
 - [x] Tests, including the email's no-claim assertion and the stale-client strip
 - [x] Decision entry; #50's last item fixed, so its `open/` file is deleted
+- [x] Review round 1: the CSV export back-filled LHDN/ROS into new rows' empty cells; leftover
+  modal, button, certificate and sponsor sign-in copy; e2e page object; memory-mode parity.
+  Declined: the modal's ROS line and transparency stat (#249, #250), and merging the two
+  acknowledgement DTO builders (pre-existing duplication, not this change)
 
 ## Review
 
