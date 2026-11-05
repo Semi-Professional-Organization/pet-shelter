@@ -38,15 +38,37 @@ describe("checkSharedRateLimit", () => {
     vi.restoreAllMocks();
   });
 
-  it("refuses from this instance's own count without querying once it is over budget", async () => {
+  it("remembers a refusal the row gave, and only until the row said", async () => {
     vi.stubEnv("DATABASE_URL", "postgresql://unit.test/none");
     vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
     const { checkSharedRateLimit } = await subject();
-    prismaDouble.$queryRaw.mockResolvedValue([{ count: 1, retryAfterSeconds: 60 }]);
 
-    for (let i = 0; i < 2; i++) await checkSharedRateLimit("flood", 2, 60_000);
-    expect((await checkSharedRateLimit("flood", 2, 60_000)).success).toBe(false);
+    prismaDouble.$queryRaw.mockResolvedValueOnce([{ count: 3, retryAfterSeconds: 20 }]);
+    expect(await checkSharedRateLimit("flood", 2, 60_000)).toMatchObject({ success: false, retryAfterSeconds: 20 });
+
+    now.mockReturnValue(1_015_000);
+    expect(await checkSharedRateLimit("flood", 2, 60_000)).toMatchObject({ success: false, retryAfterSeconds: 5 });
+    expect(prismaDouble.$queryRaw).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(1_020_000);
+    prismaDouble.$queryRaw.mockResolvedValueOnce([{ count: 1, retryAfterSeconds: 60 }]);
+    expect((await checkSharedRateLimit("flood", 2, 60_000)).success).toBe(true);
     expect(prismaDouble.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps saying 'unavailable' however many times an outage is hit, and recovers at once", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://unit.test/none");
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { checkSharedRateLimit } = await subject();
+
+    prismaDouble.$queryRaw.mockRejectedValue(new Error("connection refused"));
+    for (let i = 0; i < 12; i++) {
+      expect(await checkSharedRateLimit("outage", 5, 60_000)).toEqual({ success: false, unavailable: true });
+    }
+
+    prismaDouble.$queryRaw.mockResolvedValue([{ count: 1, retryAfterSeconds: 60 }]);
+    expect((await checkSharedRateLimit("outage", 5, 60_000)).success).toBe(true);
   });
 
   it("counts in memory and never queries when no DATABASE_URL is set", async () => {
@@ -94,7 +116,7 @@ describe("checkSharedRateLimit", () => {
 
     const result = await checkSharedRateLimit("register:email:victim@example.com", 5, 60_000);
 
-    expect(result).toEqual({ success: false, remaining: 0, retryAfterSeconds: 60, unavailable: true });
+    expect(result).toEqual({ success: false, unavailable: true });
     // Logged without the key, which carries the email.
     expect(error).toHaveBeenCalledOnce();
     expect(JSON.stringify(error.mock.calls)).not.toContain("victim@example.com");
@@ -140,6 +162,20 @@ describe("registerAction on the shared budgets", () => {
     expect(res.error).toMatch(/temporarily unavailable/i);
     expect(res.error).not.toMatch(/too many/i);
     expect(res.retryAfterSeconds).toBeUndefined();
+  });
+
+  it("says 'unavailable' when the shared address budget cannot be read", async () => {
+    vi.stubEnv("TRUSTED_PROXY_HEADER", "x-real-ip");
+    requestHeaders.current = new Headers({ "x-real-ip": "203.0.113.8" });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    prismaDouble.$queryRaw.mockRejectedValue(new Error("connection refused"));
+
+    const res = await attempt("address-outage@test.com");
+
+    expect(res.error).toMatch(/temporarily unavailable/i);
+    expect(res.retryAfterSeconds).toBeUndefined();
+    // Refused at the address budget: the email budget is never read.
+    expect(prismaDouble.$queryRaw).toHaveBeenCalledTimes(1);
   });
 
   it("spends the address budget in the shared table, digested", async () => {

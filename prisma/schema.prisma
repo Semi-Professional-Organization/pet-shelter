@@ -407,8 +407,9 @@ model ReceiptSequence {
 /// Shared by every server instance, which the per-process `Map` in
 /// `src/lib/security/rateLimit.ts` is not. Written only by
 /// `spendRateLimitBucket` (`src/lib/server/rateLimitBuckets.ts`) with one atomic
-/// upsert, never through this model's delegate. `key` is a SHA-256 of the
-/// budget name, so no email or address is stored here.
+/// upsert, never through this model's delegate. `key` is an HMAC-SHA256 of
+/// the budget name under `SESSION_SECRET` (`rateLimitKeyDigest`), so no email or
+/// address is stored here, and rotating that secret resets every budget.
 ///
 /// Applied in production by hand: `prisma/migrations/manual/20261105_rate_limit_buckets`.
 model RateLimitBucket {

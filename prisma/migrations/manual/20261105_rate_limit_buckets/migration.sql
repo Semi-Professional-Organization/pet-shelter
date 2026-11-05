@@ -19,8 +19,9 @@
 -- registration is refused with "temporarily unavailable" until the table exists.
 -- Nothing else on the site reads this table, so applying it early is harmless.
 --
--- `key` is a SHA-256 hex digest of the budget name, so no email or IP address is
--- stored. `expiresAt` is TIMESTAMPTZ because the code compares it with now().
+-- `key` is an HMAC-SHA256 of the budget name under SESSION_SECRET, so no email or
+-- IP address is stored and a copy of the table cannot be reversed by hashing
+-- every address. Rotating SESSION_SECRET resets every budget, which is harmless. `expiresAt` is TIMESTAMPTZ because the code compares it with now().
 --
 -- Takes an advisory lock in the same series as the other manual migrations, so
 -- concurrent appliers queue rather than race. Safe to re-run: every statement is

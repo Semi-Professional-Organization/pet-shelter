@@ -1,16 +1,25 @@
 import { spendRateLimitBucket, sweepExpiredRateLimitBuckets } from "@/lib/server/rateLimitBuckets";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
 import { signPayload } from "./crypto";
+import { registerStateReset } from "@/lib/stateResets";
 import { checkRateLimit, type RateLimitResult } from "./rateLimit";
 
 /**
- * What a shared check answers. `unavailable` is set only when the budget could
- * not be read: the caller must refuse, and should say "try later", not "too many".
+ * What a shared check answers. The `unavailable` member means the budget could
+ * not be read: the caller must refuse, and should say "try later", not "too
+ * many". It carries no `retryAfterSeconds` on purpose, so a call site that
+ * builds a "wait N seconds" message does not type-check until it handles the
+ * outage first.
  */
-export type SharedRateLimitResult = RateLimitResult & { unavailable?: true };
+export type SharedRateLimitResult = RateLimitResult | { success: false; unavailable: true };
 
-/** How long a refused-for-outage caller is told to wait. */
-const UNAVAILABLE_RETRY_SECONDS = 60;
+/**
+ * Keys this instance has seen the shared row refuse, and until when (epoch ms).
+ * Lets a flood on one key be refused without a query, and is never stricter
+ * than the row: it holds only a refusal the row gave, for only as long as the
+ * row said. Outages never write here.
+ */
+const refusedUntil = new Map<string, number>();
 
 /** Share of calls that also sweep expired rows. */
 const SWEEP_PROBABILITY = 0.02;
@@ -29,13 +38,13 @@ export function rateLimitKeyDigest(key: string): string {
  *
  * `checkRateLimit` is a per-process `Map`: on Vercel each warm instance counts
  * separately, so a caller spread across instances is not bounded by it. This
- * keeps the same arguments and result shape, but the count lives in
+ * keeps the same arguments and success shape, but the count lives in
  * `rate_limit_buckets` and is advanced by one atomic upsert
  * (`spendRateLimitBucket`), so callers on different instances cannot both read
  * "under budget".
  *
  * **Fails closed.** With a `DATABASE_URL` configured, any error reading the
- * budget refuses the request with `unavailable: true`. It never falls back to the
+ * budget refuses with `{ success: false, unavailable: true }`. It never falls back to the
  * per-process `Map`, because that fallback is exactly the unbounded state this
  * exists to end, and an attacker who can slow the database would choose it.
  *
@@ -66,14 +75,17 @@ export async function checkSharedRateLimit(
   limit: number,
   windowMs: number
 ): Promise<SharedRateLimitResult> {
+  // `DATABASE_URL`, not `isDatabasePersistent()`: the strict integration tier
+  // sets STRICT_PERSISTENCE with no database, and there the in-memory budget is
+  // the one under test. The ledgers choose their storage the same way.
   if (!process.env.DATABASE_URL) return checkRateLimit(key, limit, windowMs);
 
-  // A caller already over budget on this instance is over it everywhere, since
-  // the shared count includes every hit this instance made. Refusing here keeps
-  // a flood from one source off the database. This only ever refuses, so it is a
-  // filter, not a fallback.
-  const local = checkRateLimit(key, limit, windowMs);
-  if (!local.success) return local;
+  const now = Date.now();
+  const until = refusedUntil.get(key);
+  if (until !== undefined) {
+    if (until > now) return { success: false, remaining: 0, retryAfterSeconds: Math.ceil((until - now) / 1000) };
+    refusedUntil.delete(key);
+  }
 
   const hashedKey = rateLimitKeyDigest(key);
 
@@ -84,7 +96,10 @@ export async function checkSharedRateLimit(
     // table size; the next one retries it.
     if (Math.random() < SWEEP_PROBABILITY) scheduleAfterResponse(sweepExpiredRateLimitBuckets);
 
-    if (count > limit) return { success: false, remaining: 0, retryAfterSeconds };
+    if (count > limit) {
+      remember(key, now + retryAfterSeconds * 1000);
+      return { success: false, remaining: 0, retryAfterSeconds };
+    }
     return { success: true, remaining: limit - count, retryAfterSeconds: 0 };
   } catch (err) {
     // The key is left out: it is built from an email or an address.
@@ -92,6 +107,26 @@ export async function checkSharedRateLimit(
       "[security/rateLimit] Shared rate limit unavailable; refusing the request:",
       err instanceof Error ? err.message : err
     );
-    return { success: false, remaining: 0, retryAfterSeconds: UNAVAILABLE_RETRY_SECONDS, unavailable: true };
+    return { success: false, unavailable: true };
   }
 }
+
+// ceiling: bounded by evicting expired entries once it passes this size; a
+// flood of distinct keys each refused by the row is the only way to fill it.
+const REFUSED_CACHE_LIMIT = 10_000;
+
+function remember(key: string, until: number): void {
+  if (refusedUntil.size >= REFUSED_CACHE_LIMIT) {
+    const now = Date.now();
+    for (const [k, t] of refusedUntil) if (t <= now) refusedUntil.delete(k);
+    if (refusedUntil.size >= REFUSED_CACHE_LIMIT) refusedUntil.clear();
+  }
+  refusedUntil.set(key, until);
+}
+
+/** Test-only: forget every remembered refusal, as a fresh instance would. */
+export function resetSharedRateLimitCache(): void {
+  refusedUntil.clear();
+}
+
+registerStateReset("sharedRateLimit", resetSharedRateLimitCache);

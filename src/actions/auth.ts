@@ -166,10 +166,10 @@ export async function loginAction(credentials: {
  * What a refused registration budget tells the caller. An unreadable budget is
  * an outage, not the caller's fault, so it says so instead of "too many".
  */
-function registrationRefusal(limit: { retryAfterSeconds: number; unavailable?: true }): AuthResponse {
+function registrationRefusal(limit: { retryAfterSeconds: number } | { unavailable: true }): AuthResponse {
   // No `retryAfterSeconds` for an outage: the login page turns it into a
   // countdown that also disables sign-in, which does not depend on this table.
-  if (limit.unavailable) {
+  if ("unavailable" in limit) {
     return { success: false, error: "Registration is temporarily unavailable. Please try again in a few minutes." };
   }
   return {
@@ -268,7 +268,7 @@ export async function registerAction(data: {
   const addressLimit = await checkAddressRateLimit("register", 10, 60000, { shared: true });
   if (addressLimit.limited) return registrationRefusal(addressLimit);
 
-  const rateLimit = await checkSharedRateLimit(`register:email:${email || "anon"}`, 5, 60000);
+  const rateLimit = await checkSharedRateLimit(`register:email:${email}`, 5, 60000);
   if (!rateLimit.success) return registrationRefusal(rateLimit);
 
   // 2. Invite Guard — required for EVERY role.

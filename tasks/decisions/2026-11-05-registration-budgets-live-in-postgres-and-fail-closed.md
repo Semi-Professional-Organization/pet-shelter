@@ -22,7 +22,14 @@ refuse registration when that table cannot be read.
 - **A fixed window, not a sliding one.** One row per key, advanced by one upsert, so the check is a
   single statement and atomic. The cost is a possible 2x burst across a window boundary, recorded as
   a `ceiling:`.
-- **Keys are SHA-256 digests.** The table never holds the email or address a budget is named for.
+- **Keys are HMAC-SHA256 digests under `SESSION_SECRET`.** The table never holds the email or
+  address a budget is named for, and a plain hash would not do: every IPv4 address can be hashed
+  in seconds. Rotating the secret resets every budget.
+- **An outage has its own result.** `checkSharedRateLimit` answers `{ success: false, unavailable:
+  true }` with no `retryAfterSeconds`, so a caller that builds a "wait N seconds" message does not
+  type-check until it handles the outage. A refusal the row gave is remembered per instance until
+  the row's window ends, to keep a flood on one key off the database; outages are never
+  remembered.
 
 Ordering is a constraint, not a preference: the table must exist in production before the code
 deploys, or every registration is refused.

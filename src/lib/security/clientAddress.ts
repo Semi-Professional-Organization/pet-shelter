@@ -98,12 +98,26 @@ export async function getClientAddress(): Promise<string | null> {
  * serverless host each warm instance counts separately and a distributed caller
  * is not bounded. Only registration has moved so far (#213).
  */
+type AddressLimit = { limited: false } | { limited: true; retryAfterSeconds: number };
+
+export async function checkAddressRateLimit(
+  name: string,
+  limit: number,
+  windowMs: number,
+  options?: { shared?: false }
+): Promise<AddressLimit>;
+export async function checkAddressRateLimit(
+  name: string,
+  limit: number,
+  windowMs: number,
+  options: { shared: true }
+): Promise<AddressLimit | { limited: true; unavailable: true }>;
 export async function checkAddressRateLimit(
   name: string,
   limit: number,
   windowMs: number,
   options: { shared?: boolean } = {}
-): Promise<{ limited: false } | { limited: true; retryAfterSeconds: number; unavailable?: true }> {
+): Promise<AddressLimit | { limited: true; unavailable: true }> {
   const address = await getClientAddress();
   if (!address) return { limited: false };
 
@@ -112,7 +126,7 @@ export async function checkAddressRateLimit(
     ? await checkSharedRateLimit(key, limit, windowMs)
     : checkRateLimit(key, limit, windowMs);
   if (result.success) return { limited: false };
-  return result.unavailable
-    ? { limited: true, retryAfterSeconds: result.retryAfterSeconds, unavailable: true }
+  return "unavailable" in result
+    ? { limited: true, unavailable: true }
     : { limited: true, retryAfterSeconds: result.retryAfterSeconds };
 }
