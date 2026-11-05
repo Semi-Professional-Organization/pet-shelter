@@ -300,9 +300,7 @@ export interface TranslationDictionary {
     donorPhoneLabel: string;
     donorNotesLabel: string;
     bankTransferTitle: string;
-    bankName: string;
-    accountNumber: string;
-    accountHolder: string;
+    bankDetailsOnWhatsApp: string;
     copyAccountBtn: string;
     copiedBtn: string;
     duitNowScanTitle: string;
@@ -662,10 +660,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       donorEmailLabel: "Email Address",
       donorPhoneLabel: "Phone Number (WhatsApp updates)",
       donorNotesLabel: "Special Message / Donor Wishes (Optional)",
-      bankTransferTitle: "Direct Bank Transfer (Maybank)",
-      bankName: "Maybank Berhad",
-      accountNumber: "5140 1234 5678",
-      accountHolder: "Pertubuhan Kebajikan Hope for Strays",
+      bankTransferTitle: "Direct Bank Transfer",
+      bankDetailsOnWhatsApp: "Contact us on WhatsApp for transfer details.",
       copyAccountBtn: "Copy Bank Account",
       copiedBtn: "Copied!",
       duitNowScanTitle: "DuitNow National QR Pay",
@@ -1021,10 +1017,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       donorEmailLabel: "Alamat E-mel",
       donorPhoneLabel: "Nombor Telefon (makluman WhatsApp)",
       donorNotesLabel: "Mesej Khas / Harapan Penderma (Pilihan)",
-      bankTransferTitle: "Pindahan Bank Terus (Maybank)",
-      bankName: "Maybank Berhad",
-      accountNumber: "5140 1234 5678",
-      accountHolder: "Pertubuhan Kebajikan Hope for Strays",
+      bankTransferTitle: "Pindahan Bank Terus",
+      bankDetailsOnWhatsApp: "Hubungi kami di WhatsApp untuk butiran pindahan.",
       copyAccountBtn: "Salin No. Akaun",
       copiedBtn: "Disalin!",
       duitNowScanTitle: "DuitNow QR Kebangsaan",

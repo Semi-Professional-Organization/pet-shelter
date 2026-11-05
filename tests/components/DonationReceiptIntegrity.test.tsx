@@ -204,8 +204,8 @@ describe("the form asks for no tax identifier", () => {
 });
 
 /**
- * The form publishes two ways to pay — a DuitNow QR and the shelter's Maybank
- * account — and until 2026-10-13 recorded `duitnow_qr` for both. The value is
+ * The form publishes two ways to pay — a DuitNow QR and a bank transfer —
+ * and until 2026-10-13 recorded `duitnow_qr` for both. The value is
  * copied onto the acknowledgement and shown to the coordinator as the rail
  * to match against the bank statement, so a bank-transfer donor's record and
  * queue row both named the wrong one.
@@ -232,20 +232,12 @@ describe("the donor says which rail they used", () => {
     expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ paymentMethod: "online_banking" });
   });
 
-  it("does not change the donor's answer when they copy the account number", async () => {
-    // Copying is not paying. An earlier version flipped the rail on copy, which
-    // overwrote an explicit choice with a guess and pointed the coordinator at the
-    // wrong line of the statement for anyone who copied the number and then scanned.
+  it("offers no account number to copy while the shelter has not confirmed one", () => {
+    // Until 2026-11-05 the form printed a made-up Maybank number with a copy button (#252).
     renderWidget();
-    // `setupUser` installs its own clipboard on `navigator`, so the copy handler's
-    // `navigator.clipboard` branch runs here as it does in a browser.
-    const user = setupUser();
 
-    await user.click(screen.getByRole("button", { name: /copy bank account/i }));
-
-    expect(screen.getByRole("radio", { name: /duitnow qr/i })).toBeChecked();
-    await submitAGift();
-    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ paymentMethod: "duitnow_qr" });
+    expect(screen.queryByRole("button", { name: /copy bank account/i })).toBeNull();
+    expect(screen.getByText(/contact us on whatsapp for transfer details/i)).toBeInTheDocument();
   });
 
   it("offers the choice as one native radio group", () => {

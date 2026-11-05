@@ -5,13 +5,11 @@ import { useSearchParams } from "next/navigation";
 import {
   QrCode,
   CheckCircle2,
-  Copy,
   ArrowRight,
   RotateCcw,
   RotateCw,
   Sparkles,
   Gift,
-  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +24,8 @@ import {
 import { submitDonationPledgeAction } from "@/actions/donations";
 import type { DonationPledgeDTO } from "@/lib/validations/donation";
 import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel";
+import { BankTransferDetails } from "@/components/features/donations/BankTransferDetails";
+import { SHELTER_BANK_ACCOUNT } from "@/lib/domain/shelterIdentity";
 import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
 import { getPublicPets } from "@/actions/pets";
 import { SponsorshipTier } from "@/types/sponsorship";
@@ -94,7 +94,6 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [copiedBank, setCopiedBank] = useState(false);
   const qrConfig = useDonationQrConfig();
   // What the donor says they are paying with. Until 2026-10-13 this form sent
   // `duitnow_qr` for every gift while publishing the Maybank account beside the
@@ -147,14 +146,6 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const handleSelectPet = (pet: Pet | null) => {
     setSelectedPet(pet);
     setTargetPetName(pet ? pet.name : "");
-  };
-
-  const handleCopyMaybank = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText("514012345678");
-      setCopiedBank(true);
-      setTimeout(() => setCopiedBank(false), 2500);
-    }
   };
 
   const handleSelectTier = (tier: SponsorshipTier) => {
@@ -589,7 +580,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
               4.{" "}
               {isMs
                 ? "Kaedah Pembayaran Malaysia: DuitNow QR / Pindahan Bank"
-                : "Malaysian Payment Rail: DuitNow National QR / Maybank Transfer"}
+                : "Malaysian Payment Rail: DuitNow National QR / Bank Transfer"}
             </h3>
           </div>
           <span className="text-xs font-bold font-mono text-primary-ink bg-primary/10 px-3 py-1 rounded-md">
@@ -620,49 +611,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
             )}
           />
 
-          {/* Account Details */}
-          <div className="md:col-span-7 space-y-3.5 text-xs">
-            <div className="p-4 border border-border bg-card rounded-xl space-y-1.5">
-              <div className="eyebrow flex items-center gap-1">
-                <Building2 className="size-3.5" /> Beneficiary Organization
-              </div>
-              <div className="font-bold text-foreground text-sm">
-                Hope for Strays
-              </div>
-            </div>
-
-            <div className="p-4 border border-border bg-card rounded-xl space-y-2">
-              <div className="eyebrow">
-                Maybank Corporate Current Account
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="font-mono font-bold text-foreground text-base tracking-wider block">
-                    5140 1234 5678
-                  </span>
-                  <span className="text-3xs text-muted-foreground">
-                    Malayan Banking Berhad (PJ Branch)
-                  </span>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyMaybank}
-                  className="h-8 px-3 text-xs font-semibold gap-1.5 rounded-lg cursor-pointer"
-                >
-                  {copiedBank ? (
-                    <CheckCircle2 className="size-3.5 text-success-accent" />
-                  ) : (
-                    <Copy className="size-3.5" />
-                  )}
-                  {copiedBank
-                    ? t("donations.copiedBtn", "Copied!")
-                    : t("donations.copyAccountBtn", "Copy")}
-                </Button>
-              </div>
-            </div>
-          </div>
+          {/* Bank transfer: the account, or WhatsApp until the shelter confirms one (#252) */}
+          <BankTransferDetails className="md:col-span-7" />
         </div>
 
         {/*
@@ -686,7 +636,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 [
                   "online_banking",
                   isMs ? "Pindahan Bank Terus" : "Direct Bank Transfer",
-                  isMs ? "Pindahkan terus ke akaun Maybank di atas." : "Transfer to the Maybank account above.",
+                  SHELTER_BANK_ACCOUNT
+                    ? isMs ? "Pindahkan terus ke akaun bank di atas." : "Transfer to the bank account above."
+                    : isMs ? "Dapatkan butiran akaun melalui WhatsApp di atas." : "Get the account details on WhatsApp above.",
                 ],
               ] as const
             ).map(([value, label, hint]) => (

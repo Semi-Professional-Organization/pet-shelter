@@ -51,7 +51,8 @@ const sponsorshipPledge = {
 
 const QR_INSTRUCTIONS =
   "Scan with Maybank MAE, CIMB, TNG eWallet, Public Bank, etc.";
-const BANK_ACCOUNT_NUMBER = "5140 1234 5678";
+// No account is confirmed yet (#252), so the bank rail's instructions are the WhatsApp fallback.
+const BANK_INSTRUCTIONS = "Contact us on WhatsApp for transfer details.";
 const MISLEADING_TRANSFER_FAILURE =
   "We could not record this transfer, so no receipt was issued. Nothing has been charged - please try again.";
 
@@ -455,13 +456,13 @@ describe("SponsorshipModal checkout contract", () => {
     renderWithLanguage(<SponsorshipModal open onOpenChange={vi.fn()} />);
 
     expect(screen.getByText(QR_INSTRUCTIONS)).toBeInTheDocument();
-    expect(screen.queryByText(BANK_ACCOUNT_NUMBER)).not.toBeInTheDocument();
+    expect(screen.queryByText(BANK_INSTRUCTIONS)).not.toBeInTheDocument();
 
     const user = setupUser();
     await user.click(screen.getByRole("radio", { name: /bank transfer/i }));
 
     expect(screen.queryByText(QR_INSTRUCTIONS)).not.toBeInTheDocument();
-    expect(screen.getByText(BANK_ACCOUNT_NUMBER)).toBeInTheDocument();
+    expect(screen.getByText(BANK_INSTRUCTIONS)).toBeInTheDocument();
   });
 
   it("withholds target-pet transfer instructions until the pledge reference exists", async () => {
@@ -475,11 +476,11 @@ describe("SponsorshipModal checkout contract", () => {
     );
 
     expect(screen.queryByText(QR_INSTRUCTIONS)).not.toBeInTheDocument();
-    expect(screen.queryByText(BANK_ACCOUNT_NUMBER)).not.toBeInTheDocument();
+    expect(screen.queryByText(BANK_INSTRUCTIONS)).not.toBeInTheDocument();
 
     const user = setupUser();
     await user.click(screen.getByRole("radio", { name: /bank transfer/i }));
-    expect(screen.queryByText(BANK_ACCOUNT_NUMBER)).not.toBeInTheDocument();
+    expect(screen.queryByText(BANK_INSTRUCTIONS)).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/full name/i), "Aisyah Rahman");
     await user.type(
@@ -489,7 +490,7 @@ describe("SponsorshipModal checkout contract", () => {
     await user.click(submissionButton());
 
     const pledgeRef = await screen.findByText("HFS-PLG-20260914-ABCD");
-    const bankAccount = screen.getByText(BANK_ACCOUNT_NUMBER);
+    const bankAccount = screen.getByText(BANK_INSTRUCTIONS);
     expect(screen.queryByText(QR_INSTRUCTIONS)).not.toBeInTheDocument();
     expectBefore(pledgeRef, bankAccount);
   });

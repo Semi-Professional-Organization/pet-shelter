@@ -15,13 +15,11 @@ import {
   HeartHandshake,
   QrCode,
   CheckCircle2,
-  Copy,
   ShieldCheck,
   ArrowRight,
   RotateCcw,
   RotateCw,
   Heart,
-  Building2,
   Sparkles,
 } from "lucide-react";
 import {
@@ -29,6 +27,8 @@ import {
   UseSponsorshipControllerProps,
 } from "@/hooks/useSponsorshipController";
 import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel";
+import { BankTransferDetails } from "@/components/features/donations/BankTransferDetails";
+import { SHELTER_BANK_ACCOUNT } from "@/lib/domain/shelterIdentity";
 import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
 
 export function SponsorshipModal(props: UseSponsorshipControllerProps) {
@@ -47,14 +47,10 @@ export function SponsorshipModal(props: UseSponsorshipControllerProps) {
 
 function SelectedPaymentInstructions({
   paymentMethod,
-  copiedBank,
-  onCopyBank,
   petCustomQrUrl,
   petName,
 }: {
   paymentMethod: "duitnow_qr" | "online_banking" | "card";
-  copiedBank: boolean;
-  onCopyBank: () => void;
   petCustomQrUrl?: string | null;
   petName?: string;
 }) {
@@ -82,44 +78,7 @@ function SelectedPaymentInstructions({
   }
 
   if (paymentMethod === "online_banking") {
-    return (
-      <div className="space-y-3 text-xs">
-        <div className="p-3.5 border border-border bg-card rounded-lg space-y-1">
-          <div className="eyebrow flex items-center gap-1">
-            <Building2 className="size-3" /> Beneficiary Organization
-          </div>
-          <div className="font-bold text-foreground text-sm">Hope for Strays</div>
-        </div>
-
-        <div className="p-3.5 border border-border bg-card rounded-lg space-y-1">
-          <div className="eyebrow">Maybank Account Details</div>
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <span className="font-mono font-bold text-foreground text-base tracking-wider block">
-                5140 1234 5678
-              </span>
-              <span className="text-3xs text-muted-foreground">
-                Malayan Banking Berhad (PJ Branch)
-              </span>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={onCopyBank}
-              className="h-8 px-3 text-xs font-semibold gap-1.5"
-            >
-              {copiedBank ? (
-                <CheckCircle2 className="size-3.5 text-success-accent" />
-              ) : (
-                <Copy className="size-3.5" />
-              )}
-              {copiedBank ? "Copied!" : "Copy"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
+    return <BankTransferDetails compact />;
   }
 
   return (
@@ -142,7 +101,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
     donorEmail,
     donorPhone,
     notes,
-    copiedBank,
     isProcessing,
     errorMessage,
     completedCheckout,
@@ -160,7 +118,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
     setDonorEmail,
     setDonorPhone,
     setNotes,
-    handleCopyMaybank,
     handleCompleteDonation,
     handleReset,
   } = handlers;
@@ -365,7 +322,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                   <div className="flex items-center gap-2">
                     <QrCode className="size-4.5 text-primary-ink" />
                     <span className="text-xs font-bold uppercase tracking-wider text-foreground">
-                      3. Official Payment Rail: DuitNow National QR / Maybank Transfer
+                      3. Official Payment Rail: DuitNow National QR / Bank Transfer
                     </span>
                   </div>
                   <span className="text-xs font-bold font-mono text-primary-ink bg-primary/10 px-2.5 py-1 rounded-md">
@@ -415,7 +372,9 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                       />
                       <span>
                         <strong className="block text-foreground">Bank Transfer</strong>
-                        Transfer directly to the Maybank account below.
+                        {SHELTER_BANK_ACCOUNT
+                          ? "Transfer directly to the bank account below."
+                          : "We send the account details on WhatsApp."}
                       </span>
                     </label>
                   </div>
@@ -430,8 +389,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                 ) : (
                   <SelectedPaymentInstructions
                     paymentMethod={paymentMethod}
-                    copiedBank={copiedBank}
-                    onCopyBank={handleCopyMaybank}
                   />
                 )}
 
@@ -568,8 +525,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
               <SelectedPaymentInstructions
                 paymentMethod={completedPledge.paymentMethod}
-                copiedBank={copiedBank}
-                onCopyBank={handleCopyMaybank}
                 petCustomQrUrl={targetPet?.customQrUrl}
                 petName={completedPledge.petName}
               />
@@ -633,8 +588,6 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
               <SelectedPaymentInstructions
                 paymentMethod={completedGift.paymentMethod}
-                copiedBank={copiedBank}
-                onCopyBank={handleCopyMaybank}
                 petCustomQrUrl={targetPet?.customQrUrl}
                 petName={completedGift.targetPetName}
               />

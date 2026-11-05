@@ -94,23 +94,12 @@ describe("registration claims the shelter cannot back", () => {
   // statement added to public/reports needs a text extractor here instead. Accuracy is measured
   // by the probe in the #249/#250 PR: reverting any one of those files makes this fail.
 
-  /**
-   * `donations.accountHolder` is the bank account's own name, a banking fact the owner is
-   * confirming with the shelter (#252). It is the one exception, and only until then.
-   */
-  const isAccountHolder = (l: SourceLine) =>
-    l.repoPath === "src/lib/i18n/translations.ts" &&
-    /^\s*accountHolder: "Pertubuhan Kebajikan Hope for Strays",$/.test(l.text);
-
   it("prints no ROS number or LHDN reference in src/ or the report PDFs", () => {
     expect(offendersAnywhere(STATUTORY_LITERAL)).toEqual([]);
   });
 
   it("names no society and claims no registration in src/ or the report PDFs", () => {
-    const offenders = sourceLines()
-      .filter((l) => SOCIETY_CLAIM.test(l.text) && !isAccountHolder(l))
-      .map((l) => l.at);
-    expect(offenders).toEqual([]);
+    expect(offendersAnywhere(SOCIETY_CLAIM)).toEqual([]);
   });
 });
 
@@ -154,5 +143,22 @@ describe("the shelter phone number", () => {
 
   it("no longer carries the unconfirmed landline anywhere in src/", () => {
     expect(offendersOutsideOwner(/7876 ?5432|78765432/)).toEqual([]);
+  });
+});
+
+describe("the shelter bank account", () => {
+  // Until 2026-11-05 the donate widget, the sponsorship popup, the translations and FAQ faq-024
+  // told donors to transfer to this Maybank number. The owner confirmed it is fake (#252).
+  // Digits with any run of spaces, dashes or dots between them, so "5140-1234-5678",
+  // "514012345678" and "5140 1234 5678" all count.
+  //
+  // ceiling: catches this one number in any separator spelling, in src/ code, data and the report
+  // PDFs. It cannot tell a real account from another made-up one; that is what the null default
+  // and the "copy from a bank statement" rule on SHELTER_BANK_ACCOUNT are for. Measured by the
+  // probe in the #252 PR: restoring any one of the removed copies makes this fail.
+  const FAKE_ACCOUNT = new RegExp("514012345678".split("").join("[\\s.-]*"));
+
+  it("never prints the fake Maybank number anywhere in src/ or the report PDFs", () => {
+    expect(offendersAnywhere(FAKE_ACCOUNT)).toEqual([]);
   });
 });

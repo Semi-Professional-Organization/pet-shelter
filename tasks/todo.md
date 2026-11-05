@@ -15,6 +15,27 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Hide the fake bank account (#252)
+
+**Branch:** `claude/hide-fake-bank-account` · opened 2026-11-05
+
+- **Done when:** no copy of the fake Maybank number is left in `src/`, the donate widget and the
+  sponsorship popup show a WhatsApp link for transfer details while no account is confirmed, and a
+  test fails if the number comes back in any separator spelling.
+- **In scope:** one `SHELTER_BANK_ACCOUNT` constant, one shared `BankTransferDetails` panel,
+  `faq-024` in the fixture, the translation keys, tests.
+- **Not in scope:** the real account and holder name (waiting on the shelter); the DuitNow FAQ
+  (#238).
+- **Status 2026-11-05:** stopped on the owner's request after the first xhigh review, before
+  any fix round. 15 findings are listed in the PR body; triage them first.
+
+- [x] Code and tests; `typecheck`, `test`, `test:components`, `lint` (changed files), `docs:check`,
+  `build` pass
+- [x] Probe: restoring any one of the five removed copies, or a dashed spelling, fails the guard
+- **Deliberately not done:** a test pinning `SHELTER_BANK_ACCOUNT` to `null`, which would only
+  add a step to the fill-in PR. The "Bank Transfer" radio stays: donors can still pay that way
+  once WhatsApp gives them the details.
+
 # Drop the receipt tax columns (#251)
 
 **Branch:** `claude/251-drop-receipt-snapshot-columns` · opened 2026-11-05
