@@ -21,7 +21,7 @@ The items below that remain are #249 (identity constants, society names, modal r
 #250 (admin export and audit labels, transparency stat, print styles), #251 (stored columns)
 and #252 (account holder name).
 
-**Step 2 — still live, GRAVE (midwife lane):** the tax-receipt *feature* is untouched —
+**Step 2 — as found before 2026-11-05 (see the update above for what is now gone):** the tax-receipt *feature* was untouched —
 
 - `src/lib/server/donationLedger.ts`, `src/actions/donations.ts`: issue "Section 44(6)" receipts and
   snapshot the identifiers onto `Donation` rows (`prisma/schema.prisma`).

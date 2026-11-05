@@ -194,7 +194,8 @@ export function issueReceiptInMemory(draft: DonationDraft, when: Date): Donation
 
   const record: DonationRecord = {
     ...draft,
-    // Overrides a wider object's fields too, so memory mode matches Postgres.
+    // Overrides a wider object's fields too, so memory mode stores no tax number
+    // or issuer snapshot, as the Postgres insert does not.
     taxIdOrIc: undefined,
     taxDeductibleRef: RETIRED_ISSUER_SNAPSHOT,
     shelterRegistrationNo: RETIRED_ISSUER_SNAPSHOT,

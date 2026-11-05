@@ -42,6 +42,12 @@ Record active multi-step work streams below.
   the empty grid cell left by the removed field. Logged the payload-builder duplication in
   `open/`. Declined again: admin export labels (#250), certificate ROS line and dead receipt
   translation keys (#249)
+- [x] Review round 3: no logic finding, so the loop stops (two rounds in a row). Fixed the
+  modal's repeated next step, the #239 entry's "still live" heading and two overclaiming
+  comments. Left for #250: the queue's "Issue receipt" button and "Receipts issued" panel
+  (component tests pin that wording), the export's LHDN headers and filename, and
+  `docs/runbooks/RUNBOOK_DONATION_AND_LHDN_TAX_RECEIPTS.md`, which still tells staff gifts are
+  deductible. Left for #249: the certificate and modal ROS line, dead `receipt*` translation keys
 
 ## Review
 

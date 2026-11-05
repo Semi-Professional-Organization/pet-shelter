@@ -136,7 +136,8 @@ export async function recordSponsorshipPledge(
     memorySerial += 1;
     const record: SponsorshipRecord = {
       ...draft,
-      // Overrides a wider object's field too, so memory mode stores no NRIC either.
+      // Overrides a wider object's field too, so memory mode stores no NRIC, as
+      // the Postgres insert does not.
       taxIdOrIc: undefined,
       id: `mem-spn-${String(memorySerial).padStart(6, "0")}`,
       status: "PENDING_PAYMENT",

@@ -647,8 +647,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
               <p className="text-xs text-muted-foreground">
                 Status: <strong className="text-foreground">Pending payment verification</strong>.
-                This is not a receipt and cannot be filed for tax relief. We email you an
-                acknowledgement once the transfer is confirmed.
+                This is not a receipt and cannot be filed for tax relief.
               </p>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
