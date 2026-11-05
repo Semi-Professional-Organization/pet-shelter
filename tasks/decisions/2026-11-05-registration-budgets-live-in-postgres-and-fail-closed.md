@@ -27,9 +27,9 @@ refuse registration when that table cannot be read.
   in seconds. Rotating the secret resets every budget.
 - **An outage has its own result.** `checkSharedRateLimit` answers `{ success: false, unavailable:
   true }` with no `retryAfterSeconds`, so a caller that builds a "wait N seconds" message does not
-  type-check until it handles the outage. A refusal the row gave is remembered per instance until
-  the row's window ends, to keep a flood on one key off the database; outages are never
-  remembered.
+  type-check until it handles the outage.
+- **No per-instance cache in front of the row.** One was tried in review to keep a flood on one key
+  off the database, and removed: it outlived the row it copied. Every check is one upsert.
 
 Ordering is a constraint, not a preference: the table must exist in production before the code
 deploys, or every registration is refused.
