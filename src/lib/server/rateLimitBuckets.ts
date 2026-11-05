@@ -16,6 +16,15 @@ import { prisma } from "./prisma";
  * `expiresAt`; RETURNING sees the row as written. Time is the database's
  * `now()`, so instance clocks never disagree about a window.
  *
+ * `now()` is each transaction's start, so a caller that began before the row's
+ * writer can see slightly more than the window left; `retryAfterSeconds` is
+ * clamped to the window so nobody is told to wait 61 seconds for a 60-second one.
+ *
+ * ceiling: no statement timeout of its own. A database that accepts the
+ * connection and then stalls holds the request until the function's own limit
+ * instead of failing closed at once. Recorded in
+ * `tasks/open/the-shared-rate-limit-writes-on-every-attempt.md`.
+ *
  * The count is capped at `cap` so a flood cannot walk it towards int4 overflow.
  * `cap` must be a positive int4; `checkSharedRateLimit` passes `limit + 1`.
  */
@@ -30,7 +39,9 @@ export async function spendRateLimitBucket(
     ON CONFLICT ("key") DO UPDATE SET
       "count" = CASE WHEN b."expiresAt" <= now() THEN 1 ELSE LEAST(b."count" + 1, ${cap}::int) END,
       "expiresAt" = CASE WHEN b."expiresAt" <= now() THEN EXCLUDED."expiresAt" ELSE b."expiresAt" END
-    RETURNING "count", GREATEST(1, CEIL(EXTRACT(EPOCH FROM (b."expiresAt" - now()))))::int AS "retryAfterSeconds"`;
+    RETURNING "count",
+      LEAST(CEIL(${windowMs / 1000}::double precision), GREATEST(1, CEIL(EXTRACT(EPOCH FROM (b."expiresAt" - now())))))::int
+        AS "retryAfterSeconds"`;
 
   const row = rows[0];
   if (!row) throw new Error("rate_limit_buckets upsert returned no row");

@@ -377,7 +377,7 @@ export function getAdminSecretKey(): string {
  * ceiling: no lower bound on a configured code, so even one character boots.
  * The rate limit does not make up for it. Its budgets are shared across server
  * instances (`checkSharedRateLimit`), so a caller gets about 10 guesses a
- * minute per address, but a botnet, or one host rotating IPv6 addresses, gets
+ * minute per address (up to 20 across one fixed-window boundary), but a botnet, or one host rotating IPv6 addresses, gets
  * that per address it holds (see the ceilings in `registerAction`). Only the
  * code's length bounds that.
  */
