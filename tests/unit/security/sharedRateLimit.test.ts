@@ -38,25 +38,6 @@ describe("checkSharedRateLimit", () => {
     vi.restoreAllMocks();
   });
 
-  it("remembers a refusal the row gave, and only until the row said", async () => {
-    vi.stubEnv("DATABASE_URL", "postgresql://unit.test/none");
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
-    const { checkSharedRateLimit } = await subject();
-
-    prismaDouble.$queryRaw.mockResolvedValueOnce([{ count: 3, retryAfterSeconds: 20 }]);
-    expect(await checkSharedRateLimit("flood", 2, 60_000)).toMatchObject({ success: false, retryAfterSeconds: 20 });
-
-    now.mockReturnValue(1_015_000);
-    expect(await checkSharedRateLimit("flood", 2, 60_000)).toMatchObject({ success: false, retryAfterSeconds: 5 });
-    expect(prismaDouble.$queryRaw).toHaveBeenCalledTimes(1);
-
-    now.mockReturnValue(1_020_000);
-    prismaDouble.$queryRaw.mockResolvedValueOnce([{ count: 1, retryAfterSeconds: 60 }]);
-    expect((await checkSharedRateLimit("flood", 2, 60_000)).success).toBe(true);
-    expect(prismaDouble.$queryRaw).toHaveBeenCalledTimes(2);
-  });
-
   it("keeps saying 'unavailable' however many times an outage is hit, and recovers at once", async () => {
     vi.stubEnv("DATABASE_URL", "postgresql://unit.test/none");
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -176,6 +157,21 @@ describe("registerAction on the shared budgets", () => {
     expect(res.retryAfterSeconds).toBeUndefined();
     // Refused at the address budget: the email budget is never read.
     expect(prismaDouble.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("spends both budgets in the shared table before checking the invite code", async () => {
+    vi.stubEnv("TRUSTED_PROXY_HEADER", "x-real-ip");
+    requestHeaders.current = new Headers({ "x-real-ip": "203.0.113.9" });
+    prismaDouble.$queryRaw.mockResolvedValue([{ count: 1, retryAfterSeconds: 60 }]);
+    const { rateLimitKeyDigest } = await subject();
+
+    const res = await attempt("both-budgets@test.com");
+
+    expect(res.error).toMatch(/valid staff invite code is required/);
+    expect(prismaDouble.$queryRaw.mock.calls.map((call) => call[1])).toEqual([
+      rateLimitKeyDigest("register:ip:203.0.113.9"),
+      rateLimitKeyDigest("register:email:both-budgets@test.com"),
+    ]);
   });
 
   it("spends the address budget in the shared table, digested", async () => {

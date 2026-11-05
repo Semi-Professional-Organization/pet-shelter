@@ -29,8 +29,11 @@ Record active multi-step work streams below.
   so on). Each would need its own fail-closed decision; #263 is expected to be the next caller.
 
 - [x] Limiter, table, migration and rollback
-- [x] Unit tests (paths, fail-closed, no raw key sent) and Postgres probes (atomic under 25
-  concurrent hits, digest stored, retry-after, window reset)
+- [x] Unit tests (paths, fail-closed, both budgets digested) and Postgres probes (atomic under 25
+  concurrent hits, digest stored, retry-after, window reset, sweep)
+- [x] Review rounds 1-3: keyed the digest (HMAC), made an outage its own result type, built the
+  window with make_interval; a per-instance refusal cache was added and then removed (it outlived
+  the row). IPv6 prefixes and invitee lock-out logged in `tasks/open/`.
 - [ ] Owner applies `prisma/migrations/manual/20261105_rate_limit_buckets/migration.sql` in Neon
   before merge
 

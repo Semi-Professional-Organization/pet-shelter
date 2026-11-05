@@ -1,7 +1,6 @@
 import { spendRateLimitBucket, sweepExpiredRateLimitBuckets } from "@/lib/server/rateLimitBuckets";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
 import { signPayload } from "./crypto";
-import { registerStateReset } from "@/lib/stateResets";
 import { checkRateLimit, type RateLimitResult } from "./rateLimit";
 
 /**
@@ -12,14 +11,6 @@ import { checkRateLimit, type RateLimitResult } from "./rateLimit";
  * outage first.
  */
 export type SharedRateLimitResult = RateLimitResult | { success: false; unavailable: true };
-
-/**
- * Keys this instance has seen the shared row refuse, and until when (epoch ms).
- * Lets a flood on one key be refused without a query, and is never stricter
- * than the row: it holds only a refusal the row gave, for only as long as the
- * row said. Outages never write here.
- */
-const refusedUntil = new Map<string, number>();
 
 /** Share of calls that also sweep expired rows. */
 const SWEEP_PROBABILITY = 0.02;
@@ -57,6 +48,10 @@ export function rateLimitKeyDigest(key: string): string {
  * key holds that in a single statement; a sliding window needs a row per hit.
  * Upgrade path: a two-window weighted count if the 2x burst ever matters.
  *
+ * ceiling: every check is one upsert, refused or not, so a flood costs one
+ * write per request. Fine at this shelter's volume; a per-instance memory of
+ * refusals was tried and removed in review (it outlived the row it copied).
+ *
  * ceiling: expired rows are swept by about one call in fifty, so the table holds
  * at most the keys touched in the last window plus the unswept tail. Measured by
  * nothing yet; at this shelter's registration volume it is a few rows.
@@ -80,13 +75,6 @@ export async function checkSharedRateLimit(
   // the one under test. The ledgers choose their storage the same way.
   if (!process.env.DATABASE_URL) return checkRateLimit(key, limit, windowMs);
 
-  const now = Date.now();
-  const until = refusedUntil.get(key);
-  if (until !== undefined) {
-    if (until > now) return { success: false, remaining: 0, retryAfterSeconds: Math.ceil((until - now) / 1000) };
-    refusedUntil.delete(key);
-  }
-
   const hashedKey = rateLimitKeyDigest(key);
 
   try {
@@ -96,10 +84,7 @@ export async function checkSharedRateLimit(
     // table size; the next one retries it.
     if (Math.random() < SWEEP_PROBABILITY) scheduleAfterResponse(sweepExpiredRateLimitBuckets);
 
-    if (count > limit) {
-      remember(key, now + retryAfterSeconds * 1000);
-      return { success: false, remaining: 0, retryAfterSeconds };
-    }
+    if (count > limit) return { success: false, remaining: 0, retryAfterSeconds };
     return { success: true, remaining: limit - count, retryAfterSeconds: 0 };
   } catch (err) {
     // The key is left out: it is built from an email or an address.
@@ -110,23 +95,3 @@ export async function checkSharedRateLimit(
     return { success: false, unavailable: true };
   }
 }
-
-// ceiling: bounded by evicting expired entries once it passes this size; a
-// flood of distinct keys each refused by the row is the only way to fill it.
-const REFUSED_CACHE_LIMIT = 10_000;
-
-function remember(key: string, until: number): void {
-  if (refusedUntil.size >= REFUSED_CACHE_LIMIT) {
-    const now = Date.now();
-    for (const [k, t] of refusedUntil) if (t <= now) refusedUntil.delete(k);
-    if (refusedUntil.size >= REFUSED_CACHE_LIMIT) refusedUntil.clear();
-  }
-  refusedUntil.set(key, until);
-}
-
-/** Test-only: forget every remembered refusal, as a fresh instance would. */
-export function resetSharedRateLimitCache(): void {
-  refusedUntil.clear();
-}
-
-registerStateReset("sharedRateLimit", resetSharedRateLimitCache);

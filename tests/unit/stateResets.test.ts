@@ -31,7 +31,6 @@ const STORE_OWNERS = [
   "@/lib/server/clinicalRepository",
   "@/lib/server/transparencyRepository",
   "@/lib/security/secrets",
-  "@/lib/security/sharedRateLimit",
 ];
 
 const EXPECTED = [
@@ -43,7 +42,6 @@ const EXPECTED = [
   "settings",
   "auditLog",
   "rateLimit",
-  "sharedRateLimit",
   "idempotency",
   "donationLedger",
   "donationPledgeLedger",

@@ -75,6 +75,8 @@ export async function getClientAddress(): Promise<string | null> {
   }
 }
 
+type AddressLimit = { limited: false } | { limited: true; retryAfterSeconds: number };
+
 /**
  * Whether this caller's address has exhausted `limit` attempts of `name`.
  *
@@ -98,8 +100,6 @@ export async function getClientAddress(): Promise<string | null> {
  * serverless host each warm instance counts separately and a distributed caller
  * is not bounded. Only registration has moved so far (#213).
  */
-type AddressLimit = { limited: false } | { limited: true; retryAfterSeconds: number };
-
 export async function checkAddressRateLimit(
   name: string,
   limit: number,
