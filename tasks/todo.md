@@ -37,6 +37,11 @@ Record active multi-step work streams below.
   modal, button, certificate and sponsor sign-in copy; e2e page object; memory-mode parity.
   Declined: the modal's ROS line and transparency stat (#249, #250), and merging the two
   acknowledgement DTO builders (pre-existing duplication, not this change)
+- [x] Review round 2: no logic finding. Fixed the remaining "official receipt" copy on the staff
+  reconciliation screens and modal, the duplicated promise in the pledge emails, stale comments,
+  the empty grid cell left by the removed field. Logged the payload-builder duplication in
+  `open/`. Declined again: admin export labels (#250), certificate ROS line and dead receipt
+  translation keys (#249)
 
 ## Review
 

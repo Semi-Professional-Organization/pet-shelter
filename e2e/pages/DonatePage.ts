@@ -10,7 +10,7 @@ export interface DonorDetails {
  * The pledge journey on `/donate`, through to its acknowledgement.
  *
  * There is no receipt at the end of this page any more: a general gift is
- * recorded as pending and its LHDN receipt is issued from `/admin/donations`
+ * recorded as pending and its acknowledgement is sent from `/admin/donations`
  * once a coordinator confirms the transfer.
  */
 export class DonatePage {

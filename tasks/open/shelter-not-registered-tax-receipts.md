@@ -13,6 +13,14 @@ both: `src/lib/domain/shelterIdentity.ts` carries two ROS numbers (`PPM-012-10-1
 navbar "(LHDN)", donate/get-involved/terms/privacy copy, FAQ data and translation strings no longer
 claim registration or tax deductibility. See `tasks/today.md`.
 
+**2026-11-05 update.** The owner answered both questions below: the shelter is not registered,
+and the receipt feature was never active live. #248 removed the opt-in, the NRIC field, the
+issuer snapshot on new rows and the tax wording from every email, in both the donation and the
+sponsorship lanes (`tasks/decisions/2026-11-05-a-reconciled-gift-earns-an-acknowledgement-not-a-tax-receipt.md`).
+The items below that remain are #249 (identity constants, society names, modal receipt block),
+#250 (admin export and audit labels, transparency stat, print styles), #251 (stored columns)
+and #252 (account holder name).
+
 **Step 2 — still live, GRAVE (midwife lane):** the tax-receipt *feature* is untouched —
 
 - `src/lib/server/donationLedger.ts`, `src/actions/donations.ts`: issue "Section 44(6)" receipts and

@@ -82,8 +82,8 @@ export function SponsorAuthForm({ initialMode = "login" }: { initialMode?: Mode 
         <p className="text-sm text-muted-foreground">
           {isRegister
             ? isMs
-              ? "Sudah menaja haiwan rescue? Gunakan nombor rujukan HFS-DON daripada e-mel pengesahan penajaan itu untuk menuntut sejarah penajaan anda."
-              : "Sponsored a rescue? Use the HFS-DON reference from that sponsorship's acknowledgement email to claim your sponsorship history."
+              ? "Sudah menaja haiwan rescue? Gunakan nombor rujukan HFS-DON daripada e-mel yang kami hantar selepas pemindahan penajaan itu disahkan untuk menuntut sejarah penajaan anda."
+              : "Sponsored a rescue? Use the HFS-DON reference from the email we sent once that sponsorship's transfer was confirmed to claim your sponsorship history."
             : isMs
               ? "Akses rescue anda, taraf penajaan dan kandungan eksklusif."
               : "Access your rescues, sponsorship standing and exclusive content."}

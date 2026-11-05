@@ -474,7 +474,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
                   <div className="space-y-1.5">
                     <Label htmlFor="donorEmail" className="text-xs font-semibold">
-                      Email Address (For confirmation and receipt) <span className="text-destructive">*</span>
+                      Email Address (For confirmation) <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="donorEmail"
@@ -486,7 +486,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 sm:col-span-2">
                     <Label htmlFor="donorPhone" className="text-xs font-semibold">
                       WhatsApp / Mobile Phone (Optional)
                     </Label>
@@ -567,7 +567,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                   follow-up with the shelter.
                 </p>
                 <p className="text-xs font-semibold leading-relaxed">
-                  Receipt issuance follows only after a coordinator verifies the transfer against
+                  We email you an acknowledgement once a coordinator verifies the transfer against
                   the shelter bank statement, usually within two working days.
                 </p>
               </div>

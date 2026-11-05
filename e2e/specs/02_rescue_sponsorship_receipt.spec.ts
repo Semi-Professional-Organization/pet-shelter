@@ -5,13 +5,11 @@ import { AdoptionPage } from "../pages/AdoptionPage";
 /**
  * Golden path 2 — sponsoring a rescue, through to the pledge acknowledgement.
  *
- * The receipt is not a nicety: as a registered Malaysian NGO the shelter issues
- * donors a Subsection 44(6) tax-exempt document, and a donor who does not get
- * one cannot claim the deduction. Which is exactly why it must not be issued
- * here. Until 2026-09-22 this path ended on an official `HFS-DON-*` e-receipt
+ * No receipt may be issued here. The shelter is not a registered society and
+ * issues no tax receipt at all (owner, 2026-11-05; #239). Until 2026-09-22 this path ended on an official `HFS-DON-*` e-receipt
  * the moment the form was submitted, before anyone had seen a bank statement;
- * this spec used to assert that, and so pinned the defect. The receipt is now
- * drawn when a coordinator confirms the transfer, and what this walks is the
+ * this spec used to assert that, and so pinned the defect. An acknowledgement is
+ * now sent when a coordinator confirms the transfer, and what this walks is the
  * chain up to that boundary — the deep link a pet profile emits, the tier
  * choice, the pledge, and an acknowledgement that is plainly not a receipt.
  */

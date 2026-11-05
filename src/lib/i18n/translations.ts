@@ -663,7 +663,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       dedicatePlaceholder: "e.g. For Bella's surgery recovery / Milo's care",
       donorNameLabel: "Donor Full Name",
       donorEmailLabel: "Email Address",
-      donorPhoneLabel: "Phone Number (WhatsApp receipt updates)",
+      donorPhoneLabel: "Phone Number (WhatsApp updates)",
       donorNotesLabel: "Special Message / Donor Wishes (Optional)",
       bankTransferTitle: "Direct Bank Transfer (Maybank)",
       bankName: "Maybank Berhad",

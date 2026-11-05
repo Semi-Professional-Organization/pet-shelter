@@ -31,8 +31,8 @@ export interface UseSponsorshipControllerProps {
  *
  * `donation_receipt` was the general-gift arm until 2026-09-22, when the donation
  * form stopped issuing an official `HFS-DON-*` number from a supporter's word that
- * they had paid. Both lanes now end at a claim reference, and the Section 44(6)
- * receipt is issued from the coordinator's queue in `/admin/donations`. The two
+ * they had paid. Both lanes now end at a claim reference, and the acknowledgement
+ * is sent from the coordinator's queue in `/admin/donations`. The two
  * arms remain distinct because the money lands in two tables and the two
  * references are drawn from different series.
  */

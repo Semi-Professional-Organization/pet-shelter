@@ -680,8 +680,8 @@ export async function listPendingSponsorships(take = 200): Promise<SponsorshipRe
         )
         .slice(0, take)
         // The same shape as the Postgres branch, whose `select` leaves the tax
-        // identifier out. A copy, never a delete: the stored pledge still needs it
-        // for the receipt `settleSponsorship` prints.
+        // identifier out. Memory rows stopped carrying one on 2026-11-05 (#239);
+        // this keeps the projection explicit rather than relying on that.
         .map((row) => ({ ...row, taxIdOrIc: undefined }))
     );
   }

@@ -684,7 +684,7 @@ export async function sendDonationReceiptEmail(
     targetPetName: receipt.targetPetName ?? "",
     notes: receipt.notes ?? "",
     notice:
-      "This email acknowledges your gift. It is not a tax receipt and cannot be used to claim tax relief.",
+      "This email acknowledges your gift. It is not a tax receipt and cannot be used to claim tax relief. Reply to this email if you have any questions.",
   };
 
   const subject = `🐾 Thank you, we received your gift of ${fields.amount} - ${receipt.receiptNumber} (${SHELTER_NAME})`;
@@ -845,8 +845,7 @@ ${pledge.reconciliationNotice}
 Please quote ${pledge.pledgeRef} in your transfer description so our coordinator
 can match your payment quickly.
 
-IMPORTANT: This confirms your sponsorship pledge; it is not a receipt. We email
-you an acknowledgement once your payment has been reconciled.
+IMPORTANT: This confirms your sponsorship pledge; it is not a receipt.
 
 With gratitude,
 The ${SHELTER_NAME} Team
@@ -915,8 +914,7 @@ The ${SHELTER_NAME} Team
 
     <div style="background:${EMAIL_BRAND.muted}; padding: 14px; border-radius: 6px; font-size: 12px; color: ${EMAIL_BRAND.mutedForeground}; margin: 20px 0; line-height: 1.5;">
       <em>
-        This confirms your sponsorship pledge and is <strong>not</strong> a receipt. We email you
-        an acknowledgement once your payment has been reconciled.
+        This confirms your sponsorship pledge and is <strong>not</strong> a receipt.
       </em>
     </div>
 
@@ -1018,8 +1016,7 @@ Please quote ${pledge.pledgeRef} in your transfer description so our coordinator
 can match your payment quickly.
 
 IMPORTANT: This email confirms that we recorded your pledge. It is NOT a receipt
-and it cannot be used to claim tax relief. We email you an acknowledgement once
-your payment has been reconciled.
+and it cannot be used to claim tax relief.
 
 With gratitude,
 The ${SHELTER_NAME} Team
@@ -1078,8 +1075,7 @@ The ${SHELTER_NAME} Team
     <div style="background:${EMAIL_BRAND.muted}; padding: 14px; border-radius: 6px; font-size: 12px; color: ${EMAIL_BRAND.mutedForeground}; margin: 20px 0; line-height: 1.5;">
       <em>
         This email confirms that we recorded your pledge. It is <strong>not</strong> a receipt,
-        and it cannot be used to claim tax relief. We email you an acknowledgement once your
-        payment has been reconciled.
+        and it cannot be used to claim tax relief.
       </em>
     </div>
 

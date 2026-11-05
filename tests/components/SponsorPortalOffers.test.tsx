@@ -34,6 +34,6 @@ describe("sponsor portal offers", () => {
 
     await setupUser().click(screen.getByRole("button", { name: /Claim your portal/i }));
 
-    expect(screen.getByText(/HFS-DON reference from that sponsorship's acknowledgement email/)).toBeInTheDocument();
+    expect(screen.getByText(/HFS-DON reference from the email we sent once that sponsorship's transfer was confirmed/)).toBeInTheDocument();
   });
 });

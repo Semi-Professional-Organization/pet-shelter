@@ -19,7 +19,7 @@ export const donationPledgeSchema = z.object({
     .max(100, "Donor name is too long"),
   donorEmail: z
     .string()
-    .email("Please provide a valid email address for receipt dispatch"),
+    .email("Please provide a valid email address"),
   donorPhone: z
     .string()
     .max(25, "Phone number is too long")

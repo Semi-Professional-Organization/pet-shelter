@@ -489,7 +489,7 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
                         disabled={isBusy || busyRef !== null}
                         className="text-xs gap-1.5 font-semibold tone-soft tone-success hover:bg-success-surface"
                         // Two steps because the receipt cannot be withdrawn once issued.
-                        title="Confirm this transfer has landed and issue the official receipt"
+                        title="Confirm this transfer has landed and send the acknowledgement"
                       >
                         <CheckCircle2 className="size-3.5" />
                         Confirm payment received

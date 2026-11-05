@@ -32,7 +32,7 @@ const DONATION_PLEDGE_QUEUE: ReconciliationQueueSource = {
   title: "General Donation Reconciliation",
   blurb: (
     <>
-      Confirm a transfer has landed to issue the donor&apos;s official receipt. Match the{" "}
+      Confirm a transfer has landed to send the donor&apos;s acknowledgement. Match the{" "}
       <span className="font-mono font-semibold">HFS-GFT</span> reference against your bank
       statement — a pledge reference is not a receipt number, and no receipt exists for these
       gifts until you confirm one here. Dismiss a gift that no transfer ever backed.

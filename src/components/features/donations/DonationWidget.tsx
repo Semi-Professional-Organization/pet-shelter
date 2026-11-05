@@ -343,9 +343,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
           {/*
             Stated plainly rather than merely omitted. A donor who has given to this
-            shelter before was promised a tax receipt here, and silence about the
-            change reads as a missing feature. The shelter is not a registered
-            society and cannot issue one (owner, 2026-11-05; #239).
+            shelter may expect a tax receipt, and silence reads as a missing feature.
+            The shelter is not a registered society and cannot issue one (owner,
+            2026-11-05; #239).
           */}
           <p className="text-3xs text-muted-foreground leading-relaxed italic">
             *{" "}
@@ -763,9 +763,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="widgetDonorPhone" className="text-xs font-semibold">
-                {t("donations.donorPhoneLabel", "Phone Number (WhatsApp receipt updates)")}
+                {t("donations.donorPhoneLabel", "Phone Number (WhatsApp updates)")}
               </Label>
               <Input
                 id="widgetDonorPhone"

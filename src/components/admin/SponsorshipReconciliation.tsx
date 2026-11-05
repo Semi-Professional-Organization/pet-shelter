@@ -30,7 +30,7 @@ const SPONSORSHIP_QUEUE: ReconciliationQueueSource = {
   title: "Sponsorship Payment Reconciliation",
   blurb: (
     <>
-      Confirm a transfer has landed to issue the supporter&apos;s official receipt. Match the{" "}
+      Confirm a transfer has landed to send the supporter&apos;s acknowledgement. Match the{" "}
       <span className="font-mono font-semibold">HFS-PLG</span> reference against your bank
       statement — a pledge reference is not a receipt number. Dismiss a pledge that no transfer
       ever backed.
