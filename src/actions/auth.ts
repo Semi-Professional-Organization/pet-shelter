@@ -167,11 +167,14 @@ export async function loginAction(credentials: {
  * an outage, not the caller's fault, so it says so instead of "too many".
  */
 function registrationRefusal(limit: { retryAfterSeconds: number; unavailable?: true }): AuthResponse {
+  // No `retryAfterSeconds` for an outage: the login page turns it into a
+  // countdown that also disables sign-in, which does not depend on this table.
+  if (limit.unavailable) {
+    return { success: false, error: "Registration is temporarily unavailable. Please try again in a few minutes." };
+  }
   return {
     success: false,
-    error: limit.unavailable
-      ? "Registration is temporarily unavailable. Please try again in a few minutes."
-      : `Too many registration attempts. Please wait ${limit.retryAfterSeconds} seconds before trying again.`,
+    error: `Too many registration attempts. Please wait ${limit.retryAfterSeconds} seconds before trying again.`,
     retryAfterSeconds: limit.retryAfterSeconds,
   };
 }
@@ -253,6 +256,10 @@ export async function registerAction(data: {
   // ceiling: a botnet with many addresses still gets one address budget per
   // address. Nothing keyed on the caller can bound that; only the invite code's
   // length can (`getStaffInviteSecret`).
+  //
+  // ceiling: the email budget is now global too, so anyone who knows an invited
+  // person's email can keep that email refused by spending 5 tries a minute on
+  // it. Recorded in `tasks/open/a-shared-email-budget-can-lock-out-one-invitee.md`.
   //
   // ceiling: the address budget runs only where `getClientAddress()` can return
   // an address it is allowed to believe. Where it cannot, the per-email budget

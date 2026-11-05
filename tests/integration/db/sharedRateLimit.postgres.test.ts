@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { prisma, disconnectPrisma } from "@/lib/server/prisma";
-import { checkSharedRateLimit } from "@/lib/security/sharedRateLimit";
+import { checkSharedRateLimit, rateLimitKeyDigest } from "@/lib/security/sharedRateLimit";
+import { resetRateLimitStore } from "@/lib/security/rateLimit";
+import { spendRateLimitBucket } from "@/lib/server/rateLimitBuckets";
 import { requireDatabaseUrl, assertDatabaseReachable } from "./support/database";
 
 /**
@@ -11,11 +13,15 @@ import { requireDatabaseUrl, assertDatabaseReachable } from "./support/database"
  * from separate connections (standing in for separate serverless instances)
  * cannot all read "under budget", and that the window resets from the row's own
  * `expiresAt`, not from any instance's clock.
+ *
+ * `checkSharedRateLimit` also refuses from this process's own count first, so
+ * the race is run against `spendRateLimitBucket` directly, and a test that
+ * stands in for a second instance clears the local count.
  */
 
 const PROBE_PREFIX = "probe-2999:";
 const probeKey = () => `${PROBE_PREFIX}${randomUUID()}`;
-const hashed = (key: string) => createHash("sha256").update(key).digest("hex");
+const hashed = rateLimitKeyDigest;
 const probeKeys: string[] = [];
 
 function key(): string {
@@ -39,28 +45,48 @@ describe("checkSharedRateLimit against Postgres", () => {
     await disconnectPrisma();
   });
 
-  it("admits exactly `limit` of 25 concurrent hits on one key", async () => {
+  it("hands 25 concurrent hits on one key the counts 1 to 10, then the cap", async () => {
     const k = key();
-    const results = await Promise.all(Array.from({ length: 25 }, () => checkSharedRateLimit(k, 10, 60_000)));
+    const counts = await Promise.all(
+      Array.from({ length: 25 }, () => spendRateLimitBucket(hashed(k), 60_000, 11).then((r) => r.count))
+    );
 
-    expect(results.filter((r) => r.success)).toHaveLength(10);
-    expect(results.filter((r) => !r.success && !r.unavailable)).toHaveLength(15);
+    // Atomic: every count from 1 to 10 handed out exactly once, so exactly ten
+    // callers read "under budget"; the rest are held at the cap.
+    expect(counts.sort((a, b) => a - b)).toEqual([...Array.from({ length: 10 }, (_, i) => i + 1), ...Array(15).fill(11)]);
     const row = await prisma.rateLimitBucket.findUnique({ where: { key: hashed(k) } });
-    // Capped at limit + 1, so a flood cannot run the counter up.
     expect(row?.count).toBe(11);
   });
 
-  it("stores a digest, never the key it was given", async () => {
+  it("refuses a second instance once the first has spent the budget", async () => {
+    const k = key();
+    for (let i = 0; i < 3; i++) expect((await checkSharedRateLimit(k, 3, 60_000)).success).toBe(true);
+
+    resetRateLimitStore(); // a different warm instance: no local count
+    const elsewhere = await checkSharedRateLimit(k, 3, 60_000);
+    expect(elsewhere.success).toBe(false);
+    expect(elsewhere.unavailable).toBeUndefined();
+  });
+
+  it("stores the keyed digest, never the key it was given", async () => {
     const k = key();
     await checkSharedRateLimit(k, 5, 60_000);
-    const rows = await prisma.$queryRaw<{ n: number }[]>`
+
+    expect(await prisma.rateLimitBucket.findUnique({ where: { key: hashed(k) } })).toMatchObject({ count: 1 });
+    const raw = await prisma.$queryRaw<{ n: number }[]>`
       SELECT count(*)::int AS n FROM "rate_limit_buckets" WHERE "key" LIKE ${PROBE_PREFIX + "%"}`;
-    expect(rows[0].n).toBe(0);
+    expect(raw[0].n).toBe(0);
+  });
+
+  it("accepts a window that is not a whole number of milliseconds or fits no int4", async () => {
+    await expect(spendRateLimitBucket(hashed(key()), 1.5, 2)).resolves.toMatchObject({ count: 1 });
+    await expect(spendRateLimitBucket(hashed(key()), 3_000_000_000, 2)).resolves.toMatchObject({ count: 1 });
   });
 
   it("tells a refused caller how long the window has left", async () => {
     const k = key();
     for (let i = 0; i < 3; i++) await checkSharedRateLimit(k, 3, 60_000);
+    resetRateLimitStore(); // so the answer comes from the row, not the local count
     const refused = await checkSharedRateLimit(k, 3, 60_000);
 
     expect(refused.success).toBe(false);
@@ -70,13 +96,14 @@ describe("checkSharedRateLimit against Postgres", () => {
 
   it("starts a fresh window once the row's window has ended", async () => {
     const k = key();
-    for (let i = 0; i < 4; i++) await checkSharedRateLimit(k, 3, 60_000);
+    for (let i = 0; i < 4; i++) await spendRateLimitBucket(hashed(k), 60_000, 4);
     expect((await checkSharedRateLimit(k, 3, 60_000)).success).toBe(false);
 
     // Age the row past its window rather than sleep a minute.
     await prisma.$executeRaw`
       UPDATE "rate_limit_buckets" SET "expiresAt" = now() - interval '1 second' WHERE "key" = ${hashed(k)}`;
 
+    resetRateLimitStore();
     const fresh = await checkSharedRateLimit(k, 3, 60_000);
     expect(fresh).toEqual({ success: true, remaining: 2, retryAfterSeconds: 0 });
   });

@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
 import { spendRateLimitBucket, sweepExpiredRateLimitBuckets } from "@/lib/server/rateLimitBuckets";
+import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
+import { signPayload } from "./crypto";
 import { checkRateLimit, type RateLimitResult } from "./rateLimit";
 
 /**
@@ -13,6 +14,15 @@ const UNAVAILABLE_RETRY_SECONDS = 60;
 
 /** Share of calls that also sweep expired rows. */
 const SWEEP_PROBABILITY = 0.02;
+
+/**
+ * The row key for a budget name: an HMAC under the server secret, so a copy of
+ * the table cannot be reversed by hashing every IPv4 address or a list of staff
+ * emails. Rotating `SESSION_SECRET` only resets the budgets.
+ */
+export function rateLimitKeyDigest(key: string): string {
+  return signPayload(`rate-limit-bucket\u0000${key}`);
+}
 
 /**
  * A rate limit held in Postgres, so every server instance spends the same budget.
@@ -42,9 +52,14 @@ const SWEEP_PROBABILITY = 0.02;
  * at most the keys touched in the last window plus the unswept tail. Measured by
  * nothing yet; at this shelter's registration volume it is a few rows.
  *
- * ceiling: a production deploy with no `DATABASE_URL` takes the in-memory path.
- * Such a deploy keeps every account in memory too, so there is nothing for a
- * guessed invite code to reach that survives a restart.
+ * ceiling: a production deploy with no `DATABASE_URL` takes the in-memory path,
+ * and with it the per-process bound this replaces: a code guessed there stays
+ * guessed. Every hosted deploy of this app sets `DATABASE_URL`; refusing
+ * registration without one would need its own decision.
+ *
+ * ceiling: the address budget is keyed on the whole address, so a caller who
+ * can rotate through an IPv6 prefix draws a fresh budget per address
+ * (`tasks/open/address-budgets-key-the-whole-ipv6-address.md`).
  */
 export async function checkSharedRateLimit(
   key: string,
@@ -53,16 +68,21 @@ export async function checkSharedRateLimit(
 ): Promise<SharedRateLimitResult> {
   if (!process.env.DATABASE_URL) return checkRateLimit(key, limit, windowMs);
 
-  // Hashed so the table never holds the email or address a key is built from.
-  const hashedKey = createHash("sha256").update(key).digest("hex");
+  // A caller already over budget on this instance is over it everywhere, since
+  // the shared count includes every hit this instance made. Refusing here keeps
+  // a flood from one source off the database. This only ever refuses, so it is a
+  // filter, not a fallback.
+  const local = checkRateLimit(key, limit, windowMs);
+  if (!local.success) return local;
+
+  const hashedKey = rateLimitKeyDigest(key);
 
   try {
     const { count, retryAfterSeconds } = await spendRateLimitBucket(hashedKey, windowMs, limit + 1);
 
-    if (Math.random() < SWEEP_PROBABILITY) {
-      // A failed sweep costs only table size; the next one retries it.
-      await sweepExpiredRateLimitBuckets().catch(() => {});
-    }
+    // After the response, so no caller waits on it. A failed sweep costs only
+    // table size; the next one retries it.
+    if (Math.random() < SWEEP_PROBABILITY) scheduleAfterResponse(sweepExpiredRateLimitBuckets);
 
     if (count > limit) return { success: false, remaining: 0, retryAfterSeconds };
     return { success: true, remaining: limit - count, retryAfterSeconds: 0 };

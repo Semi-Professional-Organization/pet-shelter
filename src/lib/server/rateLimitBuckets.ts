@@ -17,6 +17,7 @@ import { prisma } from "./prisma";
  * `now()`, so instance clocks never disagree about a window.
  *
  * The count is capped at `cap` so a flood cannot walk it towards int4 overflow.
+ * `cap` must be a positive int4; `checkSharedRateLimit` passes `limit + 1`.
  */
 export async function spendRateLimitBucket(
   hashedKey: string,
@@ -25,7 +26,7 @@ export async function spendRateLimitBucket(
 ): Promise<{ count: number; retryAfterSeconds: number }> {
   const rows = await prisma.$queryRaw<{ count: number; retryAfterSeconds: number }[]>`
     INSERT INTO "rate_limit_buckets" AS b ("key", "count", "expiresAt")
-    VALUES (${hashedKey}, 1, now() + ${windowMs}::int * interval '1 millisecond')
+    VALUES (${hashedKey}, 1, now() + make_interval(secs => ${windowMs / 1000}::double precision))
     ON CONFLICT ("key") DO UPDATE SET
       "count" = CASE WHEN b."expiresAt" <= now() THEN 1 ELSE LEAST(b."count" + 1, ${cap}::int) END,
       "expiresAt" = CASE WHEN b."expiresAt" <= now() THEN EXCLUDED."expiresAt" ELSE b."expiresAt" END
