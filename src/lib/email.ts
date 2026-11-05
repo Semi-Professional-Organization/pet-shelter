@@ -613,24 +613,13 @@ ${SHELTER_NAME}
   });
 }
 
-/**
- * What the acknowledgement email renders: a `DonationReceipt` without the donor's tax
- * identifier or the issuer's ROS and LHDN snapshots. The shelter is not a registered
- * society (owner, 2026-11-05; #239), so the type leaves no field a tax claim could be
- * printed from, even for an old row that still carries one.
- */
-export type DonationAcknowledgement = Omit<
-  DonationReceipt,
-  "taxIdOrIc" | "taxDeductibleRef" | "shelterRegistrationNo"
->;
-
 /** The payment rails a donation can arrive on, read off the acknowledgement that renders them. */
-type PaymentMethod = DonationAcknowledgement["paymentMethod"];
+type PaymentMethod = DonationReceipt["paymentMethod"];
 
 /**
  * Payment-rail labels for the donation acknowledgement.
  *
- * Exhaustive by construction. Keyed off `DonationAcknowledgement["paymentMethod"]` — the exact union the
+ * Exhaustive by construction. Keyed off `DonationReceipt["paymentMethod"]` — the exact union the
  * templates below render — so a fourth rail added to that type fails the build here rather than
  * silently receipting the donation as something it was not. A card donation was previously
  * receipted as a bank transfer in the HTML half; see
@@ -669,7 +658,7 @@ const PAYMENT_RAIL_LABELS: Record<PaymentMethod, string> = {
  * at checkout, before that date, that a tax receipt would follow.
  */
 export async function sendDonationReceiptEmail(
-  receipt: DonationAcknowledgement
+  receipt: DonationReceipt
 ): Promise<EmailResult> {
   // Single source of truth for every value both halves of this mail state. The plain-text and
   // HTML bodies below read from here and never re-derive a value of their own — one field resolved

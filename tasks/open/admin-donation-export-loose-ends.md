@@ -5,16 +5,11 @@
 Found by the review of #249/#250 and declined there as out of scope. None of it is a claim the
 site makes to the public.
 
-- **Tax fields still reach the browser.** The donations CSV no longer has tax columns, but
-  `toReceiptDTO` in `src/actions/donations.ts` still sends each row's `taxIdOrIc`,
-  `taxDeductibleRef` and `shelterRegistrationNo` to the admin page, and the audit-trail CSV and
-  the audit viewer print each entry's full `details` JSON, which for a pre-2026-11-05 row can hold
-  a donor NRIC. The receipt feature was never live, so production rows should hold none. Belongs
-  with #251, which drops the columns: drop the DTO fields in the same change, and decide whether
-  old audit `details` need redacting on read.
-- **The schema still describes a tax receipt.** `prisma/schema.prisma`'s `Donation` doc calls
-  each row "an issued LHDN Section 44(6) tax-deductible donation receipt" and points at
-  constants `shelterIdentity.ts` no longer has. #251 rewrites that model; fix the comment there.
+- **Old audit rows can still show an NRIC.** #251 dropped the tax columns and the DTO fields,
+  but the audit-trail CSV and the audit viewer print each entry's full `details` JSON, which for
+  a row written before 2026-10-13 can hold a donor NRIC. The receipt feature was never live, so
+  production rows should hold none; #251's `precheck.sql` reports the count
+  (`audit_rows_with_nric`). Decide whether old `details` need redacting on read if it is above 0.
 - **A truncation warning can disappear.** Every transient export notice in
   `src/hooks/useAuditLogController.ts` starts an uncancelled 4s timer that clears the notice. A
   timer from an earlier export can clear the incomplete-export warning that is meant to stay.
@@ -23,4 +18,4 @@ site makes to the public.
   success styling and a check icon, including "Nothing was exported" and "Do not treat this as
   complete". Pre-existing.
 
-**Settles when:** #251 removes the fields, and the notice gets a tone and a cancellable timer.
+**Settles when:** the audit NRIC count is known (and redaction decided if it is not 0), and the notice gets a tone and a cancellable timer.

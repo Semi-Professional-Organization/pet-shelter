@@ -20,11 +20,8 @@ import { formatMYR, ringgitFromSen, senFromRinggit } from "@/lib/domain/money";
 import { generateGiftRef } from "@/lib/domain/donationPledge";
 import { reconciliationNotice } from "@/lib/domain/petSponsorship";
 import { DONATION_RECORDING_UNCONFIRMED_MESSAGE } from "@/lib/domain/contributionFailure";
-import {
-  DonationRecord,
-  ReceiptIssuanceError,
-  listDonationsOrThrow,
-} from "@/lib/server/donationLedger";
+import { ReceiptIssuanceError, listDonationsOrThrow } from "@/lib/server/donationLedger";
+import { toDonationReceiptDTO } from "@/lib/server/donationAcknowledgement";
 import {
   DonationPledgeRecord,
   DonationPledgeWriteError,
@@ -42,41 +39,6 @@ import {
 } from "@/lib/security/rbac";
 import type { SessionUser } from "@/lib/security/session";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
-
-/**
- * Renders an issued receipt for the donor-facing confirmation and the emailed PDF.
- *
- * Converts the ledger's exact integer sen back to a ringgit `number` at this
- * boundary — and only here — so the existing `DonationReceiptDTO` contract, the
- * email template, and the CSV export keep working unchanged while the stored value
- * stays exact. See `src/lib/domain/money.ts` for why the two representations differ.
- */
-function toReceiptDTO(record: DonationRecord): DonationReceiptDTO {
-  return {
-    receiptNumber: record.receiptNumber,
-    date: new Date(record.issuedAt).toLocaleDateString("en-MY", {
-      timeZone: "Asia/Kuala_Lumpur",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    donorName: record.donorName,
-    donorEmail: record.donorEmail,
-    donorPhone: record.donorPhone,
-    tierId: record.tierId,
-    tierName: record.tierName,
-    amountMYR: ringgitFromSen(record.amountSen),
-    frequency: record.frequency,
-    paymentMethod: record.paymentMethod,
-    targetPetName: record.targetPetName,
-    taxIdOrIc: record.taxIdOrIc,
-    notes: record.notes,
-    taxDeductibleRef: record.taxDeductibleRef,
-    shelterRegistrationNo: record.shelterRegistrationNo,
-  };
-}
 
 /** Normalises an optional free-text field: trimmed, or absent if empty. */
 function optionalText(value: string | undefined): string | undefined {
@@ -298,10 +260,6 @@ const NO_SUCH_PLEDGE = "No donation pledge found for that reference";
  * masks a thrown Server Action error into an opaque digest, so a thrown denial
  * reached the page indistinguishable from an outage. Returned, it arrives as the
  * guard's own message and the page can say who may not do this.
- *
- * `taxIdOrIc` is deliberately absent from the DTO and from the ledger's projection:
- * a coordinator confirming that a transfer landed does not need the donor's tax
- * identifier to do it.
  */
 export async function listPendingDonationPledgesAction(): Promise<PendingDonationPledgesResult> {
   try {
@@ -440,15 +398,10 @@ export async function reconcileDonationPledgeAction(
       frequency: donation.frequency,
       paymentMethod: donation.paymentMethod,
       targetPetName: donation.targetPetName,
-      // No `taxIdOrIc`, on purpose, and the same as the sponsorship lane. Since
-      // 2026-11-05 no new row carries one (#239), but an NRIC on a legacy row must
-      // still never be copied into `AuditLog.metadata`, which would store personal
-      // data a second time in a table with a different retention story.
-      // See `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
     },
   });
 
-  scheduleAfterResponse(() => sendDonationReceiptEmail(toReceiptDTO(donation)));
+  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation)));
 
   return {
     success: true,
@@ -586,7 +539,7 @@ const RECEIPT_EXPORT_LIMIT = 1000;
  * and moving the cap without reporting it would only change the number at which
  * the same silence begins.
  *
- * Returns `DonationReceiptDTO`, mapped by the same `toReceiptDTO` the receipt email
+ * Returns `DonationReceiptDTO`, mapped by the same `toDonationReceiptDTO` the receipt email
  * uses, so the two cannot disagree about what a receipt says. The exact integer sen
  * becomes ringgit at that one boundary.
  */
@@ -612,7 +565,7 @@ export async function fetchDonationReceiptsAction(
 
     return {
       success: true,
-      data: records.slice(0, bounded).map(toReceiptDTO),
+      data: records.slice(0, bounded).map(toDonationReceiptDTO),
       truncated: records.length > bounded,
     };
   } catch (err: unknown) {

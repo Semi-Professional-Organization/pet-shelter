@@ -102,10 +102,7 @@ describe("donation acknowledgement — the two halves must agree", () => {
     frequency: "one_time",
     paymentMethod: "duitnow_qr",
     targetPetName: "Luna",
-    taxIdOrIc: "910101-10-1234",
     notes: "In loving memory of Bubbles",
-    taxDeductibleRef: "LHDN.01/35/42/51/179-6.9999",
-    shelterRegistrationNo: "PPM-001-10-99999999",
   };
 
   /**
@@ -207,9 +204,6 @@ describe("donation acknowledgement — the two halves must agree", () => {
       expect(body, `${half} claims deductibility`).not.toMatch(/tax[\s-]*(?:deduct|exempt)/i);
       expect(body, `${half} names the tax authority`).not.toMatch(/LHDN|Inland Revenue/i);
       expect(body, `${half} names the society registry`).not.toMatch(/Registrar of Societies|PPM|\bROS\b/);
-      expect(body, `${half} prints the LHDN reference`).not.toContain(baseReceipt.taxDeductibleRef);
-      expect(body, `${half} prints the ROS number`).not.toContain(baseReceipt.shelterRegistrationNo);
-      expect(body, `${half} prints the donor's NRIC`).not.toContain("910101-10-1234");
       expect(body, `${half} calls itself official`).not.toMatch(/official/i);
     }
     for (const body of [mail.text, mail.html]) {

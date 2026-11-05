@@ -8,9 +8,9 @@ import { registerStateReset } from "@/lib/stateResets";
  * Persistence for donation acknowledgements: the numbered record that money arrived.
  *
  * The shelter is not a registered society and holds no tax-deductible approval
- * (owner, 2026-11-05; #239), so nothing written here is a tax document. Rows
- * issued before that date still carry the ROS and LHDN identifiers they were
- * snapshotted with; new rows write them empty, and #251 decides the columns' fate.
+ * (owner, 2026-11-05; #239), so nothing written here is a tax document. The
+ * columns that once held a donor NRIC and the ROS and LHDN identifiers were dropped
+ * by #251.
  *
  * ## Why this is not a dual-layer repository
  *
@@ -54,7 +54,6 @@ export interface DonationRecord {
   donorName: string;
   donorEmail: string;
   donorPhone?: string;
-  taxIdOrIc?: string;
   tierId: SponsorshipTierId;
   tierName: string;
   amountSen: Sen;
@@ -63,37 +62,15 @@ export interface DonationRecord {
   paymentMethod: "duitnow_qr" | "online_banking" | "card";
   targetPetName?: string;
   notes?: string;
-  taxDeductibleRef: string;
-  shelterRegistrationNo: string;
   /** ISO-8601 instant. Always UTC; render in Asia/Kuala_Lumpur at the edges. */
   issuedAt: string;
 }
 
-/**
- * Everything a caller supplies. The ledger owns id, numbering, and timestamp.
- *
- * The tax identifier and the two issuer snapshots are not suppliable: they are
- * read back from rows issued before 2026-11-05 and never written to a new one,
- * so no caller can put a tax claim on a new acknowledgement.
- */
+/** Everything a caller supplies. The ledger owns id, numbering, and timestamp. */
 export type DonationDraft = Omit<
   DonationRecord,
-  | "id"
-  | "receiptNumber"
-  | "sequenceScope"
-  | "sequenceValue"
-  | "issuedAt"
-  | "taxIdOrIc"
-  | "taxDeductibleRef"
-  | "shelterRegistrationNo"
+  "id" | "receiptNumber" | "sequenceScope" | "sequenceValue" | "issuedAt"
 >;
-
-/**
- * What a new row stores in the retired `taxDeductibleRef` and
- * `shelterRegistrationNo` columns. They are `NOT NULL` until #251's migration
- * drops them, and an empty string is the one value that asserts nothing.
- */
-const RETIRED_ISSUER_SNAPSHOT = "";
 
 export class ReceiptIssuanceError extends Error {
   readonly cause?: unknown;
@@ -194,11 +171,6 @@ export function issueReceiptInMemory(draft: DonationDraft, when: Date): Donation
 
   const record: DonationRecord = {
     ...draft,
-    // Overrides a wider object's fields too, so memory mode stores no tax number
-    // or issuer snapshot, as the Postgres insert does not.
-    taxIdOrIc: undefined,
-    taxDeductibleRef: RETIRED_ISSUER_SNAPSHOT,
-    shelterRegistrationNo: RETIRED_ISSUER_SNAPSHOT,
     id: `mem-don-${String(memorySeq).padStart(6, "0")}`,
     receiptNumber: formatReceiptNumber(scope, serial),
     sequenceScope: scope,
@@ -245,7 +217,6 @@ interface DonationRow {
   donorName: string;
   donorEmail: string;
   donorPhone: string | null;
-  taxIdOrIc: string | null;
   tierId: string;
   tierName: string;
   amountSen: number;
@@ -254,8 +225,6 @@ interface DonationRow {
   paymentMethod: string;
   targetPetName: string | null;
   notes: string | null;
-  taxDeductibleRef: string;
-  shelterRegistrationNo: string;
   issuedAt: Date;
 }
 
@@ -268,7 +237,6 @@ function toRecord(row: DonationRow): DonationRecord {
     donorName: row.donorName,
     donorEmail: row.donorEmail,
     donorPhone: row.donorPhone ?? undefined,
-    taxIdOrIc: row.taxIdOrIc ?? undefined,
     tierId: row.tierId as SponsorshipTierId,
     tierName: row.tierName,
     amountSen: senFromInteger(row.amountSen),
@@ -277,8 +245,6 @@ function toRecord(row: DonationRow): DonationRecord {
     paymentMethod: row.paymentMethod as DonationRecord["paymentMethod"],
     targetPetName: row.targetPetName ?? undefined,
     notes: row.notes ?? undefined,
-    taxDeductibleRef: row.taxDeductibleRef,
-    shelterRegistrationNo: row.shelterRegistrationNo,
     issuedAt: row.issuedAt.toISOString(),
   };
 }
@@ -326,8 +292,6 @@ export async function drawAndInsert(
       paymentMethod: draft.paymentMethod,
       targetPetName: draft.targetPetName ?? null,
       notes: draft.notes ?? null,
-      taxDeductibleRef: RETIRED_ISSUER_SNAPSHOT,
-      shelterRegistrationNo: RETIRED_ISSUER_SNAPSHOT,
       issuedAt: when,
     },
   });

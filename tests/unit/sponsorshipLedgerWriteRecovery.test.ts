@@ -66,7 +66,6 @@ const storedRow = {
   status: "PENDING_PAYMENT",
   receiptNumber: null,
   sponsorPhone: null,
-  taxIdOrIc: null,
   notes: null,
   createdAt: new Date("2026-09-14T12:00:00.000Z"),
 };

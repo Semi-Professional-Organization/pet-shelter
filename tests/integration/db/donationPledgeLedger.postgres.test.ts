@@ -42,14 +42,6 @@ import {
 
 const SCOPE = receiptScopeFor(PROBE_INSTANT);
 
-/**
- * Gives a pending row the NRIC a pledge made before 2026-11-05 could carry. The
- * ledger no longer accepts one (#239), but such rows can still be in production.
- */
-async function seedLegacyTaxId(pledgeRef: string): Promise<void> {
-  await prisma.donationPledge.update({ where: { pledgeRef }, data: { taxIdOrIc: "880101-14-5523" } });
-}
-
 let serial = 0;
 
 /** A fresh probe reference per gift; `cleanProbeLedger` deletes by this prefix. */
@@ -174,25 +166,6 @@ describe("donation pledge ledger against real PostgreSQL", () => {
     ]);
   });
 
-  it("lists a pending gift without reading the donor's tax identifier", async () => {
-    const record = await recordDonationPledge(draft(), { now: PROBE_INSTANT });
-    await seedLegacyTaxId(record.pledgeRef);
-
-    // The control: the column holds a value, so a queue read that fetched it would
-    // hand it back. Without this the assertion below could not fail.
-    const stored = await prisma.donationPledge.findUnique({
-      where: { pledgeRef: record.pledgeRef },
-      select: { taxIdOrIc: true },
-    });
-    expect(stored?.taxIdOrIc).toBe("880101-14-5523");
-
-    const queued = (await listPendingDonationPledges(500)).find(
-      (r) => r.pledgeRef === record.pledgeRef
-    );
-    expect(queued).toBeDefined();
-    expect(queued?.taxIdOrIc).toBeUndefined();
-  });
-
   it("settles a gift as one unit: the receipt and the ACTIVE row commit together", async () => {
     const record = await recordDonationPledge(
       draft({
@@ -201,7 +174,6 @@ describe("donation pledge ledger against real PostgreSQL", () => {
       }),
       { now: PROBE_INSTANT }
     );
-    await seedLegacyTaxId(record.pledgeRef);
 
     const outcome = await settleDonationPledge(
       record.pledgeRef,
@@ -220,12 +192,7 @@ describe("donation pledge ledger against real PostgreSQL", () => {
       donorEmail: "probe.gift@example.test",
       amountSen: 5_000,
       targetPetName: "Tuah",
-      // A legacy pledge's NRIC is not copied, and no ROS or LHDN identifier is
-      // stamped: the shelter is not a registered society (#239).
-      taxIdOrIc: null,
       notes: "For Tuah, with love",
-      taxDeductibleRef: "",
-      shelterRegistrationNo: "",
     });
 
     const row = await prisma.donationPledge.findUnique({

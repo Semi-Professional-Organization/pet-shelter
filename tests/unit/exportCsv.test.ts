@@ -57,9 +57,6 @@ describe("Donation records CSV generator", () => {
         frequency: "one_time",
         paymentMethod: "duitnow_qr",
         targetPetName: "Milo",
-        taxIdOrIc: "920512-10-5432",
-        taxDeductibleRef: OLD_LHDN_REF,
-        shelterRegistrationNo: OLD_ROS_NO,
       },
     ];
 
@@ -117,16 +114,12 @@ describe("Donation records CSV generator", () => {
         amountMYR: 50,
         frequency: "one_time",
         paymentMethod: "duitnow_qr",
-        taxIdOrIc: "900101-10-1234",
-        taxDeductibleRef: OLD_LHDN_REF,
-        shelterRegistrationNo: OLD_ROS_NO,
       },
     ]);
 
     const header = csv.split("\r\n")[0];
     expect(header).not.toMatch(/LHDN|ROS|Tax|Receipt/i);
     expect(csv).toContain("HFS-DON-202609-0001");
-    expect(csv).not.toContain("900101-10-1234");
     expect(csv).not.toContain(OLD_LHDN_REF);
     expect(csv).not.toContain(OLD_ROS_NO);
   });

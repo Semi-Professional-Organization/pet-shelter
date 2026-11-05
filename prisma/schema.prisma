@@ -162,9 +162,6 @@ model Pet {
 /// the two copies are *supposed* to stay equal. Here they are not. Renaming a pet
 /// must not retroactively rewrite the applications filed under its old name, in
 /// exactly the way `Donation.tierName` must not be rewritten by renaming a tier.
-///
-/// `Donation` documents the same reasoning for its issuer identity; treat the two
-/// as one pattern.
 model AdoptionApplication {
   id                    String            @id @default(cuid())
   /// Public reference code (`HFS-APP-YYYYMM-XXXX`) quoted by the applicant to
@@ -207,15 +204,15 @@ model AdoptionApplication {
   /// UNDER_REVIEW, so progress and decision are independent axes. Setting one
   /// of these is what lights a step in the public tracking portal — which
   /// previously had to recover the same facts by regex from `adminReviewNotes`.
-  interviewAt           DateTime?
-  interviewLocation     String?
-  interviewMeetingType  String?
-  homeVisitAt           DateTime?
-  adminNotes            String?           @db.Text
-  adminReviewNotes      String?           @db.Text
-  reviewedBy            String?
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
+  interviewAt          DateTime?
+  interviewLocation    String?
+  interviewMeetingType String?
+  homeVisitAt          DateTime?
+  adminNotes           String?   @db.Text
+  adminReviewNotes     String?   @db.Text
+  reviewedBy           String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@index([petId, status])
   @@index([email, petId])
@@ -401,7 +398,8 @@ model ReceiptSequence {
   @@map("receipt_sequences")
 }
 
-/// An issued LHDN Section 44(6) tax-deductible donation receipt.
+/// A numbered acknowledgement that a gift arrived. Not a tax receipt: the shelter
+/// is not a registered society (owner, 2026-11-05; #239).
 ///
 /// ## Append-only by construction
 ///
@@ -412,14 +410,13 @@ model ReceiptSequence {
 /// handles one. `prisma/sql/donation_append_only.sql` adds the matching database
 /// trigger for deployments that want the guarantee enforced below the ORM too.
 ///
-/// ## Why the issuer identity is copied onto every row
+/// ## No tax fields
 ///
-/// `taxDeductibleRef` and `shelterRegistrationNo` duplicate constants that live in
-/// `src/lib/domain/shelterIdentity.ts`, which a normalisation pass would flag as
-/// redundant. It is intentional, and it is the same point-in-time capture pattern
-/// as `AdoptionApplication.petName`: a receipt must forever show the identifiers it
-/// was *issued* under. Resolving the ROS registration discrepancy (P2) must not
-/// retroactively rewrite receipts already in donors' hands and in LHDN filings.
+/// Until #251 every row also snapshotted the donor's NRIC (`taxIdOrIc`) and the
+/// shelter's LHDN and ROS identifiers (`taxDeductibleRef`, `shelterRegistrationNo`).
+/// The shelter is not a registered society and the live site never issued a tax
+/// receipt (owner, 2026-11-05; #239), so those columns were dropped by
+/// `prisma/migrations/manual/20261105_drop_receipt_tax_columns/`.
 ///
 /// ## Money
 ///
@@ -437,12 +434,11 @@ model Donation {
   donorName  String
   donorEmail String
   donorPhone String?
-  /// Malaysian IC, tax file, or SSM number the donor will claim the relief against.
-  taxIdOrIc  String?
 
   tierId        String
-  /// Tier name as displayed at donation time. Snapshot, for the same reason as the
-  /// issuer identity above: renaming a sponsorship tier must not alter old receipts.
+  /// Tier name as displayed at donation time. Snapshot, the same point-in-time
+  /// capture as `AdoptionApplication.petName`: renaming a sponsorship tier must not
+  /// alter old receipts.
   tierName      String
   /// Integer sen. RM 250.00 is stored as 25000.
   amountSen     Int
@@ -453,9 +449,6 @@ model Donation {
   /// form collects a name, and the dedication should survive the pet being archived.
   targetPetName String?
   notes         String? @db.Text
-
-  taxDeductibleRef      String
-  shelterRegistrationNo String
 
   issuedAt DateTime @default(now())
 
@@ -492,10 +485,10 @@ model Donation {
 /// refuses every UPDATE. A status column on a statutory document was already
 /// forbidden by the `Donation` comment; the trigger makes it impossible as well.
 ///
-/// ## What the statutory export sees
+/// ## What the donations export sees
 ///
 /// Nothing here. `fetchDonationReceiptsAction` reads `donations`, so an
-/// unreconciled gift cannot reach an LHDN return however this table is queried.
+/// unreconciled gift cannot reach the export however this table is queried.
 /// That is deliberately structural rather than a `where` clause somebody has to
 /// remember — the defect being fixed was a silent one.
 model DonationPledge {
@@ -504,10 +497,6 @@ model DonationPledge {
   donorName  String
   donorEmail String
   donorPhone String?
-  /// Captured at checkout and copied onto the receipt at reconciliation. Never
-  /// projected into the coordinator's queue — confirming that a transfer landed
-  /// does not require reading anybody's NRIC.
-  taxIdOrIc  String?
 
   tierId    String
   /// Tier name as displayed at pledge time, snapshotted for the same reason as
@@ -764,8 +753,7 @@ model PetSponsorship {
   reconciledBy String?
   cancelledAt  DateTime?
 
-  taxIdOrIc String?
-  notes     String? @db.Text
+  notes String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
