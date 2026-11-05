@@ -15,6 +15,28 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Share the registration rate limit across server instances (#213)
+
+**Branch:** `claude/shared-registration-rate-limit` · opened 2026-11-05
+
+- **Done when:** both registration budgets are spent in `rate_limit_buckets`, concurrent hits from
+  separate connections admit exactly `limit` (`sharedRateLimit.postgres.test.ts`), and an
+  unreadable table refuses registration rather than counting in memory.
+- **In scope:** `checkSharedRateLimit`, the `rate_limit_buckets` table and its manual migration,
+  `registerAction`, `checkAddressRateLimit`'s `shared` option, the ceilings on
+  `getStaffInviteSecret` and `registerAction`.
+- **Not in scope:** every other `checkRateLimit` budget (login, sponsors, applications and
+  so on). Each would need its own fail-closed decision; #263 is expected to be the next caller.
+
+- [x] Limiter, table, migration and rollback
+- [x] Unit tests (paths, fail-closed, no raw key sent) and Postgres probes (atomic under 25
+  concurrent hits, digest stored, retry-after, window reset)
+- [ ] Owner applies `prisma/migrations/manual/20261105_rate_limit_buckets/migration.sql` in Neon
+  before merge
+
+**Review:** deliberately not done: a sliding window (2x boundary burst is the recorded ceiling),
+moving any other budget, and a scheduled sweep (one call in fifty deletes expired rows).
+
 # Remove registration numbers and receipt wording (#249, #250)
 
 **Branch:** `claude/remove-registration-and-receipt-wording` · opened 2026-11-05 · stacked on #253
