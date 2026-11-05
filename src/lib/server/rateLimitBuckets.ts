@@ -44,8 +44,9 @@ export async function spendRateLimitBucket(
         AS "retryAfterSeconds"`;
 
   const row = rows[0];
-  const count = Number(row?.count);
-  const retryAfterSeconds = Number(row?.retryAfterSeconds);
+  // typeof, not Number(): Number(null) is 0, which would admit with a full budget.
+  const count = typeof row?.count === "number" ? row.count : NaN;
+  const retryAfterSeconds = typeof row?.retryAfterSeconds === "number" ? row.retryAfterSeconds : NaN;
   // A thrown error is what makes the caller fail closed. `NaN > limit` is false,
   // so a row without a usable count must never reach it as a number.
   if (!Number.isInteger(count) || !Number.isInteger(retryAfterSeconds)) {
