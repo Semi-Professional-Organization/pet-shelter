@@ -99,12 +99,6 @@ export function SponsorCertificate({ data }: { data: CertificateData }) {
               {formatMYR(senFromInteger(data.recognisedSen), { withSymbol: true })}
             </dd>
           </div>
-          <div className="flex justify-between gap-3">
-            <dt className="text-receipt-ink/70">
-              {isMs ? "No. pendaftaran" : "Registration no."}
-            </dt>
-            <dd className="font-bold tabular-nums">{data.shelterRegistrationNo}</dd>
-          </div>
         </dl>
 
         <footer className="mt-8 flex items-end justify-between gap-6 border-t-2 border-receipt-ink/15 pt-6">

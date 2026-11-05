@@ -110,12 +110,12 @@ export const EMAIL_TONE = {
 } as const satisfies Record<DesignTone, Record<ToneSlot, string>>;
 
 /**
- * The statutory receipt group — black ink on white paper, in every theme.
+ * The paper group — black ink on white paper, in every theme.
  *
  * These are the one token group already shaped for print and email: `--receipt-*` is
- * deliberately absent from `.dark` because a Sec 44(6) receipt has to survive a monochrome
- * printer. The emailed receipt mirrors them rather than the tone palette, so the printed and
- * the emailed receipt for the same donation finally match.
+ * deliberately absent from `.dark` because a printed document has to survive a monochrome
+ * printer. The emailed acknowledgement mirrors them rather than the tone palette. The names
+ * predate 2026-11-05, when the shelter stopped issuing tax receipts (#239).
  */
 export const EMAIL_RECEIPT = {
   /** The paper. */
@@ -130,7 +130,7 @@ export const EMAIL_RECEIPT = {
   inkFaint: "#71717b",
   /** Row separators and the header rule. */
   rule: "#e4e4e7",
-  /** The inset panel behind the tax notice. */
+  /** The inset panel behind the acknowledgement notice. */
   panel: "#fafafa",
   /** The total received. Fixed green, not `--tone-success-accent`: that one lightens in dark
    *  mode and would vanish against the receipt's permanently white paper. */

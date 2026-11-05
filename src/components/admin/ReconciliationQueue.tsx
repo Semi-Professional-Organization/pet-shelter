@@ -120,10 +120,12 @@ function Notice({
 /**
  * A coordinator's reconciliation queue.
  *
- * Confirming a row is what turns a claim into a statutory document: it draws a
- * number from the same gapless monthly series every other receipt uses and emails
- * it to the supporter. That is irreversible — `Donation` is append-only and a
- * receipt cannot be withdrawn, only offset — so the button asks once before firing.
+ * Confirming a row is what turns a claim into a donation record: it draws a
+ * number from the same gapless monthly `HFS-DON-*` series every other record uses
+ * and emails the supporter a thank-you. It is not a tax receipt; the shelter holds
+ * no registration to issue one (#239). That is irreversible — `Donation` is
+ * append-only and a record cannot be withdrawn, only offset — so the button asks
+ * once before firing.
  *
  * Dismissing a row is the other way out: a claim no transfer ever backed leaves the
  * queue as `CANCELLED`, nothing is issued, and the reason goes to the audit log. It
@@ -252,7 +254,7 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
         if (result.outcome === "already_reconciled") {
           setRowNotice(
             <>
-              {row.pledgeRef} was already reconciled as receipt{" "}
+              {row.pledgeRef} was already reconciled as record{" "}
               <span className="font-mono font-semibold">{result.receiptNumber}</span>.
             </>
           );
@@ -289,7 +291,7 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
       if (result.success) {
         await removeResolvedRow(row.pledgeRef);
         setRowNotice(
-          `${row.pledgeRef} for ${row.supporterName} was dismissed. No receipt was issued.`
+          `${row.pledgeRef} for ${row.supporterName} was dismissed. Nothing was recorded.`
         );
         setIntent(null);
         setDismissReason("");
@@ -364,7 +366,7 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
         <div className="tone-soft tone-success rounded-xl border p-4 space-y-2">
           <p className="eyebrow flex items-center gap-1.5">
             <BadgeCheck className="size-3.5" />
-            Receipts issued this session
+            Recorded this session
           </p>
           <ul className="space-y-1 text-sm">
             {settled.map((s) => (
@@ -451,7 +453,7 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
                         className="text-xs font-bold gap-1.5"
                       >
                         <CheckCircle2 className="size-3.5" />
-                        {isBusy ? "Issuing…" : "Issue receipt"}
+                        {isBusy ? "Recording…" : "Record donation"}
                       </Button>
                       {cancelButton}
                     </div>
@@ -488,8 +490,8 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
                         onClick={() => openIntent(row.pledgeRef, "confirm")}
                         disabled={isBusy || busyRef !== null}
                         className="text-xs gap-1.5 font-semibold tone-soft tone-success hover:bg-success-surface"
-                        // Two steps because the receipt cannot be withdrawn once issued.
-                        title="Confirm this transfer has landed and issue the receipt"
+                        // Two steps because the record cannot be withdrawn once written.
+                        title="Confirm this transfer has landed and record the donation"
                       >
                         <CheckCircle2 className="size-3.5" />
                         Confirm payment received

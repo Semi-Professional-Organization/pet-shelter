@@ -413,7 +413,7 @@ export async function reconcilePetSponsorshipAction(
       pledgeRef: ref.data,
       receiptNumber: donation.receiptNumber,
       petName: record.petName,
-      // The block below exists for the LHDN CSV fallback. This row is classified
+      // The block below exists for the donations CSV fallback. This row is classified
       // as a donation by `exportCsv` (it carries a `receiptNumber`), and that
       // exporter reads one specific key per column: without them a reconciled
       // sponsorship exported as "Anonymous Donor", with the reconciling
@@ -423,7 +423,7 @@ export async function reconcilePetSponsorshipAction(
       // `amountMYR` in particular is not optional decoration: it is the *only*
       // amount key that exporter reads, so `amountSen` and `amountDisplay` beside
       // it — which every other reader uses — left the money column reading zero on
-      // a document filed with LHDN.
+      // the exported file.
       //
       // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. Since
       // 2026-11-05 no new row carries one (#239), and an NRIC on a legacy row is

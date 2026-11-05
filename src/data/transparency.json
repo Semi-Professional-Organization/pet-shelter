@@ -289,7 +289,7 @@
       "month": 8,
       "title": "Monthly Expenditure Summary - August 2026",
       "fileUrl": "/reports/hfs-expenditure-2026-08.pdf",
-      "summary": "SAMPLE DOCUMENT — replace with the statement filed with ROS before publishing. Line-by-line August spending across veterinary, nutrition, facilities and TNRM operations, reconciled against vendor invoices.",
+      "summary": "SAMPLE DOCUMENT — replace with the real statement before publishing. Line-by-line August spending across veterinary, nutrition, facilities and TNRM operations, reconciled against vendor invoices.",
       "publishedAt": "2026-09-01T09:00:00.000Z"
     },
     {
@@ -298,7 +298,7 @@
       "month": 7,
       "title": "Monthly Expenditure Summary - July 2026",
       "fileUrl": "/reports/hfs-expenditure-2026-07.pdf",
-      "summary": "SAMPLE DOCUMENT — replace with the statement filed with ROS before publishing. July operating expenditure with caretaker stipend disclosure and clinic invoice references.",
+      "summary": "SAMPLE DOCUMENT — replace with the real statement before publishing. July operating expenditure with caretaker stipend disclosure and clinic invoice references.",
       "publishedAt": "2026-08-08T09:00:00.000Z"
     },
     {
@@ -307,7 +307,7 @@
       "month": 6,
       "title": "Half-Year Spending Report - January to June 2026",
       "fileUrl": "/reports/hfs-half-year-2026-h1.pdf",
-      "summary": "SAMPLE DOCUMENT — replace with the statement filed with ROS before publishing. Six-month consolidated statement of receipts and payments, including donation income and category allocation.",
+      "summary": "SAMPLE DOCUMENT — replace with the real statement before publishing. Six-month consolidated statement of receipts and payments, including donation income and category allocation.",
       "publishedAt": "2026-07-20T09:00:00.000Z"
     },
     {
@@ -316,7 +316,7 @@
       "month": null,
       "title": "Annual Audited Financial Statements 2025",
       "fileUrl": "/reports/hfs-audited-financials-2025.pdf",
-      "summary": "SAMPLE DOCUMENT — replace with the statement filed with ROS before publishing. Full audited statement of income and expenditure filed with the Registrar of Societies (ROS) and tabled at the 2026 Annual General Meeting.",
+      "summary": "SAMPLE DOCUMENT — replace with the real statement before publishing. Full audited statement of income and expenditure for the 2025 financial year.",
       "publishedAt": "2026-03-28T09:00:00.000Z"
     },
     {
@@ -325,7 +325,7 @@
       "month": null,
       "title": "Annual Audited Financial Statements 2024",
       "fileUrl": "/reports/hfs-audited-financials-2024.pdf",
-      "summary": "SAMPLE DOCUMENT — replace with the statement filed with ROS before publishing. Audited statement of income and expenditure for the 2024 financial year, filed with ROS and tabled at the 2025 Annual General Meeting.",
+      "summary": "SAMPLE DOCUMENT — replace with the real statement before publishing. Audited statement of income and expenditure for the 2024 financial year.",
       "publishedAt": "2025-03-30T09:00:00.000Z"
     }
   ],
@@ -349,16 +349,6 @@
       "period": "Year to date 2026",
       "periodMs": "Sepanjang tahun 2026",
       "displayOrder": 2
-    },
-    {
-      "id": "stat-tax-receipts",
-      "key": "tax_receipts_issued",
-      "metricValue": "100%",
-      "label": "LHDN tax-deductible receipts issued",
-      "labelMs": "Resit potongan cukai LHDN dikeluarkan",
-      "period": "Every donation, 2026",
-      "periodMs": "Setiap sumbangan, 2026",
-      "displayOrder": 3
     }
   ]
 }

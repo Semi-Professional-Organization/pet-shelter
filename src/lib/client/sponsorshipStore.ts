@@ -26,8 +26,8 @@ export const STORAGE_RECEIPTS_KEY = "hope_for_strays_donation_receipts_v1";
  * ## No production caller since 2026-09-22
  *
  * The donation form used to hand every submission's receipt to this hook. It no
- * longer issues one: a general gift is recorded as a pending pledge and its
- * Section 44(6) receipt is emailed after a coordinator confirms the transfer, so
+ * longer issues one: a general gift is recorded as a pending pledge and a
+ * thank-you is emailed after a coordinator confirms the transfer, so
  * there is nothing at checkout to store. The hook, its `localStorage` history and
  * `activeReceipt` are therefore currently unused; only the `SPONSORSHIP_TIERS`
  * re-export from this module still has importers, which is why the layer graph

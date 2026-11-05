@@ -784,7 +784,7 @@ Thank you for your life-saving generosity and support of our shelter animals!
     html,
     template: "DONATION_RECEIPT",
     // NOT "DonationReceipt": the audit viewer's receipt list (`receiptLogs` in
-    // useAuditLogController), the LHDN CSV fallback (`generateReceiptsCsvString`) and the row
+    // useAuditLogController), the donations CSV fallback (`generateReceiptsCsvString`) and the row
     // highlight all treat that entity as a donation. Filed there, every receipt email would be
     // counted as a second donation and exported as a zero-amount line in a tax file.
     entity: "DonationReceiptEmail",
@@ -969,7 +969,7 @@ export interface DonationPledgeEmailInput {
  * the receipts tab, the audit viewer and the CSV fallback share — calls a row a
  * receipt on the action `DONATION_RECEIVED`, the entity `DonationReceipt`, or a
  * non-empty `receiptNumber`. An acknowledgement that tripped any of them would put
- * an unpaid gift back into the LHDN CSV fallback, which is the defect this whole
+ * an unpaid gift back into the donations CSV fallback, which is the defect this whole
  * change removes.
  */
 export async function sendDonationPledgeEmail(

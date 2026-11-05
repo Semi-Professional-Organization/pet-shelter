@@ -183,26 +183,27 @@ export function exportPetsToCsv(pets: Pet[], filenamePrefix = "hope-for-strays-p
 }
 
 /**
- * Generates an RFC-4180 formatted CSV string of official donation receipts
- * tailored for Malaysian LHDN Section 44(6) tax reporting and internal accounting.
+ * Generates an RFC-4180 formatted CSV string of reconciled donations for the
+ * shelter's own accounting.
+ *
+ * Until 2026-11-05 this was an LHDN tax-receipt export with donor tax number, LHDN
+ * reference and ROS number columns. The shelter holds neither registration (#239),
+ * so the export no longer has those columns; the stored values go with #251.
  */
 export function generateReceiptsCsvString(
   items: (DonationReceipt | AuditEntry)[]
 ): string {
   const headers = [
-    "Official Receipt No",
+    "Record No",
     "Date & Time",
     "Donor Name",
     "Donor Email",
     "Donor Phone",
-    "Tax ID / IC / Passport",
     "Amount (MYR)",
     "Sponsorship Tier",
     "Payment Method",
     "Frequency",
     "Dedicated Pet",
-    "LHDN Exemption Ref",
-    "Shelter Reg No (ROS)",
   ];
 
   const rows: (string | number | boolean | null | undefined)[][] = [];
@@ -232,16 +233,11 @@ export function generateReceiptsCsvString(
         r.donorName,
         r.donorEmail,
         r.donorPhone || "",
-        r.taxIdOrIc || "",
         formattedAmount,
         r.tierName || r.tierId,
         r.paymentMethod,
         r.frequency || "one_time",
         r.targetPetName || "",
-        // As stored, never back-filled: a row issued since 2026-11-05 carries no
-        // ROS or LHDN identifier because the shelter has neither (#239).
-        r.taxDeductibleRef,
-        r.shelterRegistrationNo,
       ]);
     } else if ("action" in item) {
       // AuditEntry representing a donation
@@ -266,7 +262,7 @@ export function generateReceiptsCsvString(
           // The two were the same value while a contribution was audited by the
           // person who made it. They no longer are: a reconciled row is written by
           // the coordinator who confirmed the transfer, so preferring `actorEmail`
-          // prints staff addresses in the "Donor Email" column of a tax export.
+          // prints staff addresses in the "Donor Email" column of the export.
           //
           // Both spellings are checked because both kinds of row land here — a
           // general gift's `DONATION_RECEIVED` carries `donorEmail`, and a
@@ -276,16 +272,11 @@ export function generateReceiptsCsvString(
           // them is correct.
           (d.donorEmail as string) || (d.sponsorEmail as string) || entry.actorEmail || "",
           (d.donorPhone as string) || "",
-          (d.taxIdOrIc as string) || "",
           formattedAmount,
           (d.tierName as string) || (d.tierId as string) || "Rescue Donation",
           (d.paymentMethod as string) || "DuitNow QR",
           (d.frequency as string) || "one_time",
           (d.targetPetName as string) || "",
-          // An audit row records no issuer snapshot, and the shelter holds no ROS
-          // or LHDN identifier to assume (#239), so these cells stay empty.
-          "",
-          "",
         ]);
       }
     }
@@ -298,11 +289,11 @@ export function generateReceiptsCsvString(
 }
 
 /**
- * Exports donation receipts / tax records to CSV and triggers download.
+ * Exports reconciled donation records to CSV and triggers download.
  */
 export function exportReceiptsToCsv(
   items: (DonationReceipt | AuditEntry)[],
-  filenamePrefix = "hope-for-strays-lhdn-receipts"
+  filenamePrefix = "hope-for-strays-donations"
 ): void {
   const csvContent = generateReceiptsCsvString(items);
   const timestamp = new Date().toISOString().slice(0, 10);
@@ -311,7 +302,7 @@ export function exportReceiptsToCsv(
 
 /**
  * Generates an RFC-4180 formatted CSV string of immutable audit logs
- * for Registrar of Societies (ROS) AGM compliance and security verification.
+ * for the shelter's own records and security verification.
  */
 export function generateAuditLogsCsvString(logs: AuditEntry[]): string {
   const headers = [

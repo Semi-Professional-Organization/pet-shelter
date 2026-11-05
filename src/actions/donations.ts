@@ -106,7 +106,7 @@ function toPledgeDTO(record: DonationPledgeRecord): DonationPledgeDTO {
  *
  * ## What changed on 2026-09-22, and why
  *
- * This action used to issue an official LHDN Section 44(6) receipt here, from the
+ * This action used to issue an official tax receipt here, from the
  * form submission alone. Nothing had observed a bank statement at that point — the
  * donor was shown a DuitNow QR and told us they paid — so a public form minted
  * statutory tax documents for money the shelter had not received. Anyone could
@@ -194,7 +194,7 @@ export async function submitDonationPledgeAction(
     //    classifies an entry as a receipt when its action is `DONATION_RECEIVED`,
     //    its entity is `DonationReceipt`, *or* its details carry a non-empty
     //    `receiptNumber`. This entry trips none of the three, which is what keeps
-    //    an unreconciled gift out of the LHDN CSV fallback.
+    //    an unreconciled gift out of the donations CSV fallback.
     recordAuditLog({
       actorId: "donor_public",
       actorEmail: record.donorEmail,
@@ -549,7 +549,7 @@ export async function rejectDonationPledgeAction(
 const RECEIPT_EXPORT_LIMIT = 1000;
 
 /**
- * The LHDN receipts export, served from the donation ledger.
+ * The donations export, served from the donation ledger.
  *
  * ## Why this exists
  *

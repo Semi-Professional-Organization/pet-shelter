@@ -238,4 +238,4 @@ UPDATE "public"."users" SET "status" = 'ACTIVE', "updatedAt" = now() WHERE "id" 
   `HFS-DON-202609-0001` to `0003`. Receipts are append-only statutory records
   (`prisma/schema.prisma`, model `Donation`): correct them with an offsetting record, never by
   deleting or renumbering. That decision is the owner's; see
-  `docs/runbooks/RUNBOOK_DONATION_AND_LHDN_TAX_RECEIPTS.md`.
+  `docs/runbooks/RUNBOOK_DONATIONS_AND_SPONSORSHIP_PAYMENTS.md`.

@@ -1,22 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "fs";
 import { join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  PUBLIC_ROS_REGISTRATION_NO,
-  SHELTER_LEGAL_NAME,
   SHELTER_PHONE_DISPLAY,
   SHELTER_PHONE_TEL,
   SHELTER_WHATSAPP_DISPLAY,
   SHELTER_WHATSAPP_NUMBER,
   SHELTER_WHATSAPP_URL,
-  STATUTORY_ROS_REGISTRATION_NO,
 } from "@/lib/domain/shelterIdentity";
-
-// The module reads ROS_REGISTRATION_NO once, when the import above loads it. That load sees the
-// variable unset, and so the default the tests below pin, because tests/setup/hermeticEnv.ts
-// deletes it before any test file loads, whatever the shell exports.
 
 const ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
 const SRC = join(ROOT, "src");
@@ -31,12 +23,18 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Every `repoPath:line` under src/, outside shelterIdentity.ts, whose text matches `pattern`. */
-function offendersOutsideOwner(pattern: RegExp): string[] {
+/**
+ * Every `repoPath:line` under src/ whose text matches `pattern`, skipping shelterIdentity.ts
+ * unless `includeOwner` is set.
+ */
+function offendersOutsideOwner(
+  pattern: RegExp,
+  { includeOwner = false }: { includeOwner?: boolean } = {}
+): string[] {
   const offenders: string[] = [];
   for (const file of walk(SRC)) {
     const repoPath = relative(ROOT, file).split(sep).join("/");
-    if (repoPath === OWNER) continue;
+    if (repoPath === OWNER && !includeOwner) continue;
     readFileSync(file, "utf8")
       .split("\n")
       .forEach((line, index) => {
@@ -46,69 +44,42 @@ function offendersOutsideOwner(pattern: RegExp): string[] {
   return offenders;
 }
 
-describe("statutory identifiers", () => {
-  it("exposes the LHDN Subsection 44(6) approval reference", () => {
-    expect(LHDN_TAX_DEDUCTIBLE_REF).toBe("LHDN.01/35/42/51/179-6.4912");
-  });
+describe("registration claims the shelter cannot back", () => {
+  // The shelter is not a registered society and holds no LHDN Subsection 44(6) approval
+  // (owner, 2026-11-05; #239, #249). Until then src/ carried two ROS numbers, an LHDN approval
+  // reference and a "Persatuan" legal name, and printed them on receipts, the sponsorship modal
+  // and the sponsor certificate. These guards keep them from coming back by accident. If the
+  // shelter does register, the decision note named in shelterIdentity.ts says what returns.
 
-  it("keeps the registered society name as filed with the ROS", () => {
-    expect(SHELTER_LEGAL_NAME).toBe("Persatuan Harapan Haiwan Terbiar Selangor");
-  });
-
-  it("preserves the registration number that issued receipts already carry", () => {
-    // Centralising these constants must not silently change what lands on a tax
-    // document. This pins the value that `src/actions/donations.ts` emitted before
-    // the constants were collapsed into one module.
-    expect(STATUTORY_ROS_REGISTRATION_NO).toBe("PPM-021-10-18082021");
-  });
-});
-
-describe("the unresolved ROS registration discrepancy (P2)", () => {
-  it("still has two deliberately divergent values", () => {
-    // ── READ THIS BEFORE "FIXING" THE FAILURE ────────────────────────────────
-    // Two digit-transposed ROS numbers are in use: one on public pages, one on
-    // statutory receipts and ROS exports. Which is correct is BLOCKED on someone
-    // checking the physical ROS certificate — see
-    // docs/archives/tasks/HANDOFF_SECURITY_REHAB_AND_HISTORY.md (P2).
-    //
-    // This assertion exists so the divergence cannot be "tidied up" by aligning
-    // one constant to the other without that check. When the certificate is
-    // confirmed: unify the constants in src/lib/domain/shelterIdentity.ts and
-    // DELETE this test, in the same change.
-    expect(STATUTORY_ROS_REGISTRATION_NO).not.toBe(PUBLIC_ROS_REGISTRATION_NO);
-    expect(PUBLIC_ROS_REGISTRATION_NO).toBe("PPM-012-10-18042016");
-  });
-
-  it("can be corrected by configuration, without a code deploy", async () => {
-    // The one test that needs a fresh module: the override is read at load, so only a re-import
-    // can see it.
-    vi.resetModules();
-    vi.stubEnv("ROS_REGISTRATION_NO", "PPM-012-10-18042016");
-
-    const reloaded = await import("@/lib/domain/shelterIdentity");
-
-    expect(reloaded.STATUTORY_ROS_REGISTRATION_NO).toBe("PPM-012-10-18042016");
-  });
-});
-
-describe("statutory literals are confined to this module", () => {
-  // The durable half of the fix, and the reason this suite is not enough on its own:
-  // proving `STATUTORY_ROS_REGISTRATION_NO` is overridable says nothing about whether the
-  // call sites read it. A single inlined string means correcting P2 half-applies — one
-  // deployment emitting two different registration numbers, invisible until somebody
-  // reconciles a receipt against an export.
-  //
-  // Same shape as tests/unit/layerBoundaries.test.ts: a property of the source tree that
-  // no behavioural test can see.
-
-  /** ROS registration numbers and the LHDN Sec 44(6) approval reference, in any spelling. */
+  /** ROS registration numbers and the LHDN approval reference, in any spelling. */
   const STATUTORY_LITERAL = /PPM-\d{3}-\d{2}-\d{8}|LHDN\.\d{2}\/\d{2}\/\d{2}/;
+
+  /** Names and statute references that assert a registered society or tax relief. */
+  const SOCIETY_CLAIM = /Persatuan|Pertubuhan Kebajikan|44\(6\)/;
+
+  /** The `accountHolder:` lines of the dictionary, wherever they sit in the file (#252). */
+  const ACCOUNT_HOLDER_LINES = new Set(
+    readFileSync(join(SRC, "lib", "i18n", "translations.ts"), "utf8")
+      .split("\n")
+      .flatMap((line, index) =>
+        /^\s*accountHolder:/.test(line) ? [`src/lib/i18n/translations.ts:${index + 1}`] : []
+      )
+  );
 
   // Walks the whole src/ tree synchronously, which costs ~6s under full-suite parallel load and
   // once failed as a timeout rather than an assertion. The tier's `testTimeout` in
   // vitest.config.mts covers it; do not re-add a per-test timeout here.
-  it("appears in no file under src/ other than shelterIdentity.ts", () => {
-    expect(offendersOutsideOwner(STATUTORY_LITERAL)).toEqual([]);
+  it("prints no ROS number or LHDN reference anywhere under src/", () => {
+    expect(offendersOutsideOwner(STATUTORY_LITERAL, { includeOwner: true })).toEqual([]);
+  });
+
+  it("names no society and cites no tax-relief section anywhere under src/", () => {
+    // `donations.accountHolder` is the bank account's own name, a banking fact the owner is
+    // confirming with the shelter (#252). It is the one exception, and only until then.
+    const offenders = offendersOutsideOwner(SOCIETY_CLAIM, { includeOwner: true }).filter(
+      (at) => !ACCOUNT_HOLDER_LINES.has(at)
+    );
+    expect(offenders).toEqual([]);
   });
 });
 

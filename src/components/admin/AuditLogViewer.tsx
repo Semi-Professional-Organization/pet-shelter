@@ -33,7 +33,7 @@ export function AuditLogViewer() {
 
   const tabs: { id: AuditTabFilter; label: string; icon: LucideIcon; count: number }[] = [
     { id: "all", label: "All Audit Records", icon: Layers, count: counts.all },
-    { id: "receipts", label: "LHDN Tax Receipts", icon: Receipt, count: counts.receipts },
+    { id: "receipts", label: "Donations", icon: Receipt, count: counts.receipts },
     { id: "adoptions", label: "Adoptions & Pets", icon: HeartHandshake, count: counts.adoptions },
     { id: "system", label: "Auth & Security", icon: Settings, count: counts.system },
   ];
@@ -49,13 +49,13 @@ export function AuditLogViewer() {
           <div>
             <h2 className="text-base font-bold text-foreground">Immutable Audit & Security Trail</h2>
             <p className="text-xs text-muted-foreground">
-              Append-only ledger of staff mutations, LHDN Section 44(6) tax receipts, and ROS AGM compliance activity.
+              Append-only ledger of staff mutations, reconciled donations, and account activity.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* 1-Click LHDN Receipts CSV Export */}
+          {/* 1-Click donation records CSV export */}
           <Button
             variant="outline"
             size="xs"
@@ -65,10 +65,10 @@ export function AuditLogViewer() {
             // warning that deliberately does not auto-dismiss.
             disabled={isLoading || isExporting}
             className="text-xs gap-1.5 font-semibold tone-soft tone-success hover:bg-success-surface"
-            title="Export official donation receipts formatted for Malaysian LHDN Section 44(6) tax reporting"
+            title="Export reconciled donations from the donation ledger"
           >
             <Receipt className="size-3.5" />
-            <span>Export Receipts CSV (LHDN)</span>
+            <span>Export Donations CSV</span>
             {counts.receipts > 0 && (
               <span className="px-1.5 py-0.2 bg-success-solid text-white text-3xs font-bold rounded-xs">
                 {counts.receipts}
@@ -76,17 +76,17 @@ export function AuditLogViewer() {
             )}
           </Button>
 
-          {/* 1-Click Full Audit Trail CSV Export for ROS AGM */}
+          {/* 1-Click full audit trail CSV export */}
           <Button
             variant="outline"
             size="xs"
             onClick={handleExportAuditTrailCsv}
             disabled={isLoading}
             className="text-xs gap-1.5 font-semibold"
-            title="Export immutable audit trail for ROS AGM reporting and compliance"
+            title="Export the immutable audit trail"
           >
             <Download className="size-3.5" />
-            Export Audit Trail (ROS)
+            Export Audit Trail
           </Button>
 
           {/* Refresh Button */}
@@ -145,7 +145,7 @@ export function AuditLogViewer() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
-            placeholder="Filter by action, staff email, entity ID, receipt number, donor name..."
+            placeholder="Filter by action, staff email, entity ID, donation record number, donor name..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             className="pl-9 text-xs sm:text-sm py-2 bg-background"
@@ -166,7 +166,7 @@ export function AuditLogViewer() {
           <div className="p-12 text-center text-muted-foreground space-y-2">
             <FileText className="size-8 mx-auto opacity-40" />
             <p className="text-sm font-semibold">No audit records found.</p>
-            <p className="text-xs">Staff actions, donation receipts, and approvals will appear here as records are recorded.</p>
+            <p className="text-xs">Staff actions, donations, and approvals will appear here as records are recorded.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

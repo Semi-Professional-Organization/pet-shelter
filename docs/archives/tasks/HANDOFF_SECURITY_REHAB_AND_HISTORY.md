@@ -9,7 +9,7 @@
 This session closed **P1** (authentication secrets), **P3** (nested pet history), **P4** (rehab needs & FAQs data layer), and **P5**
 (no UI for rehabilitating animals) from the
 [TNRM sprint handoff](HANDOFF_TNRM_REHABILITATION_SPRINT.md). **P6** (dead barrels) was closed
-in parallel by a second session. **P2** remains open (blocked on stakeholder).
+in parallel by a second session. **P2** was closed on 2026-11-05 (see §4): there is no ROS number to reconcile.
 
 Three sessions were writing to this tree concurrently. §5 records what that cost.
 
@@ -149,7 +149,13 @@ care (an earlier revision keyed it on `isAvailable`, which wrongly stripped it f
 
 ## 4. 🎯 Open Items, Prioritized
 
-### P2 — The ROS registration number is still inconsistent *(still blocked on stakeholder)*
+### P2 — The ROS registration number is still inconsistent *(closed 2026-11-05)*
+
+> **Closed 2026-11-05 (#249).** The owner confirmed the shelter is not a registered society and
+> holds no LHDN approval, so neither ROS number is correct: both, the LHDN reference and the
+> society name were removed from `shelterIdentity.ts`, the sponsorship modal, the sponsor
+> certificate and the CSV export, and `tests/unit/shelterIdentity.test.ts` now fails if any
+> reappears under `src/`. The text below is kept as the record of the open item.
 
 Two digit-transposed variants remain in use, and the wrong one reaches statutory documents:
 `PPM-012-10-18042016` (footer, donate, privacy, terms, README) versus `PPM-021-10-18082021`

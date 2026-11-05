@@ -28,7 +28,7 @@ import { registerStateReset } from "@/lib/stateResets";
  * A supporter fills in the public donation form, is shown a DuitNow QR or the
  * shelter's bank details, and tells us they paid. That is all the application
  * knows. Until 2026-09-22 `submitDonationPledgeAction` treated it as proof and
- * allocated an official `HFS-DON-*` Section 44(6) receipt on the spot, so a public
+ * allocated an official `HFS-DON-*` tax receipt on the spot, so a public
  * form minted tax documents for money nobody had counted. This module holds the
  * gift in `PENDING_PAYMENT` until a coordinator matches the transfer, and the
  * receipt is drawn at that boundary and nowhere else.
@@ -43,7 +43,7 @@ import { registerStateReset } from "@/lib/stateResets";
  * the same reason, and this module is deliberately its twin.
  *
  * The happy consequence: the statutory export reads `donations`, so an
- * unreconciled gift is invisible to an LHDN return by construction. No reader has
+ * unreconciled gift is invisible to the donations export by construction. No reader has
  * a filter to forget.
  *
  * ## Two declared modes, not a try/catch fallback
@@ -542,7 +542,7 @@ function rejectionAuditEntry(
  *
  * The audit row carries no `receiptNumber` key, deliberately. `useAuditLogController`
  * and `exportCsv` both classify any entry whose details contain one as a donation
- * receipt, and a dismissed gift appearing in the LHDN CSV fallback would be the
+ * receipt, and a dismissed gift appearing in the donations CSV fallback would be the
  * original defect wearing a different hat.
  */
 export async function rejectPendingDonationPledge(

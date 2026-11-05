@@ -15,6 +15,31 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Remove registration numbers and receipt wording (#249, #250)
+
+**Branch:** `claude/remove-registration-and-receipt-wording` · opened 2026-11-05 · stacked on #253
+
+- **Done when:** a search of `src/` for `PPM-`, `LHDN.01`, `Persatuan`, `Pertubuhan Kebajikan`
+  and `44(6)` finds only the bank account name (#252), enforced by `shelterIdentity.test.ts`; no
+  admin or public surface mentions LHDN, ROS or tax-deductible receipts.
+- **In scope:** identity constants, modal and certificate registration lines, dead translation
+  keys, footer "registered" copy, admin export columns/labels/filename and notices, reconciliation
+  queue wording, audit viewer labels, transparency stat/copy/sample PDFs, README, the donations
+  runbook (renamed), P2, the #239 open entry.
+- **Not in scope:** `donations.accountHolder` (#252), the stored columns (#251), renaming internal
+  `receipt*` identifiers and `--receipt-*` tokens (still used by the certificate and the email).
+
+- [x] Code, copy and tests
+- [x] Docs, runbook, P2, ledger
+
+## Review
+
+Deliberately kept: the `--receipt-*` tokens (the sponsor certificate and the acknowledgement
+email still use the group, so #250's "delete if unused" does not apply; only comments changed),
+and internal `receipt*` names. The export drops the tax ID column too, not only LHDN/ROS, because no
+row should export a donor tax number the shelter has no use for. Production transparency rows and
+the `ROS_REGISTRATION_NO` variable need a person: listed in the #239 open entry.
+
 # Stop issuing tax receipts (#248)
 
 **Branch:** `claude/stop-issuing-tax-receipts` · opened 2026-11-05

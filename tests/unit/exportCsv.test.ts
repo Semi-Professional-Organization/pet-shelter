@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { LHDN_TAX_DEDUCTIBLE_REF, STATUTORY_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import {
   formatCsvField,
   generateReceiptsCsvString,
@@ -39,7 +38,11 @@ describe("CSV Export Formatting & Security Engine (RFC-4180)", () => {
   });
 });
 
-describe("LHDN Donation Receipt CSV Generator", () => {
+/** What a pre-2026-11-05 row stored. The export must print none of it (#239, #250). */
+const OLD_LHDN_REF = "LHDN.01/35/42/51/179-6.4912";
+const OLD_ROS_NO = "PPM-021-10-18082021";
+
+describe("Donation records CSV generator", () => {
   it("should generate standard CSV headers and rows for DonationReceipt records", () => {
     const mockReceipts: DonationReceipt[] = [
       {
@@ -55,22 +58,17 @@ describe("LHDN Donation Receipt CSV Generator", () => {
         paymentMethod: "duitnow_qr",
         targetPetName: "Milo",
         taxIdOrIc: "920512-10-5432",
-        taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-        shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
+        taxDeductibleRef: OLD_LHDN_REF,
+        shelterRegistrationNo: OLD_ROS_NO,
       },
     ];
 
     const csv = generateReceiptsCsvString(mockReceipts);
-    expect(csv).toContain("Official Receipt No");
-    expect(csv).toContain("Tax ID / IC / Passport");
-    expect(csv).toContain("LHDN Exemption Ref");
+    expect(csv).toContain("Record No");
     expect(csv).toContain("HFS-DON-202608-1234");
     expect(csv).toContain('"Dr. Cheryl Tan"');
     expect(csv).toContain('"cheryl.tan@example.com"');
-    expect(csv).toContain('"920512-10-5432"');
     expect(csv).toContain('"50.00"');
-    expect(csv).toContain(`"${LHDN_TAX_DEDUCTIBLE_REF}"`);
-    expect(csv).toContain(`"${STATUTORY_ROS_REGISTRATION_NO}"`);
   });
 
   it("should parse donation audit log entries into valid receipt CSV rows", () => {
@@ -100,21 +98,18 @@ describe("LHDN Donation Receipt CSV Generator", () => {
     const csv = generateReceiptsCsvString(auditLogs);
     expect(csv).toContain("HFS-DON-202608-5678");
     expect(csv).toContain('"Ahmad Farhan"');
-    expect(csv).toContain('"891101-14-1122"');
     expect(csv).toContain('"120.00"');
     expect(csv).toContain('"Spay / Neuter Surgery Sponsorship"');
-    // An audit row has no issuer snapshot to print, and none is assumed (#239).
-    expect(csv).not.toContain(LHDN_TAX_DEDUCTIBLE_REF);
-    expect(csv).not.toContain(STATUTORY_ROS_REGISTRATION_NO);
+    expect(csv).not.toContain("891101-14-1122");
   });
 
-  // Rows issued since 2026-11-05 store empty ROS and LHDN snapshots, because the
-  // shelter is not a registered society (#239). The export must not back-fill them.
-  it("exports a new row's empty ROS and LHDN cells as empty, not as the old constants", () => {
+  // The shelter is not a registered society and holds no LHDN approval (#239), so the
+  // export has no tax columns and prints none of what an old row stored (#250).
+  it("has no tax columns and prints no stored tax number, LHDN reference or ROS number", () => {
     const csv = generateReceiptsCsvString([
       {
-        receiptNumber: "HFS-DON-202611-0001",
-        date: "6 Nov 2026, 10:00 AM",
+        receiptNumber: "HFS-DON-202609-0001",
+        date: "6 Sep 2026, 10:00 AM",
         donorName: "Nurul Huda",
         donorEmail: "nurul@example.com",
         tierId: "vaccine",
@@ -122,18 +117,22 @@ describe("LHDN Donation Receipt CSV Generator", () => {
         amountMYR: 50,
         frequency: "one_time",
         paymentMethod: "duitnow_qr",
-        taxDeductibleRef: "",
-        shelterRegistrationNo: "",
+        taxIdOrIc: "900101-10-1234",
+        taxDeductibleRef: OLD_LHDN_REF,
+        shelterRegistrationNo: OLD_ROS_NO,
       },
     ]);
 
-    expect(csv).toContain("HFS-DON-202611-0001");
-    expect(csv).not.toContain(LHDN_TAX_DEDUCTIBLE_REF);
-    expect(csv).not.toContain(STATUTORY_ROS_REGISTRATION_NO);
+    const header = csv.split("\r\n")[0];
+    expect(header).not.toMatch(/LHDN|ROS|Tax|Receipt/i);
+    expect(csv).toContain("HFS-DON-202609-0001");
+    expect(csv).not.toContain("900101-10-1234");
+    expect(csv).not.toContain(OLD_LHDN_REF);
+    expect(csv).not.toContain(OLD_ROS_NO);
   });
 });
 
-describe("Audit Trail CSV Generator (ROS AGM Compliance)", () => {
+describe("Audit Trail CSV Generator", () => {
   it("should format audit log entries into CSV string with timestamp and details snapshot", () => {
     const auditLogs: AuditEntry[] = [
       {
@@ -251,7 +250,7 @@ describe("a reconciled contribution's audit row exports every column it can fill
    */
   function amountCell(csv: string): string {
     const cells = csv.split("\r\n")[1].match(/"(?:[^"]|"")*"/g) ?? [];
-    return cells[6];
+    return cells[5];
   }
 
   function reconciledSponsorship(details: Record<string, unknown>): AuditEntry {
@@ -390,10 +389,10 @@ describe("a ledger receipt's amount is printed as the ledger computed it", () =>
       amountMYR,
       frequency: "one_time",
       paymentMethod: "duitnow_qr",
-      taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-      shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
+      taxDeductibleRef: "",
+      shelterRegistrationNo: "",
     }) as unknown as DonationReceipt;
-  const cell = (csv: string) => (csv.split("\r\n")[1].match(/"(?:[^"]|"")*"/g) ?? [])[6];
+  const cell = (csv: string) => (csv.split("\r\n")[1].match(/"(?:[^"]|"")*"/g) ?? [])[5];
 
   it("keeps a zero or a negative visible on the filed document", () => {
     // What an offsetting correction would look like. Blanking it would hide the

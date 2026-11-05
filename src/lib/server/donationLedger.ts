@@ -433,7 +433,7 @@ export async function listDonations(limit = 200): Promise<DonationRecord[]> {
  *
  * `listDonations` above returns `[]` on any read failure, which is right for a
  * dashboard: a panel that renders empty during a Neon outage is degraded, and the
- * next refresh fixes it. It is wrong for the LHDN export, where an empty result is
+ * next refresh fixes it. It is wrong for the donations export, where an empty result is
  * not a degraded view but a *claim* — that the shelter received no donations — and
  * it is indistinguishable from the truthful version of that claim. An operator
  * filing an annual return cannot tell the two apart, and the failure is silent on

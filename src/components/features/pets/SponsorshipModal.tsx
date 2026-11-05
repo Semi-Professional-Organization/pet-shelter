@@ -1,6 +1,5 @@
 "use client";
 
-import { STATUTORY_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import {
   Dialog,
   DialogContent,
@@ -89,12 +88,7 @@ function SelectedPaymentInstructions({
           <div className="eyebrow flex items-center gap-1">
             <Building2 className="size-3" /> Beneficiary Organization
           </div>
-          <div className="font-bold text-foreground text-sm">
-            Pertubuhan Kebajikan Hope for Strays
-          </div>
-          <div className="text-2xs text-muted-foreground">
-            ROS Registration: {STATUTORY_ROS_REGISTRATION_NO}
-          </div>
+          <div className="font-bold text-foreground text-sm">Hope for Strays</div>
         </div>
 
         <div className="p-3.5 border border-border bg-card rounded-lg space-y-1">
@@ -597,10 +591,10 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
             </div>
           ) : completedGift ? (
             /* General-gift acknowledgement. Deliberately not a receipt, and not a
-               printable dossier: until 2026-09-22 this branch rendered an official
-               Section 44(6) e-Receipt with a live HFS-DON number, issued from the
-               donor's word that they had paid. The receipt is now emailed after a
-               coordinator matches the transfer. */
+               printable dossier: until 2026-09-22 this branch rendered a tax e-receipt
+               with a live HFS-DON number, issued from the donor's word that they had
+               paid. A thank-you is now emailed after a coordinator matches the
+               transfer. */
             <div className="space-y-6">
               <div
                 role="status"

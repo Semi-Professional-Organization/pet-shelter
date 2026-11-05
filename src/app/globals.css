@@ -183,10 +183,12 @@
   --tone-neutral-solid: oklch(37% 0.013 285.805);
   --tone-neutral-on-solid: #ffffff;
 
-  /* --- Printed tax receipt --------------------------------------------------
-     Deliberately absent from `.dark`: a Sec 44(6) receipt is printed as black
+  /* --- Printed paper (sponsor certificate, emailed acknowledgement) ---------
+     Deliberately absent from `.dark`: the sponsor certificate is printed as black
      ink on white paper whatever the screen theme is, and it has to stay legible
-     through a monochrome printer. Do not "fix" these to theme tokens.
+     through a monochrome printer. The names predate 2026-11-05, when the shelter
+     stopped issuing tax receipts (#239); nothing here is a receipt any more. Do not
+     "fix" these to theme tokens.
      -------------------------------------------------------------------------- */
   --receipt-paper: #ffffff;
   --receipt-ink: oklch(21% 0.006 285.885);
@@ -712,7 +714,7 @@
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--tone-accent) 20%, transparent);
   }
 
-  /* --- Printed tax receipt: paper-fixed, never theme-flipped. --- */
+  /* --- Printed paper shell: paper-fixed, never theme-flipped. --- */
   .receipt {
     @apply rounded-xl border-2 font-sans;
     background-color: var(--receipt-paper);
@@ -722,8 +724,8 @@
   /* The receipt-accent (total) and receipt-panel (donor note) helpers were removed
      on 2026-09-22 along with the two on-screen receipt dossiers they styled. The
      donation form no longer issues a receipt — it records a pending pledge, and
-     the Section 44(6) document is emailed once a coordinator confirms the
-     transfer, from sendDonationReceiptEmail, whose HTML is inline-styled because
+     a thank-you is emailed once a coordinator confirms the transfer, from
+     sendDonationReceiptEmail, whose HTML is inline-styled because
      email clients do not load a stylesheet. The receipt shell above stays: the
      sponsor certificate still renders on this paper. The design-system guard in
      tests/unit/designSystemGuards caught both as dead CSS, which is what it is
@@ -745,7 +747,7 @@
 }
 
 /* ==========================================================================
-   4. PRINT — isolate the receipt and force paper colours.
+   4. PRINT — isolate the printable document and force paper colours.
    ========================================================================== */
 
 @media print {

@@ -185,7 +185,7 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
         <div className="mx-auto w-full max-w-6xl space-y-8 px-6 sm:px-8 lg:px-12">
           <div className="max-w-2xl">
             <span className="mb-1 block text-xs font-bold uppercase tracking-wider text-primary-ink">
-              {isMs ? "Pematuhan ROS & AGM" : "ROS & AGM Compliance"}
+              {isMs ? "Akauntabiliti" : "Accountability"}
             </span>
             <h2 className="font-heading text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
               {isMs
@@ -196,8 +196,8 @@ export function TransparencyPageView({ snapshot }: { snapshot: TransparencySnaps
               <ScrollText className="mt-0.5 size-4 shrink-0 text-primary-ink" aria-hidden="true" />
               <span>
                 {isMs
-                  ? "Penyata teraudit yang difailkan kepada Pendaftar Pertubuhan (ROS) dan dibentangkan pada Mesyuarat Agung Tahunan kami."
-                  : "Audited statements filed with the Registrar of Societies (ROS) and tabled at our Annual General Meeting."}
+                  ? "Laporan perbelanjaan dan penyata tahunan yang kami terbitkan untuk penyokong."
+                  : "Spending reports and annual statements we publish for supporters."}
               </span>
             </p>
           </div>

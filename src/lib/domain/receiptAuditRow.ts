@@ -7,12 +7,12 @@ import { ringgitFromSen, senFromInteger } from "@/lib/domain/money";
  *
  * Three readers ask the same two questions of an audit row — *is this a receipt?*
  * and *for how much?* — and each used to answer on its own: the audit controller's
- * receipts tab, the audit viewer's badge, and the LHDN CSV fallback. They drifted.
+ * receipts tab, the audit viewer's badge, and the donations CSV fallback. They drifted.
  * The viewer and the controller tested for the *presence* of a `receiptNumber`
  * key while the exporter tested its *truthiness*, so a row could wear a donation
  * badge on screen and be absent from the export; and the exporter read only
  * `amountMYR`, a key reconciled sponsorships never carried, so those rows exported
- * RM 0.00 on a document filed with LHDN.
+ * RM 0.00 in the exported file.
  *
  * The rules live here, beside `money.ts`, so a fourth reader finds them where it
  * would look, and none of the three imports a presentation module to get them.
