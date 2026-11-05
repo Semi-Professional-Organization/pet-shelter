@@ -18,7 +18,7 @@ and the receipt feature was never active live. #248 removed the opt-in, the NRIC
 issuer snapshot on new rows and the tax wording from every email, in both the donation and the
 sponsorship lanes (`tasks/decisions/2026-11-05-a-reconciled-gift-earns-an-acknowledgement-not-a-tax-receipt.md`).
 The items below that remain are #249 (identity constants, society names, modal receipt block),
-#250 (admin export and audit labels, transparency stat, print styles), #251 (stored columns)
+#250 (admin export and audit labels, transparency stat, print styles)
 and #252 (account holder name).
 
 **2026-11-05, second update (#249, #250).** The identity constants, both ROS numbers, the LHDN

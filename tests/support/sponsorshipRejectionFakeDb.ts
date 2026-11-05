@@ -29,7 +29,6 @@ export interface FakeSponsorshipRow {
   reconciledAt: Date | null;
   reconciledBy: string | null;
   cancelledAt: Date | null;
-  taxIdOrIc: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -82,7 +81,6 @@ function initialSponsorshipRow(): FakeSponsorshipRow {
     reconciledAt: null,
     reconciledBy: null,
     cancelledAt: null,
-    taxIdOrIc: null,
     notes: null,
     createdAt,
     updatedAt: createdAt,

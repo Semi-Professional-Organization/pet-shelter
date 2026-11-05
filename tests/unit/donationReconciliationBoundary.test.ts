@@ -152,11 +152,9 @@ describe("the receipt series is untouched until reconciliation", () => {
     expect(receipt?.tierName).toBe("Core Vaccination & Deworming");
     expect(receipt?.targetPetName).toBe("Barnaby");
     expect(receipt?.notes).toBe("Get well soon");
-    // The shelter is not a registered society (owner, 2026-11-05; #239): no donor
-    // tax number, ROS number or LHDN reference reaches a new row.
-    expect(receipt?.taxIdOrIc).toBeUndefined();
-    expect(receipt?.taxDeductibleRef).toBe("");
-    expect(receipt?.shelterRegistrationNo).toBe("");
+    // The shelter is not a registered society (owner, 2026-11-05; #239): the NRIC a
+    // stale client sent reaches no field of the new row.
+    expect(JSON.stringify(receipt)).not.toContain("920512-10-5432");
   });
 });
 
@@ -344,7 +342,7 @@ describe("the audit trail says what actually happened", () => {
     // Not on the row: the form no longer collects one and the schema drops it...
     const receipt = await findDonationByReceiptNumber(settled.receiptNumber!);
     expect(receipt).toBeDefined();
-    expect(receipt?.taxIdOrIc).toBeUndefined();
+    expect(JSON.stringify(receipt)).not.toContain("920512-10-5432");
 
     // ...and in neither audit row. An identifier in `AuditLog.metadata` is personal
     // data stored a second time, and the sponsorship lane never copied it there.

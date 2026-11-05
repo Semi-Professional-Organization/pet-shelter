@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 /**
- * What `listPendingSponsorships` hands back, in both of its branches: never the
- * supporter's tax identifier.
+ * What the Prisma branch of `listPendingSponsorships` asks for and hands back.
  *
  * `tests/integration/db/sponsorshipLedger.postgres.test.ts` runs the Prisma branch
  * against a real server, but only where one exists — CI's Postgres job, or
@@ -14,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
  *
  * The double honours `select` the way Prisma does — the selected columns, or every
  * column when there is no `select`. A double that returned a fixed row whatever it was
- * asked would make the tax-identifier assertion pass for any query, an experiment whose
+ * asked would make a projection assertion pass for any query, an experiment whose
  * input equals its control.
  *
  * Its own file because `vi.mock` is file-scoped: a double that knows only
@@ -25,17 +24,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 const prismaMock = vi.hoisted(() => ({ petSponsorship: { findMany: vi.fn() } }));
 vi.mock("@/lib/server/prisma", () => ({ prisma: prismaMock }));
 
-import {
-  findSponsorshipByPledgeRef,
-  listPendingSponsorships,
-  recordSponsorshipPledge,
-} from "@/lib/server/sponsorshipLedger";
+import { listPendingSponsorships } from "@/lib/server/sponsorshipLedger";
 import { isLedgerPersistent } from "@/lib/server/donationLedger";
-import { senFromInteger } from "@/lib/domain/money";
 
-const TAX_ID = "880101-14-5523";
-
-/** Every column the table holds for a pending pledge, the tax identifier included. */
+/** Every column the table holds for a pending pledge. */
 const STORED: Record<string, unknown> = {
   id: "spn-db-001",
   petId: "pet-db-001",
@@ -53,7 +45,6 @@ const STORED: Record<string, unknown> = {
   status: "PENDING_PAYMENT",
   pledgeRef: "HFS-PLG-20260910-424242",
   receiptNumber: null,
-  taxIdOrIc: TAX_ID,
   notes: null,
   createdAt: new Date("2026-09-10T01:30:00.000Z"),
   reconciledAt: null,
@@ -106,39 +97,15 @@ describe("the Prisma branch of the pending read", () => {
     });
   });
 
-  it("never reads the supporter's tax identifier", async () => {
-    const [record] = await listPendingSponsorships();
+  it("reads through an allow-list, so a column it does not name stays in Postgres", async () => {
+    await listPendingSponsorships(25);
 
-    // The row did come back; only the identifier is missing from it.
-    expect(record.pledgeRef).toBe(STORED.pledgeRef);
-    expect(record.taxIdOrIc).toBeUndefined();
-  });
-});
-
-describe("the in-memory branch of the pending read", () => {
-  it("returns the Prisma branch's shape, and stores no smuggled NRIC", async () => {
-    expect(isLedgerPersistent()).toBe(false);
-
-    // The draft type no longer accepts an NRIC (#239). A wider object can still
-    // carry one past the type checker, so smuggle it in with `Object.assign`.
-    await recordSponsorshipPledge(Object.assign({
-      petId: null,
-      petName: "Kopi",
-      sponsorName: "Tan Wei Ling",
-      sponsorEmail: "weiling@example.com",
-      tierId: "vaccine",
-      tierName: "Core Vaccination & Deworming",
-      frequency: "monthly",
-      amountSen: senFromInteger(5000),
-      paymentMethod: "duitnow_qr",
-      pledgeRef: "HFS-PLG-MEMORY-000001",
-    } as const, { taxIdOrIc: TAX_ID }));
-    // Not stored at all: the memory branch drops it, as the Postgres insert does.
-    expect(await findSponsorshipByPledgeRef("HFS-PLG-MEMORY-000001")).toBeDefined();
-    expect((await findSponsorshipByPledgeRef("HFS-PLG-MEMORY-000001"))?.taxIdOrIc).toBeUndefined();
-
-    const [record] = await listPendingSponsorships();
-    expect(record.pledgeRef).toBe("HFS-PLG-MEMORY-000001");
-    expect(record.taxIdOrIc).toBeUndefined();
+    const [args] = prismaMock.petSponsorship.findMany.mock.calls[0];
+    expect(args.select).toBeDefined();
+    expect(args.omit).toBeUndefined();
+    // `toRecord` maps field by field, so the returned record cannot show this; the query
+    // is the only place a dropped allow-list would be visible. `reconciledBy` is a
+    // coordinator's address the queue has no use for.
+    expect(args.select).not.toHaveProperty("reconciledBy");
   });
 });

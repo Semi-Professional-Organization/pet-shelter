@@ -54,7 +54,6 @@ function record(overrides: Partial<DonationRecord> = {}): DonationRecord {
     donorName: "Siti Aminah",
     donorEmail: "siti@example.com",
     donorPhone: "+60123456789",
-    taxIdOrIc: "880101-14-5566",
     tierId: "vaccine",
     tierName: "Core Vaccination & Deworming",
     amountSen: 25000,
@@ -63,8 +62,6 @@ function record(overrides: Partial<DonationRecord> = {}): DonationRecord {
     paymentMethod: "duitnow_qr",
     targetPetName: "Barnaby",
     notes: undefined,
-    taxDeductibleRef: "LHDN-REF-01",
-    shelterRegistrationNo: "ROS-0001",
     issuedAt: "2026-08-15T02:00:00.000Z",
     ...overrides,
   } as DonationRecord;

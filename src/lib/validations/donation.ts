@@ -96,13 +96,7 @@ export interface DonationPledgeDTO {
   reconciliationNotice: string;
 }
 
-/**
- * A numbered acknowledgement, as the export and the acknowledgement email read it.
- *
- * `taxIdOrIc`, `taxDeductibleRef` and `shelterRegistrationNo` are filled only on
- * rows issued before 2026-11-05; new rows leave them empty, and the email never
- * renders them. #251 decides what happens to the columns.
- */
+/** A numbered acknowledgement, as the export and the acknowledgement email read it. */
 export interface DonationReceiptDTO {
   receiptNumber: string;
   date: string;
@@ -115,8 +109,5 @@ export interface DonationReceiptDTO {
   frequency: "one_time" | "monthly";
   paymentMethod: "duitnow_qr" | "online_banking" | "card";
   targetPetName?: string;
-  taxIdOrIc?: string;
   notes?: string;
-  taxDeductibleRef: string;
-  shelterRegistrationNo: string;
 }

@@ -77,7 +77,6 @@ function createFakeDb(): FakeDb {
           id: `db-don-${rows.length + 1}`,
           currency: "MYR",
           donorPhone: null,
-          taxIdOrIc: null,
           targetPetName: null,
           notes: null,
           ...args.data,
@@ -258,10 +257,6 @@ describe("offline mode (no DATABASE_URL)", () => {
     );
 
     expect(receipt.amountSen).toBe(1990);
-    // The shelter is not a registered society (#239): new rows assert nothing.
-    expect(receipt.shelterRegistrationNo).toBe("");
-    expect(receipt.taxDeductibleRef).toBe("");
-    expect(receipt.taxIdOrIc).toBeUndefined();
     expect(receipt.issuedAt).toBe(AUGUST.toISOString());
   });
 });

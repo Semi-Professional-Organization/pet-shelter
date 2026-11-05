@@ -157,8 +157,6 @@ describe("donation ledger against real PostgreSQL", () => {
           currency: "MYR",
           frequency: "one_time",
           paymentMethod: "duitnow_qr",
-          taxDeductibleRef: "",
-          shelterRegistrationNo: "",
           issuedAt: PROBE_INSTANT,
         },
       })
@@ -181,7 +179,7 @@ describe("donation ledger against real PostgreSQL", () => {
     expect(fetched?.amountSen).toBe(123_456);
   });
 
-  it("round-trips optional columns and writes no tax snapshot on a new row", async () => {
+  it("round-trips optional columns", async () => {
     const record = await issueDonationReceipt(
       draft({
         donorPhone: "+60 12-345 6789",
@@ -196,12 +194,7 @@ describe("donation ledger against real PostgreSQL", () => {
       donorPhone: "+60 12-345 6789",
       targetPetName: "Tuah",
       notes: "In honour of a very good dog.",
-      // The shelter is not a registered society (#239): a new row carries no ROS or
-      // LHDN identifier and no donor tax number.
-      taxDeductibleRef: "",
-      shelterRegistrationNo: "",
     });
-    expect(fetched?.taxIdOrIc).toBeUndefined();
 
     // Columns the schema declares nullable must come back as undefined rather than
     // null, so a persisted DonationRecord matches the in-memory branch exactly.

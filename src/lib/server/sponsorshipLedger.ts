@@ -66,17 +66,12 @@ export interface SponsorshipRecord {
   receiptNumber?: string | null;
   /** ISO-8601 UTC. */
   createdAt: string;
-  taxIdOrIc?: string;
   notes?: string;
 }
 
-/**
- * `taxIdOrIc` is read back from pledges made before 2026-11-05 and never taken
- * from a new one: the shelter cannot issue a tax receipt (#239).
- */
 export type SponsorshipDraft = Omit<
   SponsorshipRecord,
-  "id" | "status" | "receiptNumber" | "createdAt" | "taxIdOrIc"
+  "id" | "status" | "receiptNumber" | "createdAt"
 >;
 
 export class SponsorshipWriteError extends Error {
@@ -136,9 +131,6 @@ export async function recordSponsorshipPledge(
     memorySerial += 1;
     const record: SponsorshipRecord = {
       ...draft,
-      // Overrides a wider object's field too, so memory mode stores no NRIC, as
-      // the Postgres insert does not.
-      taxIdOrIc: undefined,
       id: `mem-spn-${String(memorySerial).padStart(6, "0")}`,
       status: "PENDING_PAYMENT",
       receiptNumber: null,
@@ -680,10 +672,9 @@ export async function listPendingSponsorships(take = 200): Promise<SponsorshipRe
           (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
         )
         .slice(0, take)
-        // The same shape as the Postgres branch, whose `select` leaves the tax
-        // identifier out. Memory rows stopped carrying one on 2026-11-05 (#239);
-        // this keeps the projection explicit rather than relying on that.
-        .map((row) => ({ ...row, taxIdOrIc: undefined }))
+        // Copies, as the Postgres branch returns fresh objects: a caller that edits a
+        // queued row must not edit the stored pledge.
+        .map((row) => ({ ...row }))
     );
   }
 
@@ -692,11 +683,10 @@ export async function listPendingSponsorships(take = 200): Promise<SponsorshipRe
   // the shelter ever needs the queue exact within a millisecond.
   //
   // An explicit projection, because this is the one read that handles every pending
-  // supporter at once and `taxIdOrIc` is an NRIC nothing downstream of it wants.
-  // `listPendingSponsorshipsAction` drops it from its DTO, but dropping it there
-  // still pulls it out of Postgres into server memory, where a query log or an
-  // error dump can carry it. An allow-list rather than `omit`, so a sensitive column
-  // added to the table later stays unread here until someone selects it on purpose.
+  // supporter at once, and a column dropped only from the action's DTO is still
+  // pulled out of Postgres into server memory, where a query log or an error dump
+  // can carry it. An allow-list rather than `omit`, so a sensitive column added to
+  // the table later stays unread here until someone selects it on purpose.
   const rows = await prisma.petSponsorship.findMany({
     where: { status: "PENDING_PAYMENT" },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
@@ -867,12 +857,6 @@ interface SponsorshipRow {
   status: string;
   pledgeRef: string;
   receiptNumber: string | null;
-  /**
-   * Optional so a read may leave it out of its `select`, as the coordinator queue
-   * does — see `listPendingSponsorships`. Only pledges made before 2026-11-05 carry
-   * one, and since then nothing copies it onto an acknowledgement.
-   */
-  taxIdOrIc?: string | null;
   notes: string | null;
   createdAt: Date;
 }
@@ -896,7 +880,6 @@ function toRecord(row: SponsorshipRow): SponsorshipRecord {
     pledgeRef: row.pledgeRef,
     receiptNumber: row.receiptNumber,
     createdAt: row.createdAt.toISOString(),
-    taxIdOrIc: row.taxIdOrIc ?? undefined,
     notes: row.notes ?? undefined,
   };
 }

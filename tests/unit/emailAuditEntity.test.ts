@@ -29,8 +29,6 @@ const receipt: DonationReceipt = {
   amountMYR: 30,
   frequency: "one_time",
   paymentMethod: "duitnow_qr",
-  taxDeductibleRef: "LHDN.01/35/42/51/179-6.9999",
-  shelterRegistrationNo: "PPM-001-10-99999999",
 };
 
 const emailRow = (template: string) =>
