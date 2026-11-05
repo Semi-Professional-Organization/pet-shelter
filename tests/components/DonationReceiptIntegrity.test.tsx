@@ -54,7 +54,7 @@ async function submitAGift() {
 
 async function expectSafeExternalTransferFailure() {
   const message = await screen.findByText(
-    /could not confirm that a receipt was issued/i,
+    /could not confirm that your gift was recorded/i,
   );
 
   expect(message).not.toHaveTextContent(/nothing has been charged/i);

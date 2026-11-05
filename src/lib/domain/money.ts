@@ -3,12 +3,12 @@
  *
  * ## Why sen, and not `Float` or Prisma `Decimal`
  *
- * Donation amounts back **LHDN Section 44(6) tax-deductible receipts**, so an
- * amount that is off by a hundredth of a cent is a defective statutory document,
- * not a rounding curiosity. Three candidate representations were considered:
+ * Donation amounts back **the shelter's donation records and published accounts**, so
+ * an amount that is off by a hundredth of a cent is a defective record, not a rounding
+ * curiosity. Three candidate representations were considered:
  *
  * - `Float` / JS `number` in ringgit — rejected. `0.1 + 0.2 !== 0.3`, and summing
- *   a year of donations for an ROS annual return accumulates the error.
+ *   a year of donations for the annual accounts accumulates the error.
  * - Prisma `Decimal` (`@db.Decimal(10,2)`) — exact in the database, but crosses
  *   the `"use server"` boundary as a class instance. Next.js serializes Server
  *   Action results structurally, so a `Decimal` arrives at the client as a plain
@@ -131,7 +131,7 @@ export function sumSen(values: readonly Sen[]): Sen {
  * Formats sen as a receipt-ready MYR string, e.g. `RM 1,250.00`.
  *
  * Always two decimal places and always grouped, because this string lands on
- * statutory documents and in CSV exports for the ROS annual return, where a
+ * emails and in CSV exports for the annual accounts, where a
  * bare `RM 1250` and `RM 1,250.00` are not interchangeable.
  */
 export function formatMYR(value: Sen, options?: { withSymbol?: boolean }): string {

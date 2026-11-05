@@ -21,6 +21,28 @@ The items below that remain are #249 (identity constants, society names, modal r
 #250 (admin export and audit labels, transparency stat, print styles), #251 (stored columns)
 and #252 (account holder name).
 
+**2026-11-05, second update (#249, #250).** The identity constants, both ROS numbers, the LHDN
+reference, the "Persatuan" and "Pertubuhan Kebajikan" names (except the bank account name), the
+modal's ROS line, the certificate's registration row, the dead `receipt*` translation keys, the
+footer's "registered non-profit" line, the admin "LHDN" export and its tax columns, the queue's
+"Issue receipt" wording, the transparency stat and "filed with ROS" copy, the placeholder report
+PDFs and the donations runbook are gone or rewritten. P2 is closed.
+`tests/unit/shelterIdentity.test.ts` fails if an ROS number, LHDN reference, society name or
+"44(6)" reappears in `src/`. What is still open:
+
+- **#251:** the stored `taxIdOrIc`, `taxDeductibleRef` and `shelterRegistrationNo` columns.
+- **#252:** `donations.accountHolder` ("Pertubuhan Kebajikan Hope for Strays"), the one
+  exception the guard allows, until the owner confirms the account's real name.
+- **Production data, by hand:** if the sample transparency ledger was ever seeded into
+  production, its `tax_receipts_issued` impact stat and "filed with ROS" report summaries are
+  still in the database; the baseline file no longer carries them. Production faq-005:
+  `tasks/open/production-faqs-need-the-edits-the-fixture-made.md`.
+- **Configuration:** `ROS_REGISTRATION_NO` is no longer read. It can be deleted from Vercel and
+  from `.env.production.enc` (encrypted, so not edited in this change).
+- Internal names (`DONATION_RECEIPT` email template, `DonationReceiptEmail` audit entity,
+  `--receipt-*` tokens, `receiptNumber`) are kept: renaming them changes how old audit rows read
+  and touches every paper-styled surface, for no visible difference.
+
 **Step 2 — as found before 2026-11-05 (see the update above for what is now gone):** the tax-receipt *feature* was untouched —
 
 - `src/lib/server/donationLedger.ts`, `src/actions/donations.ts`: issue "Section 44(6)" receipts and
@@ -53,6 +75,5 @@ Unanswered questions that decide step 2:
 2. Has the **live site ever issued a tax receipt**? If so, existing `Donation` rows and sent
    emails are a legal matter for the shelter; the rows must be decided on, not deleted.
 
-**Settles when:** both questions are answered by the stakeholder, and step 2 has either removed the
-receipt feature (with a migration plan for snapshot columns) or re-pointed it at real, verified
-identifiers. Close P2 (`docs/tasks/HANDOFF_SECURITY_REHAB_AND_HISTORY.md`) in the same change.
+**Settles when:** #251 drops the stored columns and #252 settles the account name. Both questions
+above are answered (not registered; never issued live), and P2 was closed with #249.

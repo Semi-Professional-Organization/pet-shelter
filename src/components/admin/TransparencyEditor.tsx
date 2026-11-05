@@ -1089,7 +1089,7 @@ function ReportsTab({
               id="rpt-summary"
               rows={3}
               className={fieldClass}
-              placeholder="Full audited statement filed with the Registrar of Societies and tabled at the AGM."
+              placeholder="Full audited statement of income and expenditure for the year."
               value={form.summary}
               onChange={(e) => setForm({ ...form, summary: e.target.value })}
             />

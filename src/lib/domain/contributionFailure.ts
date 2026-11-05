@@ -4,13 +4,13 @@
  * what the application knows without claiming that no transfer occurred.
  */
 export const DONATION_RECORDING_FAILURE_MESSAGE =
-  "We could not record your gift, so no receipt was issued. If you already sent a transfer, contact the shelter with your bank reference before trying again.";
+  "We could not record your gift. If you already sent a transfer, contact the shelter with your bank reference before trying again.";
 
 export const SPONSORSHIP_RECORDING_FAILURE_MESSAGE =
   "We could not record your sponsorship, so no pledge was recorded. If you already sent a transfer, contact the shelter with your bank reference before trying again.";
 
 export const DONATION_RECORDING_UNCONFIRMED_MESSAGE =
-  "We could not confirm that a receipt was issued. If you already sent a transfer, contact the shelter with your bank reference before trying again.";
+  "We could not confirm that your gift was recorded. If you already sent a transfer, contact the shelter with your bank reference before trying again.";
 
 export const SPONSORSHIP_RECORDING_UNCONFIRMED_MESSAGE =
   "We could not confirm that a pledge was recorded. If you already sent a transfer, contact the shelter with your bank reference before trying again.";

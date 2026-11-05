@@ -130,7 +130,15 @@ export function AllocationSummary({
       </div>
 
       {impactStats.length > 0 && (
-        <dl className="grid grid-cols-1 gap-6 rounded-3xl border border-border bg-muted/30 p-6 sm:grid-cols-3 sm:p-7">
+        <dl
+          className={`grid grid-cols-1 gap-6 rounded-3xl border border-border bg-muted/30 p-6 sm:p-7 ${
+            impactStats.length >= 3
+              ? "sm:grid-cols-3"
+              : impactStats.length === 2
+                ? "sm:grid-cols-2"
+                : ""
+          }`}
+        >
           {impactStats.slice(0, 3).map((stat) => (
             <div key={stat.key} className="flex flex-col-reverse justify-end gap-1">
               <dt className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

@@ -21,8 +21,7 @@ HFS website serves as a platform as well as a repository of past news for first-
 - **Testing**: Vitest across four projects (`unit`, `components`, `integration`, `integration-db`) plus Playwright end-to-end specs. Note that `npm test` runs the unit project alone; see [`package.json`](package.json) for the others.
 - **Documentation**: Centralized runbooks, architecture blueprints, and tutorials located in [`docs/`](docs/).
 - **Legal & Compliance**:
-  - **Malaysian LHDN Tax Deductible**: Approved non-profit under Subsection 44(6) of the Income Tax Act 1967 (Ref: `LHDN.01/35/42/51/179-6.4912`).
-  - **ROS Registry of Societies**: Reg No. `PPM-012-10-18042016`.
+  - **Not a registered society**: the shelter holds no ROS registration and no LHDN Subsection 44(6) approval, so the site issues no tax receipts and makes no tax-deductibility claim (#239).
   - **PDPA 2010**: Malaysian Personal Data Protection Act compliance.
 
 ---
@@ -39,7 +38,7 @@ Comprehensive guides are organized in the [`docs/`](docs/) directory and synchro
 - 🗄️ **[Database & ORM Guide](docs/architecture/GUIDE_PRISMA_AND_NEON_ARCHITECTURE.md)**: Prisma, Neon serverless branching, and in-memory dual-layer storage pattern.
 - 📘 **[TNRM & Sponsorship Operations Runbook](docs/runbooks/RUNBOOK_TNRM_AND_SPONSORSHIP_OPERATIONS.md)**: Campus TNRM tracking, Rehabilitation House updates, and sponsor dispatches.
 - 📘 **[Operational Runbook](docs/runbooks/OPERATIONAL_RUNBOOK.md)**: Operations, incident management, rate-limiting, and RBAC administration.
-- 💳 **[Donations & Tax e-Receipts](docs/runbooks/RUNBOOK_DONATION_AND_LHDN_TAX_RECEIPTS.md)**: DuitNow QR, LHDN Section 44(6) tax receipts, and ROS CSV exports.
+- 💳 **[Donations & Sponsorship Payments](docs/runbooks/RUNBOOK_DONATIONS_AND_SPONSORSHIP_PAYMENTS.md)**: DuitNow QR, payment reconciliation, acknowledgements and the donations CSV export.
 - 🎓 **[Developer Tutorials & Modules](docs/tutorials/)**: Step-by-step masterclasses for Backend, Frontend, and Full-Stack development.
 
 ---

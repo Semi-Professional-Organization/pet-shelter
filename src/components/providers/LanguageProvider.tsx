@@ -48,8 +48,8 @@ function getServerSnapshot(): Language | null {
  * fallback in `useLanguage` used to be separate copies, and they had
  * diverged: outside a provider a fallback string was returned *ahead of* the
  * dictionary — the reverse of the real `t` — and params were never
- * interpolated, so `Footer` rendered without a provider printed
- * "ROS Reg: {regNo}" in place of the shelter's registration number.
+ * interpolated, so `Footer` rendered without a provider printed its raw
+ * `{param}` placeholders in place of the values.
  */
 function translate(
   language: Language,

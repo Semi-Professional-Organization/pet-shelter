@@ -5,7 +5,7 @@ import { SponsorshipTier } from "@/types/sponsorship";
  *
  * Deliberately free of a "use client" directive: this is backend reference data
  * consumed by both the donation Server Action (to resolve a tier name for the
- * LHDN e-receipt) and the client donation UI. Keeping it out of
+ * acknowledgement email) and the client donation UI. Keeping it out of
  * `sponsorshipStore.ts` is what allows `src/actions/donations.ts` to stay on the
  * server side of the layer boundary — see docs/architecture/LAYERS.md and the
  * guard in tests/unit/layerBoundaries.test.ts.

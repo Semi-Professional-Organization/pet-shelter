@@ -165,7 +165,7 @@ export function useSponsorshipController({
         // No local fallback, deliberately. A receipt number is allocated inside
         // the transaction that writes the Donation row, so one invented here
         // would name a receipt the shelter has no record of — and the donor
-        // would file it with LHDN. Report only what this application knows.
+        // would quote it back to us. Report only what this application knows.
         setErrorMessage(
           safeContributionFailureMessage(
             result.error,

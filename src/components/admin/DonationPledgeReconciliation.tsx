@@ -15,9 +15,9 @@ import {
  * The coordinator's queue of general gifts awaiting confirmation.
  *
  * The read half of the boundary added on 2026-09-22. Before it, the public
- * donation form issued an official `HFS-DON-*` Section 44(6) receipt on
+ * donation form issued an official `HFS-DON-*` tax receipt on
  * submission, from the donor's word alone. Now the gift waits here, and
- * confirming a row is the only thing in the application that draws its receipt.
+ * confirming a row is the only thing in the application that draws its record number.
  *
  * This screen is not optional furniture: without it every gift would sit in
  * `PENDING_PAYMENT` with no way out, which is precisely the shape of
@@ -34,8 +34,8 @@ const DONATION_PLEDGE_QUEUE: ReconciliationQueueSource = {
     <>
       Confirm a transfer has landed to send the donor&apos;s acknowledgement. Match the{" "}
       <span className="font-mono font-semibold">HFS-GFT</span> reference against your bank
-      statement — a pledge reference is not a receipt number, and no receipt exists for these
-      gifts until you confirm one here. Dismiss a gift that no transfer ever backed.
+      statement — a pledge reference is not a donation record number, and no donation record
+      exists for these gifts until you confirm one here. Dismiss a gift that no transfer ever backed.
     </>
   ),
   plural: "gifts",

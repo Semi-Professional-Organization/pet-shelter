@@ -88,7 +88,7 @@ describe("SponsorshipReconciliation uncertain action outcomes", () => {
     await user.click(
       screen.getByRole("button", { name: /confirm payment received/i }),
     );
-    await user.click(screen.getByRole("button", { name: /issue receipt/i }));
+    await user.click(screen.getByRole("button", { name: /record donation/i }));
 
     const alert = await screen.findByRole("alert");
     expectUnconfirmedOutcome(alert);
@@ -109,7 +109,7 @@ describe("SponsorshipReconciliation uncertain action outcomes", () => {
     expect(mockedReject).toHaveBeenCalledWith(pendingPledge.pledgeRef, "");
   });
 
-  it("keeps the issuing progress step mounted while confirmation is unresolved", async () => {
+  it("keeps the recording progress step mounted while confirmation is unresolved", async () => {
     const pending = deferred<
       Awaited<ReturnType<typeof reconcilePetSponsorshipAction>>
     >();
@@ -121,10 +121,10 @@ describe("SponsorshipReconciliation uncertain action outcomes", () => {
     await user.click(
       screen.getByRole("button", { name: /confirm payment received/i }),
     );
-    await user.click(screen.getByRole("button", { name: /issue receipt/i }));
+    await user.click(screen.getByRole("button", { name: /record donation/i }));
 
     expect(
-      await screen.findByRole("button", { name: /issuing/i }),
+      await screen.findByRole("button", { name: /recording/i }),
     ).toBeDisabled();
     expect(screen.getByRole("button", { name: /cancel/i })).toBeDisabled();
 
@@ -189,25 +189,29 @@ describe("SponsorshipReconciliation uncertain action outcomes", () => {
   });
 });
 
-describe("SponsorshipReconciliation receipt copy", () => {
+describe("SponsorshipReconciliation copy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedListPending.mockResolvedValue(queuePage());
   });
 
-  it("does not label an identifier-free pledge receipt as LHDN, Section 44, or tax", async () => {
+  it("promises no receipt, tax treatment or registration anywhere in the queue", async () => {
     const { container } = renderQueue();
+    const user = setupUser();
 
     await waitForPledge();
 
-    // PendingSponsorshipDTO intentionally does not expose the supporter's tax
-    // identifier. The queue therefore cannot truthfully promise tax treatment.
-    expect(container).not.toHaveTextContent(/LHDN|Section 44\(6\)|tax(?:-| )?receipt/i);
-    expect(
-      screen
-        .getByRole("button", { name: /confirm payment received/i })
-        .getAttribute("title"),
-    ).not.toMatch(/LHDN|Section 44\(6\)|\btax\b/i);
+    // The shelter is not a registered society (#239), so confirming a pledge records
+    // the donation and sends a thank-you; nothing in the queue may call it a receipt.
+    const claim = /LHDN|Section 44\(6\)|\btax\b|receipt/i;
+    const confirmButton = screen.getByRole("button", { name: /confirm payment received/i });
+    expect(container).not.toHaveTextContent(claim);
+    expect(confirmButton.getAttribute("title")).not.toMatch(claim);
+
+    // The second step, which used to read "Issue receipt".
+    await user.click(confirmButton);
+    expect(await screen.findByRole("button", { name: /record donation/i })).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(claim);
   });
 });
 
@@ -221,7 +225,7 @@ describe("SponsorshipReconciliation queue continuation", () => {
     });
   });
 
-  it("does not count an already reconciled receipt as issued by this session", async () => {
+  it("does not count an already reconciled record as recorded by this session", async () => {
     const alreadyReconciled = {
       success: true as const,
       outcome: "already_reconciled" as const,
@@ -235,13 +239,13 @@ describe("SponsorshipReconciliation queue continuation", () => {
     await user.click(
       screen.getByRole("button", { name: /confirm payment received/i }),
     );
-    await user.click(screen.getByRole("button", { name: /issue receipt/i }));
+    await user.click(screen.getByRole("button", { name: /record donation/i }));
 
     expect(
       await screen.findByText(alreadyReconciled.receiptNumber),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(/receipts issued this session/i),
+      screen.queryByText(/recorded this session/i),
     ).not.toBeInTheDocument();
   });
 
@@ -262,7 +266,7 @@ describe("SponsorshipReconciliation queue continuation", () => {
     await user.click(
       screen.getByRole("button", { name: /confirm payment received/i }),
     );
-    await user.click(screen.getByRole("button", { name: /issue receipt/i }));
+    await user.click(screen.getByRole("button", { name: /record donation/i }));
     await screen.findByText(reconciled.receiptNumber);
 
     await waitFor(() => {

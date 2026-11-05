@@ -113,7 +113,7 @@ export function useAuditLogController() {
   }, [logs, activeTab, receiptLogs, adoptionLogs, systemLogs, filter]);
 
   /**
-   * The LHDN export reads the donation ledger, not the audit trail.
+   * The donations export reads the donation ledger, not the audit trail.
    *
    * Three ways this export can be incomplete, and all three are announced rather
    * than absorbed. Silence is the defect being fixed here; a wrong number was
@@ -126,10 +126,10 @@ export function useAuditLogController() {
    *     file is missing older receipts. The comparison can only under-warn — the
    *     audit window is itself capped — never raise a false alarm.
    *  2. **The export caps.** Truncation drops the OLDEST rows, because the ledger
-   *     reads `issuedAt desc`. That is the wrong end for an annual return.
+   *     reads `issuedAt desc`. That is the wrong end for annual accounts.
    *  3. **The ledger read failed.** It now throws rather than returning `[]`, so
    *     a refusal or outage cannot arrive disguised as "no donations". A request
-   *     the server refused does not end in a downloaded tax document.
+   *     the server refused does not end in a downloaded file.
    */
   const handleExportReceiptsCsv = useCallback(async () => {
     if (isExporting) return;
@@ -151,15 +151,15 @@ export function useAuditLogController() {
 
       if (ledger.length === 0) {
         if (auditKnown === 0) {
-          setExportNotice("No donation receipt records found to export.");
+          setExportNotice("No donation records found to export.");
           setTimeout(() => setExportNotice(null), 4000);
           return;
         }
         exportReceiptsToCsv(receiptLogs);
         setExportNotice(
-          `The donation ledger holds no receipts, so ${auditKnown} record(s) were exported from ` +
+          `The donation ledger holds no records, so ${auditKnown} record(s) were exported from ` +
             `the audit trail instead. That source is a filter over the 250 most recent audit ` +
-            `entries of any kind and may be missing older receipts. Verify before filing.`
+            `entries of any kind and may be missing older donations. Check it before relying on it.`
         );
         return;
       }
@@ -168,24 +168,24 @@ export function useAuditLogController() {
 
       if (auditKnown > ledger.length) {
         setExportNotice(
-          `Exported ${ledger.length} receipt(s) from the ledger, but the audit trail shows ` +
-            `${auditKnown}. Receipts issued before the ledger existed are not in this file. ` +
-            `Do not file it as a complete return.`
+          `Exported ${ledger.length} record(s) from the ledger, but the audit trail shows ` +
+            `${auditKnown}. Donations recorded before the ledger existed are not in this file. ` +
+            `Do not treat it as complete.`
         );
         return;
       }
 
       if (res.truncated) {
         setExportNotice(
-          `Exported the ${ledger.length} most recent receipt(s); the ledger holds more. ` +
-            `Truncation drops the OLDEST receipts, which is the wrong end for an annual return. ` +
-            `Do not file this as a complete return.`
+          `Exported the ${ledger.length} most recent record(s); the ledger holds more. ` +
+            `Truncation drops the OLDEST records, which is the wrong end for annual accounts. ` +
+            `Do not treat this as complete.`
         );
         return;
       }
 
       setExportNotice(
-        `Exported ${ledger.length} donation receipt(s) from the donation ledger for LHDN reporting.`
+        `Exported ${ledger.length} donation record(s) from the donation ledger.`
       );
       setTimeout(() => setExportNotice(null), 4000);
     } catch (err: unknown) {

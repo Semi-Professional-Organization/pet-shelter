@@ -32,8 +32,8 @@ const SPONSORSHIP_QUEUE: ReconciliationQueueSource = {
     <>
       Confirm a transfer has landed to send the supporter&apos;s acknowledgement. Match the{" "}
       <span className="font-mono font-semibold">HFS-PLG</span> reference against your bank
-      statement — a pledge reference is not a receipt number. Dismiss a pledge that no transfer
-      ever backed.
+      statement — a pledge reference is not a donation record number. Dismiss a pledge that no
+      transfer ever backed.
     </>
   ),
   plural: "commitments",

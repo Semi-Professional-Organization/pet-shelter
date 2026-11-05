@@ -1,5 +1,11 @@
 # Guided Tutorial 04: Shelter Analytics & LHDN Tax Audit Engine
 
+> **Superseded facts (2026-11-05).** This tutorial was written when the shelter was believed to
+> be a registered society with LHDN Subsection 44(6) approval. It is neither (#239). The ROS
+> numbers, LHDN reference and society name below are not real, the site issues no tax receipts,
+> and none of them may be copied into `src/`, where `tests/unit/shelterIdentity.test.ts` rejects
+> them.
+
 **Target Feature**: Build a real-time shelter operations and financial analytics dashboard with monthly adoption trends, average length of stay (ALOS), occupancy breakdown, and 1-click Malaysian LHDN Subsection 44(6) tax audit CSV generation.  
 **Skill Focus**: Server Aggregation Queries, Metric Cards, RFC-4180 CSV Generation, Formula Injection Protection, and React Server Components.
 

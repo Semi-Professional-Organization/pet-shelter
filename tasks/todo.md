@@ -15,6 +15,45 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Remove registration numbers and receipt wording (#249, #250)
+
+**Branch:** `claude/remove-registration-and-receipt-wording` · opened 2026-11-05 · stacked on #253
+
+- **Done when:** a search of `src/` for `PPM-`, `LHDN.01`, `Persatuan`, `Pertubuhan Kebajikan`
+  and `44(6)` finds only the bank account name (#252), enforced by `shelterIdentity.test.ts`; no
+  admin or public surface mentions LHDN, ROS or tax-deductible receipts.
+- **In scope:** identity constants, modal and certificate registration lines, dead translation
+  keys, footer "registered" copy, admin export columns/labels/filename and notices, reconciliation
+  queue wording, audit viewer labels, transparency stat/copy/sample PDFs, README, the donations
+  runbook (renamed), P2, the #239 open entry.
+- **Not in scope:** `donations.accountHolder` (#252), the stored columns (#251), renaming internal
+  `receipt*` identifiers and `--receipt-*` tokens (still used by the certificate and the email).
+
+- [x] Code, copy and tests
+- [x] Docs, runbook, P2, ledger
+- [x] Review round 1: fixed the Terms page's "registered non-profit" line, the society name and
+  "Registrar of Societies" still printed in the five placeholder report PDFs, the TNRM runbook's
+  "LHDN tax exemption reference" on certificates, the donor failure copy and sponsor sign-in
+  "receipt number" label, "reconciled as receipt" errors, a false "Nothing was recorded" notice,
+  the impact strip's empty third column, and the guard (one walk, case-insensitive, now covers
+  `.json` and the report PDFs). Logged in `open/admin-donation-export-loose-ends.md`: tax fields
+  in the export DTO and audit JSON (#251), the notice timer and tone (pre-existing)
+- [x] Review round 2: no logic finding, so the loop stops (two rounds in a row with none). Fixed
+  the guard's missing "registered non-profit" phrases and added its `ceiling:` (probed: reverting
+  each of eight fixed files makes it fail), the runbook's account-name source, the dismiss
+  notice's reason claim, the one-stat strip, the sponsor sign-in label (now "donation record
+  number", as the admin screens say), "once filed", the notifications page's "Receipts", and a
+  superseded-facts banner on tutorials 03 to 05. Declined: the schema's Donation doc comment
+  (#251 rewrites that model), the hard-coded CSV cell index in tests (works; style)
+
+## Review
+
+Deliberately kept: the `--receipt-*` tokens (the sponsor certificate and the acknowledgement
+email still use the group, so #250's "delete if unused" does not apply; only comments changed),
+and internal `receipt*` names. The export drops the tax ID column too, not only LHDN/ROS, because no
+row should export a donor tax number the shelter has no use for. Production transparency rows and
+the `ROS_REGISTRATION_NO` variable need a person: listed in the #239 open entry.
+
 # Stop issuing tax receipts (#248)
 
 **Branch:** `claude/stop-issuing-tax-receipts` · opened 2026-11-05

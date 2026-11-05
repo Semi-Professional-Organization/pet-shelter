@@ -7,7 +7,7 @@ import { generateContributionRef } from "@/lib/domain/contributionRef";
  * `PENDING_PAYMENT` is where every gift starts. The donor was shown a DuitNow QR
  * or the shelter's bank details and told us they paid; nothing has looked at a
  * bank statement. Until 2026-09-22 the donation form skipped this state entirely
- * and minted an official Section 44(6) receipt from that assertion alone, which
+ * and minted an official tax receipt from that assertion alone, which
  * meant anyone could produce a tax document from a public form without sending a
  * cent.
  *

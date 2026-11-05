@@ -75,7 +75,7 @@ export const giftRefSchema = z
  *
  * Deliberately not a `DonationReceiptDTO`. Until 2026-09-22 this flow returned
  * one, which meant a supporter who had sent nothing walked away holding an
- * official `HFS-DON-*` Section 44(6) number. What they get now is a claim
+ * official `HFS-DON-*` tax receipt number. What they get now is a claim
  * reference to quote on their transfer, and the acknowledgement follows
  * reconciliation — so there is no field here for a receipt number to be
  * smuggled into.

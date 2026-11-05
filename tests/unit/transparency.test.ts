@@ -460,8 +460,23 @@ describe("Baseline dataset integrity", () => {
   const data = baseline as unknown as {
     expenses: { category: string; date: string; amountSen: number; id: string }[];
     reports: { fileUrl: string; year: number; month: number | null; summary: string }[];
-    impactStats: { key: string }[];
+    impactStats: { key: string; label: string; labelMs: string }[];
   };
+
+  it("claims no tax relief or society registration the shelter does not hold", () => {
+    // The shelter is not a registered society and has no LHDN approval (#239, #250). The
+    // baseline once shipped a "LHDN tax-deductible receipts issued" stat and reports
+    // "filed with the Registrar of Societies".
+    // "Receipts and payments" is an accounting statement, so `receipt` is checked on stats only.
+    const registration = /LHDN|\btax\b|cukai|ROS\b|Registrar of Societies|Annual General Meeting/i;
+    for (const stat of data.impactStats) {
+      expect(`${stat.key} ${stat.label} ${stat.labelMs}`).not.toMatch(registration);
+      expect(`${stat.key} ${stat.label} ${stat.labelMs}`).not.toMatch(/receipt|resit/i);
+    }
+    for (const report of data.reports) {
+      expect(report.summary).not.toMatch(registration);
+    }
+  });
 
   it("uses only known categories, ISO dates and positive integer amounts", () => {
     for (const item of data.expenses) {

@@ -10,7 +10,7 @@ import { generateReceiptsCsvString } from "@/lib/presentation/exportCsv";
 import type { DonationRecord } from "@/lib/server/donationLedger";
 
 /**
- * Tier 3a — the LHDN receipts export, at the Server Action boundary.
+ * Tier 3a — the donation records export, at the Server Action boundary.
  *
  * The export used to be assembled in the browser from the 250 most recent audit
  * rows *of any kind*, so donations fell off a statutory return once ordinary
@@ -175,7 +175,11 @@ describe("fetchDonationReceiptsAction", () => {
     expect(cell(csv, "Amount (MYR)")).toBe("250.00");
     expect(cell(csv, "Amount (MYR)")).not.toBe("undefined");
     expect(cell(csv, "Date & Time")).not.toBe("");
-    expect(cell(csv, "Official Receipt No")).toBe("HFS-DON-202608-0007");
+    expect(cell(csv, "Record No")).toBe("HFS-DON-202608-0007");
+    // Stored tax identifiers are not exported: the shelter holds no registration (#250).
+    expect(csv).not.toContain("880101-14-5566");
+    expect(csv).not.toContain("LHDN-REF-01");
+    expect(csv).not.toContain("ROS-0001");
   });
 
   it("dates the receipt in Asia/Kuala_Lumpur, not UTC", async () => {

@@ -171,7 +171,6 @@ export interface CertificateData {
   coveringPeriod: string;
   recognisedSen: number;
   rescueNames: string[];
-  shelterRegistrationNo: string;
 }
 
 /** A single row on the public sponsor wall. Carries no amounts and no contact details. */

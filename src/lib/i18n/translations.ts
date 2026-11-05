@@ -309,9 +309,6 @@ export interface TranslationDictionary {
     duitNowInstructions: string;
     pledgeBtn: string;
     pledgeProcessing: string;
-    receiptTitle: string;
-    receiptSubtitle: string;
-    printReceiptBtn: string;
     transparencyTitle: string;
     transparencySubtitle: string;
     transparencyDesc: string;
@@ -675,9 +672,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       duitNowInstructions: "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app.",
       pledgeBtn: "Complete Donation Pledge",
       pledgeProcessing: "Recording Pledge...",
-      receiptTitle: "Official Donation e-Receipt",
-      receiptSubtitle: "Approved Under Subsection 44(6) Income Tax Act 1967 • Ref: {taxRef}",
-      printReceiptBtn: "Print Official Receipt",
       transparencyTitle: "Financial Accountability",
       transparencySubtitle: "Where Your Donation Goes",
       transparencyDesc: "We operate with strict financial transparency. Direct public donations are allocated entirely to animal medical treatment, high-protein sustenance, and sanitary shelter housing.",
@@ -722,7 +716,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       noUpdates: "No updates to show right now.",
     },
     footer: {
-      orgDesc: "A registered non-profit animal rescue organisation serving Petaling Jaya and Selangor since 2016. Dedicated to rescuing, rehabilitating, and rehoming homeless dogs and cats.",
+      orgDesc: "An animal rescue serving Petaling Jaya and Selangor since 2016. Dedicated to rescuing, rehabilitating, and rehoming homeless dogs and cats.",
       quickLinksTitle: "Quick Links",
       visitingHoursTitle: "Visiting Hours",
       visitingHoursSchedule: "Tuesday – Sunday: 10:00 AM – 5:00 PM",
@@ -1037,9 +1031,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       duitNowInstructions: "Imbas menggunakan Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, atau mana-mana aplikasi perbankan Malaysia.",
       pledgeBtn: "Sempurnakan Ikrar Sumbangan",
       pledgeProcessing: "Merekodkan Ikrar Sumbangan...",
-      receiptTitle: "e-Resit Sumbangan Rasmi",
-      receiptSubtitle: "Diluluskan Di Bawah Subseksyen 44(6) Akta Cukai Pendapatan 1967 • No. Rujukan: {taxRef}",
-      printReceiptBtn: "Cetak Resit Rasmi",
       transparencyTitle: "Akauntabiliti Kewangan",
       transparencySubtitle: "Ke Mana Sumbangan Anda Disalurkan",
       transparencyDesc: "Kami beroperasi dengan ketelusan kewangan yang ketat. Sumbangan awam diperuntukkan sepenuhnya untuk rawatan perubatan, makanan berprotein tinggi, dan penyelenggaraan pusat perlindungan di Selangor.",
@@ -1084,7 +1075,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       noUpdates: "Tiada kemas kini untuk dipaparkan buat masa ini.",
     },
     footer: {
-      orgDesc: "Pertubuhan kebajikan haiwan berdaftar yang berkhidmat di Petaling Jaya dan Selangor sejak 2016. Berdedikasi untuk menyelamatkan, merawat, dan mencarikan keluarga bagi anjing dan kucing terbiar.",
+      orgDesc: "Kumpulan penyelamat haiwan yang berkhidmat di Petaling Jaya dan Selangor sejak 2016. Berdedikasi untuk menyelamatkan, merawat, dan mencarikan keluarga bagi anjing dan kucing terbiar.",
       quickLinksTitle: "Pautan Pantas",
       visitingHoursTitle: "Waktu Lawatan",
       visitingHoursSchedule: "Selasa – Ahad: 10:00 Pagi – 5:00 Petang",

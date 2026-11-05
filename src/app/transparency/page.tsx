@@ -5,7 +5,7 @@ import { readTransparencySnapshot } from "@/lib/server/transparencyRepository";
 export const metadata: Metadata = {
   title: "Where Your Money Goes | Hope for Strays",
   description:
-    "See exactly how Hope for Strays spends every ringgit: a verified expense ledger, live allocation breakdown, impact figures, and downloadable ROS-filed audited financial statements.",
+    "See exactly how Hope for Strays spends every ringgit: a verified expense ledger, live allocation breakdown, impact figures, and downloadable financial statements.",
   alternates: { canonical: "/transparency" },
 };
 
