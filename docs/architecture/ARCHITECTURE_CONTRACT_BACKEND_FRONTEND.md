@@ -89,7 +89,6 @@ export interface Pet {
     donorName: string;
     donorEmail: string;
     donorPhone?: string;
-    taxIdOrIc?: string;
     tierId: string;
     tierName: string;
     amountMYR: number;

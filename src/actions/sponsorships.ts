@@ -33,6 +33,7 @@ import {
   summarizeSponsorshipsForPet,
 } from "@/lib/server/sponsorshipLedger";
 import { ReceiptIssuanceError } from "@/lib/server/donationLedger";
+import { toDonationReceiptDTO } from "@/lib/server/donationAcknowledgement";
 import { sendSponsorshipWelcomeEmail, sendDonationReceiptEmail } from "@/lib/email";
 import type { SessionUser } from "@/lib/security/session";
 import { requirePermission } from "@/lib/security/dal";
@@ -284,10 +285,6 @@ const NO_SUCH_PLEDGE = "No sponsorship found for that pledge reference";
  * masks a thrown Server Action error into an opaque digest, so a thrown denial reached
  * the page indistinguishable from an outage; returned, it arrives as the guard's own
  * message and the page can say who may not do this.
- *
- * `taxIdOrIc` is deliberately absent from the DTO: a coordinator confirming that a
- * bank transfer landed does not need the supporter's tax identifier to do it, and
- * projecting it here would put a statutory identifier on a screen for no purpose.
  */
 export async function listPendingSponsorshipsAction(): Promise<PendingSponsorshipsResult> {
   try {
@@ -424,11 +421,6 @@ export async function reconcilePetSponsorshipAction(
       // amount key that exporter reads, so `amountSen` and `amountDisplay` beside
       // it — which every other reader uses — left the money column reading zero on
       // the exported file.
-      //
-      // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. Since
-      // 2026-11-05 no new row carries one (#239), and an NRIC on a legacy row is
-      // never copied into `AuditLog.metadata`. See
-      // `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
       sponsorName: record.sponsorName,
       sponsorEmail: record.sponsorEmail,
       amountMYR: ringgitFromSen(record.amountSen),
@@ -442,28 +434,7 @@ export async function reconcilePetSponsorshipAction(
     },
   });
 
-  const receipt = {
-    receiptNumber: donation.receiptNumber,
-    date: new Date(donation.issuedAt).toLocaleDateString("en-MY", {
-      timeZone: "Asia/Kuala_Lumpur",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    donorName: donation.donorName,
-    donorEmail: donation.donorEmail,
-    donorPhone: donation.donorPhone,
-    tierId: donation.tierId,
-    tierName: donation.tierName,
-    amountMYR: ringgitFromSen(donation.amountSen),
-    frequency: donation.frequency,
-    paymentMethod: donation.paymentMethod,
-    targetPetName: donation.targetPetName,
-    notes: donation.notes,
-  };
-  scheduleAfterResponse(() => sendDonationReceiptEmail(receipt));
+  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation)));
 
   return {
     success: true,

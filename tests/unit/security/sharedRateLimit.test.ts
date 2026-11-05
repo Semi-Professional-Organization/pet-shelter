@@ -89,6 +89,7 @@ describe("checkSharedRateLimit", () => {
   it.each([
     ["the query rejects", () => prismaDouble.$queryRaw.mockRejectedValueOnce(new Error("relation does not exist"))],
     ["the query returns no row", () => prismaDouble.$queryRaw.mockResolvedValueOnce([])],
+    ["the row has no usable count", () => prismaDouble.$queryRaw.mockResolvedValueOnce([{ retryAfterSeconds: 60 }])],
   ])("refuses, and marks it unavailable, when %s", async (_label, arrange) => {
     vi.stubEnv("DATABASE_URL", "postgresql://unit.test/none");
     const error = vi.spyOn(console, "error").mockImplementation(() => {});

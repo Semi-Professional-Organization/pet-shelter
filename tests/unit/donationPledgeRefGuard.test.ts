@@ -43,7 +43,6 @@ function pledgeRow(pledgeRef: string) {
     donorName: "Probe Donor",
     donorEmail: "probe@example.test",
     donorPhone: null,
-    taxIdOrIc: null,
     tierId: "kibble",
     tierName: "Kibble Fund",
     amountSen: 5000,

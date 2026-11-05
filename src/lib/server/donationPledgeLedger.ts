@@ -61,7 +61,6 @@ export interface DonationPledgeRecord {
   donorName: string;
   donorEmail: string;
   donorPhone?: string;
-  taxIdOrIc?: string;
   tierId: SponsorshipTierId;
   tierName: string;
   amountSen: Sen;
@@ -77,15 +76,10 @@ export interface DonationPledgeRecord {
   createdAt: string;
 }
 
-/**
- * Everything a caller supplies. The ledger owns id, status, receipt and timestamp.
- *
- * `taxIdOrIc` is read back from gifts pledged before 2026-11-05 and never taken
- * from a new one: the shelter cannot issue a tax receipt (#239).
- */
+/** Everything a caller supplies. The ledger owns id, status, receipt and timestamp. */
 export type DonationPledgeDraft = Omit<
   DonationPledgeRecord,
-  "id" | "status" | "receiptNumber" | "createdAt" | "taxIdOrIc"
+  "id" | "status" | "receiptNumber" | "createdAt"
 >;
 
 export class DonationPledgeWriteError extends Error {
@@ -126,7 +120,6 @@ interface PledgeRow {
   donorName: string;
   donorEmail: string;
   donorPhone: string | null;
-  taxIdOrIc?: string | null;
   tierId: string;
   tierName: string;
   amountSen: number;
@@ -147,7 +140,6 @@ function toRecord(row: PledgeRow): DonationPledgeRecord {
     donorName: row.donorName,
     donorEmail: row.donorEmail,
     donorPhone: row.donorPhone ?? undefined,
-    taxIdOrIc: row.taxIdOrIc ?? undefined,
     tierId: row.tierId as SponsorshipTierId,
     tierName: row.tierName,
     amountSen: senFromInteger(row.amountSen),
@@ -181,9 +173,6 @@ export async function recordDonationPledge(
     memorySerial += 1;
     const record: DonationPledgeRecord = {
       ...draft,
-      // Overrides a wider object's field too, so memory mode stores no NRIC, as
-      // the Postgres insert does not.
-      taxIdOrIc: undefined,
       id: `mem-gift-${String(memorySerial).padStart(6, "0")}`,
       status: "PENDING_PAYMENT",
       receiptNumber: null,
@@ -608,19 +597,16 @@ export async function listPendingDonationPledges(
         // here is exactly insertion order.
         .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
         .slice(0, take)
-        // The same shape as the Postgres branch, whose `select` leaves the tax
-        // identifier out. Memory rows stopped carrying one on 2026-11-05 (#239);
-        // this keeps the projection explicit rather than relying on that.
-        .map((row) => ({ ...row, taxIdOrIc: undefined }))
+        // Copies, as the Postgres branch returns fresh objects: a caller that edits a
+        // queued row must not edit the stored pledge.
+        .map((row) => ({ ...row }))
     );
   }
 
   // An explicit projection, for the reason `listPendingSponsorships` gives: this is
-  // the one read that handles every pending donor at once, and `taxIdOrIc` is an
-  // NRIC that confirming a bank transfer does not need. Dropping it from the DTO
-  // alone would still pull it into server memory, where a query log or an error
-  // dump can carry it. An allow-list rather than `omit`, so a sensitive column
-  // added to the table later stays unread here until someone selects it on purpose.
+  // the one read that handles every pending donor at once. An allow-list rather
+  // than `omit`, so a sensitive column added to the table later stays unread here
+  // until someone selects it on purpose.
   const rows = await prisma.donationPledge.findMany({
     where: { status: "PENDING_PAYMENT" },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],

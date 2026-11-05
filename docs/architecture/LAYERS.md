@@ -158,7 +158,7 @@ Zod 4. The rule (Blueprint Tenet 3): **every value crossing into a Server Action
 |---|---|
 | **Files** | `src/lib/security/{session,crypto,rbac,rateLimit,sharedRateLimit,idempotency,secrets,adminSession}.ts` |
 | **Owns** | Authentication, authorization, abuse control |
-| **May import** | L-B4, and L-B2 for `dal.ts` (user lookups) and `sharedRateLimit.ts` (`rateLimitBuckets.ts`) |
+| **May import** | L-B4, and L-B2 for `dal.ts` (user lookups) and `sharedRateLimit.ts` (`rateLimitBuckets.ts`, plus `scheduleAfterResponse` for its sweep) |
 
 - **Sessions** — not JWT. `sealSession` produces `base64url(payload).hmac` (`createHmac("sha256", …)`) signed with `SESSION_SECRET`, stored in the HTTP-only `hope_shelter_session` cookie, 24 h expiry.
 - **Passwords** — `crypto.scrypt`, 16-byte random salt, 64-byte derived key, compared with `timingSafeEqual`. *(The README says bcrypt. The code is scrypt — verified.)*

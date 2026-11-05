@@ -241,8 +241,7 @@ describe("Donation persistence (the pledge table is the system of record until r
     const result = await submitDonationPledgeAction(basePledge);
     const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
 
-    // The issuer identity is snapshotted onto the *receipt* at reconciliation; what
-    // the pledge owns is what the donor was shown when they gave.
+    // What the pledge owns is what the donor was shown when they gave.
     expect(stored?.tierName).toBe("1-Week Nutrition & Kibble Fund");
     expect(stored?.currency).toBe("MYR");
   });
@@ -315,7 +314,7 @@ describe("a gift collects no tax identifier", () => {
 
     const stored = await findDonationPledgeByRef(result.data!.pledgeRef);
     expect(stored).toBeDefined();
-    expect(stored?.taxIdOrIc).toBeUndefined();
+    expect(JSON.stringify(stored)).not.toContain("920512-10-5432");
     expect(await listDonations()).toHaveLength(0);
   });
 

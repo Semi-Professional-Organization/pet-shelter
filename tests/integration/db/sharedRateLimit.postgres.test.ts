@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { prisma, disconnectPrisma } from "@/lib/server/prisma";
 import { checkSharedRateLimit, rateLimitKeyDigest } from "@/lib/security/sharedRateLimit";
@@ -34,7 +34,14 @@ describe("checkSharedRateLimit against Postgres", () => {
     await assertDatabaseReachable();
   });
 
+  // No random sweep: it would run after the test, and could delete a row a
+  // test has just aged on purpose. The sweep has its own probe below.
+  beforeEach(() => {
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  });
+
   afterEach(async () => {
+    vi.restoreAllMocks();
     await prisma.rateLimitBucket.deleteMany({ where: { key: { in: probeKeys } } });
     probeKeys.length = 0;
   });

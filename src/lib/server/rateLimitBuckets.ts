@@ -44,8 +44,14 @@ export async function spendRateLimitBucket(
         AS "retryAfterSeconds"`;
 
   const row = rows[0];
-  if (!row) throw new Error("rate_limit_buckets upsert returned no row");
-  return { count: Number(row.count), retryAfterSeconds: Number(row.retryAfterSeconds) };
+  const count = Number(row?.count);
+  const retryAfterSeconds = Number(row?.retryAfterSeconds);
+  // A thrown error is what makes the caller fail closed. `NaN > limit` is false,
+  // so a row without a usable count must never reach it as a number.
+  if (!Number.isInteger(count) || !Number.isInteger(retryAfterSeconds)) {
+    throw new Error("rate_limit_buckets upsert returned no usable row");
+  }
+  return { count, retryAfterSeconds };
 }
 
 /** Deletes every bucket whose window has ended. */

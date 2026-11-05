@@ -40,6 +40,27 @@ Record active multi-step work streams below.
 **Review:** deliberately not done: a sliding window (2x boundary burst is the recorded ceiling),
 moving any other budget, and a scheduled sweep (one call in fifty deletes expired rows).
 
+# Drop the receipt tax columns (#251)
+
+**Branch:** `claude/251-drop-receipt-snapshot-columns` · opened 2026-11-05
+
+- **Done when:** the five tax columns are gone from `prisma/schema.prisma` and from every reader
+  and writer, the expand/contract SQL is rehearsed against the real schemas, and the two reconcile
+  lanes build the acknowledgement through one helper.
+- **In scope:** schema, the three ledgers, both reconcile actions, `DonationReceiptDTO` and
+  `DonationReceipt`, the email's input type, tests, the migration folder.
+- **Not in scope:** anything #255 (#249, #250) already did; `donations.accountHolder` (#252);
+  the historical `prisma/sql/` DDL files; redacting NRICs in old audit `details`
+  (`tasks/open/admin-donation-export-loose-ends.md`).
+
+- [x] Code and tests; `typecheck`, `test`, `test:components`, `test:integration`, `lint`,
+  `docs:check` pass
+- [x] `rehearse.mjs` 31/31; `test:db` ledger suites pass on local Postgres 16
+- [x] Two xhigh review rounds. Declined: precheck erroring in a hand-dropped partial state
+  (it runs first), one `Intl` formatter per export row (pre-existing), two items in `tasks/open/`
+- [x] Decision entry; `open/two-acknowledgement-payload-builders.md` settled and deleted
+- **Deliberately not done:** an archive table before the drop (see the decision); renaming
+  `receiptNumber`/`ReceiptSequence`, which still number acknowledgements.
 # Remove registration numbers and receipt wording (#249, #250)
 
 **Branch:** `claude/remove-registration-and-receipt-wording` · opened 2026-11-05 · stacked on #253
