@@ -425,9 +425,9 @@ export async function reconcilePetSponsorshipAction(
       // it — which every other reader uses — left the money column reading zero on
       // a document filed with LHDN.
       //
-      // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. It is
-      // an NRIC; it lives on the `Donation` row, where the statutory export reads
-      // it, and is not copied into `AuditLog.metadata`. See
+      // No `taxIdOrIc`, on purpose, and the same as the general-gift lane. Since
+      // 2026-11-05 no new row carries one (#239), and an NRIC on a legacy row is
+      // never copied into `AuditLog.metadata`. See
       // `tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`.
       sponsorName: record.sponsorName,
       sponsorEmail: record.sponsorEmail,

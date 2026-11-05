@@ -350,8 +350,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           <p className="text-3xs text-muted-foreground leading-relaxed italic">
             *{" "}
             {isMs
-              ? "Ini bukan resit cukai dan ia tidak boleh difailkan untuk potongan cukai."
-              : "This is not a tax receipt and cannot be filed for a tax deduction."}
+              ? "Ini bukan resit dan ia tidak boleh difailkan untuk potongan cukai."
+              : "This is not a receipt and cannot be filed for a tax deduction."}
           </p>
         </div>
 

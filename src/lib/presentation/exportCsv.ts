@@ -3,10 +3,6 @@ import { DonationReceipt } from "@/types/sponsorship";
 import { AuditEntry } from "@/lib/domain/auditLog";
 import { Pet } from "@/types/pet";
 import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  STATUTORY_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
-import {
   auditDetails,
   formatAmountCell,
   isReceiptAuditRow,
@@ -242,8 +238,10 @@ export function generateReceiptsCsvString(
         r.paymentMethod,
         r.frequency || "one_time",
         r.targetPetName || "",
-        r.taxDeductibleRef || LHDN_TAX_DEDUCTIBLE_REF,
-        r.shelterRegistrationNo || STATUTORY_ROS_REGISTRATION_NO,
+        // As stored, never back-filled: a row issued since 2026-11-05 carries no
+        // ROS or LHDN identifier because the shelter has neither (#239).
+        r.taxDeductibleRef,
+        r.shelterRegistrationNo,
       ]);
     } else if ("action" in item) {
       // AuditEntry representing a donation
@@ -284,8 +282,10 @@ export function generateReceiptsCsvString(
           (d.paymentMethod as string) || "DuitNow QR",
           (d.frequency as string) || "one_time",
           (d.targetPetName as string) || "",
-          LHDN_TAX_DEDUCTIBLE_REF,
-          STATUTORY_ROS_REGISTRATION_NO,
+          // An audit row records no issuer snapshot, and the shelter holds no ROS
+          // or LHDN identifier to assume (#239), so these cells stay empty.
+          "",
+          "",
         ]);
       }
     }

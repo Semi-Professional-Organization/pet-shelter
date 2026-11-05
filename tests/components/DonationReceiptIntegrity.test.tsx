@@ -125,7 +125,7 @@ describe("the browser never invents a receipt number", () => {
     // The boundary, asserted on the success path: a donor who has sent nothing yet
     // must not be looking at a receipt number.
     expect(screen.queryByText(RECEIPT_NUMBER)).toBeNull();
-    expect(screen.getByText(/not a tax receipt/i)).toBeInTheDocument();
+    expect(screen.getByText(/not a receipt/i)).toBeInTheDocument();
   });
 });
 

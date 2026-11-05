@@ -103,6 +103,33 @@ describe("LHDN Donation Receipt CSV Generator", () => {
     expect(csv).toContain('"891101-14-1122"');
     expect(csv).toContain('"120.00"');
     expect(csv).toContain('"Spay / Neuter Surgery Sponsorship"');
+    // An audit row has no issuer snapshot to print, and none is assumed (#239).
+    expect(csv).not.toContain(LHDN_TAX_DEDUCTIBLE_REF);
+    expect(csv).not.toContain(STATUTORY_ROS_REGISTRATION_NO);
+  });
+
+  // Rows issued since 2026-11-05 store empty ROS and LHDN snapshots, because the
+  // shelter is not a registered society (#239). The export must not back-fill them.
+  it("exports a new row's empty ROS and LHDN cells as empty, not as the old constants", () => {
+    const csv = generateReceiptsCsvString([
+      {
+        receiptNumber: "HFS-DON-202611-0001",
+        date: "6 Nov 2026, 10:00 AM",
+        donorName: "Nurul Huda",
+        donorEmail: "nurul@example.com",
+        tierId: "vaccine",
+        tierName: "Core Vaccination & Deworming",
+        amountMYR: 50,
+        frequency: "one_time",
+        paymentMethod: "duitnow_qr",
+        taxDeductibleRef: "",
+        shelterRegistrationNo: "",
+      },
+    ]);
+
+    expect(csv).toContain("HFS-DON-202611-0001");
+    expect(csv).not.toContain(LHDN_TAX_DEDUCTIBLE_REF);
+    expect(csv).not.toContain(STATUTORY_ROS_REGISTRATION_NO);
   });
 });
 

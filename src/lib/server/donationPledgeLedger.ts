@@ -77,8 +77,9 @@ export interface DonationPledgeRecord {
   createdAt: string;
 }
 
-/** Everything a caller supplies. The ledger owns id, status, receipt and timestamp. */
 /**
+ * Everything a caller supplies. The ledger owns id, status, receipt and timestamp.
+ *
  * `taxIdOrIc` is read back from gifts pledged before 2026-11-05 and never taken
  * from a new one: the shelter cannot issue a tax receipt (#239).
  */
@@ -180,6 +181,8 @@ export async function recordDonationPledge(
     memorySerial += 1;
     const record: DonationPledgeRecord = {
       ...draft,
+      // Overrides a wider object's field too, so memory mode stores no NRIC either.
+      taxIdOrIc: undefined,
       id: `mem-gift-${String(memorySerial).padStart(6, "0")}`,
       status: "PENDING_PAYMENT",
       receiptNumber: null,

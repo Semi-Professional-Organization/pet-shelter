@@ -194,6 +194,8 @@ export function issueReceiptInMemory(draft: DonationDraft, when: Date): Donation
 
   const record: DonationRecord = {
     ...draft,
+    // Overrides a wider object's fields too, so memory mode matches Postgres.
+    taxIdOrIc: undefined,
     taxDeductibleRef: RETIRED_ISSUER_SNAPSHOT,
     shelterRegistrationNo: RETIRED_ISSUER_SNAPSHOT,
     id: `mem-don-${String(memorySeq).padStart(6, "0")}`,

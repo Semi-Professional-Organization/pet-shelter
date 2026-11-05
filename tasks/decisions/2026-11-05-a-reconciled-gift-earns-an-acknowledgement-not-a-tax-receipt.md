@@ -21,6 +21,13 @@ active on the live site (#239). So from this change:
   one negative line stays because donors who pledged before this date were told a tax receipt
   would follow.
 
+This reverses `2026-09-08-lhdn-relief-is-opt-in-not-a-column.md` (there is no relief to opt
+into) and `2026-09-08-a-receipt-asserts-relief-only-when-it-can-back-it.md` (no receipt asserts
+relief at all, so `isTaxClaimable` is gone). The admin CSV export from
+`2026-08-31-lhdn-export-reads-the-ledger.md` still exists; it now prints a row's stored
+identifiers as they are, so new rows export empty ROS and LHDN cells instead of back-filled
+constants, and #250 renames it.
+
 Reversing this needs a real registration and approval first. Then the identifiers come back in
 `shelterIdentity.ts`, a migration restores what #251 removed, and the opt-in returns to both forms.
 

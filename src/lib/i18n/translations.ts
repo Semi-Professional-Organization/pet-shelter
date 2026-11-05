@@ -664,8 +664,6 @@ export const translations: Record<Language, TranslationDictionary> = {
       donorNameLabel: "Donor Full Name",
       donorEmailLabel: "Email Address",
       donorPhoneLabel: "Phone Number (WhatsApp receipt updates)",
-      // No baked-in "*": this field is required only when the donor asks for a
-      // Section 44(6) receipt, so the marker is rendered from that state instead.
       donorNotesLabel: "Special Message / Donor Wishes (Optional)",
       bankTransferTitle: "Direct Bank Transfer (Maybank)",
       bankName: "Maybank Berhad",
@@ -675,7 +673,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       copiedBtn: "Copied!",
       duitNowScanTitle: "DuitNow National QR Pay",
       duitNowInstructions: "Scan using Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, or any Malaysian banking app.",
-      pledgeBtn: "Complete Donation Pledge & Generate e-Receipt",
+      pledgeBtn: "Complete Donation Pledge",
       pledgeProcessing: "Recording Pledge...",
       receiptTitle: "Official Donation e-Receipt",
       receiptSubtitle: "Approved Under Subsection 44(6) Income Tax Act 1967 • Ref: {taxRef}",
@@ -1037,7 +1035,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       copiedBtn: "Disalin!",
       duitNowScanTitle: "DuitNow QR Kebangsaan",
       duitNowInstructions: "Imbas menggunakan Maybank MAE, CIMB Clicks, Touch 'n Go eWallet, Public Bank, atau mana-mana aplikasi perbankan Malaysia.",
-      pledgeBtn: "Sempurnakan Ikrar Sumbangan & Jana e-Resit",
+      pledgeBtn: "Sempurnakan Ikrar Sumbangan",
       pledgeProcessing: "Merekodkan Ikrar Sumbangan...",
       receiptTitle: "e-Resit Sumbangan Rasmi",
       receiptSubtitle: "Diluluskan Di Bawah Subseksyen 44(6) Akta Cukai Pendapatan 1967 • No. Rujukan: {taxRef}",

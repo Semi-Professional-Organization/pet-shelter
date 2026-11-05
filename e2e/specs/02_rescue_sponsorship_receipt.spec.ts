@@ -68,7 +68,6 @@ test.describe("rescue sponsorship", () => {
       name: "E2E Golden Path Donor",
       email: "e2e-donor@example.test",
       phone: "012-345 6789",
-      taxIdOrIc: "920512-10-5432",
     });
     await page.getByRole("button", { name: /complete donation pledge/i }).click();
 

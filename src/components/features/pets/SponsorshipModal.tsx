@@ -445,8 +445,8 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                   <ShieldCheck className="size-4 text-success-accent shrink-0" />
                   <span>
                     {targetPet
-                      ? "Receipt issuance waits until a coordinator verifies the transfer."
-                      : "An official receipt is issued for every recorded gift; tax relief is optional below."}
+                      ? "We email an acknowledgement once a coordinator verifies the transfer."
+                      : "We email an acknowledgement once a coordinator verifies the transfer. It is not a tax receipt."}
                   </span>
                 </div>
               </div>
@@ -647,8 +647,8 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
 
               <p className="text-xs text-muted-foreground">
                 Status: <strong className="text-foreground">Pending payment verification</strong>.
-                This acknowledgement is not a receipt and cannot be filed for tax relief. Your
-                official Section 44(6) receipt is emailed once the transfer is confirmed.
+                This is not a receipt and cannot be filed for tax relief. We email you an
+                acknowledgement once the transfer is confirmed.
               </p>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">

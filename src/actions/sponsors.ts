@@ -121,7 +121,7 @@ export async function registerSponsorAction(
     return {
       success: false,
       error:
-        "That receipt number does not match this email address. Check the e-Receipt we sent you when you donated.",
+        "That receipt number does not match this email address. Check the acknowledgement email we sent you when your transfer was confirmed.",
     };
   }
 

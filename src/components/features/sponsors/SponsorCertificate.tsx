@@ -116,8 +116,8 @@ export function SponsorCertificate({ data }: { data: CertificateData }) {
           </div>
           <p className="max-w-[16rem] text-right text-2xs leading-snug text-receipt-ink/60">
             {isMs
-              ? "Sijil pengiktirafan penajaan. Ini bukan resit cukai — sila rujuk e-Resit LHDN anda."
-              : "Sponsorship recognition certificate. This is not a tax receipt — refer to your LHDN e-Receipt for tax purposes."}
+              ? "Sijil pengiktirafan penajaan. Ini bukan resit cukai."
+              : "Sponsorship recognition certificate. This is not a tax receipt."}
           </p>
         </footer>
       </article>
