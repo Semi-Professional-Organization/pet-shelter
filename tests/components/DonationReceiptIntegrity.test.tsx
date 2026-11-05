@@ -23,8 +23,8 @@ import { renderWithLanguage, setupUser, makePet } from "./support/render";
  * receipt. These tests exist so that fallback cannot come back.
  *
  * Since 2026-09-22 the guard is stronger still: this screen has no receipt on it
- * at all. Submitting the form records a pending pledge, and the Section 44(6)
- * receipt is issued from the coordinator's queue once the transfer is matched. So
+ * at all. Submitting the form records a pending pledge, and the acknowledgement
+ * is issued from the coordinator's queue once the transfer is matched. So
  * `RECEIPT_NUMBER` must not appear here on *any* path, success included.
  */
 const RECEIPT_NUMBER = /HFS-DON-\d{6}-\d{4}/;
@@ -125,98 +125,50 @@ describe("the browser never invents a receipt number", () => {
     // The boundary, asserted on the success path: a donor who has sent nothing yet
     // must not be looking at a receipt number.
     expect(screen.queryByText(RECEIPT_NUMBER)).toBeNull();
-    expect(screen.getByText(/not a receipt/i)).toBeInTheDocument();
+    expect(screen.getByText(/not a tax receipt/i)).toBeInTheDocument();
   });
 });
 
 /**
- * The form displayed the tax identifier as required and the schema accepted its
- * absence, so a donor could be handed a receipt that announces itself as
- * tax-deductible while carrying nothing to deduct against.
- *
- * The checkbox is what reconciles the two. It gates the *identifier*, never the
- * gift: every gift is recorded, because the ledger is the shelter's record of
- * money received rather than of claims made. Since 2026-09-22 the identifier is
- * snapshotted onto the pending pledge and copied onto the receipt at
- * reconciliation, so what it gates here is what the eventual receipt can claim.
+ * The shelter is not a registered society and cannot issue a tax receipt (owner,
+ * 2026-11-05; #239). Until then this form had a Section 44(6) opt-in and an NRIC
+ * field; both are gone, so a gift is a name, an email and an amount.
  */
-describe("Section 44(6) relief is opt-in", () => {
+describe("the form asks for no tax identifier", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
   });
 
-  it("still lets a donor give with only a name and an email", async () => {
+  it("offers no relief opt-in and no identifier field", () => {
+    renderWidget();
+
+    expect(screen.queryByRole("checkbox", { name: /tax/i })).toBeNull();
+    expect(screen.queryByLabelText(/\bIC\b|passport|SSM/i)).toBeNull();
+    expect(document.body).not.toHaveTextContent(/44\s*\(6\)|tax-exemption/i);
+  });
+
+  it("lets a donor give with only a name and an email, sending no tax fields", async () => {
     renderWidget();
     await submitAGift();
 
-    // The regression this guards: defaulting the box to ticked would make the IC
-    // field required and block every donor who could complete this form before.
     expect(mockedSubmit).toHaveBeenCalledTimes(1);
-    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({
-      wantsTaxReceipt: false,
-      taxIdOrIc: undefined,
-    });
+    const payload = mockedSubmit.mock.calls[0][0];
+    expect(payload).not.toHaveProperty("taxIdOrIc");
+    expect(payload).not.toHaveProperty("wantsTaxReceipt");
   });
 
-  it("leaves the identifier field disabled until relief is asked for", async () => {
+  // #50 §2: each label carried its own "*" and the widget rendered a second one.
+  it("marks each required donor field once", () => {
     renderWidget();
-    expect(screen.getByLabelText(/Malaysian IC/i)).toBeDisabled();
 
-    const user = setupUser();
-    await user.click(
-      screen.getByRole("checkbox", { name: /tax-exemption receipt/i }),
-    );
-
-    expect(screen.getByLabelText(/Malaysian IC/i)).toBeEnabled();
+    for (const id of ["widgetDonorName", "widgetDonorEmail"]) {
+      const label = document.querySelector(`label[for="${id}"]`);
+      expect(label?.textContent?.match(/\*/g) ?? []).toHaveLength(1);
+    }
   });
 
-  it("blocks the submission when relief is claimed with no identifier", async () => {
-    renderWidget();
-    const user = setupUser();
-
-    await user.type(screen.getByLabelText(/donor full name/i), "Aisyah Rahman");
-    await user.type(
-      screen.getByLabelText(/email address/i),
-      "aisyah@example.com",
-    );
-    await user.click(
-      screen.getByRole("checkbox", { name: /tax-exemption receipt/i }),
-    );
-    await user.click(
-      screen.getByRole("button", { name: /complete donation pledge/i }),
-    );
-
-    // The required attribute stops it here; `donationPledgeSchema.superRefine` stops
-    // it server-side for anything that bypasses the browser. Both exist on purpose.
-    expect(mockedSubmit).not.toHaveBeenCalled();
-  });
-
-  it("sends the identifier once relief is claimed and it is supplied", async () => {
-    renderWidget();
-    const user = setupUser();
-
-    await user.type(screen.getByLabelText(/donor full name/i), "Aisyah Rahman");
-    await user.type(
-      screen.getByLabelText(/email address/i),
-      "aisyah@example.com",
-    );
-    await user.click(
-      screen.getByRole("checkbox", { name: /tax-exemption receipt/i }),
-    );
-    await user.type(screen.getByLabelText(/Malaysian IC/i), "920512-10-5432");
-    await user.click(
-      screen.getByRole("button", { name: /complete donation pledge/i }),
-    );
-
-    expect(mockedSubmit).toHaveBeenCalledTimes(1);
-    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({
-      wantsTaxReceipt: true,
-      taxIdOrIc: "920512-10-5432",
-    });
-  });
-
-  it("claims no tax relief on the acknowledgement, whatever the donor ticked", async () => {
+  it("claims no tax relief on the pledge screen", async () => {
     mockedSubmit.mockResolvedValue({
       success: true,
       data: {
@@ -237,100 +189,25 @@ describe("Section 44(6) relief is opt-in", () => {
     renderWidget();
     await submitAGift();
 
-    // A document that announces itself as deductible while carrying nothing to
-    // deduct against is the original defect. The pledge screen cannot have it: it
-    // says outright that it is not a receipt, and prints no exemption reference.
+    // The shelter is not a registered society: the screen says outright that it is
+    // not a tax receipt, and names no statutory section or exemption reference.
     expect(await screen.findByText("HFS-GFT-20260922-000008")).toBeInTheDocument();
     expect(
       screen.getByText(/cannot be filed for a tax deduction/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/tax-exempt e-Receipt/i)).not.toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/44\s*\(6\)/);
     expect(
       screen.queryByText(/LHDN\.01\/35\/42\/51\/179-6\.4912/),
     ).not.toBeInTheDocument();
-  });
-
-  it("clears the opt-in when the donor starts another gift", async () => {
-    mockedSubmit.mockResolvedValue({
-      success: true,
-      data: {
-        pledgeRef: "HFS-GFT-20260922-000009",
-        donorName: "Aisyah Rahman",
-        donorEmail: "aisyah@example.com",
-        tierId: "vaccine",
-        tierName: "Core Vaccination & Deworming",
-        amountMYR: 50,
-        frequency: "one_time",
-        paymentMethod: "duitnow_qr",
-        status: "PENDING_PAYMENT",
-        reconciliationNotice:
-          "Your official receipt is issued once our coordinator matches your transfer.",
-      },
-    });
-
-    renderWidget();
-    const user = setupUser();
-
-    await user.type(screen.getByLabelText(/donor full name/i), "Aisyah Rahman");
-    await user.type(
-      screen.getByLabelText(/email address/i),
-      "aisyah@example.com",
-    );
-    await user.click(
-      screen.getByRole("checkbox", { name: /tax-exemption receipt/i }),
-    );
-    await user.type(screen.getByLabelText(/Malaysian IC/i), "920512-10-5432");
-    await user.click(
-      screen.getByRole("button", { name: /complete donation pledge/i }),
-    );
-
-    await screen.findByText("HFS-GFT-20260922-000009");
-    await user.click(screen.getByRole("button", { name: /another donation/i }));
-
-    // handleReset cleared taxIdOrIc but not the box, so the field came back required
-    // and empty — blocking the next submission on something the donor never re-chose.
-    expect(
-      screen.getByRole("checkbox", { name: /tax-exemption receipt/i }),
-    ).not.toBeChecked();
-    expect(screen.getByLabelText(/Malaysian IC/i)).toBeDisabled();
-  });
-
-  it("drops an identifier the donor typed and then withdrew", async () => {
-    renderWidget();
-    const user = setupUser();
-
-    await user.type(screen.getByLabelText(/donor full name/i), "Aisyah Rahman");
-    await user.type(
-      screen.getByLabelText(/email address/i),
-      "aisyah@example.com",
-    );
-    const box = screen.getByRole("checkbox", {
-      name: /tax-exemption receipt/i,
-    });
-
-    await user.click(box);
-    await user.type(screen.getByLabelText(/Malaysian IC/i), "920512-10-5432");
-    await user.click(box); // changed their mind
-
-    await user.click(
-      screen.getByRole("button", { name: /complete donation pledge/i }),
-    );
-
-    // A tax number the donor withdrew is not ours to keep, so it must not ride along
-    // in the payload merely because the input still holds the text.
-    expect(mockedSubmit).toHaveBeenCalledTimes(1);
-    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({
-      wantsTaxReceipt: false,
-      taxIdOrIc: undefined,
-    });
   });
 });
 
 /**
  * The form publishes two ways to pay — a DuitNow QR and the shelter's Maybank
  * account — and until 2026-10-13 recorded `duitnow_qr` for both. The value is
- * copied onto the Section 44(6) receipt and shown to the coordinator as the rail
- * to match against the bank statement, so a bank-transfer donor's receipt and
+ * copied onto the acknowledgement and shown to the coordinator as the rail
+ * to match against the bank statement, so a bank-transfer donor's record and
  * queue row both named the wrong one.
  */
 describe("the donor says which rail they used", () => {

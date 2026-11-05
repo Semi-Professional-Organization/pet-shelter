@@ -87,7 +87,9 @@ describe("Transactional Email Service", () => {
   });
 });
 
-describe("Sec 44(6) donation receipt — the two halves must agree", () => {
+describe("donation acknowledgement — the two halves must agree", () => {
+  // Carries an old row's tax identifier and issuer snapshots on purpose: the mail must
+  // ignore them even when a caller hands them over.
   const baseReceipt: DonationReceipt = {
     receiptNumber: "HFS-DON-202608-4821",
     date: "28 Aug 2026, 10:15 AM",
@@ -182,25 +184,37 @@ describe("Sec 44(6) donation receipt — the two halves must agree", () => {
   });
 
   it("states the same optional rows in both halves", async () => {
-    const mail = await renderReceipt({ targetPetName: "Luna", taxIdOrIc: "910101-10-1234" });
+    const mail = await renderReceipt({ targetPetName: "Luna" });
 
     for (const body of [mail.text, mail.html]) {
       expect(body).toContain("Luna");
-      expect(body).toContain("910101-10-1234");
       expect(body).toContain("RM 250.00");
     }
   });
 
-  it("keeps an identifier-free HTML receipt non-claimable without promising reissue", async () => {
-    const mail = await renderReceipt({ taxIdOrIc: undefined });
+  // #248: the shelter is not a registered society (owner, 2026-11-05; #239), so no half of
+  // this mail may claim tax deductibility, ROS registration or LHDN approval, or print the
+  // donor's tax number, whatever the caller passes in.
+  it("makes no tax, ROS or LHDN claim in any half, even given an old row's identifiers", async () => {
+    const mail = await renderReceipt();
 
-    expect(mail.html).not.toContain("Official Tax-Exempt e-Receipt");
-    expect(mail.html).not.toMatch(/valid for .*tax filing.*Section 44\(6\)/i);
-    expect(mail.html).toMatch(/cannot be filed against a tax return/i);
-    expect(mail.html).toMatch(
-      /cannot be filed against a tax return[\s\S]*contact (?:us|the shelter)/i
-    );
-    expect(mail.html).not.toMatch(/we (?:will|'ll) reissue/i);
+    for (const [half, body] of [
+      ["subject", mail.subject],
+      ["text", mail.text],
+      ["html", mail.html],
+    ] as const) {
+      expect(body, `${half} names a statutory section`).not.toMatch(/44\s*\(6\)|Income Tax Act/i);
+      expect(body, `${half} claims deductibility`).not.toMatch(/tax[\s-]*(?:deduct|exempt)/i);
+      expect(body, `${half} names the tax authority`).not.toMatch(/LHDN|Inland Revenue/i);
+      expect(body, `${half} names the society registry`).not.toMatch(/Registrar of Societies|PPM|\bROS\b/);
+      expect(body, `${half} prints the LHDN reference`).not.toContain(baseReceipt.taxDeductibleRef);
+      expect(body, `${half} prints the ROS number`).not.toContain(baseReceipt.shelterRegistrationNo);
+      expect(body, `${half} prints the donor's NRIC`).not.toContain("910101-10-1234");
+      expect(body, `${half} calls itself official`).not.toMatch(/official/i);
+    }
+    for (const body of [mail.text, mail.html]) {
+      expect(body).toMatch(/not a tax receipt/i);
+    }
   });
 });
 
@@ -285,7 +299,7 @@ describe("rendered email colour parity", () => {
 
   it("styles the statutory receipt from the --receipt-* group", async () => {
     // §3.3: --receipt-* is the one token group already fixed across themes, because a
-    // Sec 44(6) receipt is black ink on white paper and has to survive a monochrome printer.
+    // receipt is black ink on white paper and has to survive a monochrome printer.
     // The emailed and the printed receipt for the same donation are meant to be one document.
     const html = await capture(() =>
       sendDonationReceiptEmail({
@@ -299,8 +313,6 @@ describe("rendered email colour parity", () => {
         frequency: "one_time",
         paymentMethod: "duitnow_qr",
         targetPetName: "Luna",
-        taxDeductibleRef: "LHDN.01/35/42/51/179-6.9999",
-        shelterRegistrationNo: "PPM-001-10-99999999",
       })
     );
 

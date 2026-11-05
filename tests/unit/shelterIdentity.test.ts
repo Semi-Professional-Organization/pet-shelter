@@ -12,7 +12,6 @@ import {
   SHELTER_WHATSAPP_NUMBER,
   SHELTER_WHATSAPP_URL,
   STATUTORY_ROS_REGISTRATION_NO,
-  currentIssuerIdentity,
 } from "@/lib/domain/shelterIdentity";
 
 // The module reads ROS_REGISTRATION_NO once, when the import above loads it. That load sees the
@@ -89,26 +88,6 @@ describe("the unresolved ROS registration discrepancy (P2)", () => {
     const reloaded = await import("@/lib/domain/shelterIdentity");
 
     expect(reloaded.STATUTORY_ROS_REGISTRATION_NO).toBe("PPM-012-10-18042016");
-    expect(reloaded.currentIssuerIdentity().shelterRegistrationNo).toBe(
-      "PPM-012-10-18042016"
-    );
-  });
-});
-
-describe("currentIssuerIdentity", () => {
-  it("captures the identifiers a receipt is stamped with at issue time", () => {
-    expect(currentIssuerIdentity()).toEqual({
-      taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-      shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
-    });
-  });
-
-  it("returns a fresh object each call, so a stored snapshot cannot be mutated later", () => {
-    const first = currentIssuerIdentity();
-    const second = currentIssuerIdentity();
-
-    expect(first).not.toBe(second);
-    expect(first).toEqual(second);
   });
 });
 

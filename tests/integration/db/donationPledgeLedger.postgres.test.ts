@@ -14,10 +14,6 @@ import {
 } from "@/lib/server/donationLedger";
 import { senFromInteger } from "@/lib/domain/money";
 import {
-  LHDN_TAX_DEDUCTIBLE_REF,
-  STATUTORY_ROS_REGISTRATION_NO,
-} from "@/lib/domain/shelterIdentity";
-import {
   requireDatabaseUrl,
   assertDatabaseReachable,
   cleanProbeLedger,
@@ -46,10 +42,13 @@ import {
 
 const SCOPE = receiptScopeFor(PROBE_INSTANT);
 
-const ISSUER = {
-  taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-  shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
-};
+/**
+ * Gives a pending row the NRIC a pledge made before 2026-11-05 could carry. The
+ * ledger no longer accepts one (#239), but such rows can still be in production.
+ */
+async function seedLegacyTaxId(pledgeRef: string): Promise<void> {
+  await prisma.donationPledge.update({ where: { pledgeRef }, data: { taxIdOrIc: "880101-14-5523" } });
+}
 
 let serial = 0;
 
@@ -159,7 +158,7 @@ describe("donation pledge ledger against real PostgreSQL", () => {
     const settled = await recordDonationPledge(draft(), {
       now: new Date("2999-01-01T04:00:00.000Z"),
     });
-    await settleDonationPledge(settled.pledgeRef, ISSUER, "probe@x", { now: sameInstant });
+    await settleDonationPledge(settled.pledgeRef, "probe@x", { now: sameInstant });
 
     // The tiebreak is `id`, in the database's own ordering of that column — asked of
     // Postgres rather than assumed, because text collation decides it, not JavaScript.
@@ -176,9 +175,8 @@ describe("donation pledge ledger against real PostgreSQL", () => {
   });
 
   it("lists a pending gift without reading the donor's tax identifier", async () => {
-    const record = await recordDonationPledge(draft({ taxIdOrIc: "880101-14-5523" }), {
-      now: PROBE_INSTANT,
-    });
+    const record = await recordDonationPledge(draft(), { now: PROBE_INSTANT });
+    await seedLegacyTaxId(record.pledgeRef);
 
     // The control: the column holds a value, so a queue read that fetched it would
     // hand it back. Without this the assertion below could not fail.
@@ -198,16 +196,15 @@ describe("donation pledge ledger against real PostgreSQL", () => {
   it("settles a gift as one unit: the receipt and the ACTIVE row commit together", async () => {
     const record = await recordDonationPledge(
       draft({
-        taxIdOrIc: "880101-14-5523",
         notes: "For Tuah, with love",
         targetPetName: "Tuah",
       }),
       { now: PROBE_INSTANT }
     );
+    await seedLegacyTaxId(record.pledgeRef);
 
     const outcome = await settleDonationPledge(
       record.pledgeRef,
-      ISSUER,
       "coordinator@example.test",
       { now: PROBE_INSTANT }
     );
@@ -223,10 +220,12 @@ describe("donation pledge ledger against real PostgreSQL", () => {
       donorEmail: "probe.gift@example.test",
       amountSen: 5_000,
       targetPetName: "Tuah",
-      taxIdOrIc: "880101-14-5523",
+      // A legacy pledge's NRIC is not copied, and no ROS or LHDN identifier is
+      // stamped: the shelter is not a registered society (#239).
+      taxIdOrIc: null,
       notes: "For Tuah, with love",
-      taxDeductibleRef: LHDN_TAX_DEDUCTIBLE_REF,
-      shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
+      taxDeductibleRef: "",
+      shelterRegistrationNo: "",
     });
 
     const row = await prisma.donationPledge.findUnique({
@@ -245,7 +244,7 @@ describe("donation pledge ledger against real PostgreSQL", () => {
 
     const outcomes = await Promise.all(
       ["a@example.test", "b@example.test", "c@example.test"].map((who) =>
-        settleDonationPledge(record.pledgeRef, ISSUER, who, { now: PROBE_INSTANT })
+        settleDonationPledge(record.pledgeRef, who, { now: PROBE_INSTANT })
       )
     );
 
@@ -282,14 +281,13 @@ describe("donation pledge ledger against real PostgreSQL", () => {
 
     const afterDismissal = await settleDonationPledge(
       dismissed.pledgeRef,
-      ISSUER,
       "coordinator@example.test",
       { now: PROBE_INSTANT }
     );
     expect(afterDismissal.status).toBe("not_pending");
 
     const settled = await recordDonationPledge(draft(), { now: PROBE_INSTANT });
-    await settleDonationPledge(settled.pledgeRef, ISSUER, "coordinator@example.test", {
+    await settleDonationPledge(settled.pledgeRef, "coordinator@example.test", {
       now: PROBE_INSTANT,
     });
 
@@ -332,7 +330,7 @@ describe("donation pledge ledger against real PostgreSQL", () => {
     // Prisma's string inputs also accept filter objects, so `{ not: "" }` would
     // match every row. The ledger asserts the runtime type before the `where`.
     await expect(
-      settleDonationPledge({ not: "" } as unknown as string, ISSUER, "coordinator@example.test")
+      settleDonationPledge({ not: "" } as unknown as string, "coordinator@example.test")
     ).rejects.toThrow(TypeError);
 
     const receipts = await prisma.donation.count({ where: { sequenceScope: SCOPE } });

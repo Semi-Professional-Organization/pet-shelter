@@ -10,7 +10,6 @@ import {
   type DonationRecord,
 } from "@/lib/server/donationLedger";
 import { uniqueViolationOn } from "@/lib/server/uniqueViolation";
-import type { StatutoryIssuerIdentity } from "@/lib/domain/shelterIdentity";
 import type { SponsorshipTierId } from "@/types/sponsorship";
 import { formatMYR, Sen, senFromInteger } from "@/lib/domain/money";
 import {
@@ -79,9 +78,13 @@ export interface DonationPledgeRecord {
 }
 
 /** Everything a caller supplies. The ledger owns id, status, receipt and timestamp. */
+/**
+ * `taxIdOrIc` is read back from gifts pledged before 2026-11-05 and never taken
+ * from a new one: the shelter cannot issue a tax receipt (#239).
+ */
 export type DonationPledgeDraft = Omit<
   DonationPledgeRecord,
-  "id" | "status" | "receiptNumber" | "createdAt"
+  "id" | "status" | "receiptNumber" | "createdAt" | "taxIdOrIc"
 >;
 
 export class DonationPledgeWriteError extends Error {
@@ -245,7 +248,6 @@ async function createPledgeRow(
         donorName: draft.donorName,
         donorEmail: draft.donorEmail,
         donorPhone: draft.donorPhone ?? null,
-        taxIdOrIc: draft.taxIdOrIc ?? null,
         tierId: draft.tierId,
         tierName: draft.tierName,
         amountSen: draft.amountSen as number,
@@ -359,15 +361,11 @@ async function transitionPending(
 }
 
 /** The receipt a gift earns, snapshotting what the donor supplied at checkout. */
-function receiptDraftFor(
-  record: DonationPledgeRecord,
-  issuer: StatutoryIssuerIdentity
-): DonationDraft {
+function receiptDraftFor(record: DonationPledgeRecord): DonationDraft {
   return {
     donorName: record.donorName,
     donorEmail: record.donorEmail,
     donorPhone: record.donorPhone,
-    taxIdOrIc: record.taxIdOrIc,
     tierId: record.tierId,
     tierName: record.tierName,
     amountSen: record.amountSen,
@@ -376,13 +374,11 @@ function receiptDraftFor(
     paymentMethod: record.paymentMethod,
     targetPetName: record.targetPetName,
     notes: record.notes,
-    taxDeductibleRef: issuer.taxDeductibleRef,
-    shelterRegistrationNo: issuer.shelterRegistrationNo,
   };
 }
 
 /**
- * Confirms a gift and issues its Section 44(6) receipt as one unit of work.
+ * Confirms a gift and issues its numbered acknowledgement as one unit of work.
  *
  * Guard first, draw second, write third, all inside the transaction that draws the
  * serial — the ordering `settleSponsorship` arrived at on 2026-09-14 after the
@@ -418,7 +414,6 @@ function receiptDraftFor(
  */
 export async function settleDonationPledge(
   pledgeRef: string,
-  issuer: StatutoryIssuerIdentity,
   reconciledBy: string,
   options?: { now?: Date }
 ): Promise<SettleGiftOutcome> {
@@ -442,7 +437,7 @@ export async function settleDonationPledge(
     // The guard, the draw and the write with no await between them. In a
     // single-threaded process that is the whole transaction, and it is why
     // `issueReceiptInMemory` is synchronous.
-    const donation = issueReceiptInMemory(receiptDraftFor(current, issuer), when);
+    const donation = issueReceiptInMemory(receiptDraftFor(current), when);
     const record: DonationPledgeRecord = {
       ...current,
       status: "ACTIVE",
@@ -462,7 +457,7 @@ export async function settleDonationPledge(
       if (guard.status === "not_found") return guard;
       if (guard.status === "not_pending") return settledOutcome(guard.record);
 
-      const donation = await drawAndInsert(tx, receiptDraftFor(guard.record, issuer), when);
+      const donation = await drawAndInsert(tx, receiptDraftFor(guard.record), when);
       const row = await tx.donationPledge.update({
         where: { pledgeRef },
         data: { receiptNumber: donation.receiptNumber },

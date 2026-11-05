@@ -131,15 +131,13 @@ describe("the receipt series is untouched until reconciliation", () => {
     expect(serials).toEqual([1, 2, 3]);
   });
 
-  it("copies the pledge's snapshot and the issuer identity onto the receipt", async () => {
+  it("copies the pledge's snapshot onto the acknowledgement, and no tax claim", async () => {
     const { reconcileDonationPledgeAction } = await import("@/actions/donations");
     const { findDonationByReceiptNumber } = await import(
       "@/lib/server/donationLedger"
     );
-    const { LHDN_TAX_DEDUCTIBLE_REF, STATUTORY_ROS_REGISTRATION_NO } = await import(
-      "@/lib/domain/shelterIdentity"
-    );
 
+    // The relief fields a client built before 2026-11-05 could still send.
     const ref = await pledge({
       taxIdOrIc: "920512-10-5432",
       wantsTaxReceipt: true,
@@ -152,13 +150,13 @@ describe("the receipt series is untouched until reconciliation", () => {
     expect(receipt?.donorName).toBe("Nurul Huda binti Ahmad");
     expect(receipt?.amountSen).toBe(5000);
     expect(receipt?.tierName).toBe("Core Vaccination & Deworming");
-    expect(receipt?.taxIdOrIc).toBe("920512-10-5432");
     expect(receipt?.targetPetName).toBe("Barnaby");
     expect(receipt?.notes).toBe("Get well soon");
-    // Snapshotted at issuance, so correcting the ROS number later cannot rewrite
-    // a receipt already in a donor's hands.
-    expect(receipt?.taxDeductibleRef).toBe(LHDN_TAX_DEDUCTIBLE_REF);
-    expect(receipt?.shelterRegistrationNo).toBe(STATUTORY_ROS_REGISTRATION_NO);
+    // The shelter is not a registered society (owner, 2026-11-05; #239): no donor
+    // tax number, ROS number or LHDN reference reaches a new row.
+    expect(receipt?.taxIdOrIc).toBeUndefined();
+    expect(receipt?.taxDeductibleRef).toBe("");
+    expect(receipt?.shelterRegistrationNo).toBe("");
   });
 });
 
@@ -335,7 +333,7 @@ describe("the audit trail says what actually happened", () => {
     expect(received?.actorEmail).toBe("coordinator@hopeforstrays.org");
   });
 
-  it("keeps the donor's NRIC on the receipt and out of the audit log", async () => {
+  it("keeps a stale client's NRIC off the acknowledgement and out of the audit log", async () => {
     const { reconcileDonationPledgeAction } = await import("@/actions/donations");
     const { getAuditLogs } = await import("@/lib/domain/auditLog");
     const { findDonationByReceiptNumber } = await import("@/lib/server/donationLedger");
@@ -343,9 +341,10 @@ describe("the audit trail says what actually happened", () => {
     const ref = await pledge({ taxIdOrIc: "920512-10-5432", wantsTaxReceipt: true });
     const settled = await reconcileDonationPledgeAction(ref);
 
-    // On the statutory row, which is what the LHDN export reads...
+    // Not on the row: the form no longer collects one and the schema drops it...
     const receipt = await findDonationByReceiptNumber(settled.receiptNumber!);
-    expect(receipt?.taxIdOrIc).toBe("920512-10-5432");
+    expect(receipt).toBeDefined();
+    expect(receipt?.taxIdOrIc).toBeUndefined();
 
     // ...and in neither audit row. An identifier in `AuditLog.metadata` is personal
     // data stored a second time, and the sponsorship lane never copied it there.

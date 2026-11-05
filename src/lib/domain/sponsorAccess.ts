@@ -11,7 +11,7 @@ import {
 import { seedOfflineSponsorships } from "@/lib/server/sponsorDemoSeed";
 import { getServerPetsAsync } from "@/lib/server/petRepository";
 import { getPetMedicalTimeline } from "@/lib/domain/medicalTimeline";
-import { currentIssuerIdentity } from "@/lib/domain/shelterIdentity";
+import { STATUTORY_ROS_REGISTRATION_NO } from "@/lib/domain/shelterIdentity";
 import {
   deriveTier,
   recognisedContributionSen,
@@ -332,7 +332,7 @@ export async function getSponsorCertificate(
     coveringPeriod: `${year - 1}–${year}`,
     recognisedSen: context.recognisedSen,
     rescueNames: dashboard?.rescues.map((rescue) => rescue.name) ?? [],
-    shelterRegistrationNo: currentIssuerIdentity().shelterRegistrationNo,
+    shelterRegistrationNo: STATUTORY_ROS_REGISTRATION_NO,
   };
 }
 

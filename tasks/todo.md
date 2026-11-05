@@ -15,6 +15,30 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Stop issuing tax receipts (#248)
+
+**Branch:** `claude/stop-issuing-tax-receipts` · opened 2026-11-05
+
+- **Done when:** no code path can produce text claiming tax deductibility, ROS registration or
+  LHDN approval for a new donation or sponsorship; a test asserts it for the action and the email.
+- **In scope:** both forms' opt-in and NRIC field, both validators, the pledge and donation
+  ledgers' drafts, both reconcile actions, the acknowledgement and pledge emails, the
+  reconciliation notice, #50 §2 (double asterisk), tests.
+- **Not in scope:** the identity constants and sponsorship receipt block (#249), admin export
+  and audit labels, transparency stat, print styles (#250), the stored columns (#251), the bank
+  account name (#252).
+
+- [x] Forms, validators, ledgers, actions, emails
+- [x] Tests, including the email's no-claim assertion and the stale-client strip
+- [x] Decision entry; #50's last item fixed, so its `open/` file is deleted
+
+## Review
+
+Deliberately kept: the `HFS-DON-*` series and the `Donation` row at reconciliation (the record
+that money arrived), the `DONATION_RECEIPT` email template name and `DonationReceiptEmail` audit
+entity (renaming them changes how old audit rows read, which is #250's call), and `taxIdOrIc` on
+record types, because rows written before 2026-11-05 may still carry one.
+
 # Pet page: training icons (house, litter box, leash)
 
 **Branch:** `claude/pet-training-icons` · opened 2026-10-28, resumed 2026-10-30

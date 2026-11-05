@@ -298,7 +298,6 @@ export interface TranslationDictionary {
     donorNameLabel: string;
     donorEmailLabel: string;
     donorPhoneLabel: string;
-    donorIcLabel: string;
     donorNotesLabel: string;
     bankTransferTitle: string;
     bankName: string;
@@ -662,12 +661,11 @@ export const translations: Record<Language, TranslationDictionary> = {
       taxReliefNoticeDesc: "Provide your name and email so we can confirm your pledge.",
       dedicateLabel: "Dedicate or Sponsor a Specific Pet (Optional)",
       dedicatePlaceholder: "e.g. For Bella's surgery recovery / Milo's care",
-      donorNameLabel: "Donor Full Name *",
-      donorEmailLabel: "Email Address (to receive e-Receipt) *",
+      donorNameLabel: "Donor Full Name",
+      donorEmailLabel: "Email Address",
       donorPhoneLabel: "Phone Number (WhatsApp receipt updates)",
       // No baked-in "*": this field is required only when the donor asks for a
       // Section 44(6) receipt, so the marker is rendered from that state instead.
-      donorIcLabel: "Malaysian IC / Passport / SSM Company No.",
       donorNotesLabel: "Special Message / Donor Wishes (Optional)",
       bankTransferTitle: "Direct Bank Transfer (Maybank)",
       bankName: "Maybank Berhad",
@@ -1027,10 +1025,9 @@ export const translations: Record<Language, TranslationDictionary> = {
       taxReliefNoticeDesc: "Sila masukkan nama dan emel anda supaya kami boleh mengesahkan ikrar anda.",
       dedicateLabel: "Dedikasikan atau Taja Haiwan Tertentu (Pilihan)",
       dedicatePlaceholder: "cth. Untuk pemulihan pembedahan Bella / penjagaan Milo",
-      donorNameLabel: "Nama Penuh Penderma *",
-      donorEmailLabel: "Alamat E-mel (untuk penerimaan e-Resit) *",
+      donorNameLabel: "Nama Penuh Penderma",
+      donorEmailLabel: "Alamat E-mel",
       donorPhoneLabel: "Nombor Telefon (makluman WhatsApp)",
-      donorIcLabel: "No. Kad Pengenalan / Pasport / No. SSM Syarikat",
       donorNotesLabel: "Mesej Khas / Harapan Penderma (Pilihan)",
       bankTransferTitle: "Pindahan Bank Terus (Maybank)",
       bankName: "Maybank Berhad",

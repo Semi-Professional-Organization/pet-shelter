@@ -124,10 +124,10 @@ describe("a pledge reference is not a receipt number", () => {
     expect(ref.startsWith("HFS-DON")).toBe(false);
   });
 
-  it("tells the supporter the receipt follows reconciliation", () => {
+  it("tells the supporter the acknowledgement follows reconciliation", () => {
     const notice = reconciliationNotice("one_time", "duitnow_qr");
 
-    expect(notice).toMatch(/official receipt.*coordinator matches/i);
+    expect(notice).toMatch(/acknowledgement.*coordinator matches/i);
     expect(notice).not.toMatch(/Section 44\(6\)|tax-exempt/i);
     expect(reconciliationNotice("monthly", "duitnow_qr")).toMatch(/standing instruction/);
     expect(reconciliationNotice("one_time", "card")).toMatch(/not enabled/);
@@ -453,14 +453,8 @@ describe("reconciliation draws its receipt from the shared gapless series", () =
       pledgeRef: generatePledgeRef(),
     });
 
-    // Explicit test-double issuer identity: production identity remains a deployment
-    // verification concern, while this test proves the atomic ledger path.
     const outcome = await settleSponsorship(
       pledge.pledgeRef,
-      {
-        taxDeductibleRef: "TEST-TAX-REFERENCE",
-        shelterRegistrationNo: "TEST-REGISTRATION",
-      },
       "coordinator@example.com"
     );
     expect(outcome.status).toBe("reconciled");

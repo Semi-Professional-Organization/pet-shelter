@@ -73,7 +73,6 @@ export const petSponsorshipSchema = z.object({
    */
   displayOnWall: z.boolean().default(false),
 
-  taxIdOrIc: z.string().max(30, "Tax ID / IC / SSM number is too long").optional().or(z.literal("")),
   notes: z.string().max(500, "Note to the shelter must be under 500 characters").optional().or(z.literal("")),
 });
 

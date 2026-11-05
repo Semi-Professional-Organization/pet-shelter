@@ -112,7 +112,6 @@ describe("a malformed pledge reference fails as a TypeError on the Postgres path
 
     const attempt = settleDonationPledge(
       { not: "" } as unknown as string,
-      { taxDeductibleRef: "ref", shelterRegistrationNo: "reg" },
       "coordinator@example.test"
     );
 
@@ -131,7 +130,6 @@ describe("a malformed pledge reference fails as a TypeError on the Postgres path
     await expect(
       settleDonationPledge(
         { not: "" } as unknown as string,
-        { taxDeductibleRef: "ref", shelterRegistrationNo: "reg" },
         "coordinator@example.test"
       )
     ).rejects.toThrow(TypeError);

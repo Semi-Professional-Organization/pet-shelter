@@ -217,7 +217,8 @@ describe("listPendingSponsorshipsAction", () => {
     const { recordSponsorshipPledge } = await import("@/lib/server/sponsorshipLedger");
     const { listPendingSponsorshipsAction } = await import("@/actions/sponsorships");
 
-    await recordSponsorshipPledge(pledge({ taxIdOrIc: "920512-10-5432" }));
+    // A legacy pledge's NRIC, simulated: the draft type no longer accepts one (#239).
+    await recordSponsorshipPledge(Object.assign(pledge(), { taxIdOrIc: "920512-10-5432" }));
 
     currentRole.value = ROLES.VOLUNTEER_COORDINATOR;
     const result = await listPendingSponsorshipsAction();

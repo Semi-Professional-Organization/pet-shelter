@@ -181,63 +181,10 @@ describe("SponsorshipModal checkout contract", () => {
         sponsorName: "Aisyah Rahman",
         sponsorEmail: "aisyah@example.com",
         paymentMethod: "duitnow_qr",
-        taxIdOrIc: undefined,
       }),
     );
+    expect(mockedCreateSponsorship.mock.calls[0][0]).not.toHaveProperty("taxIdOrIc");
     expect(mockedSubmitDonation).not.toHaveBeenCalled();
-  });
-
-  it("drops a withdrawn tax identifier from a target-pet pledge", async () => {
-    const pet = makePet({ id: "pet-bella", name: "Bella" });
-    renderWithLanguage(
-      <SponsorshipModal open onOpenChange={vi.fn()} targetPet={pet} />,
-    );
-
-    const user = await fillRequiredDonorDetails();
-    const taxOptIn = screen.getByRole("checkbox", {
-      name: /tax-exemption receipt|Section 44\(6\)/i,
-    });
-    const taxIdentifier = screen.getByLabelText(
-      /NRIC|passport|SSM|Malaysian IC/i,
-    );
-
-    await user.click(taxOptIn);
-    await user.type(taxIdentifier, "920512-10-5432");
-    await user.click(taxOptIn);
-    await user.click(submissionButton());
-
-    await waitFor(() =>
-      expect(mockedCreateSponsorship).toHaveBeenCalledTimes(1),
-    );
-    expect(mockedCreateSponsorship).toHaveBeenCalledWith(
-      expect.objectContaining({ taxIdOrIc: undefined }),
-    );
-  });
-
-  it("sends a target-pet tax identifier after the supporter opts in", async () => {
-    const pet = makePet({ id: "pet-bella", name: "Bella" });
-    renderWithLanguage(
-      <SponsorshipModal open onOpenChange={vi.fn()} targetPet={pet} />,
-    );
-
-    const user = await fillRequiredDonorDetails();
-    await user.click(
-      screen.getByRole("checkbox", {
-        name: /tax-exemption receipt|Section 44\(6\)/i,
-      }),
-    );
-    await user.type(
-      screen.getByLabelText(/NRIC|passport|SSM|Malaysian IC/i),
-      "920512-10-5432",
-    );
-    await user.click(submissionButton());
-
-    await waitFor(() =>
-      expect(mockedCreateSponsorship).toHaveBeenCalledTimes(1),
-    );
-    expect(mockedCreateSponsorship).toHaveBeenCalledWith(
-      expect.objectContaining({ taxIdOrIc: "920512-10-5432" }),
-    );
   });
 
   it("clears a completed pledge and prior supporter PII after close and reopen", async () => {
@@ -253,15 +200,6 @@ describe("SponsorshipModal checkout contract", () => {
 
     const user = await fillRequiredDonorDetails();
     await user.type(screen.getByLabelText(/mobile phone/i), "012-345 6789");
-    await user.click(
-      screen.getByRole("checkbox", {
-        name: /tax-exemption receipt|Section 44\(6\)/i,
-      }),
-    );
-    await user.type(
-      screen.getByLabelText(/NRIC|passport|SSM|Malaysian IC/i),
-      "920512-10-5432",
-    );
     await user.type(
       screen.getByLabelText(/message of encouragement/i),
       "Private donor note",
@@ -288,9 +226,6 @@ describe("SponsorshipModal checkout contract", () => {
     expect(await screen.findByLabelText(/full name/i)).toHaveValue("");
     expect(screen.getByLabelText(/email address/i)).toHaveValue("");
     expect(screen.getByLabelText(/mobile phone/i)).toHaveValue("");
-    expect(
-      screen.getByLabelText(/NRIC|passport|SSM|Malaysian IC/i),
-    ).toHaveValue("");
     expect(screen.getByLabelText(/message of encouragement/i)).toHaveValue("");
     expect(screen.queryByText("HFS-PLG-20260914-ABCD")).not.toBeInTheDocument();
   });
@@ -350,10 +285,10 @@ describe("SponsorshipModal checkout contract", () => {
       expect.objectContaining({
         donorName: "Aisyah Rahman",
         donorEmail: "aisyah@example.com",
-        wantsTaxReceipt: false,
-        taxIdOrIc: undefined,
       }),
     );
+    expect(mockedSubmitDonation.mock.calls[0][0]).not.toHaveProperty("taxIdOrIc");
+    expect(mockedSubmitDonation.mock.calls[0][0]).not.toHaveProperty("wantsTaxReceipt");
     expect(mockedCreateSponsorship).not.toHaveBeenCalled();
     // The client receipt store holds receipts. A claim reference is not one, and
     // writing it there would rebuild the confusion this boundary removed. The modal
@@ -497,46 +432,19 @@ describe("SponsorshipModal checkout contract", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("sends the tax identifier only after the donor opts in", async () => {
-    renderWithLanguage(<SponsorshipModal open onOpenChange={vi.fn()} />);
-
-    const user = await fillRequiredDonorDetails();
-    const taxOptIn = screen.getByRole("checkbox", {
-      name: /tax-exemption receipt|Section 44\(6\)/i,
-    });
-    const taxIdentifier = screen.getByLabelText(
-      /NRIC|passport|SSM|Malaysian IC/i,
-    );
-
-    expect(taxOptIn).not.toBeChecked();
-    expect(taxIdentifier).toBeDisabled();
-
-    await user.click(taxOptIn);
-    await user.type(taxIdentifier, "920512-10-5432");
-    await user.click(submissionButton());
-
-    await waitFor(() => expect(mockedSubmitDonation).toHaveBeenCalledTimes(1));
-    expect(mockedSubmitDonation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        wantsTaxReceipt: true,
-        taxIdOrIc: "920512-10-5432",
-      }),
-    );
-  });
-
-  it("connects the tax opt-in to its consequential accessible description", () => {
-    const pet = makePet({ id: "pet-bella", name: "Bella" });
+  // The shelter is not a registered society and cannot issue a tax receipt (owner,
+  // 2026-11-05; #239), so neither checkout path offers relief or asks for an NRIC.
+  it.each([
+    ["a target pet", makePet({ id: "pet-bella", name: "Bella" })],
+    ["a general gift", undefined],
+  ])("offers no relief opt-in and no identifier field for %s", (_label, pet) => {
     renderWithLanguage(
       <SponsorshipModal open onOpenChange={vi.fn()} targetPet={pet} />,
     );
 
-    expect(
-      screen.getByRole("checkbox", {
-        name: /tax-exemption receipt|Section 44\(6\)/i,
-      }),
-    ).toHaveAccessibleDescription(
-      /requires your NRIC, passport or SSM number.*receipt is issued only after/i,
-    );
+    expect(screen.queryByRole("checkbox", { name: /tax/i })).toBeNull();
+    expect(screen.queryByLabelText(/NRIC|passport|SSM|Malaysian IC/i)).toBeNull();
+    expect(screen.queryByText(/Section 44\(6\)|tax-exemption/i)).toBeNull();
   });
 
   it("renders actionable instructions for only the selected general-donation rail", async () => {

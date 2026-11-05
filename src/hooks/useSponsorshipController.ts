@@ -60,8 +60,6 @@ export function useSponsorshipController({
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
-  const [wantsTaxReceipt, setWantsTaxReceipt] = useState(false);
-  const [taxIdOrIc, setTaxIdOrIc] = useState("");
   const [notes, setNotes] = useState("");
   const [copiedBank, setCopiedBank] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -114,13 +112,6 @@ export function useSponsorshipController({
       return;
     }
 
-    if (wantsTaxReceipt && !taxIdOrIc.trim()) {
-      setErrorMessage(
-        "Your NRIC, passport or SSM number is required for a tax-exemption receipt."
-      );
-      return;
-    }
-
     setIsProcessing(true);
 
     try {
@@ -136,7 +127,6 @@ export function useSponsorshipController({
           amountMYR: finalAmount,
           frequency,
           paymentMethod,
-          taxIdOrIc: wantsTaxReceipt ? taxIdOrIc.trim() || undefined : undefined,
           notes: notes.trim() || undefined,
         });
 
@@ -162,8 +152,6 @@ export function useSponsorshipController({
         tierName: isCustomTier ? "Custom Rescue Donation" : selectedTier.name,
         amountMYR: finalAmount,
         frequency,
-        wantsTaxReceipt,
-        taxIdOrIc: wantsTaxReceipt ? taxIdOrIc.trim() || undefined : undefined,
         notes: notes.trim() || undefined,
         paymentMethod,
       });
@@ -202,8 +190,6 @@ export function useSponsorshipController({
     setDonorName("");
     setDonorEmail("");
     setDonorPhone("");
-    setWantsTaxReceipt(false);
-    setTaxIdOrIc("");
     setNotes("");
     setErrorMessage(null);
   };
@@ -218,8 +204,6 @@ export function useSponsorshipController({
       donorName,
       donorEmail,
       donorPhone,
-      wantsTaxReceipt,
-      taxIdOrIc,
       notes,
       copiedBank,
       isProcessing,
@@ -238,8 +222,6 @@ export function useSponsorshipController({
       setDonorName,
       setDonorEmail,
       setDonorPhone,
-      setWantsTaxReceipt,
-      setTaxIdOrIc,
       setNotes,
       handleCopyMaybank,
       handleCompleteDonation,
