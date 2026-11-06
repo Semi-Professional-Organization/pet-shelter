@@ -237,7 +237,7 @@ describe("the donor says which rail they used", () => {
     renderWidget();
 
     expect(screen.queryByRole("button", { name: /copy bank account/i })).toBeNull();
-    expect(screen.getByText(/record your pledge first/i)).toBeInTheDocument();
+    expect(screen.getByText(/choose bank transfer as how you are paying/i)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
   });
 
@@ -263,6 +263,8 @@ describe("the donor says which rail they used", () => {
     expect(await screen.findByText("HFS-GFT-20261106-000003")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
     expect(screen.queryByText(/contact us on whatsapp/i)).toBeNull();
+    expect(screen.queryByText(/record your pledge first/i)).toBeNull();
+    expect(screen.queryByText(/direct bank transfer/i)).toBeNull();
   });
 
   it("keeps the WhatsApp route, with the reference, on a bank-transfer donor's pledge screen", async () => {

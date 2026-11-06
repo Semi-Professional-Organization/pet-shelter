@@ -22,7 +22,7 @@ The items below that remain are #249 (identity constants, society names, modal r
 and #252 (account holder name).
 
 **2026-11-05, second update (#249, #250).** The identity constants, both ROS numbers, the LHDN
-reference, the "Persatuan" and "Pertubuhan Kebajikan" names (except the bank account name), the
+reference, the "Persatuan" and "Pertubuhan Kebajikan" names (the bank account name followed in #281), the
 modal's ROS line, the certificate's registration row, the dead `receipt*` translation keys, the
 footer's "registered non-profit" line, the admin "LHDN" export and its tax columns, the queue's
 "Issue receipt" wording, the transparency stat and "filed with ROS" copy, the placeholder report

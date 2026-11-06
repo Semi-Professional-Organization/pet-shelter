@@ -25,12 +25,19 @@ export function BankTransferDetails({
   compact = false,
   className = "",
   reference,
+  besideOtherRails = false,
 }: {
   account?: ShelterBankAccount | null;
   compact?: boolean;
   className?: string;
   /** The pledge reference, once there is one, so the coordinator can match the chat to it. */
   reference?: string;
+  /**
+   * True while the panel shows beside other payment options and bank transfer is not the one
+   * selected (`/donate` before the donor picks it), so the pre-pledge note also says to choose
+   * bank transfer. The popup shows the panel only once bank transfer is chosen.
+   */
+  besideOtherRails?: boolean;
 }) {
   const { t, isMs } = useLanguage();
   const [copied, setCopied] = useState(false);
@@ -54,10 +61,15 @@ export function BankTransferDetails({
         */}
         {!reference ? (
           <p className="text-foreground leading-relaxed">
-            {t(
-              "donations.bankDetailsAfterPledge",
-              "Choose bank transfer as how you are paying and record your pledge first. You then get a reference to quote on WhatsApp for the account details."
-            )}
+            {besideOtherRails
+              ? t(
+                  "donations.bankDetailsChooseThenPledge",
+                  "Choose bank transfer as how you are paying and record your pledge first. You then get a reference to quote on WhatsApp for the account details."
+                )
+              : t(
+                  "donations.bankDetailsAfterPledge",
+                  "Record your pledge first. You then get a reference to quote on WhatsApp for the account details."
+                )}
           </p>
         ) : (
           <>

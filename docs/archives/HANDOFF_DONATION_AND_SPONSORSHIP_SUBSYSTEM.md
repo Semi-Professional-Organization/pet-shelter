@@ -19,7 +19,7 @@ The Hybrid Donation Subsystem unifies high-conversion public marketing and trans
 │ 1. Dedicated Marketing & Social Page │ 2. Contextual Quick-Action Modal     │
 │    URL: /donate                      │    Trigger: "Sponsor Care" on /pets  │
 │    - Financial impact visualizer     │    - Widened sm:max-w-3xl lg:max-w-4 │
-│    - DuitNow QR + Maybank rails      │    - Pre-filled with dedicated pet   │
+│    - DuitNow QR + bank rails (#252)  │    - Pre-filled with dedicated pet   │
 │    - Physical supplies wishlist      │    - Custom amount + instant voucher │
 │    - LHDN tax deduction FAQ         │    - Zero navigation displacement    │
 ├──────────────────────────────────────┴──────────────────────────────────────┤
@@ -42,7 +42,7 @@ The Hybrid Donation Subsystem unifies high-conversion public marketing and trans
 - **Embedded Giving Hub ([`DonationWidget.tsx`](file:///c:/Users/User/pet-shelter/src/components/DonationWidget.tsx))**:
   - One-time vs Monthly recurring partner toggle.
   - Interactive tier cards (RM 30 Kibble, RM 50 Vaccine, RM 120 Spay/Neuter, RM 250 Emergency Medical) + Custom Amount (RM 5+).
-  - Authentic DuitNow National QR Standard frame (PayNet Malaysia) + 1-click Maybank account copy.
+  - Authentic DuitNow National QR Standard frame (PayNet Malaysia) + 1-click Maybank account copy (the account was fake and is removed, #252).
   - Form capturing Donor Name, Email, Phone, optional NRIC/SSM Number, and encouragement notes.
   - Instant on-screen e-Receipt rendering with 1-click browser print.
 - **Financial Transparency Visualizer**: Breakdown of medical care (45%), nutrition (30%), sanctuary boarding (20%), and stray rescue operations (5%).

@@ -26,10 +26,14 @@ Record active multi-step work streams below.
   `faq-024` in the fixture, the translation keys, tests.
 - **Not in scope:** the real account and holder name (waiting on the shelter); the DuitNow FAQ
   (#238).
-- [x] Review round 1 (xhigh, 15 findings): fixed the pledge screen losing the WhatsApp route,
-  the modal hint, copy promise and digits-only copy, untranslated holder label, reference in the
-  WhatsApp text, Unicode dashes in the guard, stale runbook/README/ledger text. Declined items
-  are in `tasks/open/the-shelter-bank-account-is-not-confirmed.md`.
+- [x] Seven xhigh review rounds: 15, 12, 10, 10, 10, 7 and 8 findings. Round 7 found no bug in
+  shipped code, only tests and docs (fixed: anchored popup regex, the `/donate` choose-bank note
+  following the selection, the runbook's stale-pledge step, the fill-in test list). In-scope
+  fixes: the pledge screen losing the bank route; no WhatsApp request before a reference exists
+  (it now quotes the reference); `/donate` telling donors to choose bank transfer; the pet hint;
+  copy promise and digits-only copy; Unicode dashes in the guard; runbook coordinator steps;
+  stale README, archive and ledger text. Declined items are in
+  `tasks/open/the-shelter-bank-account-is-not-confirmed.md`.
 
 - [x] Code and tests; `typecheck`, `test`, `test:components`, `test:integration`, `docs:check`,
   `lint` (0 errors), `build` pass

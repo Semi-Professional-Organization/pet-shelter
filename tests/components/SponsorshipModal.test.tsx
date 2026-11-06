@@ -53,7 +53,7 @@ const QR_INSTRUCTIONS =
   "Scan with Maybank MAE, CIMB, TNG eWallet, Public Bank, etc.";
 // No account is confirmed yet (#252), so the bank rail's instructions are the WhatsApp fallback:
 // before the pledge, a note to record it first; after, the WhatsApp link with the reference.
-const BANK_BEFORE_PLEDGE = /record your pledge first/i;
+const BANK_BEFORE_PLEDGE = /^record your pledge first/i;
 const BANK_INSTRUCTIONS = "Contact us on WhatsApp for transfer details.";
 const MISLEADING_TRANSFER_FAILURE =
   "We could not record this transfer, so no receipt was issued. Nothing has been charged - please try again.";
@@ -500,8 +500,11 @@ describe("SponsorshipModal checkout contract", () => {
 
     const user = setupUser();
     await user.click(screen.getByRole("radio", { name: /bank transfer/i }));
-    // No bank panel at all before the reference exists, and the hint says when it will appear.
+    // No bank panel at all before the reference exists, in either account state, and the hint
+    // says when it will appear.
     expect(screen.queryByText(BANK_BEFORE_PLEDGE)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /copy bank account/i })).toBeNull();
+    expect(screen.queryByText(/account holder/i)).toBeNull();
     expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
     expect(
       screen.getByText("How to transfer appears once your pledge is recorded."),

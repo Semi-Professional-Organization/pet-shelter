@@ -622,7 +622,10 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           />
 
           {/* Bank transfer: the account, or WhatsApp until the shelter confirms one (#252) */}
-          <BankTransferDetails className="md:col-span-7" />
+          <BankTransferDetails
+            className="md:col-span-7"
+            besideOtherRails={paymentMethod !== "online_banking"}
+          />
         </div>
 
         {/*

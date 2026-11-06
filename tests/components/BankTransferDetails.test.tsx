@@ -13,10 +13,16 @@ describe("BankTransferDetails", () => {
   it("asks for the pledge first, with no WhatsApp link, number, holder or copy button, before a reference exists", () => {
     renderWithLanguage(<BankTransferDetails account={null} />);
 
-    expect(screen.getByText(/record your pledge first/i)).toBeInTheDocument();
+    expect(screen.getByText(/^record your pledge first/i)).toBeInTheDocument();
     expect(screen.queryByRole("link")).toBeNull();
     expect(screen.queryByRole("button", { name: /copy/i })).toBeNull();
     expect(screen.queryByText(/account holder/i)).toBeNull();
+  });
+
+  it("also says to choose bank transfer when it sits beside the other payment options", () => {
+    renderWithLanguage(<BankTransferDetails account={null} besideOtherRails />);
+
+    expect(screen.getByText(/^choose bank transfer as how you are paying/i)).toBeInTheDocument();
   });
 
   it("sends the donor to WhatsApp, with no number, holder or copy button, once a reference exists", () => {

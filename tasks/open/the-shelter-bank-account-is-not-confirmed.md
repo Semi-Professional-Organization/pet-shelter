@@ -18,9 +18,11 @@ Two things remain:
    needed for it; add the fixed wording there only if that entry brings it across.
 
 When filling it in, also: reword `faq-024` in `src/data/faqs.json`, the README donation line and
-the runbook's §6 "Bank account" paragraph, which all describe the WhatsApp fallback; update the component tests that assert the WhatsApp fallback
-(`SponsorshipModal.test.tsx` `BANK_INSTRUCTIONS`, `DonationReceiptIntegrity.test.tsx`) to the
-confirmed state, keep the target-pet "no account before the pledge reference" checks, and bring
+the runbook's §6 "Bank account" paragraph, which all describe the WhatsApp fallback; update every component test that asserts the WhatsApp fallback
+(`git grep -n "record your pledge first\|whatsapp" tests/components` finds them: the
+`BANK_BEFORE_PLEDGE`/`BANK_INSTRUCTIONS` and reference checks in `SponsorshipModal.test.tsx`,
+and `DonationReceiptIntegrity.test.tsx`) to the confirmed state, without dropping what each
+covers (no route before a reference exists, the reference in the request), keep the target-pet "no account before the pledge reference" checks, and bring
 back the `DonationReceiptIntegrity.test.tsx` test that copying the account does not change the
 donor's chosen payment method (deleted in #281 because there is no copy button to click).
 
