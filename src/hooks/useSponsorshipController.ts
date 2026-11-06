@@ -61,7 +61,6 @@ export function useSponsorshipController({
   const [donorEmail, setDonorEmail] = useState("");
   const [donorPhone, setDonorPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [copiedBank, setCopiedBank] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedCheckout, setCompletedCheckout] = useState<CheckoutOutcome | null>(null);
@@ -78,14 +77,6 @@ export function useSponsorshipController({
       ? parsedCustomAmount
       : 0
     : tierAmountFor(selectedTier, frequency);
-
-  const handleCopyMaybank = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText("514012345678");
-      setCopiedBank(true);
-      setTimeout(() => setCopiedBank(false), 2500);
-    }
-  };
 
   const handleSelectTier = (tier: SponsorshipTier) => {
     setIsCustomTier(false);
@@ -205,7 +196,6 @@ export function useSponsorshipController({
       donorEmail,
       donorPhone,
       notes,
-      copiedBank,
       isProcessing,
       errorMessage,
       completedCheckout,
@@ -223,7 +213,6 @@ export function useSponsorshipController({
       setDonorEmail,
       setDonorPhone,
       setNotes,
-      handleCopyMaybank,
       handleCompleteDonation,
       handleReset,
     },

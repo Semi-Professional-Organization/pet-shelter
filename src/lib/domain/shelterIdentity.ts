@@ -38,3 +38,29 @@ export const SHELTER_PHONE_TEL = `+${SHELTER_WHATSAPP_NUMBER}`;
 
 /** {@link SHELTER_PHONE_TEL} as people read it. */
 export const SHELTER_PHONE_DISPLAY = SHELTER_WHATSAPP_DISPLAY;
+
+/** A bank account donors can transfer to, exactly as the bank prints it. */
+export interface ShelterBankAccount {
+  /** The bank and branch, exactly as the bank's confirmation names them. */
+  bankName: string;
+  /** The account number with the bank's own spacing, e.g. "XXXX XXXX XXXX". Never a placeholder. */
+  accountNumber: string;
+  /** The account holder's name exactly as the bank has it, so a donor's app shows a match. */
+  accountHolder: string;
+}
+
+/**
+ * The account donors transfer to, or `null` while the shelter has not confirmed one.
+ *
+ * Until 2026-11-05 the donate widget, the sponsorship popup, the translations and an FAQ printed a
+ * made-up Maybank number and a society name as the holder. The owner confirmed that day that the
+ * account is fake and asked the shelter for the real one (#252). While this is
+ * `null`, every bank-transfer panel shows no number, no holder and no copy button. Before the
+ * pledge it asks the donor to record one; after, it links to WhatsApp ({@link SHELTER_WHATSAPP_URL})
+ * with the pledge reference in the message.
+ *
+ * When the shelter sends the real details, replace `null` with all three fields, copied from a
+ * bank statement or the bank's account confirmation, not retyped from a message.
+ * `tests/unit/shelterIdentity.test.ts` fails if the fake number reappears in `src/`.
+ */
+export const SHELTER_BANK_ACCOUNT: ShelterBankAccount | null = null;
