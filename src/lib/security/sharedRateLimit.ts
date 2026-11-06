@@ -49,12 +49,15 @@ export function rateLimitKeyDigest(key: string): string {
  * Upgrade path: a two-window weighted count if the 2x burst ever matters.
  *
  * ceiling: every check is one upsert, refused or not, so a flood costs one
- * write per request. Fine at this shelter's volume; a per-instance memory of
+ * write per request. Fine at this shelter's volume. Upgrade
+ * path: skip the write when the row is at its cap, and add a statement timeout
+ * (`tasks/open/the-shared-rate-limit-writes-on-every-attempt.md`); a per-instance memory of
  * refusals was tried and removed in review (it outlived the row it copied).
  *
  * ceiling: expired rows are swept by about one call in fifty, so the table holds
  * at most the keys touched in the last window plus the unswept tail. Measured by
  * nothing yet; at this shelter's registration volume it is a few rows.
+ * Upgrade path: a scheduled sweep if the table ever grows past a few thousand.
  *
  * ceiling: a production deploy with no `DATABASE_URL` takes the in-memory path,
  * and with it the per-process bound this replaces: a code guessed there stays

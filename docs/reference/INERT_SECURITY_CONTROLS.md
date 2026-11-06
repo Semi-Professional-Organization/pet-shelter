@@ -216,7 +216,7 @@ permitted to write it, on each deployment shape the repo actually ships.
 **Make the dangerous misreading impossible.** `checkAddressRateLimit` returns
 `{limited: false} | {limited: true, retryAfterSeconds}` rather than `RateLimitResult | null`
 (with `{ shared: true }` it may also answer `{limited: true, unavailable: true}`, an outage). With
-five call sites, a nullable return makes each one decide what `null` means, where reading it as
+seven call sites, a nullable return makes each one decide what `null` means, where reading it as
 *denied* locks everyone out and reading it as *allowed* is a silent no-op indistinguishable from a
 working limiter. Two mistakes, one character apart. Collapsing to `limited` makes the untrusted case
 read exactly as what it is: not limited, this time.

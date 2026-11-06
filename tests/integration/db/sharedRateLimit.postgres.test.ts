@@ -79,10 +79,12 @@ describe("checkSharedRateLimit against Postgres", () => {
 
   it("refuses from the row once the budget is spent, not from any local count", async () => {
     const k = key();
-    for (let i = 0; i < 3; i++) expect((await checkSharedRateLimit(k, 3, 60_000)).success).toBe(true);
-    const elsewhere = await checkSharedRateLimit(k, 3, 60_000);
-    expect(elsewhere).toMatchObject({ success: false, remaining: 0 });
-    expect(elsewhere).not.toHaveProperty("unavailable");
+    // Spent out-of-band, as another instance would: this process has counted nothing.
+    for (let i = 0; i < 3; i++) await spendRateLimitBucket(hashed(k), 60_000, 4);
+
+    const refused = await checkSharedRateLimit(k, 3, 60_000);
+    expect(refused).toMatchObject({ success: false, remaining: 0 });
+    expect(refused).not.toHaveProperty("unavailable");
   });
 
   it("stores the keyed digest, never the key it was given", async () => {
