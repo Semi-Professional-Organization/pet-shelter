@@ -156,14 +156,14 @@ Zod 4. The rule (Blueprint Tenet 3): **every value crossing into a Server Action
 
 |  |  |
 |---|---|
-| **Files** | `src/lib/security/{session,crypto,rbac,rateLimit,idempotency,secrets,adminSession}.ts` |
+| **Files** | `src/lib/security/{session,crypto,rbac,rateLimit,sharedRateLimit,idempotency,secrets,adminSession}.ts` |
 | **Owns** | Authentication, authorization, abuse control |
-| **May import** | L-B4 |
+| **May import** | L-B4, and L-B2 for `dal.ts` (user lookups) and `sharedRateLimit.ts` (`rateLimitBuckets.ts`, plus `scheduleAfterResponse` for its sweep) |
 
 - **Sessions** — not JWT. `sealSession` produces `base64url(payload).hmac` (`createHmac("sha256", …)`) signed with `SESSION_SECRET`, stored in the HTTP-only `hope_shelter_session` cookie, 24 h expiry.
 - **Passwords** — `crypto.scrypt`, 16-byte random salt, 64-byte derived key, compared with `timingSafeEqual`. *(The README says bcrypt. The code is scrypt — verified.)*
 - **RBAC** — `ADMIN | COORDINATOR | STAFF | VOLUNTEER`; `assertAuthorized(user, roles)` throws `UnauthorizedError` / `ForbiddenError`. `verifyAdminSession()` additionally accepts a legacy `admin_session` cookie matching `ADMIN_SECRET_KEY`.
-- **Rate limiting / idempotency** — in-memory `Map`, sliding window (login 5/min). Per-process only: does not survive a restart and does not scale horizontally. Externalize before any multi-instance deployment.
+- **Rate limiting / idempotency** — in-memory `Map`, sliding window (login 5/min). Per-process only: does not survive a restart and does not scale horizontally. Externalize before any multi-instance deployment. **Exception:** registration's two budgets use `checkSharedRateLimit` (`sharedRateLimit.ts`), a fixed window held in the `rate_limit_buckets` table through `src/lib/server/rateLimitBuckets.ts` (L-B2), which fails closed when the table cannot be read (#213).
 
 ⚠️ **Admin pages gate on the server; actions still gate themselves.** Every admin section's page calls `requireAdminSection(href)` (`src/lib/security/adminSectionGate.ts`) before rendering, which reads the same table (`src/lib/security/adminSections.ts`) as the nav in `src/app/admin/layout.tsx` and the `/admin` landing, so a new section needs a table entry and that call. `src/proxy.ts` answers `/admin/members` with a real HTTP 403 from the same table, on the cookie's role. The layout's client redirect is a convenience. None of these is the boundary: every admin Server Action must re-check authorization itself.
 
