@@ -51,7 +51,9 @@ const sponsorshipPledge = {
 
 const QR_INSTRUCTIONS =
   "Scan with Maybank MAE, CIMB, TNG eWallet, Public Bank, etc.";
-// No account is confirmed yet (#252), so the bank rail's instructions are the WhatsApp fallback.
+// No account is confirmed yet (#252), so the bank rail's instructions are the WhatsApp fallback:
+// before the pledge, a note to record it first; after, the WhatsApp link with the reference.
+const BANK_BEFORE_PLEDGE = /record your pledge first/i;
 const BANK_INSTRUCTIONS = "Contact us on WhatsApp for transfer details.";
 const MISLEADING_TRANSFER_FAILURE =
   "We could not record this transfer, so no receipt was issued. Nothing has been charged - please try again.";
@@ -267,6 +269,22 @@ describe("SponsorshipModal checkout contract", () => {
     ).toBeInTheDocument();
   });
 
+  it("quotes the gift reference in the WhatsApp request on a bank-transfer gift", async () => {
+    mockedSubmitDonation.mockResolvedValue({
+      success: true,
+      data: { ...donationPledge, paymentMethod: "online_banking" as const },
+    });
+    renderWithLanguage(<SponsorshipModal open onOpenChange={vi.fn()} />);
+
+    const user = await fillRequiredDonorDetails();
+    await user.click(screen.getByRole("radio", { name: /bank transfer/i }));
+    await user.click(submissionButton());
+
+    expect(await screen.findByText("HFS-GFT-20260914-004242")).toBeInTheDocument();
+    const whatsApp = screen.getByRole("link", { name: /whatsapp/i }).getAttribute("href") ?? "";
+    expect(decodeURIComponent(whatsApp)).toContain("pledge HFS-GFT-20260914-004242");
+  });
+
   it("keeps a checkout without a target pet on the donation pledge path", async () => {
     mockedSubmitDonation.mockResolvedValue({
       success: true,
@@ -456,13 +474,15 @@ describe("SponsorshipModal checkout contract", () => {
     renderWithLanguage(<SponsorshipModal open onOpenChange={vi.fn()} />);
 
     expect(screen.getByText(QR_INSTRUCTIONS)).toBeInTheDocument();
-    expect(screen.queryByText(BANK_INSTRUCTIONS)).not.toBeInTheDocument();
+    expect(screen.queryByText(BANK_BEFORE_PLEDGE)).not.toBeInTheDocument();
 
     const user = setupUser();
     await user.click(screen.getByRole("radio", { name: /bank transfer/i }));
 
     expect(screen.queryByText(QR_INSTRUCTIONS)).not.toBeInTheDocument();
-    expect(screen.getByText(BANK_INSTRUCTIONS)).toBeInTheDocument();
+    expect(screen.getByText(BANK_BEFORE_PLEDGE)).toBeInTheDocument();
+    // No WhatsApp request before there is a reference to quote in it.
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
   });
 
   it("withholds target-pet transfer instructions until the pledge reference exists", async () => {
@@ -480,7 +500,12 @@ describe("SponsorshipModal checkout contract", () => {
 
     const user = setupUser();
     await user.click(screen.getByRole("radio", { name: /bank transfer/i }));
-    expect(screen.queryByText(BANK_INSTRUCTIONS)).not.toBeInTheDocument();
+    // No bank panel at all before the reference exists, and the hint says when it will appear.
+    expect(screen.queryByText(BANK_BEFORE_PLEDGE)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
+    expect(
+      screen.getByText("How to transfer appears once your pledge is recorded."),
+    ).toBeInTheDocument();
 
     await user.type(screen.getByLabelText(/full name/i), "Aisyah Rahman");
     await user.type(
@@ -493,6 +518,9 @@ describe("SponsorshipModal checkout contract", () => {
     const bankAccount = screen.getByText(BANK_INSTRUCTIONS);
     expect(screen.queryByText(QR_INSTRUCTIONS)).not.toBeInTheDocument();
     expectBefore(pledgeRef, bankAccount);
+    // The WhatsApp request carries the reference, so the coordinator can match the chat to it.
+    const whatsApp = screen.getByRole("link", { name: /whatsapp/i }).getAttribute("href") ?? "";
+    expect(decodeURIComponent(whatsApp)).toContain("pledge HFS-PLG-20260914-ABCD");
   });
 
   it("records an explicit bank-transfer choice as online banking", async () => {

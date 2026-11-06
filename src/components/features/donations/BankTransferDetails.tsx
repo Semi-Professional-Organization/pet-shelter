@@ -16,19 +16,23 @@ import {
  * popup so there is one place that prints an account number.
  *
  * Until the shelter confirms an account ({@link SHELTER_BANK_ACCOUNT} is `null`, #252) it shows no
- * number, no holder and no copy button, only a WhatsApp link for the transfer details. `account`
+ * number, no holder and no copy button: before the pledge, a note to record it first; after, a
+ * WhatsApp link that quotes the pledge `reference`. `account`
  * is a prop only so tests can render the confirmed state; callers leave it out.
  */
 export function BankTransferDetails({
   account = SHELTER_BANK_ACCOUNT,
   compact = false,
   className = "",
+  reference,
 }: {
   account?: ShelterBankAccount | null;
   compact?: boolean;
   className?: string;
+  /** The pledge reference, once there is one, so the coordinator can match the chat to it. */
+  reference?: string;
 }) {
-  const { t } = useLanguage();
+  const { t, isMs } = useLanguage();
   const [copied, setCopied] = useState(false);
   // Whole class strings, so Tailwind's scanner sees both.
   const box = compact
@@ -42,39 +46,65 @@ export function BankTransferDetails({
           <MessageCircle className="size-3.5" />{" "}
           {t("donations.bankTransferTitle", "Direct Bank Transfer")}
         </div>
-        <p className="text-foreground leading-relaxed">
-          {t(
-            "donations.bankDetailsOnWhatsApp",
-            "Contact us on WhatsApp for transfer details."
-          )}
-        </p>
-        <a
-          href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
-            "Hi Hope for Strays, could you send me the bank transfer details for a donation?"
-          )}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-block font-semibold text-primary-ink hover:underline"
-        >
-          WhatsApp: {SHELTER_WHATSAPP_DISPLAY}
-        </a>
+        {/*
+          No link before the pledge is recorded: a WhatsApp request without an HFS- reference
+          gets an account the donor can pay with nothing to quote, which the coordinator then
+          cannot match. On /donate this panel sits beside the QR whatever is selected, so it
+          also says to pick bank transfer: the pledge screen only offers the link for that rail.
+        */}
+        {!reference ? (
+          <p className="text-foreground leading-relaxed">
+            {t(
+              "donations.bankDetailsAfterPledge",
+              "Choose bank transfer as how you are paying and record your pledge first. You then get a reference to quote on WhatsApp for the account details."
+            )}
+          </p>
+        ) : (
+          <>
+            <p className="text-foreground leading-relaxed">
+              {t(
+                "donations.bankDetailsOnWhatsApp",
+                "Contact us on WhatsApp for transfer details."
+              )}
+            </p>
+            <a
+              href={`${SHELTER_WHATSAPP_URL}?text=${encodeURIComponent(
+                whatsAppRequest(isMs, reference)
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block font-semibold text-primary-ink hover:underline"
+            >
+              WhatsApp: {SHELTER_WHATSAPP_DISPLAY}
+            </a>
+          </>
+        )}
       </div>
     );
   }
 
+  // ceiling: the reset timer is not cleared on unmount or a second click, and where
+  // navigator.clipboard is missing the button does nothing; hold the timer in a ref and hide the
+  // button without a clipboard if either shows up in use (tasks/open, #252).
   const handleCopy = () => {
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(account.accountNumber.replace(/\s/g, ""));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+    // Digits only: banking apps reject the spaces or dashes a statement prints. "Copied!" only
+    // once the write has landed, as AdoptionWizard does, so a refused write is not reported as done.
+    navigator.clipboard.writeText(account.accountNumber.replace(/\D/g, "")).then(
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      },
+      () => setCopied(false)
+    );
   };
 
   return (
     <div className={`space-y-3 text-xs ${className}`}>
       <div className={`${box} space-y-1`}>
         <div className="eyebrow flex items-center gap-1">
-          <Building2 className="size-3.5" /> Account Holder
+          <Building2 className="size-3.5" />{" "}
+          {t("donations.accountHolderLabel", "Account Holder")}
         </div>
         <div className="font-bold text-foreground text-sm">{account.accountHolder}</div>
       </div>
@@ -108,4 +138,11 @@ export function BankTransferDetails({
       </div>
     </div>
   );
+}
+
+/** The pre-filled WhatsApp message asking for the transfer details for a recorded pledge. */
+function whatsAppRequest(isMs: boolean, reference: string): string {
+  return isMs
+    ? `Hai Hope for Strays, boleh hantar butiran pindahan bank untuk ikrar ${reference}?`
+    : `Hi Hope for Strays, could you send me the bank transfer details for pledge ${reference}?`;
 }

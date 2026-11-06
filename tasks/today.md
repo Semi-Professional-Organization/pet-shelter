@@ -160,8 +160,8 @@ colour — styling gets redone later.
 - [ ] Confirm with the shelter before re-adding (dropped as unverified): event group size
       "8 to 25", "participation certificate", volunteer shift days/times, orientation needed?
 - [ ] Get-involved and impact pages have no Malay — add translations
-- [ ] Real bank details: the account number `5140 1234 5678` is a placeholder, and the account
-      holder name must match the real account
+- [ ] Real bank details: the account the site printed was fake (#252, hidden in #281); fill in
+      `SHELTER_BANK_ACCOUNT` when the shelter confirms the real number and holder name
 - [ ] Get adopter criteria from the shelter → section on `/adoption`
 - [ ] Hero: drop the dead CTA overrides
 - [x] `npm install` (deps were declared, not installed): component tests run again and the 4

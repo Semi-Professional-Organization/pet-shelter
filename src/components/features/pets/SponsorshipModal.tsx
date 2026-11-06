@@ -30,6 +30,7 @@ import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel
 import { BankTransferDetails } from "@/components/features/donations/BankTransferDetails";
 import { SHELTER_BANK_ACCOUNT } from "@/lib/domain/shelterIdentity";
 import { useDonationQrConfig } from "@/components/providers/DonationQrProvider";
+import { useLanguage } from "@/components/providers/LanguageProvider";
 
 export function SponsorshipModal(props: UseSponsorshipControllerProps) {
   const checkoutIdentity = props.targetPet?.id ?? "general";
@@ -49,10 +50,13 @@ function SelectedPaymentInstructions({
   paymentMethod,
   petCustomQrUrl,
   petName,
+  reference,
 }: {
   paymentMethod: "duitnow_qr" | "online_banking" | "card";
   petCustomQrUrl?: string | null;
   petName?: string;
+  /** The pledge reference, once there is one, so a WhatsApp request can quote it. */
+  reference?: string;
 }) {
   const qrConfig = useDonationQrConfig();
 
@@ -78,7 +82,7 @@ function SelectedPaymentInstructions({
   }
 
   if (paymentMethod === "online_banking") {
-    return <BankTransferDetails compact />;
+    return <BankTransferDetails compact reference={reference} />;
   }
 
   return (
@@ -91,6 +95,7 @@ function SelectedPaymentInstructions({
 function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
   const { open, onOpenChange, targetPet } = props;
   const { state, handlers } = useSponsorshipController(props);
+  const { t } = useLanguage();
   const {
     selectedTier,
     isCustomTier,
@@ -372,9 +377,14 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                       />
                       <span>
                         <strong className="block text-foreground">Bank Transfer</strong>
-                        {SHELTER_BANK_ACCOUNT
-                          ? "Transfer directly to the bank account below."
-                          : "We send the account details on WhatsApp."}
+                        {/*
+                          Transfer details wait for the pledge reference whenever the account
+                          is not printed up front: always for a pet sponsorship, and for a
+                          general gift while no account is confirmed (#252).
+                        */}
+                        {SHELTER_BANK_ACCOUNT && !targetPet
+                          ? t("donations.bankHintAccountShown", "Transfer to the bank account shown.")
+                          : t("donations.bankHintAfterPledge", "How to transfer appears once your pledge is recorded.")}
                       </span>
                     </label>
                   </div>
@@ -527,6 +537,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                 paymentMethod={completedPledge.paymentMethod}
                 petCustomQrUrl={targetPet?.customQrUrl}
                 petName={completedPledge.petName}
+                reference={completedPledge.pledgeRef}
               />
 
               <p className="text-xs text-muted-foreground">
@@ -590,6 +601,7 @@ function SponsorshipModalCheckout(props: UseSponsorshipControllerProps) {
                 paymentMethod={completedGift.paymentMethod}
                 petCustomQrUrl={targetPet?.customQrUrl}
                 petName={completedGift.targetPetName}
+                reference={completedGift.pledgeRef}
               />
 
               <p className="text-xs text-muted-foreground">

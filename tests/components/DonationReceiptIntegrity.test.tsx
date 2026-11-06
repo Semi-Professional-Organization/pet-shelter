@@ -237,7 +237,62 @@ describe("the donor says which rail they used", () => {
     renderWidget();
 
     expect(screen.queryByRole("button", { name: /copy bank account/i })).toBeNull();
-    expect(screen.getByText(/contact us on whatsapp for transfer details/i)).toBeInTheDocument();
+    expect(screen.getByText(/record your pledge first/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
+  });
+
+  it("shows no bank-transfer panel on a DuitNow QR donor's pledge screen", async () => {
+    mockedSubmit.mockResolvedValue({
+      success: true,
+      data: {
+        pledgeRef: "HFS-GFT-20261106-000003",
+        donorName: "Aisyah Rahman",
+        donorEmail: "aisyah@example.com",
+        tierId: "vaccine",
+        tierName: "Core Vaccination & Deworming",
+        amountMYR: 50,
+        frequency: "one_time",
+        paymentMethod: "duitnow_qr",
+        status: "PENDING_PAYMENT",
+        reconciliationNotice: "We email you once our coordinator matches your transfer.",
+      },
+    });
+    renderWidget();
+    await submitAGift();
+
+    expect(await screen.findByText("HFS-GFT-20261106-000003")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).toBeNull();
+    expect(screen.queryByText(/contact us on whatsapp/i)).toBeNull();
+  });
+
+  it("keeps the WhatsApp route, with the reference, on a bank-transfer donor's pledge screen", async () => {
+    // The pledge screen replaces the form and asks the donor to quote the reference in their
+    // transfer. Until #252's review it dropped the bank panel, so a donor who submitted first
+    // was left with no account and no way to ask for one.
+    mockedSubmit.mockResolvedValue({
+      success: true,
+      data: {
+        pledgeRef: "HFS-GFT-20261106-000252",
+        donorName: "Aisyah Rahman",
+        donorEmail: "aisyah@example.com",
+        tierId: "vaccine",
+        tierName: "Core Vaccination & Deworming",
+        amountMYR: 50,
+        frequency: "one_time",
+        paymentMethod: "online_banking",
+        status: "PENDING_PAYMENT",
+        reconciliationNotice: "We email you once our coordinator matches your transfer.",
+      },
+    });
+    renderWidget();
+    await setupUser().click(screen.getByRole("radio", { name: /direct bank transfer/i }));
+    await submitAGift();
+
+    expect(await screen.findByText("HFS-GFT-20261106-000252")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /whatsapp/i });
+    expect(decodeURIComponent(link.getAttribute("href") ?? "")).toContain(
+      "HFS-GFT-20261106-000252",
+    );
   });
 
   it("offers the choice as one native radio group", () => {

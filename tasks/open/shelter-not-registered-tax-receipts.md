@@ -31,8 +31,9 @@ PDFs and the donations runbook are gone or rewritten. P2 is closed.
 "44(6)" reappears in `src/`. What is still open:
 
 - **#251:** the stored `taxIdOrIc`, `taxDeductibleRef` and `shelterRegistrationNo` columns.
-- **#252:** `donations.accountHolder` ("Pertubuhan Kebajikan Hope for Strays"), the one
-  exception the guard allows, until the owner confirms the account's real name.
+- **#252:** the bank account. The site's account was fake; PR #281 removes it, the holder-name
+  exception in the guard and the `donations.accountHolder` key. The real account is
+  `tasks/open/the-shelter-bank-account-is-not-confirmed.md`.
 - **Production data, by hand:** if the sample transparency ledger was ever seeded into
   production, its `tax_receipts_issued` impact stat and "filed with ROS" report summaries are
   still in the database; the baseline file no longer carries them. Production faq-005:
@@ -63,8 +64,7 @@ metadata). Still claiming, all part of the receipt feature or a banking fact, le
   Section 44(6) receipt is emailed" line;
 - `SponsorshipModal.tsx`: the "Pertubuhan Kebajikan" name and `STATUTORY_ROS_REGISTRATION_NO` in
   its receipt block; `donations.receiptSubtitle`; the admin "Export Receipts CSV (LHDN)" label;
-- `donations.accountHolder` ("Pertubuhan Kebajikan Hope for Strays") — the bank account's name,
-  a banking fact to confirm with the shelter, not copy to reword;
+- the bank account and its holder name (removed in #281, see #252);
 - `src/data/transparency.json`'s sample "LHDN tax-deductible receipts issued" stat;
 - production faq-005: `tasks/open/production-faqs-need-the-edits-the-fixture-made.md`.
 

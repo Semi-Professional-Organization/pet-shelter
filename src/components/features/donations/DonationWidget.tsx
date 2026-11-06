@@ -326,6 +326,16 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
             </span>
           </div>
 
+          {/*
+            The form, and with it the bank panel, is gone once the pledge is recorded,
+            and the donor is told to quote the reference in a transfer. Without this
+            a bank-transfer donor who submits first has nowhere left to get the
+            account (or, until it is confirmed, the WhatsApp link) from (#252).
+          */}
+          {completedPledge.paymentMethod === "online_banking" && (
+            <BankTransferDetails reference={completedPledge.pledgeRef} />
+          )}
+
           <div className="tone-soft tone-warning rounded-xl border p-4 text-xs leading-relaxed">
             <strong>{isMs ? "Apa yang berlaku seterusnya" : "What happens next"}</strong>
             <br />
@@ -637,8 +647,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                   "online_banking",
                   isMs ? "Pindahan Bank Terus" : "Direct Bank Transfer",
                   SHELTER_BANK_ACCOUNT
-                    ? isMs ? "Pindahkan terus ke akaun bank di atas." : "Transfer to the bank account above."
-                    : isMs ? "Dapatkan butiran akaun melalui WhatsApp di atas." : "Get the account details on WhatsApp above.",
+                    ? t("donations.bankHintAccountShown", "Transfer to the bank account shown.")
+                    : t("donations.bankHintAfterPledge", "How to transfer appears once your pledge is recorded."),
                 ],
               ] as const
             ).map(([value, label, hint]) => (
