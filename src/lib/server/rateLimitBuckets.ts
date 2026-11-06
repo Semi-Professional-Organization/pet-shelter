@@ -44,15 +44,13 @@ export async function spendRateLimitBucket(
         AS "retryAfterSeconds"`;
 
   const row = rows[0];
-  // typeof, not Number(): Number(null) is 0, which would admit with a full budget.
-  const count = typeof row?.count === "number" ? row.count : NaN;
-  const retryAfterSeconds = typeof row?.retryAfterSeconds === "number" ? row.retryAfterSeconds : NaN;
-  // A thrown error is what makes the caller fail closed. `NaN > limit` is false,
-  // so a row without a usable count must never reach it as a number.
-  if (!Number.isInteger(count) || !Number.isInteger(retryAfterSeconds)) {
+  // A thrown error is what makes the caller fail closed: a missing or
+  // non-integer count must never reach `count > limit` (`NaN > limit` is false).
+  // `Number.isInteger` does not coerce, so null and strings are rejected too.
+  if (!row || !Number.isInteger(row.count) || !Number.isInteger(row.retryAfterSeconds)) {
     throw new Error("rate_limit_buckets upsert returned no usable row");
   }
-  return { count, retryAfterSeconds };
+  return { count: row.count, retryAfterSeconds: row.retryAfterSeconds };
 }
 
 /** Deletes every bucket whose window has ended. */

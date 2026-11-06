@@ -249,9 +249,10 @@ export async function registerAction(data: {
   //
   // Both budgets are held in Postgres (`checkSharedRateLimit`), so every
   // serverless instance spends the same one: a caller spread across warm
-  // instances no longer draws a fresh budget from each (#213). If that budget
-  // cannot be read, registration is refused, never waved through on a
-  // per-process count.
+  // instances no longer draws a fresh budget from each (#213). With a
+  // DATABASE_URL, a budget that cannot be read refuses registration, never
+  // waves it through on a per-process count. Without one (development, unit
+  // tiers) both budgets are per-process, as before.
   //
   // ceiling: a botnet with many addresses still gets one address budget per
   // address. Nothing keyed on the caller can bound that; only the invite code's

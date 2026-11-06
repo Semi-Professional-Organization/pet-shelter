@@ -77,7 +77,7 @@ describe("checkSharedRateLimit against Postgres", () => {
     expect(await prisma.rateLimitBucket.findUnique({ where: { key: hashed(live) } })).not.toBeNull();
   });
 
-  it("refuses a second instance once the first has spent the budget", async () => {
+  it("refuses from the row once the budget is spent, not from any local count", async () => {
     const k = key();
     for (let i = 0; i < 3; i++) expect((await checkSharedRateLimit(k, 3, 60_000)).success).toBe(true);
     const elsewhere = await checkSharedRateLimit(k, 3, 60_000);

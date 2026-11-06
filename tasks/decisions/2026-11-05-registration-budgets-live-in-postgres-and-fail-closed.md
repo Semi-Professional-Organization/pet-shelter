@@ -10,7 +10,7 @@ refuse registration when that table cannot be read.
   outage and a second bill for a few rows a minute.
 - **A new async function, not a changed `checkRateLimit`.** `checkRateLimit` is synchronous and has
   sixteen callers. A database call cannot be synchronous, so `checkSharedRateLimit`
-  (`src/lib/security/sharedRateLimit.ts`) takes the same arguments and returns the same shape,
+  (`src/lib/security/sharedRateLimit.ts`) takes the same arguments and the same success shape (plus an outage member),
   and only registration moves to it. `checkAddressRateLimit` takes `{ shared: true }`. The other
   budgets stay per-process until someone needs them shared (#263, volunteer applications, is
   expected to be the next).
