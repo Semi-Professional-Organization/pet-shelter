@@ -375,10 +375,13 @@ export function getAdminSecretKey(): string {
  * (`assertSecretsConfigured`).
  *
  * ceiling: no lower bound on a configured code, so even one character boots.
- * The rate limit does not make up for it: `checkRateLimit` is a per-process Map,
- * so each warm serverless instance counts separately, and a botnet is bounded by
- * neither the per-address nor the per-email budget (see the ceiling in
- * `registerAction`). Upgrade path: move the limiter to shared state.
+ * The rate limit does not make up for it. Its budgets are shared across server
+ * instances (`checkSharedRateLimit`), so where a trusted address header exists
+ * a caller gets about 10 guesses a minute per address (up to 20 across one
+ * fixed-window boundary). A botnet, or one host rotating IPv6 addresses, gets
+ * that per address it holds, and with no trusted header (see
+ * `getClientAddress()`) only the per-email budget runs, which the caller
+ * escapes by varying the email. Only the code's length bounds those.
  */
 export function getStaffInviteSecret(): string {
   return resolveSecret("STAFF_INVITE_SECRET", {

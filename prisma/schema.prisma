@@ -398,6 +398,26 @@ model ReceiptSequence {
   @@map("receipt_sequences")
 }
 
+/// One shared rate-limit budget: how many hits a key has spent in its current
+/// fixed window, and when that window ends.
+///
+/// Shared by every server instance, which the per-process `Map` in
+/// `src/lib/security/rateLimit.ts` is not. Read and written only through raw SQL
+/// in `src/lib/server/rateLimitBuckets.ts`: one atomic upsert per hit, and a
+/// sweep that deletes rows whose window has ended. `key` is an HMAC-SHA256 of
+/// the budget name under `SESSION_SECRET` (`rateLimitKeyDigest`), so no email or
+/// address is stored here, and rotating that secret resets every budget.
+///
+/// Applied in production by hand: `prisma/migrations/manual/20261105_rate_limit_buckets`.
+model RateLimitBucket {
+  key       String   @id
+  count     Int
+  expiresAt DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("rate_limit_buckets")
+}
+
 /// A numbered acknowledgement that a gift arrived. Not a tax receipt: the shelter
 /// is not a registered society (owner, 2026-11-05; #239).
 ///

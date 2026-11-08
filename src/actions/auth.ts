@@ -2,6 +2,7 @@
 
 import { checkRateLimit } from "@/lib/security/rateLimit";
 import { checkAddressRateLimit } from "@/lib/security/clientAddress";
+import { checkSharedRateLimit } from "@/lib/security/sharedRateLimit";
 import { hashPassword, verifyPassword, timingSafeCompare } from "@/lib/security/crypto";
 import {
   setSessionCookie,
@@ -162,6 +163,23 @@ export async function loginAction(credentials: {
 }
 
 /**
+ * What a refused registration budget tells the caller. An unreadable budget is
+ * an outage, not the caller's fault, so it says so instead of "too many".
+ */
+function registrationRefusal(limit: { retryAfterSeconds: number } | { unavailable: true }): AuthResponse {
+  // No `retryAfterSeconds` for an outage: the login page turns it into a
+  // countdown that also disables sign-in, which does not depend on this table.
+  if ("unavailable" in limit) {
+    return { success: false, error: "Registration is temporarily unavailable. Please try again in a few minutes." };
+  }
+  return {
+    success: false,
+    error: `Too many registration attempts. Please wait ${limit.retryAfterSeconds} seconds before trying again.`,
+    retryAfterSeconds: limit.retryAfterSeconds,
+  };
+}
+
+/**
  * Registers a new staff or volunteer account with scrypt password hashing.
  */
 export async function registerAction(data: {
@@ -229,32 +247,30 @@ export async function registerAction(data: {
   // fresh bucket, and a distributed caller now gets one per (ip, email) pair.
   // Widening a key never narrows what it limits.
   //
-  // ceiling: `checkRateLimit` is a per-process Map, so on a serverless host
-  // each warm instance counts separately and a botnet is not bounded by either
-  // budget. Bounding those needs shared state (Redis, or Postgres) — out of
-  // scope here, and not a reason to leave the single-host case open.
+  // Both budgets are held in Postgres (`checkSharedRateLimit`), so every
+  // serverless instance spends the same one: a caller spread across warm
+  // instances no longer draws a fresh budget from each (#213). With a
+  // DATABASE_URL, a budget that cannot be read refuses registration, never
+  // waves it through on a per-process count. Without one (development, unit
+  // tiers) both budgets are per-process, as before.
+  //
+  // ceiling: a botnet with many addresses still gets one address budget per
+  // address. Nothing keyed on the caller can bound that; only the invite code's
+  // length can (`getStaffInviteSecret`).
+  //
+  // ceiling: the email budget is now global too, so anyone who knows an invited
+  // person's email can keep that email refused by spending 5 tries a minute on
+  // it. Recorded in `tasks/open/a-shared-email-budget-can-lock-out-one-invitee.md`.
   //
   // ceiling: the address budget runs only where `getClientAddress()` can return
   // an address it is allowed to believe. Where it cannot, the per-email budget
   // is the only one left and the invite code is enumerable again by varying the
   // address — see that function for why a guessed address is worse than none.
-  const addressLimit = await checkAddressRateLimit("register", 10, 60000);
-  if (addressLimit.limited) {
-    return {
-      success: false,
-      error: `Too many registration attempts. Please wait ${addressLimit.retryAfterSeconds} seconds before trying again.`,
-      retryAfterSeconds: addressLimit.retryAfterSeconds,
-    };
-  }
+  const addressLimit = await checkAddressRateLimit("register", 10, 60000, { shared: true });
+  if (addressLimit.limited) return registrationRefusal(addressLimit);
 
-  const rateLimit = checkRateLimit(`register:email:${email || "anon"}`, 5, 60000);
-  if (!rateLimit.success) {
-    return {
-      success: false,
-      error: `Too many registration attempts. Please wait ${rateLimit.retryAfterSeconds} seconds before trying again.`,
-      retryAfterSeconds: rateLimit.retryAfterSeconds,
-    };
-  }
+  const rateLimit = await checkSharedRateLimit(`register:email:${email}`, 5, 60000);
+  if (!rateLimit.success) return registrationRefusal(rateLimit);
 
   // 2. Invite Guard — required for EVERY role.
   // A shelter has no anonymous-staff use case, and the default STAFF role is

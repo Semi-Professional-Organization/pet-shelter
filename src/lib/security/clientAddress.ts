@@ -1,6 +1,7 @@
 import { isIP } from "node:net";
 import { headers } from "next/headers";
 import { checkRateLimit } from "./rateLimit";
+import { checkSharedRateLimit, type SharedRateLimitResult } from "./sharedRateLimit";
 
 /**
  * Rate limiting by caller address, for the auth endpoints that cannot be
@@ -74,6 +75,8 @@ export async function getClientAddress(): Promise<string | null> {
   }
 }
 
+type AddressLimit = { limited: false } | { limited: true; retryAfterSeconds: number };
+
 /**
  * Whether this caller's address has exhausted `limit` attempts of `name`.
  *
@@ -89,18 +92,41 @@ export async function getClientAddress(): Promise<string | null> {
  * an untrustworthy address cannot bound anything — but a self-hosted deployment
  * has to set `TRUSTED_PROXY_HEADER` to get this protection at all.
  *
- * ceiling: `checkRateLimit` is a per-process Map, so on a serverless host each
- * warm instance counts separately and a distributed caller is not bounded.
- * Bounding that needs shared state (Redis, or Postgres).
+ * `shared: true` spends the budget in Postgres (`checkSharedRateLimit`), so every
+ * server instance counts it together, and refuses with `unavailable` when that
+ * budget cannot be read. Registration uses it.
+ *
+ * ceiling: without `shared`, `checkRateLimit` is a per-process Map, so on a
+ * serverless host each warm instance counts separately and a distributed caller
+ * is not bounded. Only registration has moved so far (#213).
  */
 export async function checkAddressRateLimit(
   name: string,
   limit: number,
-  windowMs: number
-): Promise<{ limited: false } | { limited: true; retryAfterSeconds: number }> {
+  windowMs: number,
+  options?: { shared?: false }
+): Promise<AddressLimit>;
+export async function checkAddressRateLimit(
+  name: string,
+  limit: number,
+  windowMs: number,
+  options: { shared: true }
+): Promise<AddressLimit | { limited: true; unavailable: true }>;
+export async function checkAddressRateLimit(
+  name: string,
+  limit: number,
+  windowMs: number,
+  options: { shared?: boolean } = {}
+): Promise<AddressLimit | { limited: true; unavailable: true }> {
   const address = await getClientAddress();
   if (!address) return { limited: false };
 
-  const result = checkRateLimit(`${name}:ip:${address}`, limit, windowMs);
-  return result.success ? { limited: false } : { limited: true, retryAfterSeconds: result.retryAfterSeconds };
+  const key = `${name}:ip:${address}`;
+  const result: SharedRateLimitResult = options.shared
+    ? await checkSharedRateLimit(key, limit, windowMs)
+    : checkRateLimit(key, limit, windowMs);
+  if (result.success) return { limited: false };
+  return "unavailable" in result
+    ? { limited: true, unavailable: true }
+    : { limited: true, retryAfterSeconds: result.retryAfterSeconds };
 }

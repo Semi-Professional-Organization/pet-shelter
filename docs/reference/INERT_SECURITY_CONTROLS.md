@@ -214,8 +214,9 @@ private ranges, and names that merely *resemble* one. For anything reading a req
 permitted to write it, on each deployment shape the repo actually ships.
 
 **Make the dangerous misreading impossible.** `checkAddressRateLimit` returns
-`{limited: false} | {limited: true, retryAfterSeconds}` rather than `RateLimitResult | null`. With
-five call sites, a nullable return makes each one decide what `null` means, where reading it as
+`{limited: false} | {limited: true, retryAfterSeconds}` rather than `RateLimitResult | null`
+(with `{ shared: true }` it may also answer `{limited: true, unavailable: true}`, an outage). With
+seven call sites, a nullable return makes each one decide what `null` means, where reading it as
 *denied* locks everyone out and reading it as *allowed* is a silent no-op indistinguishable from a
 working limiter. Two mistakes, one character apart. Collapsing to `limited` makes the untrusted case
 read exactly as what it is: not limited, this time.
@@ -234,7 +235,9 @@ instead of the code, on the only gate in front of applicant PII. And the first f
   `tasks/decisions/2026-09-16-neon-verifies-under-strict-tls.md`. Local connections only — what the
   Vercel deployment connects to is still unobserved.
 - **`checkRateLimit` is a per-process `Map`.** On a serverless host each warm instance counts
-  separately, so no budget here bounds a distributed caller. That needs shared state.
+  separately, so those budgets do not bound a distributed caller. Registration's two budgets moved
+  to shared state on 2026-11-05 (`checkSharedRateLimit`, #213) and fail closed when `DATABASE_URL`
+  is set; with none they fall back to the per-process `Map`. The other budgets have not moved.
 - **Address budgets require configuration.** With neither `TRUSTED_PROXY_HEADER` nor Vercel's edge,
   none of the five run, and each endpoint's per-email budget is all that remains. Deliberate, pinned
   by tests, and a real operational requirement for self-hosted deployments.
