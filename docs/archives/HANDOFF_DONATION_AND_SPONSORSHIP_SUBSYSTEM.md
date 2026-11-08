@@ -19,7 +19,7 @@ The Hybrid Donation Subsystem unifies high-conversion public marketing and trans
 │ 1. Dedicated Marketing & Social Page │ 2. Contextual Quick-Action Modal     │
 │    URL: /donate                      │    Trigger: "Sponsor Care" on /pets  │
 │    - Financial impact visualizer     │    - Widened sm:max-w-3xl lg:max-w-4 │
-│    - DuitNow QR + Maybank rails      │    - Pre-filled with dedicated pet   │
+│    - DuitNow QR + bank rails (#252)  │    - Pre-filled with dedicated pet   │
 │    - Physical supplies wishlist      │    - Custom amount + instant voucher │
 │    - LHDN tax deduction FAQ         │    - Zero navigation displacement    │
 ├──────────────────────────────────────┴──────────────────────────────────────┤
@@ -42,7 +42,7 @@ The Hybrid Donation Subsystem unifies high-conversion public marketing and trans
 - **Embedded Giving Hub ([`DonationWidget.tsx`](file:///c:/Users/User/pet-shelter/src/components/DonationWidget.tsx))**:
   - One-time vs Monthly recurring partner toggle.
   - Interactive tier cards (RM 30 Kibble, RM 50 Vaccine, RM 120 Spay/Neuter, RM 250 Emergency Medical) + Custom Amount (RM 5+).
-  - Authentic DuitNow National QR Standard frame (PayNet Malaysia) + 1-click Maybank account copy.
+  - Authentic DuitNow National QR Standard frame (PayNet Malaysia) + 1-click Maybank account copy (the account was fake and is removed, #252).
   - Form capturing Donor Name, Email, Phone, optional NRIC/SSM Number, and encouragement notes.
   - Instant on-screen e-Receipt rendering with 1-click browser print.
 - **Financial Transparency Visualizer**: Breakdown of medical care (45%), nutrition (30%), sanctuary boarding (20%), and stray rescue operations (5%).
@@ -81,15 +81,19 @@ The Hybrid Donation Subsystem unifies high-conversion public marketing and trans
 
 ## 3. Malaysian Regulatory & Fiscal Details
 
+> **Not real (2026-11-05).** The shelter is not a registered society (#239) and the bank account
+> was fake (#252). Do not use any value below; the live account is `SHELTER_BANK_ACCOUNT` in
+> `src/lib/domain/shelterIdentity.ts`.
+
 | Attribute | Specification |
 | :--- | :--- |
 | **Organization Name** | Pertubuhan Kebajikan Hope for Strays Selangor |
 | **ROS Registration** | `PPM-021-10-18082021` |
 | **LHDN Tax Exemption Ref** | `LHDN.01/35/42/51/179-6.4912` |
 | **Legal Basis** | Subsection 44(6), Income Tax Act 1967 (Malaysia) |
-| **Primary Bank** | Malayan Banking Berhad (Maybank) |
-| **Account Number** | `5140 1234 5678` |
-| **Account Name** | Pertubuhan Kebajikan Hope for Strays |
+| **Primary Bank** | Not confirmed (the bank shown here was fake, #252) |
+| **Account Number** | Not confirmed (the number shown here was fake, #252) |
+| **Account Name** | Not confirmed (#252) |
 | **National QR Standard** | DuitNow QR (PayNet Malaysia) |
 | **Physical Sanctuary** | No. 18, Jalan SS 2/72, 47300 Petaling Jaya, Selangor |
 

@@ -300,9 +300,12 @@ export interface TranslationDictionary {
     donorPhoneLabel: string;
     donorNotesLabel: string;
     bankTransferTitle: string;
-    bankName: string;
-    accountNumber: string;
-    accountHolder: string;
+    bankDetailsOnWhatsApp: string;
+    bankDetailsAfterPledge: string;
+    bankDetailsChooseThenPledge: string;
+    bankHintAfterPledge: string;
+    bankHintAccountShown: string;
+    accountHolderLabel: string;
     copyAccountBtn: string;
     copiedBtn: string;
     duitNowScanTitle: string;
@@ -662,10 +665,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       donorEmailLabel: "Email Address",
       donorPhoneLabel: "Phone Number (WhatsApp updates)",
       donorNotesLabel: "Special Message / Donor Wishes (Optional)",
-      bankTransferTitle: "Direct Bank Transfer (Maybank)",
-      bankName: "Maybank Berhad",
-      accountNumber: "5140 1234 5678",
-      accountHolder: "Pertubuhan Kebajikan Hope for Strays",
+      bankTransferTitle: "Direct Bank Transfer",
+      bankDetailsOnWhatsApp: "Contact us on WhatsApp for transfer details.",
+      bankDetailsAfterPledge: "Record your pledge first. You then get a reference to quote on WhatsApp for the account details.",
+      bankDetailsChooseThenPledge: "Choose bank transfer as how you are paying and record your pledge first. You then get a reference to quote on WhatsApp for the account details.",
+      bankHintAfterPledge: "How to transfer appears once your pledge is recorded.",
+      bankHintAccountShown: "Transfer to the bank account shown.",
+      accountHolderLabel: "Account Holder",
       copyAccountBtn: "Copy Bank Account",
       copiedBtn: "Copied!",
       duitNowScanTitle: "DuitNow National QR Pay",
@@ -1021,10 +1027,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       donorEmailLabel: "Alamat E-mel",
       donorPhoneLabel: "Nombor Telefon (makluman WhatsApp)",
       donorNotesLabel: "Mesej Khas / Harapan Penderma (Pilihan)",
-      bankTransferTitle: "Pindahan Bank Terus (Maybank)",
-      bankName: "Maybank Berhad",
-      accountNumber: "5140 1234 5678",
-      accountHolder: "Pertubuhan Kebajikan Hope for Strays",
+      bankTransferTitle: "Pindahan Bank Terus",
+      bankDetailsOnWhatsApp: "Hubungi kami di WhatsApp untuk butiran pindahan.",
+      bankDetailsAfterPledge: "Rekodkan ikrar anda dahulu. Anda kemudian mendapat rujukan untuk dicatat di WhatsApp bagi butiran akaun.",
+      bankDetailsChooseThenPledge: "Pilih pindahan bank sebagai cara pembayaran dan rekodkan ikrar anda dahulu. Anda kemudian mendapat rujukan untuk dicatat di WhatsApp bagi butiran akaun.",
+      bankHintAfterPledge: "Cara membuat pindahan dipaparkan selepas ikrar anda direkodkan.",
+      bankHintAccountShown: "Pindahkan ke akaun bank yang dipaparkan.",
+      accountHolderLabel: "Pemegang Akaun",
       copyAccountBtn: "Salin No. Akaun",
       copiedBtn: "Disalin!",
       duitNowScanTitle: "DuitNow QR Kebangsaan",

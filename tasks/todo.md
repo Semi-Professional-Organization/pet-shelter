@@ -40,6 +40,33 @@ Record active multi-step work streams below.
 **Review:** deliberately not done: a sliding window (2x boundary burst is the recorded ceiling),
 moving any other budget, and a scheduled sweep (one call in fifty deletes expired rows).
 
+# Hide the fake bank account (#252)
+
+**Branch:** `claude/hide-fake-bank-account` · opened 2026-11-05
+
+- **Done when:** no copy of the fake Maybank number is left in `src/`, the donate widget and the
+  sponsorship popup show no account while none is confirmed (record the pledge first, then a
+  WhatsApp link quoting its reference), and a test fails if the number comes back.
+- **In scope:** one `SHELTER_BANK_ACCOUNT` constant, one shared `BankTransferDetails` panel,
+  `faq-024` in the fixture, the translation keys, tests.
+- **Not in scope:** the real account and holder name (waiting on the shelter); the DuitNow FAQ
+  (#238).
+- [x] Seven xhigh review rounds: 15, 12, 10, 10, 10, 7 and 8 findings. Round 7 found no bug in
+  shipped code, only tests and docs (fixed: anchored popup regex, the `/donate` choose-bank note
+  following the selection, the runbook's stale-pledge step, the fill-in test list). In-scope
+  fixes: the pledge screen losing the bank route; no WhatsApp request before a reference exists
+  (it now quotes the reference); `/donate` telling donors to choose bank transfer; the pet hint;
+  copy promise and digits-only copy; Unicode dashes in the guard; runbook coordinator steps;
+  stale README, archive and ledger text. Declined items are in
+  `tasks/open/the-shelter-bank-account-is-not-confirmed.md`.
+
+- [x] Code and tests; `typecheck`, `test`, `test:components`, `test:integration`, `docs:check`,
+  `lint` (0 errors), `build` pass
+- [x] Probe: restoring any one of the five removed copies, or a dashed spelling, fails the guard
+- **Deliberately not done:** a test pinning `SHELTER_BANK_ACCOUNT` to `null`, which would only
+  add a step to the fill-in PR. The "Bank Transfer" radio stays: donors can still pay that way
+  once WhatsApp gives them the details.
+
 # Drop the receipt tax columns (#251)
 
 **Branch:** `claude/251-drop-receipt-snapshot-columns` · opened 2026-11-05

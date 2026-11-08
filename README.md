@@ -64,7 +64,7 @@ Comprehensive guides are organized in the [`docs/`](docs/) directory and synchro
 - **Public Self-Service Tracker (`/applications/track`)**: Real-time 4-step progress stepper (*Received, Review, Meet & Greet, Approved*), video meeting links, Google Maps shelter directions, and adoption-day checklists.
 
 ### 5. 💳 Malaysian Giving Rail & LHDN Tax e-Receipts
-- **Donation Portal (`/donate` & `DonationWidget.tsx`)**: Direct DuitNow QR standard (PayNet Malaysia) and Maybank instant bank transfer.
+- **Donation Portal (`/donate` & `DonationWidget.tsx`)**: Direct DuitNow QR standard (PayNet Malaysia) and direct bank transfer (account details on WhatsApp until the shelter confirms its account, #252).
 - **Automated e-Receipt Dossier**: Computes official tax receipts with statutory LHDN exemption numbers and instant printing.
 - **1-Click LHDN & ROS CSV Export Engine**: Automated CSV download for Malaysian tax filing and NGO audits in the Admin Portal.
 - **Public Transparency Ledger (`/transparency`)**: "Where Your Money Goes" — a verified expense ledger with per-category allocation shares *computed from the ledger rather than hand-written*, headline impact counters, a chronological purchase feed carrying clinic/supplier invoice references, and downloadable ROS/AGM audited statements. Editable at `/admin/transparency` by `ADMIN` and `COORDINATOR`.

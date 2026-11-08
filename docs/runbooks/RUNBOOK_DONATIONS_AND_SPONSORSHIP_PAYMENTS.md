@@ -75,8 +75,17 @@ The form rejects amounts below RM 5.00.
 ## 6. Changing payment details
 
 - **QR codes**: `/admin/settings`, DuitNow QR section.
-- **Bank account name**: `/donate` (`DonationWidget.tsx`) and the sponsorship modal
-  (`SponsorshipModal.tsx`) both show "Hope for Strays" as the beneficiary. The name on the
-  account itself is being confirmed with the shelter under #252, which will also settle the
-  unused `donations.accountHolder` dictionary key.
+- **Bank account**: one constant, `SHELTER_BANK_ACCOUNT` in `src/lib/domain/shelterIdentity.ts`
+  (bank and branch, number, holder name), printed only by `BankTransferDetails.tsx` on `/donate`
+  and in the sponsorship modal. It is `null` until the shelter confirms a real account (#252):
+  the account the site printed before 2026-11-05 was fake. While it is `null`, every
+  bank-transfer panel shows no account: before the pledge it asks the donor to record it first,
+  and after it offers a WhatsApp link (+60 10-550 3056) that quotes the pledge reference.
+  **Coordinators:** a request quoting an `HFS-GFT-` or `HFS-PLG-` reference whose pledge says
+  bank transfer in `/admin/donations` gets the account details, and the transfer is matched by
+  that reference as usual. If that pledge says DuitNow QR, ask the donor to record a new pledge
+  choosing bank transfer, so the record names the rail they actually use, and dismiss the old
+  DuitNow pledge in the queue so it cannot be matched by mistake. A request with no reference
+  gets asked to record the pledge on the site first, so the transfer has something to match. To fill the account in, copy all three fields from a bank
+  statement or the bank's confirmation, not from a message.
 - **Sponsorship tiers**: `SPONSORSHIP_TIERS` in `src/lib/domain/sponsorshipTiers.ts`.
