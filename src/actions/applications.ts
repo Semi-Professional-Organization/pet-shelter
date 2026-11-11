@@ -145,26 +145,33 @@ async function insertWithUniqueReferenceCode(
  */
 function describeFailureForLog(err: unknown): unknown {
   if (typeof err !== "object" || err === null) return err;
-  const { name, code, meta } = err as {
+  const { name, code, errorCode, meta } = err as {
     name?: unknown;
     code?: unknown;
+    errorCode?: unknown;
     meta?: {
       modelName?: unknown;
       target?: unknown;
-      driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } };
+      driverAdapterError?: {
+        cause?: { originalCode?: unknown; constraint?: { fields?: unknown; index?: unknown } };
+      };
     };
   };
+  const cause = meta?.driverAdapterError?.cause;
   const fromPrisma =
     (typeof name === "string" && name.startsWith("Prisma")) ||
     (typeof code === "string" && /^P\d{4}$/.test(code));
   if (!fromPrisma) return err;
   return {
     name,
-    code,
+    // An initialization error carries its code as `errorCode`.
+    code: code ?? errorCode,
     modelName: meta?.modelName,
-    // Column names only, never values: which unique an insert broke is what tells an `id`
-    // collision (#201) from a reference-code one.
-    fields: meta?.driverAdapterError?.cause?.constraint?.fields ?? meta?.target,
+    sqlState: cause?.originalCode,
+    // Names only, never values: which unique an insert broke is what tells an `id` collision
+    // (#201) from a reference-code one.
+    fields: cause?.constraint?.fields ?? meta?.target,
+    constraint: cause?.constraint?.index,
   };
 }
 
