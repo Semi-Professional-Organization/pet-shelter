@@ -20,7 +20,6 @@ import {
   insertServerPet,
   updateServerPet,
   archiveServerPet,
-  getStoredGalleryImages,
 } from "@/lib/server/petRepository";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
 import {
@@ -309,11 +308,10 @@ export async function updatePet(
     const wantsNotification = notify?.notifySponsors === true;
 
     // Captured before the write: the dispatcher compares against the gallery as
-    // it stood, not as it is about to stand. Prefer the database over the
-    // in-memory record, which reflects only this instance's own writes and would
-    // make another instance's photos look new again.
-    const storedGallery = wantsNotification ? await getStoredGalleryImages(id) : null;
-    const previousGallery = storedGallery ?? [...(existing.galleryImages || [])];
+    // it stood, not as it is about to stand. `existing` is the database's copy
+    // (see `readPetForEdit`), not the in-memory mirror, which reflects only this
+    // instance's own writes and would make another instance's photos look new again.
+    const previousGallery = [...(existing.galleryImages || [])];
 
     // Nested history is replaced only when the payload carries it: an absent key means "not
     // touched", and only a submitted list (an explicit `[]` included) replaces the stored rows. The
@@ -366,7 +364,9 @@ export async function updatePet(
       },
     });
 
-    const stored = await updateServerPet(id, updated, actor, replaceHistory);
+    const stored = await updateServerPet(id, updated, actor, replaceHistory, {
+      baseline: existing,
+    });
     if (!stored) {
       return { success: false, error: "Pet not found" };
     }
@@ -450,9 +450,17 @@ export async function updatePetStatus(
 
     const updated: Pet = { ...existing, status };
     // A status change replaces no history, and writes only the status column.
-    const stored = await updateServerPet(id, updated, actor, {}, "status");
+    const stored = await updateServerPet(id, updated, actor, {}, {
+      columns: "status",
+      baseline: existing,
+    });
     if (!stored) {
-      return { success: false, error: "Pet not found" };
+      // The write is conditional on the status read above, so this is a row deleted or a status
+      // changed (an approval, another admin) since then. One message covers both.
+      return {
+        success: false,
+        error: "This pet was changed or removed since the table loaded. Reload and try again.",
+      };
     }
 
     revalidatePath("/pets");

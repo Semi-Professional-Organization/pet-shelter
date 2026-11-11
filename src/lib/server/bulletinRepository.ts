@@ -32,7 +32,7 @@ import {
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
-import { handlePersistenceError, isDatabasePersistent } from "@/lib/persistenceMode";
+import { handlePersistenceError, isDatabasePersistent, isRecordNotFound } from "@/lib/persistenceMode";
 import { registerStateReset } from "@/lib/stateResets";
 
 /**
@@ -147,14 +147,14 @@ registerStateReset("bulletins", resetBulletins);
  * Reached when a notice is deleted between an editor opening it and acting on
  * it, and mapped to the action's "no longer exists" rather than a generic
  * failure with a logged stack. The same shape as the private helper of the same
- * name in `./transparencyRepository` — two copies, which AGENTS.md's
- * "Boundaries and duplication" says to leave until a third occurrence.
+ * name in `./transparencyRepository`; the P2025 test both use is the shared
+ * `isRecordNotFound` in `@/lib/persistenceMode`.
  */
 async function orNullIfMissing<T>(operation: () => Promise<T>): Promise<T | null> {
   try {
     return await operation();
   } catch (err) {
-    if (prismaCode(err) === "P2025") return null;
+    if (isRecordNotFound(err)) return null;
     throw err;
   }
 }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/server/prisma";
+import { isRecordNotFound } from "@/lib/persistenceMode";
 import { getSampleLedger, type SampleLedger } from "../domain/transparencySample";
 import {
   buildSnapshot,
@@ -143,18 +144,10 @@ export function isDatabaseUnavailable(err: unknown): boolean {
 }
 
 /**
- * Prisma raises P2025 when an update or delete targets a row that is not there.
- * That is an ordinary outcome — a stale tab, a double-clicked delete — not a
- * server fault, so it becomes a `null` result and a plain "no longer exists"
- * message instead of being logged as an unexpected error.
+ * Resolves to null when the row is gone (P2025, see `isRecordNotFound`); rethrows anything else.
+ * That is an ordinary outcome — a stale tab, a double-clicked delete — not a server fault, so it
+ * becomes a `null` result and a plain "no longer exists" message instead of an unexpected error.
  */
-function isRecordNotFound(err: unknown): boolean {
-  return (
-    !!err && typeof err === "object" && (err as { code?: unknown }).code === "P2025"
-  );
-}
-
-/** Resolves to null when the row is gone; rethrows anything else. */
 async function orNullIfMissing<T>(operation: () => Promise<T>): Promise<T | null> {
   try {
     return await operation();

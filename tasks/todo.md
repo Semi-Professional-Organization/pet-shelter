@@ -31,12 +31,20 @@ Record active multi-step work streams below.
 - [x] Read path, stored-id write, status-only write, P2025 as `null`
 - [x] Tests: mirror/database disagree, miscased and padded ids, P2025, unreadable database
 - [x] Admin table rollback checked: `usePetTableController` already rolls back on `success: false`
+- [x] Review round 1 (xhigh): status write conditional on the status read; the action's database
+  copy passed in as `updateServerPet`'s `baseline`; status-only write refuses a history
+  replacement; refused outage read logs; P2025 logs, rethrows in strict mode and drops the mirror
+  entry; returned pet carries the stored id; `getStoredGalleryImages` removed (the edit's own
+  read has the gallery); `bulletinRepository` and `transparencyRepository` moved onto the shared
+  `isRecordNotFound`; the #204 entry updated to say only the write side remains.
 
 **Review:** deliberately not done: a write the database refuses for any reason other than P2025 is
 still swallowed outside strict mode and reported as saved (#204, unchanged; the read side now
-refuses, so this fix narrows it rather than widening it). The P2025 check is a third copy of the
-one in `bulletinRepository` and `transparencyRepository`; the new `isRecordNotFound` in
-`persistenceMode.ts` is where those two could move, not done here to keep the diff to its brief.
+refuses, so this fix narrows it rather than widening it). Declined from review round 1: a
+row-only read for the status path (performance only), the archive padded-id bug (already in
+`tasks/open/`), and the dead link in a closed decision entry (decisions are not rewritten). One
+message covers "deleted" and "status changed" for a failed status write; Prisma's P2025 does not
+tell them apart without a second read.
 
 # Share the registration rate limit across server instances (#213)
 

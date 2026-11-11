@@ -87,32 +87,6 @@ export async function getServerPetsAsync(): Promise<Pet[]> {
 }
 
 /**
- * Reads an animal's stored gallery straight from the database.
- *
- * The in-memory store is seeded from fixtures and mutated only by writes this
- * process handled — it cannot be the baseline for "which photos are new":
- * another instance's uploads are invisible to it, so those photos would look
- * new again and supporters are mailed them a second time. Only the database
- * can answer this question.
- *
- * Returns null when the row does not exist. Read failures are routed through
- * the shared persistence decision point (strict mode rethrows) before falling
- * back to null, so the caller's fallback is never reached silently.
- */
-export async function getStoredGalleryImages(id: string): Promise<string[] | null> {
-  try {
-    const row = await prisma.pet.findUnique({
-      where: { id },
-      select: { galleryImages: true },
-    });
-    return row ? row.galleryImages : null;
-  } catch (err) {
-    handlePersistenceError("Prisma gallery read", err, "read");
-    return null;
-  }
-}
-
-/**
  * The database could not be asked about an animal, on a path that must not
  * answer from the mirror. Carries the underlying error as `cause`.
  */
@@ -127,8 +101,8 @@ export class PetStoreUnavailableError extends Error {
 }
 
 /**
- * Reads one animal for **display**, falling back to the mirror when the
- * database cannot answer.
+ * Reads one animal with its history, falling back to the mirror when the
+ * database cannot answer — unless the caller passes `onOutage: "refuse"`.
  *
  * **"No such row" is an answer, not an outage.** A successful query that found
  * nothing returns `null`; the mirror is reached only when the query *threw*, or
@@ -142,12 +116,16 @@ export class PetStoreUnavailableError extends Error {
  * a third case they do not: no database configured at all, where there is
  * nothing to ask and the mirror is the whole store.
  *
- * **Display only.** On a non-strict outage the `catch` serves the mirror, which
- * is seeded from `src/data/pets.json`, so for a fixture id this returns the
- * demo animal. A profile page may show that for the length of an outage; a path
- * that writes a record or takes a pledge may not, and uses
- * {@link findPetForWriteAsync} instead
+ * **`onOutage`.** With the default `"mirror"`, a non-strict outage is answered
+ * from the mirror, which is seeded from `src/data/pets.json`, so for a fixture
+ * id this returns the demo animal. A profile page may show that for the length
+ * of an outage. A write may not: with `"refuse"` the `catch` logs and throws
+ * {@link PetStoreUnavailableError} instead, as {@link findPetForWriteAsync}
+ * does. The admin edit and status change read their starting copy that way,
+ * because they need the history this read joins; the public adoption and
+ * sponsorship paths use {@link findPetForWriteAsync}
  * (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`).
+ * Strict persistence rethrows the query's own error under either option.
  *
  * It used to fall through to the mirror on both exits, which published demo
  * data: an id present in `src/data/pets.json` but absent from a populated
@@ -175,7 +153,13 @@ export async function findServerPetByIdAsync(
       handlePersistenceError("Prisma pet find by id", err, "read");
       // The admin edits read their starting copy here and must not start from the mirror, which
       // on a cold instance is `src/data/pets.json`: they ask to be refused instead.
-      if (onOutage === "refuse") throw new PetStoreUnavailableError(id.trim(), err);
+      if (onOutage === "refuse") {
+        console.error(
+          `[Database Store] Pet read for a write path failed for ${JSON.stringify(id.trim())}:`,
+          err instanceof Error ? err.message : err
+        );
+        throw new PetStoreUnavailableError(id.trim(), err);
+      }
       return findServerPetById(id);
     }
   }
@@ -185,8 +169,9 @@ export async function findServerPetByIdAsync(
 /**
  * Reads one animal for a path that **writes a record or takes a pledge**.
  *
- * The same row as {@link findServerPetByIdAsync}, without its outage fallback:
- * when a database is configured and the query throws, this throws
+ * The same row as {@link findServerPetByIdAsync} with `onOutage: "refuse"`, but
+ * without the history joins: when a database is configured and the query
+ * throws, this throws
  * {@link PetStoreUnavailableError} rather than answering from the mirror, so
  * the caller refuses instead of acknowledging an application or a pledge
  * against a `src/data/pets.json` demo animal. Under strict persistence the
@@ -314,14 +299,29 @@ export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<
   });
 }
 
+/**
+ * Writes an edit and returns the pet as stored, or `null` when nothing was written.
+ *
+ * `baseline` is the copy the caller read and edited. The admin actions pass the database copy
+ * they read, so the transition check, the audit row's `before` and the conditional status write
+ * are all against what the database held, not against this instance's mirror. Without one, the
+ * mirror (then the database) is asked, as before.
+ *
+ * `columns: "status"` writes the status column alone, and only while the row still holds
+ * `baseline`'s status: a concurrent change (an approval that set Adopted) matches no row, and
+ * that is reported as `null` rather than overwritten.
+ */
 export async function updateServerPet(
   id: string,
   updated: Pet,
   actor: SessionUser,
   replaceHistory: PetHistoryReplacement,
-  columns: "all" | "status" = "all"
+  { columns = "all", baseline }: { columns?: "all" | "status"; baseline?: Pet } = {}
 ): Promise<Pet | null> {
-  let previous = serverPets.find((p) => p.id === id);
+  if (columns === "status" && (replaceHistory.updates || replaceHistory.medicalTimeline)) {
+    throw new Error("updateServerPet: a status-only write cannot replace history");
+  }
+  let previous = baseline ?? serverPets.find((p) => p.id === id);
   if (!previous && isDatabasePersistent()) {
     const fromDb = await findServerPetByIdAsync(id);
     if (fromDb) previous = fromDb;
@@ -347,21 +347,33 @@ export async function updateServerPet(
       ...(replaceHistory.medicalTimeline
         ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: storedId } })]
         : []),
-      prisma.pet.update({
-        where: { id: storedId },
-        // A status change writes the one column it changes, so it cannot carry any other column
-        // back over a newer write from another instance.
-        data:
-          columns === "status"
-            ? { status: toDbPetStatus(updated.status) }
-            : buildPetUpdatePayload(updated, replaceHistory),
-      }),
+      columns === "status"
+        ? // The one column it changes, and only from the status it was read with, so it cannot
+          // carry any other column back over a newer write, nor overwrite a newer status.
+          prisma.pet.update({
+            where: { id: storedId, status: toDbPetStatus(previous.status) },
+            data: { status: toDbPetStatus(updated.status) },
+          })
+        : prisma.pet.update({
+            where: { id: storedId },
+            data: buildPetUpdatePayload(updated, replaceHistory),
+          }),
     ]);
   } catch (err) {
-    // The row is gone (deleted since it was read): nothing was written, and the caller is told so
-    // rather than handed a pet as if it had been. Any other failure is still swallowed outside
-    // strict mode — tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.
-    if (isRecordNotFound(err)) return null;
+    // No row matched (deleted since it was read, or, for a status write, its status changed):
+    // nothing was written, and the caller is told so rather than handed a pet as if it had been.
+    // The mirror's copy is dropped, so an outage fallback cannot serve it; the next read refills
+    // it. Any other failure is still swallowed outside strict mode —
+    // tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.
+    if (isRecordNotFound(err)) {
+      if (isStrictPersistence()) throw err;
+      console.warn(
+        `[Database Store] Pet update matched no row for ${JSON.stringify(storedId)}:`,
+        err instanceof Error ? err.message : err
+      );
+      serverPets = serverPets.filter((p) => p.id !== storedId);
+      return null;
+    }
     handlePersistenceError("Prisma pet update", err, "write");
   }
 
@@ -369,11 +381,13 @@ export async function updateServerPet(
   // get back the pet as stored. A collection this write did not replace keeps the copy the mirror
   // holds *now*: not the caller's copy, and not `previous`, which was read before the await above
   // and may predate a concurrent write.
-  // The admin actions read their baseline with `findServerPetByIdAsync`, which refreshes the
-  // mirror entry from the database, so in database mode that copy is the stored one.
+  // The admin actions pass a `baseline` read by `findServerPetByIdAsync`, which also put that
+  // database copy in the mirror, so in database mode this is the stored history unless a write on
+  // this instance has replaced it since.
   const keptFrom = serverPets.find((p) => p.id === storedId) ?? previous;
   const stored: Pet = {
     ...updated,
+    id: storedId,
     updates: replaceHistory.updates ? updated.updates : keptFrom.updates,
     medicalTimeline: replaceHistory.medicalTimeline
       ? updated.medicalTimeline

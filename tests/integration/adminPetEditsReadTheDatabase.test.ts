@@ -6,9 +6,9 @@ import {
   resetPrismaDouble,
   type PrismaDouble,
 } from "./support/prismaDouble";
-import { signInAsAdmin } from "../setup/authSession";
+import { signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { updatePet, updatePetStatus } from "@/actions/pets";
-import { findServerPetById } from "@/lib/server/petRepository";
+import { findServerPetById, findServerPetByIdAsync, updateServerPet } from "@/lib/server/petRepository";
 
 /**
  * Tier 3a — the admin pet edit and status change start from the database, write with the stored
@@ -113,7 +113,8 @@ describe("when the mirror and the database disagree", () => {
 
     expect(result).toEqual({ success: true });
     const { where, data } = petUpdateCall();
-    expect(where).toEqual({ id: PET_ID });
+    // Conditional on the status it was read with, so a concurrent change matches no row.
+    expect(where).toEqual({ id: PET_ID, status: "Available" });
     expect(data).toEqual({ status: "Pending" });
     expect(double.petUpdate.deleteMany).not.toHaveBeenCalled();
     expect(double.medicalTimelineEvent.deleteMany).not.toHaveBeenCalled();
@@ -171,15 +172,64 @@ describe("a write that writes nothing", () => {
 
     expect(await updatePetStatus(PET_ID, "Pending")).toEqual({
       success: false,
-      error: "Pet not found",
+      error: "This pet was changed or removed since the table loaded. Reload and try again.",
     });
     expect(await updatePet(PET_ID, editForm())).toEqual({
       success: false,
       error: "Pet not found",
     });
-    // No mirror write and no audit row for a write that did not happen.
-    expect(findServerPetById(PET_ID)?.status).toBe("Available");
+    // No mirror write and no audit row for a write that did not happen; the vanished row is
+    // dropped from the mirror so an outage fallback cannot serve it.
+    expect(findServerPetById(PET_ID)).toBeNull();
     expect(double.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a status change when the status changed after it was read", async () => {
+    // Read as Available; by the time of the write an approval has set Adopted. Postgres matches
+    // no row for `status = 'Available'` and Prisma raises P2025, which the double reproduces.
+    const statusAtWriteTime = "Adopted";
+    double.pet.update.mockImplementation(
+      async (args: { where: { id: string; status?: string } }) => {
+        if (args.where.status !== undefined && args.where.status !== statusAtWriteTime) {
+          throw Object.assign(new Error("Record to update not found."), { code: "P2025" });
+        }
+        return {};
+      }
+    );
+
+    const result = await updatePetStatus(PET_ID, "Pending");
+
+    expect(result).toEqual({
+      success: false,
+      error: "This pet was changed or removed since the table loaded. Reload and try again.",
+    });
+    expect(double.pet.update.mock.calls[0][0].where).toEqual({ id: PET_ID, status: "Available" });
+    expect(double.auditLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateServerPet", () => {
+  it("writes and clears history with the stored id, not a padded spelling of it", async () => {
+    const pet = (await findServerPetByIdAsync(PET_ID))!;
+    // Not in the mirror under this spelling, so the repository's own lookup (which trims) finds it.
+    const stored = await updateServerPet(
+      ` ${PET_ID}`,
+      { ...pet, id: ` ${PET_ID}`, description: "Edited through a padded id." },
+      TEST_ADMIN_ACTOR,
+      { updates: true }
+    );
+
+    expect(stored?.id).toBe(PET_ID);
+    expect(double.petUpdate.deleteMany).toHaveBeenCalledWith({ where: { petId: PET_ID } });
+    expect(petUpdateCall().where).toEqual({ id: PET_ID });
+  });
+
+  it("refuses a status-only write that would also replace history", async () => {
+    const pet = (await findServerPetByIdAsync(PET_ID))!;
+    await expect(
+      updateServerPet(PET_ID, pet, TEST_ADMIN_ACTOR, { updates: true }, { columns: "status" })
+    ).rejects.toThrow(/status-only write cannot replace history/);
+    expect(double.pet.update).not.toHaveBeenCalled();
   });
 });
 
