@@ -23,7 +23,8 @@ Record active multi-step work streams below.
   only `status`, a miscased or padded id fails, and a write that matched no row fails, pinned by
   `tests/integration/adminPetEditsReadTheDatabase.test.ts`.
 - **In scope:** `src/actions/pets.ts` (`readPetForEdit`), `updateServerPet` (required `baseline`,
-  stored id, status-only conditional `updateMany`, P2025 / `count: 0` as `null`),
+  stored id, both writes conditional on the status read, status-only `updateMany`, P2025 /
+  `count: 0` as `null`),
   `findServerPetByIdAsync`'s `onOutage: "refuse"`.
 - **Not in scope:** outage-mode writes (#204), the client store's merge rules (#212), the archive
   path (`tasks/open/pet-archive-reports-success-for-an-id-it-did-not-write.md`), and a stale
@@ -32,7 +33,8 @@ Record active multi-step work streams below.
   read and its write. It does **not** protect against an admin table or edit form that was
   already stale when the admin clicked: neither sends the status it showed, so a stale status
   dropdown can still move Adopted back to Available (a legal transition), and a stale edit form
-  writes its old status unconditionally.
+  writes its old status, because the condition is the status read at save time, not the one the
+  form showed.
 
 - [x] Read path, stored-id write, status-only write, P2025 as `null`
 - [x] Tests: mirror/database disagree, miscased and padded ids, row deleted, status changed in
@@ -48,13 +50,23 @@ Record active multi-step work streams below.
   reports the baseline plus the new status; `baseline` required and the id must equal its stored
   id; one `refuseForWrite` and one shared `orNullIfMissing`; error text no longer claims to catch
   a stale table; runbook §1 cross-reference fixed in its own commit.
+- [x] Review round 3 (xhigh): the full edit's write is conditional on the status read too (P2025
+  in the batch rolls the history deletes back), and no miss drops the mirror any more; only the
+  query is treated as an outage in the refusing read; tests for the edit race, the photo diff's
+  baseline and a mapping fault; decision entry for moving `orNullIfMissing`.
 
 **Review:** deliberately not done: a write the database refuses for any reason other than a missed
 row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side
 now refuses, so this narrows it rather than widening it). Declined from review: a row-only read
 for the status path (performance and fault coupling only), the archive padded-id bug (already
 open), the dead link in a closed decision entry (decisions are not rewritten), and sending the
-expected status from the client (new behaviour, recorded for the owner). One message covers
+expected status from the client (new behaviour, recorded for the owner; an `updatedAt` version
+is the likely mechanism). Round 3 declined: the server half of the edit-merge defaults (the form
+schema's defaults wipe a newer gallery/QR and un-archive an animal on a partial form), appended
+to the #212 entry; `deletedAt` precision, recorded in
+`tasks/open/a-pet-edit-round-trips-deletedat-through-date-tostring.md` because both one-line
+fixes change other behaviour; strict-mode P2025 rethrow (contract stays); exact-id lookups at a
+lower altitude; a separate `updateServerPetStatus`; a shared `prismaCode` helper. One message covers
 "deleted" and "status changed" for a failed status write; `count: 0` does not tell them apart
 without a second read.
 

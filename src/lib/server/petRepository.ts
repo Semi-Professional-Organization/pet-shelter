@@ -154,15 +154,12 @@ export async function findServerPetByIdAsync(
 ): Promise<Pet | null> {
   const norm = id.trim().toLowerCase();
   if (isDatabasePersistent()) {
+    let row;
     try {
-      const row = await prisma.pet.findUnique({
+      row = await prisma.pet.findUnique({
         where: { id: id.trim() },
         include: PET_INCLUDE,
       });
-      if (!row) return null;
-      const pet = mapDbPetToPet(row as unknown as DbPetRecord);
-      serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
-      return pet;
     } catch (err) {
       // The admin edits read their starting copy here and must not start from the mirror, which
       // on a cold instance is `src/data/pets.json`: they ask to be refused instead.
@@ -170,6 +167,11 @@ export async function findServerPetByIdAsync(
       handlePersistenceError("Prisma pet find by id", err, "read");
       return findServerPetById(id);
     }
+    // Outside the `try`: only the query is an outage. A mapping fault surfaces as itself.
+    if (!row) return null;
+    const pet = mapDbPetToPet(row as unknown as DbPetRecord);
+    serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
+    return pet;
   }
   return findServerPetById(id);
 }
@@ -310,10 +312,10 @@ export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<
  * condition and the stored id all come from it, never from this instance's mirror. `id` must be
  * that stored id verbatim.
  *
- * `columns: "status"` writes the status column alone, and only while the row still holds
- * `baseline`'s status. That guards the window between the caller's read and this write (an
- * approval that set Adopted in between matches no row, and is reported as `null`); it does not
- * know what an older admin table showed —
+ * Both writes match only while the row still holds `baseline`'s status, and
+ * `columns: "status"` writes the status column alone. That guards the window between the
+ * caller's read and this write (an approval that set Adopted in between matches no row, and is
+ * reported as `null`); it does not know what an older admin table showed —
  * `tasks/open/admin-pet-writes-send-no-expected-status.md`.
  */
 export async function updateServerPet(
@@ -341,10 +343,13 @@ export async function updateServerPet(
   // Before the `try` as well, so a throw here is never swallowed as an outage. A stored status
   // the enum does not know (`fromDbPetStatus` passes it through, and staff may move it to a
   // canonical one) has no enum value to match on.
-  // ceiling: such a status write matches on the id alone, so it is unguarded against a
-  // concurrent change; Prisma's enum read normally fails before such a row gets here —
+  // ceiling: such a write matches on the id alone, so it is unguarded against a concurrent
+  // change; Prisma's enum read normally fails before such a row gets here —
   // tasks/open/a-drifted-pet-status-fails-the-whole-prisma-read.md.
   const expectedStatus = isKnownPetStatus(previous.status) ? toDbPetStatus(previous.status) : undefined;
+  // Both writes match only while the row still holds the status the transition was checked
+  // against, so an approval landing between the caller's read and this write is not overwritten.
+  const where = { id: storedId, ...(expectedStatus ? { status: expectedStatus } : {}) };
   const data =
     columns === "status"
       ? { status: toDbPetStatus(updated.status) }
@@ -355,10 +360,7 @@ export async function updateServerPet(
       // `updateMany` reports a miss as `count: 0` rather than an error, as
       // `atomicUpdateApplicationStatus` relies on. The row may well still exist with a newer
       // status, so the mirror is left alone.
-      const { count } = await prisma.pet.updateMany({
-        where: { id: storedId, ...(expectedStatus ? { status: expectedStatus } : {}) },
-        data,
-      });
+      const { count } = await prisma.pet.updateMany({ where, data });
       if (count === 0) {
         console.warn(
           `[Database Store] Pet status write matched no row for ${JSON.stringify(storedId)}: deleted or changed since it was read`
@@ -368,7 +370,8 @@ export async function updateServerPet(
     } else {
       // A collection is cleared and rewritten only when the caller says it is replacing it. The
       // rows carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is
-      // never a no-op.
+      // never a no-op. `update` with a non-unique filter raises P2025 when nothing matches, and
+      // the batch rolls back, so the history deletes do not commit without the row write.
       await prisma.$transaction([
         ...(replaceHistory.updates
           ? [prisma.petUpdate.deleteMany({ where: { petId: storedId } })]
@@ -376,21 +379,20 @@ export async function updateServerPet(
         ...(replaceHistory.medicalTimeline
           ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: storedId } })]
           : []),
-        prisma.pet.update({ where: { id: storedId }, data }),
+        prisma.pet.update({ where, data }),
       ]);
     }
   } catch (err) {
-    // The row is gone (deleted since it was read): nothing was written, and the caller is told so
-    // rather than handed a pet as if it had been. Its mirror copy is dropped, so an outage
-    // fallback cannot serve it. Any other failure is still swallowed outside strict mode —
-    // tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.
+    // No row matched: deleted, or its status changed, since it was read. Nothing was written, and
+    // the caller is told so rather than handed a pet as if it had been. The mirror is left alone,
+    // since the row may well still exist. Any other failure is still swallowed outside strict
+    // mode — tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.
     if (isRecordNotFound(err)) {
       if (isStrictPersistence()) throw err;
       console.warn(
         `[Database Store] Pet update matched no row for ${JSON.stringify(storedId)}:`,
         err instanceof Error ? err.message : err
       );
-      serverPets = serverPets.filter((p) => p.id !== storedId);
       return null;
     }
     handlePersistenceError("Prisma pet update", err, "write");

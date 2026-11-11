@@ -179,6 +179,9 @@ async function getAdminActorOrThrow(): Promise<AdminPrincipal> {
   throw new UnauthorizedError("Unauthorized: Admin authorization required");
 }
 
+/** An edit or status write that matched no row: see `updateServerPet`. */
+const PET_CHANGED_WHILE_SAVING = "This pet was changed or removed while saving. Reload and try again.";
+
 /**
  * The starting copy for an admin edit or status change, read from the database.
  *
@@ -368,7 +371,8 @@ export async function updatePet(
       baseline: existing,
     });
     if (!stored) {
-      return { success: false, error: "Pet not found" };
+      // As in `updatePetStatus`: deleted, or its status changed, between the read and the write.
+      return { success: false, error: PET_CHANGED_WHILE_SAVING };
     }
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
@@ -459,10 +463,7 @@ export async function updatePetStatus(
       // changed (an approval, another admin) between that read and the write. One message covers
       // both. It says nothing about a table that was already stale when the admin clicked —
       // tasks/open/admin-pet-writes-send-no-expected-status.md.
-      return {
-        success: false,
-        error: "This pet was changed or removed while saving. Reload and try again.",
-      };
+      return { success: false, error: PET_CHANGED_WHILE_SAVING };
     }
 
     revalidatePath("/pets");

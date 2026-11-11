@@ -9,6 +9,7 @@ import {
 import { signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { updatePet, updatePetStatus } from "@/actions/pets";
 import { findServerPetById, findServerPetByIdAsync, updateServerPet } from "@/lib/server/petRepository";
+import { dispatchPetPhotoUpdate } from "@/lib/domain/photoUpdateDispatch";
 
 /**
  * Tier 3a — the admin pet edit and status change start from the database, write with the stored
@@ -32,10 +33,24 @@ vi.mock("@/lib/server/prisma", async () => {
   return { prisma: double, default: double, disconnectPrisma: vi.fn().mockResolvedValue(undefined) };
 });
 
+/** Run deferred work at once, so the photo dispatch an edit schedules can be asserted. */
+vi.mock("@/lib/scheduleAfterResponse", () => ({
+  scheduleAfterResponse: (work: () => unknown) => void work(),
+}));
+
+vi.mock("@/lib/domain/photoUpdateDispatch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/domain/photoUpdateDispatch")>();
+  return { ...actual, dispatchPetPhotoUpdate: vi.fn().mockResolvedValue(undefined) };
+});
+
 const PET_ID = "pet-001";
 const fixture = initialPets.find((p) => p.id === PET_ID)!;
 
-/** The database's copy: newer than the fixture in every column a status change must not touch. */
+/**
+ * The database's copy: newer than the fixture in every column a status change must not touch.
+ * An edit is another matter: the form schema defaults the gallery and QR code, so an edit that
+ * omits them still overwrites both (`tasks/open/the-client-pet-store-drops-gallery-and-qr-edits.md`).
+ */
 const newerRow = () =>
   makeDbPet({
     id: PET_ID,
@@ -139,14 +154,14 @@ describe("when the mirror and the database disagree", () => {
     });
   });
 
-  it("an edit carries over the database's columns, not the mirror's", async () => {
+  it("an edit carries over the database's birthDateIsEstimate, not the mirror's", async () => {
     expect(findServerPetById(PET_ID)?.birthDateIsEstimate).toBe(true);
 
     const result = await updatePet(PET_ID, editForm());
 
     expect(result.success).toBe(true);
     const { where, data } = petUpdateCall();
-    expect(where).toEqual({ id: PET_ID });
+    expect(where).toEqual({ id: PET_ID, status: "Available" });
     expect(data).toMatchObject({
       description: "Submitted by this edit.",
       birthDateIsEstimate: false,
@@ -179,16 +194,28 @@ describe("an id that is not the stored id verbatim", () => {
 });
 
 describe("a write that writes nothing", () => {
-  it("reports an edit of a row deleted since it was read (P2025) and drops it from the mirror", async () => {
-    double.pet.update.mockRejectedValue(
-      Object.assign(new Error("Record to update not found."), { code: "P2025" })
-    );
+  it("refuses an edit when the status changed after it was read, and writes nothing", async () => {
+    // Read as Available; by the write an approval has set Adopted. `update` with
+    // `status = 'Available'` in its filter matches no row and Prisma raises P2025, which the
+    // double reproduces; the batch transaction rolls the history deletes back with it.
+    const statusAtWriteTime = "Adopted";
+    double.pet.update.mockImplementation(async (args: { where: { status?: string } }) => {
+      if (args.where.status !== undefined && args.where.status !== statusAtWriteTime) {
+        throw Object.assign(new Error("Record to update not found."), { code: "P2025" });
+      }
+      return {};
+    });
 
-    expect(await updatePet(PET_ID, editForm())).toEqual({ success: false, error: "Pet not found" });
-    // No audit row for a write that did not happen, and the vanished row is gone from the
-    // mirror so an outage fallback cannot serve it.
-    expect(findServerPetById(PET_ID)).toBeNull();
+    const result = await updatePet(PET_ID, { ...editForm(), status: "Pending" as const });
+
+    expect(result).toEqual({ success: false, error: CHANGED_WHILE_SAVING });
+    expect(petUpdateCall().where).toEqual({ id: PET_ID, status: "Available" });
     expect(double.auditLog.create).not.toHaveBeenCalled();
+    // The row may still exist, so the mirror keeps the copy as read, without the refused edit.
+    expect(findServerPetById(PET_ID)).toMatchObject({
+      status: "Available",
+      description: "Edited on another instance after this one loaded the fixture.",
+    });
   });
 
   it("refuses a status change when the status changed after it was read, and keeps the mirror", async () => {
@@ -268,6 +295,40 @@ describe("when the database cannot be read", () => {
     expect(edit.success).toBe(false);
     expect(edit.error).toMatch(/Could not read pet/);
     expect(double.pet.update).not.toHaveBeenCalled();
+    expect(double.pet.updateMany).not.toHaveBeenCalled();
     expect(findServerPetById(PET_ID)?.status).toBe("Available");
+  });
+});
+
+describe("a fault in mapping the row that was read", () => {
+  it("surfaces as itself, not as a database outage", async () => {
+    // A row the query returned but the mapper cannot read: not an outage, so not reported as one.
+    double.pet.findUnique.mockResolvedValue({ ...newerRow(), medicalTimeline: [null] });
+
+    const result = await updatePetStatus(PET_ID, "Pending");
+
+    expect(result.success).toBe(false);
+    expect(result.error).not.toMatch(/Could not read pet/);
+    expect(double.pet.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("photo notifications", () => {
+  it("diffs the submitted gallery against the database's, not the mirror's", async () => {
+    const dbPhoto = "https://example.test/newer-gallery.jpg";
+    const added = "https://example.test/added-by-this-edit.jpg";
+    // The mirror (the fixture) has never seen `dbPhoto`, so diffing against it would mail
+    // supporters about a photo another instance already announced.
+    expect(findServerPetById(PET_ID)?.galleryImages).not.toContain(dbPhoto);
+
+    const result = await updatePet(
+      PET_ID,
+      { ...editForm(), galleryImages: [dbPhoto, added] },
+      { notifySponsors: true }
+    );
+
+    expect(result.success).toBe(true);
+    expect(dispatchPetPhotoUpdate).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(dispatchPetPhotoUpdate).mock.calls[0][0].newImageUrls).toEqual([added]);
   });
 });

@@ -5,7 +5,7 @@
 
 The admin table and the pet edit form send no expected status. `updatePetStatus` and `updatePet`
 (`src/actions/pets.ts`) read the pet from the database at the start of the request, and since
-#210/#211 the status write matches only the status that read returned, so a change *between that
+#210/#211 both writes match only the status that read returned, so a change *between that
 read and the write* is refused. A change made *before the click* is not: the server never learns
 what the admin was looking at.
 
@@ -13,10 +13,16 @@ what the admin was looking at.
   admin whose table still shows Available picks Available. The server reads Adopted, Adopted →
   Available is a legal transition, and the write succeeds: the approval is undone.
 - **Edit form.** The edit dialog submits the whole form, status included. Saving a form opened
-  before the approval writes its old status over Adopted, with no condition at all.
+  before the approval writes its old status over Adopted: the write's condition is the status
+  the server read at save time (Adopted), which still matches, and nothing checks what the form
+  showed.
 
 Out of #210/#211's scope, which is the server's stale mirror; this is new behaviour, so the owner
 decides.
+
+The likely mechanism is optimistic concurrency on a version the client already holds, such as
+an `updatedAt` column the table and form send back and the write matches on, rather than status
+alone, which would also catch a stale form whose status did not change.
 
 **Settles when:** the table and the form send the status they showed, the server puts it in the
 write's `where` (or refuses when it differs from the stored one), and a test approves an animal
