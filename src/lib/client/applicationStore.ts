@@ -53,7 +53,7 @@ export function useApplicationStore() {
     (input: ApplicationFormInput): AdoptionApplicationRecord => {
       const today = new Date().toISOString().split("T")[0];
       const newApp: AdoptionApplicationRecord = {
-        id: `app-${Date.now()}`,
+        id: `app-${crypto.randomUUID()}`,
         petId: input.petId,
         petName: input.petName,
         applicantName: input.applicantName,

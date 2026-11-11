@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 import {
   applicationFormSchema,
   ApplicationFormInput,
@@ -218,7 +219,10 @@ export async function submitApplication(
       const today = new Date().toISOString().split("T")[0];
 
       const draft: Omit<AdoptionApplicationRecord, "referenceCode"> = {
-        id: `app-${Date.now()}`,
+        // Random, not `app-${Date.now()}`: two submissions in the same millisecond shared that id,
+        // the insert raised P2002 on `id`, and `insertWithUniqueReferenceCode` retries only a
+        // `referenceCode` collision, so the second applicant was refused (#201).
+        id: `app-${crypto.randomUUID()}`,
         // The verified row's own id and name, not the request's. Both matter, and neither is
         // cosmetic:
         //
@@ -293,8 +297,20 @@ export async function submitApplication(
     if (err instanceof ApplicationWriteError) {
       return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
     }
-    const msg = err instanceof Error ? err.message : "Failed to submit adoption application";
-    return { success: false, error: msg };
+    // A ZodError's `.message` is `JSON.stringify(issues)`; its first issue is written for the
+    // applicant. Same handling as `submitDonationPledgeAction`.
+    if (err instanceof ZodError) {
+      return {
+        success: false,
+        error: err.issues[0]?.message ?? "Please check the application details and try again.",
+      };
+    }
+    // Never `err.message`: this is an anonymous caller, and a raw P2002 (which
+    // `insertServerApplication` rethrows unwrapped) carried Prisma's own invocation text, model
+    // and column names to the public (#201). Log the cause for staff; the applicant gets the same
+    // message as a refused insert, which is true whatever failed here.
+    console.error("[submitApplication] Unexpected failure", err);
+    return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
   }
 }
 

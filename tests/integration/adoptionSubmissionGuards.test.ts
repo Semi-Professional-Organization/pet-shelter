@@ -357,4 +357,84 @@ describe("submitApplication under strict persistence", () => {
       expect(prismaDouble.pet.findUnique).not.toHaveBeenCalled();
     });
   });
+
+  describe("a database error never reaches the applicant (#201)", () => {
+    /**
+     * A unique violation on `id`, in the shape Prisma 7 with `@prisma/adapter-pg` raises it
+     * (see `src/lib/server/uniqueViolation.ts`), carrying the invocation text the action used to
+     * hand back as `err.message`.
+     */
+    function idCollision() {
+      return Object.assign(
+        new Error(
+          "Invalid `prisma.adoptionApplication.create()` invocation:\n\nUnique constraint failed on the fields: (`id`)"
+        ),
+        {
+          code: "P2002",
+          meta: {
+            modelName: "AdoptionApplication",
+            driverAdapterError: {
+              name: "DriverAdapterError",
+              cause: {
+                originalCode: "23505",
+                originalMessage: 'duplicate key value violates unique constraint "adoption_applications_pkey"',
+                kind: "UniqueConstraintViolation",
+                constraint: { fields: ['"id"'] },
+              },
+            },
+          },
+        }
+      );
+    }
+
+    it("answers a colliding id with the fixed message, not Prisma's text", async () => {
+      givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Available" }));
+      prismaDouble.adoptionApplication.create.mockRejectedValueOnce(idCollision());
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { submitApplication } = await import("@/actions/applications");
+
+      const result = await submitApplication(applicationFor("pet-001"));
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
+      );
+      expect(result.error).not.toMatch(/prisma|unique constraint|invocation/i);
+      // The cause is kept for staff, in the server log.
+      expect(logged).toHaveBeenCalledWith("[submitApplication] Unexpected failure", expect.objectContaining({ code: "P2002" }));
+      logged.mockRestore();
+    });
+
+    it("gives two submissions in the same millisecond different ids", async () => {
+      givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Available" }));
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_762_000_000_000);
+      const { submitApplication } = await import("@/actions/applications");
+
+      try {
+        const first = await submitApplication(applicationFor("pet-001"));
+        const second = await submitApplication(applicationFor("pet-001"));
+
+        expect(first.success).toBe(true);
+        expect(second.success).toBe(true);
+        expect(first.data?.id).not.toBe(second.data?.id);
+      } finally {
+        now.mockRestore();
+      }
+    });
+
+    it("still tells the applicant which field is wrong", async () => {
+      // The fixed message is for failures the applicant cannot act on. A validation error is one
+      // they can, and its `.message` is a JSON array, so the first issue is surfaced instead.
+      const { submitApplication } = await import("@/actions/applications");
+
+      const result = await submitApplication({ ...applicationFor("pet-001"), email: "not-an-email" });
+
+      expect(result.success).toBe(false);
+      expect(result.error).not.toMatch(/^\[/);
+      expect(result.error).not.toBe(
+        "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
+      );
+      expect(prismaDouble.adoptionApplication.create).not.toHaveBeenCalled();
+    });
+  });
 });

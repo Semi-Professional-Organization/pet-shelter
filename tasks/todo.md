@@ -15,6 +15,24 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Hide database errors from adoption applicants (#201)
+
+**Branch:** `claude/hide-application-db-errors` · opened 2026-11-11
+
+- **Done when:** a first insert that raises P2002 on `id` gives the applicant the fixed
+  `APPLICATION_WRITE_UNCONFIRMED_MESSAGE`, not Prisma's text
+  (`tests/integration/adoptionSubmissionGuards.test.ts`).
+- **In scope:** the application id (`crypto.randomUUID()` on the server and in the client store)
+  and `submitApplication`'s outer catch.
+- **Not in scope:** the staff actions' catches in the same file, which still return `err.message`
+  to staff, and the public status lookup's catch (`tasks/open/the-public-status-lookup-returns-raw-error-text.md`).
+
+- [x] Random ids, fixed public message, cause logged, Zod issue surfaced
+- [x] Tests red on revert (all three), green after
+
+**Review:** deliberately not done: the stale `tracking.refPlaceholder` translation still shows an
+`app-<timestamp>` example; the form's own default is a reference code, so it is cosmetic.
+
 # Share the registration rate limit across server instances (#213)
 
 **Branch:** `claude/shared-registration-rate-limit` · opened 2026-11-05
