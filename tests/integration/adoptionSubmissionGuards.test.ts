@@ -380,7 +380,9 @@ describe("submitApplication under strict persistence", () => {
                 originalCode: "23505",
                 originalMessage: 'duplicate key value violates unique constraint "adoption_applications_pkey"',
                 kind: "UniqueConstraintViolation",
-                constraint: { fields: ['"id"'] },
+                // adapter-pg 7.10 reports the constraint's name whenever Postgres gives one,
+                // which it always does for a unique violation.
+                constraint: { index: "adoption_applications_pkey" },
               },
             },
           },
@@ -405,7 +407,7 @@ describe("submitApplication under strict persistence", () => {
         // The cause is kept for staff, in the server log.
         expect(logged).toHaveBeenCalledWith(
           "[submitApplication] Unexpected failure",
-          expect.objectContaining({ code: "P2002", fields: ['"id"'] })
+          expect.objectContaining({ code: "P2002", sqlState: "23505", constraint: "adoption_applications_pkey" })
         );
       } finally {
         logged.mockRestore();
@@ -445,7 +447,9 @@ describe("submitApplication under strict persistence", () => {
         code: "P2002",
         meta: {
           modelName: "AdoptionApplication",
-          driverAdapterError: { cause: { constraint: { fields: ['"referenceCode"'] } } },
+          driverAdapterError: {
+            cause: { originalCode: "23505", constraint: { index: "adoption_applications_referenceCode_key" } },
+          },
         },
       });
       prismaDouble.adoptionApplication.create.mockRejectedValue(referenceCollision);
@@ -459,10 +463,11 @@ describe("submitApplication under strict persistence", () => {
         expect(result.error).toBe(
           "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
         );
-        expect(prismaDouble.adoptionApplication.create.mock.calls.length).toBeGreaterThan(1);
+        // MAX_REFERENCE_CODE_ATTEMPTS: every attempt was a retry, none was given up early.
+        expect(prismaDouble.adoptionApplication.create).toHaveBeenCalledTimes(5);
         expect(logged).toHaveBeenCalledWith(
           expect.stringMatching(/No free reference code/),
-          expect.objectContaining({ fields: ['"referenceCode"'] })
+          expect.objectContaining({ constraint: "adoption_applications_referenceCode_key" })
         );
       } finally {
         logged.mockRestore();

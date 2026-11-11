@@ -38,7 +38,9 @@ Record active multi-step work streams below.
 **Review:** round 1 found the client store's `crypto.randomUUID()` would throw outside a secure
 context after the save (it now draws a local id from `getRandomValues`, after round 3 undid the
 round-1 switch to the server's id) and two loose test assertions. Round 4 found no in-scope
-correctness bug; the log line gained the SQLSTATE and constraint name. Deliberately not
+correctness bug; the log line gained the SQLSTATE and constraint name. Round 5 found none either,
+so the loop stopped; its wording fixes and test-fixture shape (adapter-pg 7.10 names the
+constraint by `index`, not `fields`) were applied without a further round. Deliberately not
 done: the status lookup's catch, its stale placeholder and its id casing, and `createPet`'s
 timestamp id, the unread client store, and `handlePersistenceError` logging a refused row, each
 with its own `tasks/open/` entry; a shared

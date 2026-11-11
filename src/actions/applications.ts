@@ -140,8 +140,13 @@ async function insertWithUniqueReferenceCode(
  * Postgres constraint error's detail prints the failing row, so either would copy an applicant's
  * NRIC, phone and address into host logs
  * (`tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`). A Prisma error is
- * reduced to its name, code, model and constraint columns; anything else is logged whole, since
- * its message is this codebase's or Node's own text.
+ * reduced to its name, code, model, SQLSTATE and constraint name or columns; anything else is
+ * logged whole, since its message is this codebase's or Node's own text.
+ *
+ * ceiling: "from Prisma" is recognised by a `Prisma*` or `DriverAdapterError` name, a `P####`
+ * code, or a `meta.driverAdapterError`. A database error that reached here in some other shape
+ * would be logged whole. Measured only against the shapes in
+ * `tests/integration/adoptionSubmissionGuards.test.ts` and `src/lib/server/uniqueViolation.ts`.
  */
 function describeFailureForLog(err: unknown): unknown {
   if (typeof err !== "object" || err === null) return err;
@@ -159,8 +164,9 @@ function describeFailureForLog(err: unknown): unknown {
   };
   const cause = meta?.driverAdapterError?.cause;
   const fromPrisma =
-    (typeof name === "string" && name.startsWith("Prisma")) ||
-    (typeof code === "string" && /^P\d{4}$/.test(code));
+    (typeof name === "string" && (name.startsWith("Prisma") || name === "DriverAdapterError")) ||
+    (typeof code === "string" && /^P\d{4}$/.test(code)) ||
+    meta?.driverAdapterError !== undefined;
   if (!fromPrisma) return err;
   return {
     name,
@@ -343,7 +349,8 @@ export async function submitApplication(
   } catch (err: unknown) {
     // Thrown, not returned, from inside `withIdempotency`, so a retry with the same key runs again
     // instead of replaying this failure.
-    // The repository has already logged the cause.
+    // Already logged where it was thrown: by the repository for a refused insert, and by
+    // `insertWithUniqueReferenceCode` for exhausted reference-code retries.
     if (err instanceof ApplicationWriteError) {
       return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
     }
