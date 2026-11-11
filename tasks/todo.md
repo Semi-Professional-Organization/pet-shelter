@@ -28,12 +28,14 @@ Record active multi-step work streams below.
   to staff, and the public status lookup's catch (`tasks/open/the-public-status-lookup-returns-raw-error-text.md`).
 
 - [x] Random ids, fixed public message, cause logged, Zod issue surfaced
-- [x] Tests red on revert (all three), green after
+- [x] Server tests red on revert, green after (the client store's id has no test: nothing reads it)
+- [x] Round 2: the new log line reduces a Prisma error to name, code and model, so an applicant's
+  NRIC cannot reach host logs; exhausted reference retries throw `ApplicationWriteError`
 
 **Review:** round 1 found the client store's `crypto.randomUUID()` would throw outside a secure
 context after the save (now uses the server's id) and two loose test assertions. Deliberately not
 done: the status lookup's catch, its stale placeholder and its id casing, and `createPet`'s
-timestamp id, all in `tasks/open/the-public-status-lookup-returns-raw-error-text.md`; a shared
+timestamp id, and the unread client store, each with its own `tasks/open/` entry; a shared
 Zod-to-public-message helper (bulletins and transparency already differ from donations and
 sponsorships, so it wants its own change); and a distinct message for failures before the insert,
 since the unconfirmed message is true for every path that reaches it.

@@ -54,9 +54,10 @@ export function useApplicationStore() {
       const today = new Date().toISOString().split("T")[0];
       const newApp: AdoptionApplicationRecord = {
         // The server's id, so this copy and the row it mirrors are the same record (#201).
-        // The timestamp is only a fallback for a caller with no server record, and is not
-        // `crypto.randomUUID()`, which is undefined outside a secure context (plain-HTTP LAN
+        // Not `crypto.randomUUID()`, which is undefined outside a secure context (plain-HTTP LAN
         // hosts) and would throw after the application was already saved.
+        // ceiling: the timestamp fallback collides within one millisecond; it is reached only by
+        // a caller with no server record, and this localStorage copy has no unique index.
         id: serverId ?? `app-${Date.now()}`,
         petId: input.petId,
         petName: input.petName,

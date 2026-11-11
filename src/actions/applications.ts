@@ -108,6 +108,7 @@ function isReferenceCodeCollision(err: unknown): boolean {
 async function insertWithUniqueReferenceCode(
   draft: Omit<AdoptionApplicationRecord, "referenceCode">
 ): Promise<AdoptionApplicationRecord> {
+  let lastCollision: unknown;
   for (let attempt = 0; attempt < MAX_REFERENCE_CODE_ATTEMPTS; attempt += 1) {
     const candidate: AdoptionApplicationRecord = {
       ...draft,
@@ -119,10 +120,30 @@ async function insertWithUniqueReferenceCode(
       return candidate;
     } catch (err) {
       if (!isReferenceCodeCollision(err)) throw err;
+      lastCollision = err;
     }
   }
 
-  throw new Error("Could not allocate a unique application reference. Please try again.");
+  // Wrapped, so the outer catch answers it like any refused insert and the last collision
+  // survives as the cause.
+  throw new ApplicationWriteError(lastCollision);
+}
+
+/**
+ * What the submit path writes to the server log for an unexpected failure. Never the error
+ * object itself: a Prisma validation error's message renders the whole `data` argument, and a
+ * Postgres constraint error's detail prints the failing row, so either would copy an applicant's
+ * NRIC, phone and address into host logs
+ * (`tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`). A Prisma error is
+ * reduced to its name, code and model; anything else keeps its message, which is this
+ * codebase's own text.
+ */
+function describeFailureForLog(err: unknown): Record<string, unknown> {
+  if (typeof err !== "object" || err === null) return { error: String(err) };
+  const { name, code, meta } = err as { name?: unknown; code?: unknown; meta?: { modelName?: unknown } };
+  const fromPrisma = code !== undefined || (typeof name === "string" && name.startsWith("Prisma"));
+  if (fromPrisma) return { name, code, modelName: meta?.modelName };
+  return { name, message: err instanceof Error ? err.message : undefined };
 }
 
 export async function submitApplication(
@@ -309,7 +330,7 @@ export async function submitApplication(
     // `insertServerApplication` rethrows unwrapped) carried Prisma's own invocation text, model
     // and column names to the public (#201). Log the cause for staff; the applicant gets the same
     // message as a refused insert, which is true whatever failed here.
-    console.error("[submitApplication] Unexpected failure", err);
+    console.error("[submitApplication] Unexpected failure", describeFailureForLog(err));
     return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
   }
 }

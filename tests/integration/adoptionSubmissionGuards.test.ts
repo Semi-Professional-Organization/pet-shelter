@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import { describe, it, expect, beforeEach, beforeAll, vi } from "vitest";
 import {
   getPrismaDouble,
@@ -390,8 +391,8 @@ describe("submitApplication under strict persistence", () => {
     it("answers a colliding id with the fixed message, not Prisma's text", async () => {
       givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Available" }));
       prismaDouble.adoptionApplication.create.mockRejectedValueOnce(idCollision());
-      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
       const { submitApplication } = await import("@/actions/applications");
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
       try {
         const result = await submitApplication(applicationFor("pet-001"));
@@ -411,10 +412,35 @@ describe("submitApplication under strict persistence", () => {
       }
     });
 
+    it("keeps the applicant's details out of the server log", async () => {
+      // A Prisma validation error renders the whole `data` argument in its message.
+      givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Available" }));
+      prismaDouble.adoptionApplication.create.mockRejectedValueOnce(
+        Object.assign(
+          new Error('Invalid `prisma.adoptionApplication.create()` invocation: { identification: "880101-14-5678" }'),
+          { name: "PrismaClientValidationError" }
+        )
+      );
+      const { submitApplication } = await import("@/actions/applications");
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        const result = await submitApplication(applicationFor("pet-001"));
+
+        expect(result.success).toBe(false);
+        expect(result.error).not.toContain("880101");
+        expect(logged).toHaveBeenCalled();
+        // `inspect`, as the console prints it: `JSON.stringify` drops an Error's message.
+        expect(inspect(logged.mock.calls, { depth: 10 })).not.toContain("880101");
+      } finally {
+        logged.mockRestore();
+      }
+    });
+
     it("gives two submissions in the same millisecond different ids", async () => {
       givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Available" }));
-      const now = vi.spyOn(Date, "now").mockReturnValue(1_762_000_000_000);
       const { submitApplication } = await import("@/actions/applications");
+      const now = vi.spyOn(Date, "now").mockReturnValue(1_762_000_000_000);
 
       try {
         const first = await submitApplication(applicationFor("pet-001"));
