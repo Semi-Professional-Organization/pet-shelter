@@ -87,8 +87,8 @@ describe("Cryptographic Primitives & Security", () => {
       const sig1 = signPayload(payload);
       const sig2 = signPayload(payload);
 
-      expect(sig1).toHaveLength(64);
-      expect(/^[0-9a-f]+$/i.test(sig1)).toBe(true);
+      // Lowercase only: verifySignature compares strings, so the case is part of the token.
+      expect(sig1).toMatch(/^[0-9a-f]{64}$/);
       expect(sig1).toEqual(sig2);
     });
 
@@ -144,6 +144,54 @@ describe("Cryptographic Primitives & Security", () => {
       for (const badSig of invalidSignatures) {
         expect(verifySignature(payload, badSig)).toBe(false);
       }
+    });
+
+    // #286: Buffer.from(sig, "hex") stops at the first non-hex character, drops an odd
+    // trailing character and ignores case, so most of these used to decode to the real
+    // signature's bytes and verify. (63 characters, a leading space and a 0x prefix were
+    // already refused; they are here so the table states the whole rule.) One signed
+    // payload must have exactly one valid token.
+    describe("accepts only the exact signature string (#286)", () => {
+      const payload = '{"userId":"staff-1","role":"COORDINATOR"}';
+      const validSig = signPayload(payload);
+
+      it.each([
+        ["a trailing 0", (sig: string) => `${sig}0`],
+        ["a trailing zz", (sig: string) => `${sig}zz`],
+        ["uppercase", (sig: string) => sig.toUpperCase()],
+        ["one uppercase letter", (sig: string) => sig.replace(/[a-f]/, (c) => c.toUpperCase())],
+        ["63 characters", (sig: string) => sig.slice(0, 63)],
+        ["65 characters", (sig: string) => `${sig}${sig.slice(0, 1)}`],
+        ["a trailing newline", (sig: string) => `${sig}\n`],
+        ["a leading space", (sig: string) => ` ${sig}`],
+        ["a trailing space", (sig: string) => `${sig} `],
+        ["a 0x prefix", (sig: string) => `0x${sig}`],
+      ])("rejects the real signature with %s", (_label, alter) => {
+        const altered = alter(validSig);
+        expect(altered).not.toBe(validSig);
+        expect(verifySignature(payload, altered)).toBe(false);
+      });
+
+      // Without the typeof guard a Buffer, Uint8Array or DataView of the same characters
+      // hashes like the string and verifies; a String object or undefined throws instead.
+      const nonStrings = (text: string): [string, unknown][] => {
+        const bytes = Buffer.from(text, "utf8");
+        return [
+          ["a Buffer", bytes],
+          ["a Uint8Array", new Uint8Array(bytes)],
+          ["a DataView", new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)],
+          ["a String object", new String(text)],
+          ["undefined", undefined],
+        ];
+      };
+
+      it.each(nonStrings(validSig))("refuses the real signature passed as %s", (_label, value) => {
+        expect(verifySignature(payload, value as string)).toBe(false);
+      });
+
+      it.each(nonStrings(payload))("refuses the real payload passed as %s", (_label, value) => {
+        expect(verifySignature(value as string, validSig)).toBe(false);
+      });
     });
   });
 
