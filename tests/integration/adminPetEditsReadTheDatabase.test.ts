@@ -7,7 +7,7 @@ import {
   type PrismaDouble,
 } from "./support/prismaDouble";
 import { signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
-import { updatePet, updatePetStatus } from "@/actions/pets";
+import { getPetById, updatePet, updatePetStatus } from "@/actions/pets";
 import { findServerPetById, findServerPetByIdAsync, updateServerPet } from "@/lib/server/petRepository";
 import { dispatchPetPhotoUpdate } from "@/lib/domain/photoUpdateDispatch";
 
@@ -104,6 +104,8 @@ beforeEach(async () => {
   );
   // One row matched, as for a status write whose row still holds the status it was read with.
   double.pet.updateMany.mockResolvedValue({ count: 1 });
+  // A module mock, so neither `resetPrismaDouble` nor `restoreAllMocks` clears its calls.
+  vi.mocked(dispatchPetPhotoUpdate).mockClear();
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
   await signInAsAdmin();
@@ -274,6 +276,22 @@ describe("updateServerPet", () => {
     expect(findServerPetById(PET_ID)?.description).toBe(pet.description);
   });
 
+  it("keeps a newer mirror copy from this instance when a status write lands on it", async () => {
+    const pet = (await findServerPetByIdAsync(PET_ID))!;
+    // Another write on this instance, after `pet` was read: the mirror is now newer than `pet`.
+    const newer = { ...pet, description: "Newer, from this instance." };
+    await updateServerPet(PET_ID, newer, TEST_ADMIN_ACTOR, {}, { baseline: pet });
+
+    const statusOnly = { baseline: pet, columns: "status" as const };
+    const stored = await updateServerPet(PET_ID, { ...pet, status: "Pending" }, TEST_ADMIN_ACTOR, {}, statusOnly);
+
+    expect(stored).toMatchObject({ status: "Pending", description: "Newer, from this instance." });
+    expect(findServerPetById(PET_ID)).toMatchObject({
+      status: "Pending",
+      description: "Newer, from this instance.",
+    });
+  });
+
   it("refuses a status-only write that would also replace history", async () => {
     const pet = (await findServerPetByIdAsync(PET_ID))!;
     await expect(
@@ -301,7 +319,15 @@ describe("when the database cannot be read", () => {
 });
 
 describe("a fault in mapping the row that was read", () => {
-  it("surfaces as itself, not as a database outage", async () => {
+  it("still falls back to the mirror on the display path, as it always has", async () => {
+    double.pet.findUnique.mockResolvedValue({ ...newerRow(), medicalTimeline: [null] });
+
+    expect((await findServerPetByIdAsync(PET_ID))?.description).toBe(fixture.description);
+    // And so the public profile is served rather than failing.
+    expect((await getPetById(PET_ID))?.id).toBe(PET_ID);
+  });
+
+  it("surfaces as itself on a write path, not as a database outage", async () => {
     // A row the query returned but the mapper cannot read: not an outage, so not reported as one.
     double.pet.findUnique.mockResolvedValue({ ...newerRow(), medicalTimeline: [null] });
 

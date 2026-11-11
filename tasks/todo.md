@@ -54,6 +54,12 @@ Record active multi-step work streams below.
   in the batch rolls the history deletes back), and no miss drops the mirror any more; only the
   query is treated as an outage in the refusing read; tests for the edit race, the photo diff's
   baseline and a mapping fault; decision entry for moving `orNullIfMissing`.
+- [x] Review round 4 (xhigh): the display read maps inside its `try` again, as on main (a row the
+  mapper cannot read serves the mirror; only the refusing read lets a mapping fault surface); a
+  status write stores, returns and audits the mirror's current copy plus the new status, so a
+  newer write on this instance is not reverted; the photo test's module mock is cleared per test.
+  Declined again: `deletedAt` precision and the stale-client status (both already open), the
+  strict-mode `count: 0` vs P2025 asymmetry (a miss is a concurrency answer, not a broken query).
 
 **Review:** deliberately not done: a write the database refuses for any reason other than a missed
 row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side

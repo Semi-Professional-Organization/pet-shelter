@@ -154,12 +154,21 @@ export async function findServerPetByIdAsync(
 ): Promise<Pet | null> {
   const norm = id.trim().toLowerCase();
   if (isDatabasePersistent()) {
+    const remember = (row: unknown): Pet | null => {
+      if (!row) return null;
+      const pet = mapDbPetToPet(row as DbPetRecord);
+      serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
+      return pet;
+    };
     let row;
     try {
       row = await prisma.pet.findUnique({
         where: { id: id.trim() },
         include: PET_INCLUDE,
       });
+      // The display path maps inside the `try`, as it always has, so a row the mapper cannot read
+      // falls back to the mirror like an outage does.
+      if (onOutage === "mirror") return remember(row);
     } catch (err) {
       // The admin edits read their starting copy here and must not start from the mirror, which
       // on a cold instance is `src/data/pets.json`: they ask to be refused instead.
@@ -167,11 +176,9 @@ export async function findServerPetByIdAsync(
       handlePersistenceError("Prisma pet find by id", err, "read");
       return findServerPetById(id);
     }
-    // Outside the `try`: only the query is an outage. A mapping fault surfaces as itself.
-    if (!row) return null;
-    const pet = mapDbPetToPet(row as unknown as DbPetRecord);
-    serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
-    return pet;
+    // A write path maps outside the `try`: only the query is an outage, and a mapping fault
+    // surfaces as itself rather than as "could not read".
+    return remember(row);
   }
   return findServerPetById(id);
 }
@@ -407,7 +414,10 @@ export async function updateServerPet(
   const keptFrom = serverPets.find((p) => p.id === storedId) ?? previous;
   // A status write changed one column, so it reports the baseline with that column, not the
   // caller's whole object: nothing it did not write is reported as stored.
-  const written: Pet = columns === "status" ? { ...previous, status: updated.status } : updated;
+  // It starts from the mirror's current copy (`keptFrom`, the baseline when the mirror has none), so
+  // a newer write this instance made since the read is not reverted in the mirror, and the
+  // returned pet and the audit row's `after` report that same copy.
+  const written: Pet = columns === "status" ? { ...keptFrom, status: updated.status } : updated;
   const stored: Pet = {
     ...written,
     id: storedId,
