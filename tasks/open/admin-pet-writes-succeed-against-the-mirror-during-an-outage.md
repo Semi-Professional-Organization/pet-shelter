@@ -11,10 +11,13 @@ rewriting `updateServerPet` would conflict.
 Since #210/#211, `updatePet` and `updatePetStatus` in `src/actions/pets.ts` read the existing
 animal from the database and refuse when it cannot be read (`readPetForEdit`), so only the write
 side remains for them. `archiveServerPet` (behind `toggleArchivePet`) in
-`src/lib/server/petRepository.ts` still looks in the mirror first. Then `updateServerPet` and
-`archiveServerPet` both pass a failed `prisma.pet.update` (other than P2025, which
-`updateServerPet` now reports as nothing written) to `handlePersistenceError(…, "write")`, which
-swallows it outside strict mode, and update the mirror and the audit log anyway. So during an outage a staff edit or archive is reported as
+`src/lib/server/petRepository.ts` still looks in the mirror first. On the write side,
+`updateServerPet` sends a status change through `prisma.pet.updateMany` (a `count: 0` miss is
+reported as nothing written) and a full edit through a `$transaction` around `prisma.pet.update`
+(a P2025 miss is reported as nothing written), and `archiveServerPet` through `prisma.pet.update`.
+Any other failure on any of the three, an outage included, goes to
+`handlePersistenceError(…, "write")`, which swallows it outside strict mode, and the mirror and
+the audit log are updated anyway. So during an outage a staff edit or archive is reported as
 saved, written to an audit row, and lost at the next restart. Archiving is the shelter's "take
 this down" action, so a lost archive leaves the animal up while staff believe it is down.
 

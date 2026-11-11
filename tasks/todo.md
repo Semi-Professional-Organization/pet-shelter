@@ -72,6 +72,12 @@ Record active multi-step work streams below.
   refusing read refreshes the mirror before `readPetForEdit` rejects a non-verbatim id (it writes
   true database data); the display read serving the fixture on a mapper fault (main's behaviour,
   restored on purpose); the redundant `id` parameter; status-path joins.
+- [x] Review round 6 (xhigh): no in-scope correctness finding. Cleanups only: a `ceiling:` comment
+  on the status guard, each write builds its own payload, a simpler status-write mirror copy, and
+  the #204 entry corrected for the `updateMany` and `$transaction` write paths. Declined repeats:
+  the archive race, `deletedAt` precision, the batch-rollback test, the strict-mode `count: 0`
+  vs P2025 asymmetry, status-path joins, validating before the read, the `onOutage` naming, the
+  redundant `id` parameter, a separate status writer, a shared `prismaCode`.
 
 **Review:** deliberately not done: a write the database refuses for any reason other than a missed
 row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side

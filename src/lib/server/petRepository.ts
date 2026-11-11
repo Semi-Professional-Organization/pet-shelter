@@ -356,18 +356,21 @@ export async function updateServerPet(
   const expectedStatus = isKnownPetStatus(previous.status) ? toDbPetStatus(previous.status) : undefined;
   // Both writes match only while the row still holds the status the transition was checked
   // against, so an approval landing between the caller's read and this write is not overwritten.
+  // ceiling: status is the only column guarded. Any other change landing between the read and the
+  // write (an archive, another edit) is overwritten by a full edit, and an admin table or form that
+  // was already stale when submitted is not detected at all. Upgrade path: match on an `updatedAt`
+  // version the client sends back — tasks/open/admin-pet-writes-send-no-expected-status.md.
   const where = { id: storedId, ...(expectedStatus ? { status: expectedStatus } : {}) };
-  const data =
-    columns === "status"
-      ? { status: toDbPetStatus(updated.status) }
-      : buildPetUpdatePayload(updated, replaceHistory);
 
   try {
     if (columns === "status") {
       // `updateMany` reports a miss as `count: 0` rather than an error, as
       // `atomicUpdateApplicationStatus` relies on. The row may well still exist with a newer
       // status, so the mirror is left alone.
-      const { count } = await prisma.pet.updateMany({ where, data });
+      const { count } = await prisma.pet.updateMany({
+        where,
+        data: { status: toDbPetStatus(updated.status) },
+      });
       if (count === 0) {
         console.warn(
           `[Database Store] Pet status write matched no row for ${JSON.stringify(storedId)}: deleted or changed since it was read`
@@ -386,7 +389,7 @@ export async function updateServerPet(
         ...(replaceHistory.medicalTimeline
           ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: storedId } })]
           : []),
-        prisma.pet.update({ where, data }),
+        prisma.pet.update({ where, data: buildPetUpdatePayload(updated, replaceHistory) }),
       ]);
     }
   } catch (err) {
@@ -426,8 +429,9 @@ export async function updateServerPet(
   const stored: Pet = { ...written, id: storedId, ...history };
   // The mirror, though, keeps its own current copy under a status write, so a newer write this
   // instance made since the read is not reverted there.
-  const mirrored: Pet =
-    columns === "status" ? { ...keptFrom, status: updated.status, id: storedId, ...history } : stored;
+  // `keptFrom` already carries the stored id and, since a status write replaces no history, its
+  // own history.
+  const mirrored: Pet = columns === "status" ? { ...keptFrom, status: updated.status } : stored;
   serverPets = serverPets.map((p) => (p.id === storedId ? mirrored : p));
 
   const auditedHistory = (pet: Pet): Partial<Pet> => {
