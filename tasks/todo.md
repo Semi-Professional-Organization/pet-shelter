@@ -44,6 +44,89 @@ decodes before the codec sees them (`a-token-is-exact-only-after-the-request-is-
 trimming a notification link that picked up trailing punctuation
 (`a-preference-link-with-trailing-punctuation-is-refused.md`).
 
+# Pet edits read the database and fail when nothing was written (#210, #211)
+
+**Branch:** `fix/pet-edits-read-database` · opened 2026-11-11
+
+- **Done when:** `updatePet` and `updatePetStatus` start from the database, a status change writes
+  only `status`, a miscased or padded id fails, and a write that matched no row fails, pinned by
+  `tests/integration/adminPetEditsReadTheDatabase.test.ts`.
+- **In scope:** `src/actions/pets.ts` (`readPetForEdit`), `updateServerPet` (required `baseline`,
+  stored id, both writes conditional on the status read, status-only `updateMany`, P2025 /
+  `count: 0` as `null`),
+  `findServerPetByIdAsync`'s `onOutage: "refuse"`.
+- **Not in scope:** outage-mode writes (#204), the client store's merge rules (#212), the archive
+  path (`tasks/open/pet-archive-reports-success-for-an-id-it-did-not-write.md`), and a stale
+  table or form (`tasks/open/admin-pet-writes-send-no-expected-status.md`).
+- **What the status condition covers, plainly:** only the window between this request's database
+  read and its write. It does **not** protect against an admin table or edit form that was
+  already stale when the admin clicked: neither sends the status it showed, so a stale status
+  dropdown can still move Adopted back to Available (a legal transition), and a stale edit form
+  writes its old status, because the condition is the status read at save time, not the one the
+  form showed.
+
+- [x] Read path, stored-id write, status-only write, P2025 as `null`
+- [x] Tests: mirror/database disagree, miscased and padded ids, row deleted, status changed in
+  between, off-enum stored status, unreadable database
+- [x] Admin table rollback checked: `usePetTableController` already rolls back on `success: false`
+- [x] Review round 1 (xhigh): status write conditional on the status read; the action's database
+  copy passed in as `baseline`; status-only write refuses a history replacement; refused outage
+  read logs; P2025 logs, rethrows in strict mode; returned pet carries the stored id;
+  `getStoredGalleryImages` removed; `isRecordNotFound` shared; the #204 entry updated.
+- [x] Review round 2 (xhigh): status write is an `updateMany` checked on `count` and keeps the
+  mirror on a miss (only an edit's P2025, a deleted row, drops it); an off-enum stored status is
+  matched on id alone instead of throwing inside the `try` (`ceiling:` comment); a status write
+  reports the baseline plus the new status; `baseline` required and the id must equal its stored
+  id; one `refuseForWrite` and one shared `orNullIfMissing`; error text no longer claims to catch
+  a stale table; runbook §1 cross-reference fixed in its own commit.
+- [x] Review round 3 (xhigh): the full edit's write is conditional on the status read too (P2025
+  in the batch rolls the history deletes back), and no miss drops the mirror any more; only the
+  query is treated as an outage in the refusing read; tests for the edit race, the photo diff's
+  baseline and a mapping fault; decision entry for moving `orNullIfMissing`.
+- [x] Review round 4 (xhigh): the display read maps inside its `try` again, as on main (a row the
+  mapper cannot read serves the mirror; only the refusing read lets a mapping fault surface); a
+  status write stores, returns and audits the mirror's current copy plus the new status, so a
+  newer write on this instance is not reverted; the photo test's module mock is cleared per test.
+  Declined again: `deletedAt` precision and the stale-client status (both already open), the
+  strict-mode `count: 0` vs P2025 asymmetry (a miss is a concurrency answer, not a broken query).
+- [x] Review round 5 (xhigh): round 4 also made a status write's returned pet and audit `after`
+  the mirror's copy, so a mirror older or newer than the baseline put description changes this
+  write never made into the permanent audit row. The returned pet and audit now report the
+  baseline plus the new status (what the database saw); only the mirror keeps its own copy.
+  Declined: a full edit's condition checks status only, so an archive landing between read and
+  write is overwritten (the `updatedAt` mechanism in
+  `tasks/open/admin-pet-writes-send-no-expected-status.md` would cover it); the batch
+  transaction's rollback of history deletes on P2025 is untested here because the double runs
+  `Promise.all` (it rests on Prisma's documented batch atomicity; `test:db` could pin it); the
+  refusing read refreshes the mirror before `readPetForEdit` rejects a non-verbatim id (it writes
+  true database data); the display read serving the fixture on a mapper fault (main's behaviour,
+  restored on purpose); the redundant `id` parameter; status-path joins.
+- [x] Review round 6 (xhigh): no in-scope correctness finding. Cleanups only: a `ceiling:` comment
+  on the status guard, each write builds its own payload, a simpler status-write mirror copy, and
+  the #204 entry corrected for the `updateMany` and `$transaction` write paths. Declined repeats:
+  the archive race, `deletedAt` precision, the batch-rollback test, the strict-mode `count: 0`
+  vs P2025 asymmetry, status-path joins, validating before the read, the `onOutage` naming, the
+  redundant `id` parameter, a separate status writer, a shared `prismaCode`.
+- [x] Review round 7 (xhigh): no in-scope correctness finding, the second clean round in a row, so
+  the loop stops. Cleanups: the "what the database saw" comment now says a non-miss failure still
+  arrives unwritten (#204); the rehab-fields open entry names the status-only write; a redundant
+  `vi.unstubAllEnvs()` removed. Everything else repeated rounds 1-6's declined list.
+
+**Review:** deliberately not done: a write the database refuses for any reason other than a missed
+row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side
+now refuses, so this narrows it rather than widening it). Declined from review: a row-only read
+for the status path (performance and fault coupling only), the archive padded-id bug (already
+open), the dead link in a closed decision entry (decisions are not rewritten), and sending the
+expected status from the client (new behaviour, recorded for the owner; an `updatedAt` version
+is the likely mechanism). Round 3 declined: the server half of the edit-merge defaults (the form
+schema's defaults wipe a newer gallery/QR and un-archive an animal on a partial form), appended
+to the #212 entry; `deletedAt` precision, recorded in
+`tasks/open/a-pet-edit-round-trips-deletedat-through-date-tostring.md` because both one-line
+fixes change other behaviour; strict-mode P2025 rethrow (contract stays); exact-id lookups at a
+lower altitude; a separate `updateServerPetStatus`; a shared `prismaCode` helper. One message covers
+"deleted" and "status changed" for a failed status write; `count: 0` does not tell them apart
+without a second read.
+
 # Share the registration rate limit across server instances (#213)
 
 **Branch:** `claude/shared-registration-rate-limit` · opened 2026-11-05

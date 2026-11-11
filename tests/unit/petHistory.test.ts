@@ -745,7 +745,8 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
         "pet-hist-update-01",
         { ...pet, medicalTimeline: [timelineIntake], updates: undefined },
         TEST_ADMIN_ACTOR,
-        { updates: true, medicalTimeline: true }
+        { updates: true, medicalTimeline: true },
+        { baseline: pet }
       );
 
       // Clear-then-write must be ordered and atomic: a nested create alone would
@@ -779,14 +780,16 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
         "pet-hist-update-02",
         { ...pet, medicalTimeline: [timelineIntake] },
         TEST_ADMIN_ACTOR,
-        { medicalTimeline: true }
+        { medicalTimeline: true },
+        { baseline: pet }
       );
 
       const stored = await updateServerPet(
         "pet-hist-update-02",
         { ...pet, name: "Tuah Stale Copy" },
         TEST_ADMIN_ACTOR,
-        {}
+        {},
+        { baseline: pet }
       );
 
       expect(stored?.name).toBe("Tuah Stale Copy");
@@ -971,14 +974,19 @@ describe("Nested Pet History Persistence (updates[] & medicalTimeline[])", () =>
       const created = await createPet({ ...baseForm, name: "Tuah Cleared For Adoption" });
       const petId = created.data!.id;
       prismaSpies.transaction.mockClear();
+      prismaSpies.petUpdateDeleteMany.mockClear();
+      prismaSpies.timelineDeleteMany.mockClear();
+      // A status write is a conditional `updateMany`; one row matched.
+      prismaSpies.petUpdateMany.mockResolvedValueOnce({ count: 1 });
 
       expect((await updatePetStatus(petId, "Available")).success).toBe(true);
 
-      const queued = prismaSpies.transaction.mock.calls[0]?.[0] as { __op: string; __args: unknown }[];
-      expect(queued.map((q) => q.__op)).toEqual(["pet.update"]);
-      const data = (queued[0].__args as { data: Record<string, unknown> }).data;
-      expect("updates" in data).toBe(false);
-      expect("medicalTimeline" in data).toBe(false);
+      // The status column alone, outside any history transaction.
+      expect(prismaSpies.transaction).not.toHaveBeenCalled();
+      expect(prismaSpies.petUpdateDeleteMany).not.toHaveBeenCalled();
+      expect(prismaSpies.timelineDeleteMany).not.toHaveBeenCalled();
+      const args = prismaSpies.petUpdateMany.mock.calls.at(-1)?.[0] as { data: Record<string, unknown> };
+      expect(args.data).toEqual({ status: "Available" });
       expect((await getPetById(petId))?.medicalTimeline?.length).toBe(2);
     });
 
