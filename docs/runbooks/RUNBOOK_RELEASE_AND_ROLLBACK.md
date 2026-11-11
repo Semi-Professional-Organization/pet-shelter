@@ -26,9 +26,10 @@ The full Preview variable list is in
 [RUNBOOK_VERCEL_DEPLOY_VERIFICATION.md §2](RUNBOOK_VERCEL_DEPLOY_VERIFICATION.md#preview).
 
 The preview's Neon branch is a copy of production from the moment it was created and does not
-follow later migrations. Before testing a PR that needs a new schema, apply that PR's
-`migration.sql` to the preview branch first (§3 step 3), or reset the branch from production in the
-Neon Console (Branches → the preview branch → **Reset from parent**).
+follow later migrations. Before testing a PR that needs a new schema, run that PR's
+`migration.sql` on the preview branch in the Neon SQL Editor (the same steps §3 step 3 uses on a
+throwaway branch, but keep this branch), or reset the branch from production in the Neon Console
+(Branches → the preview branch → **Reset from parent**).
 
 ---
 
