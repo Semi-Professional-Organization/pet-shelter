@@ -50,10 +50,14 @@ export function useApplicationStore() {
   }, []);
 
   const addApplication = useCallback(
-    (input: ApplicationFormInput): AdoptionApplicationRecord => {
+    (input: ApplicationFormInput, serverId?: string): AdoptionApplicationRecord => {
       const today = new Date().toISOString().split("T")[0];
       const newApp: AdoptionApplicationRecord = {
-        id: `app-${crypto.randomUUID()}`,
+        // The server's id, so this copy and the row it mirrors are the same record (#201).
+        // The timestamp is only a fallback for a caller with no server record, and is not
+        // `crypto.randomUUID()`, which is undefined outside a secure context (plain-HTTP LAN
+        // hosts) and would throw after the application was already saved.
+        id: serverId ?? `app-${Date.now()}`,
         petId: input.petId,
         petName: input.petName,
         applicantName: input.applicantName,

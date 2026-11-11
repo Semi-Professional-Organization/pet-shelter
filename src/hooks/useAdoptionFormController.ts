@@ -235,7 +235,7 @@ export function useAdoptionFormController({
       petId: written?.petId ?? input.petId,
       petName: written?.petName ?? input.petName,
     };
-    addApplication({ ...input, ...recordedPet });
+    addApplication({ ...input, ...recordedPet }, written?.id);
     setSubmittedData({ ...data, ...recordedPet });
     setIsSubmitted(true);
   };

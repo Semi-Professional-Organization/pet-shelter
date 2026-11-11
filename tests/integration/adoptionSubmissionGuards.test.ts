@@ -393,16 +393,22 @@ describe("submitApplication under strict persistence", () => {
       const logged = vi.spyOn(console, "error").mockImplementation(() => {});
       const { submitApplication } = await import("@/actions/applications");
 
-      const result = await submitApplication(applicationFor("pet-001"));
+      try {
+        const result = await submitApplication(applicationFor("pet-001"));
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe(
-        "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
-      );
-      expect(result.error).not.toMatch(/prisma|unique constraint|invocation/i);
-      // The cause is kept for staff, in the server log.
-      expect(logged).toHaveBeenCalledWith("[submitApplication] Unexpected failure", expect.objectContaining({ code: "P2002" }));
-      logged.mockRestore();
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(
+          "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
+        );
+        expect(result.error).not.toMatch(/prisma|unique constraint|invocation/i);
+        // The cause is kept for staff, in the server log.
+        expect(logged).toHaveBeenCalledWith(
+          "[submitApplication] Unexpected failure",
+          expect.objectContaining({ code: "P2002" })
+        );
+      } finally {
+        logged.mockRestore();
+      }
     });
 
     it("gives two submissions in the same millisecond different ids", async () => {
@@ -430,10 +436,7 @@ describe("submitApplication under strict persistence", () => {
       const result = await submitApplication({ ...applicationFor("pet-001"), email: "not-an-email" });
 
       expect(result.success).toBe(false);
-      expect(result.error).not.toMatch(/^\[/);
-      expect(result.error).not.toBe(
-        "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
-      );
+      expect(result.error).toBe("Please enter a valid email address");
       expect(prismaDouble.adoptionApplication.create).not.toHaveBeenCalled();
     });
   });
