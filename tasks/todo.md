@@ -15,6 +15,39 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Hide database errors from adoption applicants (#201)
+
+**Branch:** `claude/hide-application-db-errors` · opened 2026-11-11
+
+- **Done when:** a first insert that raises P2002 on `id` gives the applicant the fixed
+  `APPLICATION_WRITE_UNCONFIRMED_MESSAGE`, not Prisma's text
+  (`tests/integration/adoptionSubmissionGuards.test.ts`).
+- **In scope:** the application id (`crypto.randomUUID()` on the server, a random local id from
+  `getRandomValues` in the client store) and `submitApplication`'s outer catch.
+- **Not in scope:** the staff actions' catches in the same file, which still return `err.message`
+  to staff, and the public status lookup's catch (`tasks/open/the-public-status-lookup-returns-raw-error-text.md`).
+
+- [x] Random ids, fixed public message, cause logged, Zod issue surfaced
+- [x] Server tests red on revert, green after (the client store's id has no test: nothing reads it)
+- [x] Round 2: the new log line reduces a Prisma error to name, code and model, so an applicant's
+  NRIC cannot reach host logs; exhausted reference retries throw `ApplicationWriteError`
+- [x] Round 3: exhausted retries are logged (they were silent after round 2); the log keeps the
+  constraint columns; the client copy went back to a local id, since storing the server's id beside
+  the email made localStorage a tracking-portal credential
+
+**Review:** round 1 found the client store's `crypto.randomUUID()` would throw outside a secure
+context after the save (it now draws a local id from `getRandomValues`, after round 3 undid the
+round-1 switch to the server's id) and two loose test assertions. Round 4 found no in-scope
+correctness bug; the log line gained the SQLSTATE and constraint name. Round 5 found none either,
+so the loop stopped; its wording fixes and test-fixture shape (adapter-pg 7.10 names the
+constraint by `index`, not `fields`) were applied without a further round. Deliberately not
+done: the status lookup's catch, its stale placeholder and its id casing, and `createPet`'s
+timestamp id, the unread client store, and `handlePersistenceError` logging a refused row, each
+with its own `tasks/open/` entry; a shared
+Zod-to-public-message helper (bulletins and transparency already differ from donations and
+sponsorships, so it wants its own change); and a distinct message for failures before the insert,
+since the unconfirmed message is true for every path that reaches it.
+
 # Accept only the exact session signature (#286)
 
 **Branch:** `claude/strict-signature-hex` · opened 2026-11-11

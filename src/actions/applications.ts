@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 import {
   applicationFormSchema,
   ApplicationFormInput,
@@ -107,6 +108,7 @@ function isReferenceCodeCollision(err: unknown): boolean {
 async function insertWithUniqueReferenceCode(
   draft: Omit<AdoptionApplicationRecord, "referenceCode">
 ): Promise<AdoptionApplicationRecord> {
+  let lastCollision: unknown;
   for (let attempt = 0; attempt < MAX_REFERENCE_CODE_ATTEMPTS; attempt += 1) {
     const candidate: AdoptionApplicationRecord = {
       ...draft,
@@ -118,10 +120,65 @@ async function insertWithUniqueReferenceCode(
       return candidate;
     } catch (err) {
       if (!isReferenceCodeCollision(err)) throw err;
+      lastCollision = err;
     }
   }
 
-  throw new Error("Could not allocate a unique application reference. Please try again.");
+  // Logged here because `handlePersistenceError` rethrows a P2002 without logging it, and the
+  // outer catch does not log an `ApplicationWriteError`. Wrapped, so the applicant gets the same
+  // answer as any refused insert.
+  console.error(
+    `[submitApplication] No free reference code after ${MAX_REFERENCE_CODE_ATTEMPTS} attempts`,
+    describeFailureForLog(lastCollision)
+  );
+  throw new ApplicationWriteError(lastCollision);
+}
+
+/**
+ * What the submit path writes to the server log for an unexpected failure. Never the error
+ * object itself: a Prisma validation error's message renders the whole `data` argument, and a
+ * Postgres constraint error's detail prints the failing row, so either would copy an applicant's
+ * NRIC, phone and address into host logs
+ * (`tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`). A Prisma error is
+ * reduced to its name, code, model, SQLSTATE and constraint name or columns; anything else is
+ * logged whole, since its message is this codebase's or Node's own text.
+ *
+ * ceiling: "from Prisma" is recognised by a `Prisma*` or `DriverAdapterError` name, a `P####`
+ * code, or a `meta.driverAdapterError`. A database error that reached here in some other shape
+ * would be logged whole. Measured only against the shapes in
+ * `tests/integration/adoptionSubmissionGuards.test.ts` and `src/lib/server/uniqueViolation.ts`.
+ */
+function describeFailureForLog(err: unknown): unknown {
+  if (typeof err !== "object" || err === null) return err;
+  const { name, code, errorCode, meta } = err as {
+    name?: unknown;
+    code?: unknown;
+    errorCode?: unknown;
+    meta?: {
+      modelName?: unknown;
+      target?: unknown;
+      driverAdapterError?: {
+        cause?: { originalCode?: unknown; constraint?: { fields?: unknown; index?: unknown } };
+      };
+    };
+  };
+  const cause = meta?.driverAdapterError?.cause;
+  const fromPrisma =
+    (typeof name === "string" && (name.startsWith("Prisma") || name === "DriverAdapterError")) ||
+    (typeof code === "string" && /^P\d{4}$/.test(code)) ||
+    meta?.driverAdapterError !== undefined;
+  if (!fromPrisma) return err;
+  return {
+    name,
+    // An initialization error carries its code as `errorCode`.
+    code: code ?? errorCode,
+    modelName: meta?.modelName,
+    sqlState: cause?.originalCode,
+    // Names only, never values: which unique an insert broke is what tells an `id` collision
+    // (#201) from a reference-code one.
+    fields: cause?.constraint?.fields ?? meta?.target,
+    constraint: cause?.constraint?.index,
+  };
 }
 
 export async function submitApplication(
@@ -218,7 +275,10 @@ export async function submitApplication(
       const today = new Date().toISOString().split("T")[0];
 
       const draft: Omit<AdoptionApplicationRecord, "referenceCode"> = {
-        id: `app-${Date.now()}`,
+        // Random, not `app-${Date.now()}`: two submissions in the same millisecond shared that id,
+        // the insert raised P2002 on `id`, and `insertWithUniqueReferenceCode` retries only a
+        // `referenceCode` collision, so the second applicant was refused (#201).
+        id: `app-${crypto.randomUUID()}`,
         // The verified row's own id and name, not the request's. Both matter, and neither is
         // cosmetic:
         //
@@ -289,12 +349,25 @@ export async function submitApplication(
   } catch (err: unknown) {
     // Thrown, not returned, from inside `withIdempotency`, so a retry with the same key runs again
     // instead of replaying this failure.
-    // The repository has already logged the cause.
+    // Already logged where it was thrown: by the repository for a refused insert, and by
+    // `insertWithUniqueReferenceCode` for exhausted reference-code retries.
     if (err instanceof ApplicationWriteError) {
       return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
     }
-    const msg = err instanceof Error ? err.message : "Failed to submit adoption application";
-    return { success: false, error: msg };
+    // A ZodError's `.message` is `JSON.stringify(issues)`; its first issue is written for the
+    // applicant. Same handling as `submitDonationPledgeAction`.
+    if (err instanceof ZodError) {
+      return {
+        success: false,
+        error: err.issues[0]?.message ?? "Please check the application details and try again.",
+      };
+    }
+    // Never `err.message`: this is an anonymous caller, and a raw P2002 (which
+    // `insertServerApplication` rethrows unwrapped) carried Prisma's own invocation text, model
+    // and column names to the public (#201). Log the cause for staff; the applicant gets the same
+    // message as a refused insert, which is true whatever failed here.
+    console.error("[submitApplication] Unexpected failure", describeFailureForLog(err));
+    return { success: false, error: APPLICATION_WRITE_UNCONFIRMED_MESSAGE };
   }
 }
 
