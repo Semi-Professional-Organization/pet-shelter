@@ -50,15 +50,17 @@ export function useApplicationStore() {
   }, []);
 
   const addApplication = useCallback(
-    (input: ApplicationFormInput, serverId?: string): AdoptionApplicationRecord => {
+    (input: ApplicationFormInput): AdoptionApplicationRecord => {
       const today = new Date().toISOString().split("T")[0];
       const newApp: AdoptionApplicationRecord = {
-        // The server's id, so this copy and the row it mirrors are the same record (#201).
-        // Not `crypto.randomUUID()`, which is undefined outside a secure context (plain-HTTP LAN
-        // hosts) and would throw after the application was already saved.
-        // ceiling: the timestamp fallback collides within one millisecond; it is reached only by
-        // a caller with no server record, and this localStorage copy has no unique index.
-        id: serverId ?? `app-${Date.now()}`,
+        // A local id, deliberately not the server's: the tracking portal accepts an application
+        // id with its email, so storing both here would turn this localStorage copy into a
+        // credential on a shared device. Random rather than `Date.now()` (#201), and from
+        // `getRandomValues` rather than `randomUUID`, which is undefined outside a secure context
+        // (plain-HTTP LAN hosts) and would throw after the application was already saved.
+        id: `app-local-${Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+          b.toString(16).padStart(2, "0")
+        ).join("")}`,
         petId: input.petId,
         petName: input.petName,
         applicantName: input.applicantName,

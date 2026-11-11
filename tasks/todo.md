@@ -22,8 +22,8 @@ Record active multi-step work streams below.
 - **Done when:** a first insert that raises P2002 on `id` gives the applicant the fixed
   `APPLICATION_WRITE_UNCONFIRMED_MESSAGE`, not Prisma's text
   (`tests/integration/adoptionSubmissionGuards.test.ts`).
-- **In scope:** the application id (`crypto.randomUUID()` on the server; the client store now keeps
-  the server's id instead of making its own) and `submitApplication`'s outer catch.
+- **In scope:** the application id (`crypto.randomUUID()` on the server, a random local id from
+  `getRandomValues` in the client store) and `submitApplication`'s outer catch.
 - **Not in scope:** the staff actions' catches in the same file, which still return `err.message`
   to staff, and the public status lookup's catch (`tasks/open/the-public-status-lookup-returns-raw-error-text.md`).
 
@@ -31,11 +31,15 @@ Record active multi-step work streams below.
 - [x] Server tests red on revert, green after (the client store's id has no test: nothing reads it)
 - [x] Round 2: the new log line reduces a Prisma error to name, code and model, so an applicant's
   NRIC cannot reach host logs; exhausted reference retries throw `ApplicationWriteError`
+- [x] Round 3: exhausted retries are logged (they were silent after round 2); the log keeps the
+  constraint columns; the client copy went back to a local id, since storing the server's id beside
+  the email made localStorage a tracking-portal credential
 
 **Review:** round 1 found the client store's `crypto.randomUUID()` would throw outside a secure
 context after the save (now uses the server's id) and two loose test assertions. Deliberately not
 done: the status lookup's catch, its stale placeholder and its id casing, and `createPet`'s
-timestamp id, and the unread client store, each with its own `tasks/open/` entry; a shared
+timestamp id, the unread client store, and `handlePersistenceError` logging a refused row, each
+with its own `tasks/open/` entry; a shared
 Zod-to-public-message helper (bulletins and transparency already differ from donations and
 sponsorships, so it wants its own change); and a distinct message for failures before the insert,
 since the unconfirmed message is true for every path that reaches it.

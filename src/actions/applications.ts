@@ -124,8 +124,13 @@ async function insertWithUniqueReferenceCode(
     }
   }
 
-  // Wrapped, so the outer catch answers it like any refused insert and the last collision
-  // survives as the cause.
+  // Logged here because `handlePersistenceError` rethrows a P2002 without logging it, and the
+  // outer catch does not log an `ApplicationWriteError`. Wrapped, so the applicant gets the same
+  // answer as any refused insert.
+  console.error(
+    `[submitApplication] No free reference code after ${MAX_REFERENCE_CODE_ATTEMPTS} attempts`,
+    describeFailureForLog(lastCollision)
+  );
   throw new ApplicationWriteError(lastCollision);
 }
 
@@ -135,15 +140,32 @@ async function insertWithUniqueReferenceCode(
  * Postgres constraint error's detail prints the failing row, so either would copy an applicant's
  * NRIC, phone and address into host logs
  * (`tasks/decisions/2026-10-13-an-nric-is-not-copied-into-the-audit-log.md`). A Prisma error is
- * reduced to its name, code and model; anything else keeps its message, which is this
- * codebase's own text.
+ * reduced to its name, code, model and constraint columns; anything else is logged whole, since
+ * its message is this codebase's or Node's own text.
  */
-function describeFailureForLog(err: unknown): Record<string, unknown> {
-  if (typeof err !== "object" || err === null) return { error: String(err) };
-  const { name, code, meta } = err as { name?: unknown; code?: unknown; meta?: { modelName?: unknown } };
-  const fromPrisma = code !== undefined || (typeof name === "string" && name.startsWith("Prisma"));
-  if (fromPrisma) return { name, code, modelName: meta?.modelName };
-  return { name, message: err instanceof Error ? err.message : undefined };
+function describeFailureForLog(err: unknown): unknown {
+  if (typeof err !== "object" || err === null) return err;
+  const { name, code, meta } = err as {
+    name?: unknown;
+    code?: unknown;
+    meta?: {
+      modelName?: unknown;
+      target?: unknown;
+      driverAdapterError?: { cause?: { constraint?: { fields?: unknown } } };
+    };
+  };
+  const fromPrisma =
+    (typeof name === "string" && name.startsWith("Prisma")) ||
+    (typeof code === "string" && /^P\d{4}$/.test(code));
+  if (!fromPrisma) return err;
+  return {
+    name,
+    code,
+    modelName: meta?.modelName,
+    // Column names only, never values: which unique an insert broke is what tells an `id`
+    // collision (#201) from a reference-code one.
+    fields: meta?.driverAdapterError?.cause?.constraint?.fields ?? meta?.target,
+  };
 }
 
 export async function submitApplication(

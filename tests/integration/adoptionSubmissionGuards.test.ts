@@ -405,7 +405,7 @@ describe("submitApplication under strict persistence", () => {
         // The cause is kept for staff, in the server log.
         expect(logged).toHaveBeenCalledWith(
           "[submitApplication] Unexpected failure",
-          expect.objectContaining({ code: "P2002" })
+          expect.objectContaining({ code: "P2002", fields: ['"id"'] })
         );
       } finally {
         logged.mockRestore();
@@ -432,6 +432,38 @@ describe("submitApplication under strict persistence", () => {
         expect(logged).toHaveBeenCalled();
         // `inspect`, as the console prints it: `JSON.stringify` drops an Error's message.
         expect(inspect(logged.mock.calls, { depth: 10 })).not.toContain("880101");
+      } finally {
+        logged.mockRestore();
+      }
+    });
+
+    it("logs, and answers with the fixed message, when every reference code collides", async () => {
+      // `handlePersistenceError` rethrows a P2002 without logging it, so the give-up is the only
+      // place the exhausted retries are seen by staff.
+      givenPersistedPet(makeDbPet({ id: "pet-001", name: "Bella", status: "Available" }));
+      const referenceCollision = Object.assign(new Error("Unique constraint failed"), {
+        code: "P2002",
+        meta: {
+          modelName: "AdoptionApplication",
+          driverAdapterError: { cause: { constraint: { fields: ['"referenceCode"'] } } },
+        },
+      });
+      prismaDouble.adoptionApplication.create.mockRejectedValue(referenceCollision);
+      const { submitApplication } = await import("@/actions/applications");
+      const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      try {
+        const result = await submitApplication(applicationFor("pet-001"));
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(
+          "We could not confirm that your application was saved, so we cannot give you a reference code. Please try again in a few minutes."
+        );
+        expect(prismaDouble.adoptionApplication.create.mock.calls.length).toBeGreaterThan(1);
+        expect(logged).toHaveBeenCalledWith(
+          expect.stringMatching(/No free reference code/),
+          expect.objectContaining({ fields: ['"referenceCode"'] })
+        );
       } finally {
         logged.mockRestore();
       }
