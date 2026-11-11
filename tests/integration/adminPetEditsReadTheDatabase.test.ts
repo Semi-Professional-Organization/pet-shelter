@@ -96,7 +96,6 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   resetPrismaDouble(double);
-  vi.unstubAllEnvs();
   vi.stubEnv("STRICT_PERSISTENCE", "false");
   vi.stubEnv("DATABASE_URL", "postgresql://itest/unreachable");
   // Postgres's `=`: case-sensitive, and the repository trims before it asks.

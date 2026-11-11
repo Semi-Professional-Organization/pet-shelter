@@ -421,8 +421,10 @@ export async function updateServerPet(
       ? updated.medicalTimeline
       : keptFrom.medicalTimeline,
   };
-  // What the database saw, which the returned pet and the permanent audit row report. A status
-  // write changed one column of the row it was conditional on, so that is the baseline with the
+  // What the database saw, which the returned pet and the permanent audit row report, when the
+  // write landed. (A failure other than a miss is still swallowed outside strict mode and reaches
+  // here unwritten: that is #204, tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.)
+  // A status write changed one column of the row it was conditional on, so that is the baseline with the
   // new status: not the caller's whole object, and not the mirror, which may hold an older or a
   // newer snapshot than the baseline.
   const written: Pet = columns === "status" ? { ...previous, status: updated.status } : updated;

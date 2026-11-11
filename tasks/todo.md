@@ -78,6 +78,10 @@ Record active multi-step work streams below.
   the archive race, `deletedAt` precision, the batch-rollback test, the strict-mode `count: 0`
   vs P2025 asymmetry, status-path joins, validating before the read, the `onOutage` naming, the
   redundant `id` parameter, a separate status writer, a shared `prismaCode`.
+- [x] Review round 7 (xhigh): no in-scope correctness finding, the second clean round in a row, so
+  the loop stops. Cleanups: the "what the database saw" comment now says a non-miss failure still
+  arrives unwritten (#204); the rehab-fields open entry names the status-only write; a redundant
+  `vi.unstubAllEnvs()` removed. Everything else repeated rounds 1-6's declined list.
 
 **Review:** deliberately not done: a write the database refuses for any reason other than a missed
 row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side

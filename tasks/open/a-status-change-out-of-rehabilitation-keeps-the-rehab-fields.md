@@ -2,7 +2,9 @@
 
 **Status:** open · opened 2026-10-27 · found by `/code-review xhigh` on the #107 fix (PR #196)
 
-`updatePetStatus` (`src/actions/pets.ts`) writes `{ ...existing, status }`, so moving a pet from
+`updatePetStatus` (`src/actions/pets.ts`) writes only the `status` column (a status-only
+`updateMany` in `updateServerPet` since the #210/#211 fix; before that it wrote `{ ...existing, status }`),
+so the fix needs columns beyond `status`. Moving a pet from
 "In Rehabilitation" to "Available" from the admin table keeps `rehabStage`, `rehabStageMs` and
 `rehabProgressPercent`. The form schema refuses those fields on any other status. Opening Edit on
 that pet loads them through `reset()`, validation fails on fields hidden because the pet is no
