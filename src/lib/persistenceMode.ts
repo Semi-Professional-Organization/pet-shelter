@@ -88,3 +88,32 @@ function isUniqueViolation(err: unknown): boolean {
     (err as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION
   );
 }
+
+/**
+ * Prisma's "record to update/delete not found" (P2025). Not an outage: the query ran and the row
+ * was not there, so a write that hits it wrote nothing and must not be reported as saved.
+ */
+export function isRecordNotFound(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2025"
+  );
+}
+
+/**
+ * Resolves to `null` when Prisma reports the row gone (P2025); rethrows anything else.
+ *
+ * Reached when a record is deleted between an editor opening it and acting on it — a stale tab, a
+ * double-clicked delete — which is an ordinary outcome, not a server fault, so the action can say
+ * "no longer exists" instead of logging an unexpected error.
+ */
+export async function orNullIfMissing<T>(operation: () => Promise<T>): Promise<T | null> {
+  try {
+    return await operation();
+  } catch (err) {
+    if (isRecordNotFound(err)) return null;
+    throw err;
+  }
+}
