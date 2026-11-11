@@ -4,7 +4,12 @@ import { validatePetTransition } from "@/lib/domain/stateMachine";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
-import { handlePersistenceError, isDatabasePersistent, isStrictPersistence } from "@/lib/persistenceMode";
+import {
+  handlePersistenceError,
+  isDatabasePersistent,
+  isRecordNotFound,
+  isStrictPersistence,
+} from "@/lib/persistenceMode";
 import { withDerivedAge } from "@/lib/domain/petAge";
 import {
   DbPetRecord,
@@ -12,6 +17,7 @@ import {
   buildPetUpdatePayload,
   mapDbPetToPet,
   assertKnownPetStatus,
+  toDbPetStatus,
   type PetHistoryReplacement,
 } from "./petMappers";
 import { registerStateReset } from "@/lib/stateResets";
@@ -150,7 +156,10 @@ export class PetStoreUnavailableError extends Error {
  * `tasks/decisions/2026-09-22-a-pet-the-database-lacks-is-a-missing-pet.md`
  * carries the reasoning.
  */
-export async function findServerPetByIdAsync(id: string): Promise<Pet | null> {
+export async function findServerPetByIdAsync(
+  id: string,
+  { onOutage = "mirror" }: { onOutage?: "mirror" | "refuse" } = {}
+): Promise<Pet | null> {
   const norm = id.trim().toLowerCase();
   if (isDatabasePersistent()) {
     try {
@@ -164,6 +173,9 @@ export async function findServerPetByIdAsync(id: string): Promise<Pet | null> {
       return pet;
     } catch (err) {
       handlePersistenceError("Prisma pet find by id", err, "read");
+      // The admin edits read their starting copy here and must not start from the mirror, which
+      // on a cold instance is `src/data/pets.json`: they ask to be refused instead.
+      if (onOutage === "refuse") throw new PetStoreUnavailableError(id.trim(), err);
       return findServerPetById(id);
     }
   }
@@ -306,7 +318,8 @@ export async function updateServerPet(
   id: string,
   updated: Pet,
   actor: SessionUser,
-  replaceHistory: PetHistoryReplacement
+  replaceHistory: PetHistoryReplacement,
+  columns: "all" | "status" = "all"
 ): Promise<Pet | null> {
   let previous = serverPets.find((p) => p.id === id);
   if (!previous && isDatabasePersistent()) {
@@ -314,6 +327,9 @@ export async function updateServerPet(
     if (fromDb) previous = fromDb;
   }
   if (!previous) return null;
+  // Every write below uses the id as stored, never the caller's spelling: the database lookup
+  // above trims, so a padded id used to find the row, update nothing, and report success.
+  const storedId = previous.id;
 
   if (previous.status !== updated.status) {
     validatePetTransition(previous.status, updated.status);
@@ -325,16 +341,27 @@ export async function updateServerPet(
     // carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is never a
     // no-op, and the caller's copy may be an in-memory mirror older than the database.
     await prisma.$transaction([
-      ...(replaceHistory.updates ? [prisma.petUpdate.deleteMany({ where: { petId: id } })] : []),
+      ...(replaceHistory.updates
+        ? [prisma.petUpdate.deleteMany({ where: { petId: storedId } })]
+        : []),
       ...(replaceHistory.medicalTimeline
-        ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: id } })]
+        ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: storedId } })]
         : []),
       prisma.pet.update({
-        where: { id },
-        data: buildPetUpdatePayload(updated, replaceHistory),
+        where: { id: storedId },
+        // A status change writes the one column it changes, so it cannot carry any other column
+        // back over a newer write from another instance.
+        data:
+          columns === "status"
+            ? { status: toDbPetStatus(updated.status) }
+            : buildPetUpdatePayload(updated, replaceHistory),
       }),
     ]);
   } catch (err) {
+    // The row is gone (deleted since it was read): nothing was written, and the caller is told so
+    // rather than handed a pet as if it had been. Any other failure is still swallowed outside
+    // strict mode — tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.
+    if (isRecordNotFound(err)) return null;
     handlePersistenceError("Prisma pet update", err, "write");
   }
 
@@ -342,11 +369,9 @@ export async function updateServerPet(
   // get back the pet as stored. A collection this write did not replace keeps the copy the mirror
   // holds *now*: not the caller's copy, and not `previous`, which was read before the await above
   // and may predate a concurrent write.
-  // ceiling: in database mode that copy is still this instance's mirror, which on a cold instance
-  // is the pets.json fixture. The database rows are untouched either way; only the returned pet and
-  // the mirror can show stale history. Upgrade path: read the baseline from the database, as
-  // tasks/open/pet-writes-start-from-the-in-memory-mirror.md describes.
-  const keptFrom = serverPets.find((p) => p.id === id) ?? previous;
+  // The admin actions read their baseline with `findServerPetByIdAsync`, which refreshes the
+  // mirror entry from the database, so in database mode that copy is the stored one.
+  const keptFrom = serverPets.find((p) => p.id === storedId) ?? previous;
   const stored: Pet = {
     ...updated,
     updates: replaceHistory.updates ? updated.updates : keptFrom.updates,
@@ -354,7 +379,7 @@ export async function updateServerPet(
       ? updated.medicalTimeline
       : keptFrom.medicalTimeline,
   };
-  serverPets = serverPets.map((p) => (p.id === id ? stored : p));
+  serverPets = serverPets.map((p) => (p.id === storedId ? stored : p));
 
   const auditedHistory = (pet: Pet): Partial<Pet> => {
     const { updates, medicalTimeline, ...rest } = pet;
@@ -371,7 +396,7 @@ export async function updateServerPet(
     actorRole: actor.role,
     action: "PET_UPDATED",
     entity: "Pet",
-    entityId: id,
+    entityId: storedId,
     // History appears only when this write replaced it. A collection it did not touch is whatever
     // the mirror held, which can be older than the database, and the audit row is permanent.
     details: { before: auditedHistory(previous), after: auditedHistory(stored) },

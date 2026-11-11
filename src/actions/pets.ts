@@ -16,7 +16,6 @@ import { AdminPrincipal, verifyAdminSession } from "@/lib/security/adminSession"
 import { assertHasPermission, PERMISSIONS, UnauthorizedError } from "@/lib/security/rbac";
 import {
   getServerPetsAsync,
-  findServerPetById,
   findServerPetByIdAsync,
   insertServerPet,
   updateServerPet,
@@ -114,7 +113,7 @@ export async function getAdminPets(): Promise<(Pet & { applicationCount: number 
  * page and stayed reachable by direct link and by anything holding the old URL. Archiving is the
  * shelter's "take this down" action, and it was only taking down the grid.
  *
- * The repository stays unfiltered on purpose: `findServerPetById` is what the update and archive
+ * The repository stays unfiltered on purpose: its readers are what the update and archive
  * mutations read with, and they must see the row they are about to write.
  */
 export async function getPetById(id: string): Promise<Pet | null> {
@@ -144,7 +143,8 @@ export async function getPetById(id: string): Promise<Pet | null> {
   // fixture on either route. That residual is deliberate for a page, and only for a page: the
   // public adoption and sponsorship writes read with `findPetForWriteAsync` instead
   // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`); the
-  // admin edits further down do not yet
+  // admin edits further down read with `readPetForEdit`, which refuses an unreadable database,
+  // but their writes and the archive still report success when the database refuses them
   // (`tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md`). So: do not delete this guard on
   // the grounds that the repository "returns null now" — it does not, on those two paths — and
   // do not read it as closing them.
@@ -178,6 +178,25 @@ async function getAdminActorOrThrow(): Promise<AdminPrincipal> {
   // verbatim because it reaches the admin UI through each action's catch.
   // See docs/archives/tasks/URGENT_NONPRODUCTION_ADMIN_BYPASS.md.
   throw new UnauthorizedError("Unauthorized: Admin authorization required");
+}
+
+/**
+ * The starting copy for an admin edit or status change, read from the database.
+ *
+ * Not `findServerPetById`: that is this instance's mirror, which on a cold instance is
+ * `src/data/pets.json` and on any instance can be older than another instance's write, and every
+ * column the edit did not touch used to be written back from it. When the database cannot be
+ * read this throws `PetStoreUnavailableError` (caught by the action, which reports a failure)
+ * rather than answering from the mirror. With no database configured the mirror is the whole
+ * store, as everywhere else.
+ *
+ * The id must be the stored id verbatim. The database lookup trims, and the mirror's lowercases
+ * as well, so `" pet-009"` or `"PET-009"` used to resolve to `pet-009` while the write beside it
+ * matched nothing and the action still reported success.
+ */
+async function readPetForEdit(id: string): Promise<Pet | null> {
+  const pet = await findServerPetByIdAsync(id, { onOutage: "refuse" });
+  return pet && pet.id === id ? pet : null;
 }
 
 export async function createPet(
@@ -265,7 +284,7 @@ export async function updatePet(
   try {
     const actor = await getAdminActorOrThrow();
     const validated = petFormSchema.parse(data);
-    const existing = findServerPetById(id);
+    const existing = await readPetForEdit(id);
 
     if (!existing) {
       return { success: false, error: "Pet not found" };
@@ -424,14 +443,17 @@ export async function updatePetStatus(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const actor = await getAdminActorOrThrow();
-    const existing = findServerPetById(id);
+    const existing = await readPetForEdit(id);
     if (!existing) {
       return { success: false, error: "Pet not found" };
     }
 
     const updated: Pet = { ...existing, status };
-    // A status change replaces no history.
-    await updateServerPet(id, updated, actor, {});
+    // A status change replaces no history, and writes only the status column.
+    const stored = await updateServerPet(id, updated, actor, {}, "status");
+    if (!stored) {
+      return { success: false, error: "Pet not found" };
+    }
 
     revalidatePath("/pets");
     revalidatePath(`/pets/${id}`);

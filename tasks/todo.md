@@ -15,6 +15,29 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Pet edits read the database and fail when nothing was written (#210, #211)
+
+**Branch:** `fix/pet-edits-read-database` · opened 2026-11-11
+
+- **Done when:** `updatePet` and `updatePetStatus` start from the database, a status change writes
+  only `status`, a miscased or padded id fails, and a write that hits P2025 fails, pinned by
+  `tests/integration/adminPetEditsReadTheDatabase.test.ts`.
+- **In scope:** `src/actions/pets.ts` (`readPetForEdit`), `updateServerPet`'s stored id, status-only
+  write and P2025 result, `findServerPetByIdAsync`'s `onOutage: "refuse"`.
+- **Not in scope:** outage-mode writes (#204), the client store's merge rules (#212), the archive
+  path (same padded-id shape, recorded in
+  `tasks/open/pet-archive-reports-success-for-an-id-it-did-not-write.md`).
+
+- [x] Read path, stored-id write, status-only write, P2025 as `null`
+- [x] Tests: mirror/database disagree, miscased and padded ids, P2025, unreadable database
+- [x] Admin table rollback checked: `usePetTableController` already rolls back on `success: false`
+
+**Review:** deliberately not done: a write the database refuses for any reason other than P2025 is
+still swallowed outside strict mode and reported as saved (#204, unchanged; the read side now
+refuses, so this fix narrows it rather than widening it). The P2025 check is a third copy of the
+one in `bulletinRepository` and `transparencyRepository`; the new `isRecordNotFound` in
+`persistenceMode.ts` is where those two could move, not done here to keep the diff to its brief.
+
 # Share the registration rate limit across server instances (#213)
 
 **Branch:** `claude/shared-registration-rate-limit` · opened 2026-11-05

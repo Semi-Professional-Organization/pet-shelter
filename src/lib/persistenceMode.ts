@@ -88,3 +88,16 @@ function isUniqueViolation(err: unknown): boolean {
     (err as { code?: unknown }).code === PRISMA_UNIQUE_VIOLATION
   );
 }
+
+/**
+ * Prisma's "record to update/delete not found" (P2025). Not an outage: the query ran and the row
+ * was not there, so a write that hits it wrote nothing and must not be reported as saved.
+ */
+export function isRecordNotFound(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "P2025"
+  );
+}
