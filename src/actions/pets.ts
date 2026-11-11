@@ -16,12 +16,10 @@ import { AdminPrincipal, verifyAdminSession } from "@/lib/security/adminSession"
 import { assertHasPermission, PERMISSIONS, UnauthorizedError } from "@/lib/security/rbac";
 import {
   getServerPetsAsync,
-  findServerPetById,
   findServerPetByIdAsync,
   insertServerPet,
   updateServerPet,
   archiveServerPet,
-  getStoredGalleryImages,
 } from "@/lib/server/petRepository";
 import { scheduleAfterResponse } from "@/lib/scheduleAfterResponse";
 import {
@@ -114,7 +112,7 @@ export async function getAdminPets(): Promise<(Pet & { applicationCount: number 
  * page and stayed reachable by direct link and by anything holding the old URL. Archiving is the
  * shelter's "take this down" action, and it was only taking down the grid.
  *
- * The repository stays unfiltered on purpose: `findServerPetById` is what the update and archive
+ * The repository stays unfiltered on purpose: its readers are what the update and archive
  * mutations read with, and they must see the row they are about to write.
  */
 export async function getPetById(id: string): Promise<Pet | null> {
@@ -144,7 +142,8 @@ export async function getPetById(id: string): Promise<Pet | null> {
   // fixture on either route. That residual is deliberate for a page, and only for a page: the
   // public adoption and sponsorship writes read with `findPetForWriteAsync` instead
   // (`tasks/decisions/2026-10-27-fixture-animals-are-display-only-during-an-outage.md`); the
-  // admin edits further down do not yet
+  // admin edits further down read with `readPetForEdit`, which refuses an unreadable database,
+  // but their writes and the archive still report success when the database refuses them
   // (`tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md`). So: do not delete this guard on
   // the grounds that the repository "returns null now" — it does not, on those two paths — and
   // do not read it as closing them.
@@ -178,6 +177,28 @@ async function getAdminActorOrThrow(): Promise<AdminPrincipal> {
   // verbatim because it reaches the admin UI through each action's catch.
   // See docs/archives/tasks/URGENT_NONPRODUCTION_ADMIN_BYPASS.md.
   throw new UnauthorizedError("Unauthorized: Admin authorization required");
+}
+
+/** An edit or status write that matched no row: see `updateServerPet`. */
+const PET_CHANGED_WHILE_SAVING = "This pet was changed or removed while saving. Reload and try again.";
+
+/**
+ * The starting copy for an admin edit or status change, read from the database.
+ *
+ * Not `findServerPetById`: that is this instance's mirror, which on a cold instance is
+ * `src/data/pets.json` and on any instance can be older than another instance's write, and every
+ * column the edit did not touch used to be written back from it. When the database cannot be
+ * read this throws `PetStoreUnavailableError` (caught by the action, which reports a failure)
+ * rather than answering from the mirror. With no database configured the mirror is the whole
+ * store, as everywhere else.
+ *
+ * The id must be the stored id verbatim. The database lookup trims, and the mirror's lowercases
+ * as well, so `" pet-009"` or `"PET-009"` used to resolve to `pet-009` while the write beside it
+ * matched nothing and the action still reported success.
+ */
+async function readPetForEdit(id: string): Promise<Pet | null> {
+  const pet = await findServerPetByIdAsync(id, { onOutage: "refuse" });
+  return pet && pet.id === id ? pet : null;
 }
 
 export async function createPet(
@@ -265,7 +286,7 @@ export async function updatePet(
   try {
     const actor = await getAdminActorOrThrow();
     const validated = petFormSchema.parse(data);
-    const existing = findServerPetById(id);
+    const existing = await readPetForEdit(id);
 
     if (!existing) {
       return { success: false, error: "Pet not found" };
@@ -290,11 +311,10 @@ export async function updatePet(
     const wantsNotification = notify?.notifySponsors === true;
 
     // Captured before the write: the dispatcher compares against the gallery as
-    // it stood, not as it is about to stand. Prefer the database over the
-    // in-memory record, which reflects only this instance's own writes and would
-    // make another instance's photos look new again.
-    const storedGallery = wantsNotification ? await getStoredGalleryImages(id) : null;
-    const previousGallery = storedGallery ?? [...(existing.galleryImages || [])];
+    // it stood, not as it is about to stand. `existing` is the database's copy
+    // (see `readPetForEdit`), not the in-memory mirror, which reflects only this
+    // instance's own writes and would make another instance's photos look new again.
+    const previousGallery = [...(existing.galleryImages || [])];
 
     // Nested history is replaced only when the payload carries it: an absent key means "not
     // touched", and only a submitted list (an explicit `[]` included) replaces the stored rows. The
@@ -347,9 +367,12 @@ export async function updatePet(
       },
     });
 
-    const stored = await updateServerPet(id, updated, actor, replaceHistory);
+    const stored = await updateServerPet(id, updated, actor, replaceHistory, {
+      baseline: existing,
+    });
     if (!stored) {
-      return { success: false, error: "Pet not found" };
+      // As in `updatePetStatus`: deleted, or its status changed, between the read and the write.
+      return { success: false, error: PET_CHANGED_WHILE_SAVING };
     }
 
     // Only *newly added* gallery photos trigger supporter mail. Saving the form
@@ -424,14 +447,24 @@ export async function updatePetStatus(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const actor = await getAdminActorOrThrow();
-    const existing = findServerPetById(id);
+    const existing = await readPetForEdit(id);
     if (!existing) {
       return { success: false, error: "Pet not found" };
     }
 
     const updated: Pet = { ...existing, status };
-    // A status change replaces no history.
-    await updateServerPet(id, updated, actor, {});
+    // A status change replaces no history, and writes only the status column.
+    const stored = await updateServerPet(id, updated, actor, {}, {
+      columns: "status",
+      baseline: existing,
+    });
+    if (!stored) {
+      // The write is conditional on the status read above, so this is a row deleted or a status
+      // changed (an approval, another admin) between that read and the write. One message covers
+      // both. It says nothing about a table that was already stale when the admin clicked —
+      // tasks/open/admin-pet-writes-send-no-expected-status.md.
+      return { success: false, error: PET_CHANGED_WHILE_SAVING };
+    }
 
     revalidatePath("/pets");
     revalidatePath(`/pets/${id}`);
