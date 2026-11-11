@@ -48,6 +48,35 @@ Zod-to-public-message helper (bulletins and transparency already differ from don
 sponsorships, so it wants its own change); and a distinct message for failures before the insert,
 since the unconfirmed message is true for every path that reaches it.
 
+# Accept only the exact session signature (#286)
+
+**Branch:** `claude/strict-signature-hex` · opened 2026-11-11
+
+- **Done when:** `verifySignature` accepts the real signature and refuses it with a trailing `0`,
+  a trailing `zz`, in uppercase, and at 63 or 65 characters (`tests/unit/crypto.test.ts`), and the
+  same alterations are refused through the staff session, the sponsor session and the
+  notification link (`tests/unit/security/signedTokenIsExact.test.ts`).
+- **In scope:** `verifySignature`, tests.
+- **Not in scope:** the other hex decodes in `crypto.ts` (`verifyPassword`, `decryptField`);
+  what a request does to a token before the codec sees it; revoking tokens.
+
+- [x] Compare the signature as a string with `timingSafeCompare` instead of decoding it
+- [x] Tests fail against the old `crypto.ts` (11 in `crypto.test.ts`, 12 through the codecs) and
+  pass after
+- [x] Review round 1: no break in the check. Swapped a format regex for the existing
+  `timingSafeCompare` (one copy of the signature's format, no dead length branch), made the
+  non-string test able to fail, folded the codec tests into one table.
+- [x] Review round 2: a Buffer holding the signature's characters verified, because it hashes
+  like the string. Added the `typeof` guard and a test that fails without it.
+- [x] Review round 3: no bug in the fix. Extended the guard to the payload, with a test for each
+  non-string form.
+
+**Review:** deliberately not done, each logged in `tasks/open/`: `decryptField`'s lenient decode
+(`decrypt-field-accepts-a-shortened-auth-tag.md`); percent-encoded copies of a token, which Next
+decodes before the codec sees them (`a-token-is-exact-only-after-the-request-is-decoded.md`); and
+trimming a notification link that picked up trailing punctuation
+(`a-preference-link-with-trailing-punctuation-is-refused.md`).
+
 # Pet edits read the database and fail when nothing was written (#210, #211)
 
 **Branch:** `fix/pet-edits-read-database` · opened 2026-11-11

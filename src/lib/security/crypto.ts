@@ -56,18 +56,19 @@ export function signPayload(payload: string): string {
 
 /**
  * Verifies that a signed payload has not been tampered with.
+ *
+ * The signature must be the exact string `signPayload` produces, so the two strings are
+ * compared as strings. Decoding the caller's copy first is what made this lenient:
+ * `Buffer.from(x, "hex")` stops at the first non-hex character, drops an odd trailing
+ * character and ignores case, so `${sig}0`, `${sig}zz` and an uppercase copy all decoded
+ * to the right bytes and many token strings counted as one (#286).
  */
 export function verifySignature(payload: string, signature: string): boolean {
-  try {
-    const expectedSignature = signPayload(payload);
-    const expectedBuf = Buffer.from(expectedSignature, "hex");
-    const actualBuf = Buffer.from(signature, "hex");
-
-    if (expectedBuf.length !== actualBuf.length) return false;
-    return crypto.timingSafeEqual(expectedBuf, actualBuf);
-  } catch {
-    return false;
-  }
+  // The types say string, but a caller that destructures a malformed token can pass
+  // anything at runtime. A Buffer holding the same characters hashes to the same digest
+  // as the string, which would be a second accepted form of one token.
+  if (typeof payload !== "string" || typeof signature !== "string") return false;
+  return timingSafeCompare(signature, signPayload(payload));
 }
 
 /**
