@@ -24,6 +24,10 @@ The likely mechanism is optimistic concurrency on a version the client already h
 an `updatedAt` column the table and form send back and the write matches on, rather than status
 alone, which would also catch a stale form whose status did not change.
 
+The same gap covers more than status: a full edit's write is conditional on the status it read
+only, so an archive (or any other column change) landing between that read and the write is
+overwritten by the edit. A version match on `updatedAt` would cover that too.
+
 **Settles when:** the table and the form send the status they showed, the server puts it in the
 write's `where` (or refuses when it differs from the stored one), and a test approves an animal
 and then submits a status change and an edit from the pre-approval copy, asserting both fail and

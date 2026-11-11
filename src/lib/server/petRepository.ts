@@ -412,21 +412,23 @@ export async function updateServerPet(
   // baseline in the mirror, so in database mode this is the stored history unless such a write
   // has replaced it since.
   const keptFrom = serverPets.find((p) => p.id === storedId) ?? previous;
-  // A status write changed one column, so it reports the baseline with that column, not the
-  // caller's whole object: nothing it did not write is reported as stored.
-  // It starts from the mirror's current copy (`keptFrom`, the baseline when the mirror has none), so
-  // a newer write this instance made since the read is not reverted in the mirror, and the
-  // returned pet and the audit row's `after` report that same copy.
-  const written: Pet = columns === "status" ? { ...keptFrom, status: updated.status } : updated;
-  const stored: Pet = {
-    ...written,
-    id: storedId,
+  const history = {
     updates: replaceHistory.updates ? updated.updates : keptFrom.updates,
     medicalTimeline: replaceHistory.medicalTimeline
       ? updated.medicalTimeline
       : keptFrom.medicalTimeline,
   };
-  serverPets = serverPets.map((p) => (p.id === storedId ? stored : p));
+  // What the database saw, which the returned pet and the permanent audit row report. A status
+  // write changed one column of the row it was conditional on, so that is the baseline with the
+  // new status: not the caller's whole object, and not the mirror, which may hold an older or a
+  // newer snapshot than the baseline.
+  const written: Pet = columns === "status" ? { ...previous, status: updated.status } : updated;
+  const stored: Pet = { ...written, id: storedId, ...history };
+  // The mirror, though, keeps its own current copy under a status write, so a newer write this
+  // instance made since the read is not reverted there.
+  const mirrored: Pet =
+    columns === "status" ? { ...keptFrom, status: updated.status, id: storedId, ...history } : stored;
+  serverPets = serverPets.map((p) => (p.id === storedId ? mirrored : p));
 
   const auditedHistory = (pet: Pet): Partial<Pet> => {
     const { updates, medicalTimeline, ...rest } = pet;

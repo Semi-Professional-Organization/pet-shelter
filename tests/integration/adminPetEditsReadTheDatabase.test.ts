@@ -10,6 +10,7 @@ import { signInAsAdmin, TEST_ADMIN_ACTOR } from "../setup/authSession";
 import { getPetById, updatePet, updatePetStatus } from "@/actions/pets";
 import { findServerPetById, findServerPetByIdAsync, updateServerPet } from "@/lib/server/petRepository";
 import { dispatchPetPhotoUpdate } from "@/lib/domain/photoUpdateDispatch";
+import { getAuditLogs } from "@/lib/domain/auditLog";
 
 /**
  * Tier 3a — the admin pet edit and status change start from the database, write with the stored
@@ -276,16 +277,25 @@ describe("updateServerPet", () => {
     expect(findServerPetById(PET_ID)?.description).toBe(pet.description);
   });
 
-  it("keeps a newer mirror copy from this instance when a status write lands on it", async () => {
+  it("audits and returns what the database saw, while the mirror keeps its own copy", async () => {
     const pet = (await findServerPetByIdAsync(PET_ID))!;
-    // Another write on this instance, after `pet` was read: the mirror is now newer than `pet`.
+    // Another write on this instance, after `pet` was read: the mirror's description now differs
+    // from the baseline's. (The reverse, a mirror older than the baseline, is the same mismatch.)
     const newer = { ...pet, description: "Newer, from this instance." };
     await updateServerPet(PET_ID, newer, TEST_ADMIN_ACTOR, {}, { baseline: pet });
 
     const statusOnly = { baseline: pet, columns: "status" as const };
     const stored = await updateServerPet(PET_ID, { ...pet, status: "Pending" }, TEST_ADMIN_ACTOR, {}, statusOnly);
 
-    expect(stored).toMatchObject({ status: "Pending", description: "Newer, from this instance." });
+    // The row it was conditional on, with the one column it wrote.
+    expect(stored).toMatchObject({ status: "Pending", description: pet.description });
+    // The permanent audit row records only the change this write made.
+    const { before, after } = getAuditLogs(1)[0].details as Record<string, Record<string, unknown>>;
+    const changed = Object.keys(after).filter(
+      (key) => JSON.stringify(after[key]) !== JSON.stringify(before[key])
+    );
+    expect(changed).toEqual(["status"]);
+    // The mirror is not reverted to the baseline's description.
     expect(findServerPetById(PET_ID)).toMatchObject({
       status: "Pending",
       description: "Newer, from this instance.",

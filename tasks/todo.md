@@ -60,6 +60,18 @@ Record active multi-step work streams below.
   newer write on this instance is not reverted; the photo test's module mock is cleared per test.
   Declined again: `deletedAt` precision and the stale-client status (both already open), the
   strict-mode `count: 0` vs P2025 asymmetry (a miss is a concurrency answer, not a broken query).
+- [x] Review round 5 (xhigh): round 4 also made a status write's returned pet and audit `after`
+  the mirror's copy, so a mirror older or newer than the baseline put description changes this
+  write never made into the permanent audit row. The returned pet and audit now report the
+  baseline plus the new status (what the database saw); only the mirror keeps its own copy.
+  Declined: a full edit's condition checks status only, so an archive landing between read and
+  write is overwritten (the `updatedAt` mechanism in
+  `tasks/open/admin-pet-writes-send-no-expected-status.md` would cover it); the batch
+  transaction's rollback of history deletes on P2025 is untested here because the double runs
+  `Promise.all` (it rests on Prisma's documented batch atomicity; `test:db` could pin it); the
+  refusing read refreshes the mirror before `readPetForEdit` rejects a non-verbatim id (it writes
+  true database data); the display read serving the fixture on a mapper fault (main's behaviour,
+  restored on purpose); the redundant `id` parameter; status-path joins.
 
 **Review:** deliberately not done: a write the database refuses for any reason other than a missed
 row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side
