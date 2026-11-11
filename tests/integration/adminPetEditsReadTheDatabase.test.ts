@@ -87,6 +87,8 @@ beforeEach(async () => {
   double.pet.findUnique.mockImplementation(async (args: { where: { id: string } }) =>
     args.where.id === PET_ID ? newerRow() : null
   );
+  // One row matched, as for a status write whose row still holds the status it was read with.
+  double.pet.updateMany.mockResolvedValue({ count: 1 });
   vi.spyOn(console, "warn").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
   await signInAsAdmin();
@@ -96,11 +98,22 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** The single `prisma.pet.update` a successful write makes. */
+/** The single `prisma.pet.update` a successful edit makes. */
 function petUpdateCall() {
   expect(double.pet.update).toHaveBeenCalledTimes(1);
   return double.pet.update.mock.calls[0][0] as { where: { id: string }; data: Record<string, unknown> };
 }
+
+/** The single `prisma.pet.updateMany` a status write makes. */
+function statusWriteCall() {
+  expect(double.pet.updateMany).toHaveBeenCalledTimes(1);
+  return double.pet.updateMany.mock.calls[0][0] as {
+    where: { id: string; status?: string };
+    data: Record<string, unknown>;
+  };
+}
+
+const CHANGED_WHILE_SAVING = "This pet was changed or removed while saving. Reload and try again.";
 
 describe("when the mirror and the database disagree", () => {
   it("is arranged so the mirror really holds the older copy", () => {
@@ -112,10 +125,11 @@ describe("when the mirror and the database disagree", () => {
     const result = await updatePetStatus(PET_ID, "Pending");
 
     expect(result).toEqual({ success: true });
-    const { where, data } = petUpdateCall();
-    // Conditional on the status it was read with, so a concurrent change matches no row.
+    const { where, data } = statusWriteCall();
+    // Conditional on the status it was read with, so a change in between matches no row.
     expect(where).toEqual({ id: PET_ID, status: "Available" });
     expect(data).toEqual({ status: "Pending" });
+    expect(double.pet.update).not.toHaveBeenCalled();
     expect(double.petUpdate.deleteMany).not.toHaveBeenCalled();
     expect(double.medicalTimelineEvent.deleteMany).not.toHaveBeenCalled();
     // The mirror now carries the database's copy with the new status, not the fixture's.
@@ -148,8 +162,8 @@ describe("an id that is not the stored id verbatim", () => {
     const result = await updatePetStatus(id, "Pending");
 
     expect(result).toEqual({ success: false, error: "Pet not found" });
+    expect(double.pet.updateMany).not.toHaveBeenCalled();
     expect(double.pet.update).not.toHaveBeenCalled();
-    expect(double.$transaction).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -165,71 +179,80 @@ describe("an id that is not the stored id verbatim", () => {
 });
 
 describe("a write that writes nothing", () => {
-  it("reports failure when the row is gone by the time it is written (P2025)", async () => {
+  it("reports an edit of a row deleted since it was read (P2025) and drops it from the mirror", async () => {
     double.pet.update.mockRejectedValue(
       Object.assign(new Error("Record to update not found."), { code: "P2025" })
     );
 
-    expect(await updatePetStatus(PET_ID, "Pending")).toEqual({
-      success: false,
-      error: "This pet was changed or removed since the table loaded. Reload and try again.",
-    });
-    expect(await updatePet(PET_ID, editForm())).toEqual({
-      success: false,
-      error: "Pet not found",
-    });
-    // No mirror write and no audit row for a write that did not happen; the vanished row is
-    // dropped from the mirror so an outage fallback cannot serve it.
+    expect(await updatePet(PET_ID, editForm())).toEqual({ success: false, error: "Pet not found" });
+    // No audit row for a write that did not happen, and the vanished row is gone from the
+    // mirror so an outage fallback cannot serve it.
     expect(findServerPetById(PET_ID)).toBeNull();
     expect(double.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it("refuses a status change when the status changed after it was read", async () => {
-    // Read as Available; by the time of the write an approval has set Adopted. Postgres matches
-    // no row for `status = 'Available'` and Prisma raises P2025, which the double reproduces.
-    const statusAtWriteTime = "Adopted";
-    double.pet.update.mockImplementation(
-      async (args: { where: { id: string; status?: string } }) => {
-        if (args.where.status !== undefined && args.where.status !== statusAtWriteTime) {
-          throw Object.assign(new Error("Record to update not found."), { code: "P2025" });
-        }
-        return {};
-      }
-    );
+  it("refuses a status change when the status changed after it was read, and keeps the mirror", async () => {
+    // Read as Available; by the write an approval has set Adopted, so `status = 'Available'`
+    // matches no row and `updateMany` reports `count: 0`.
+    double.pet.updateMany.mockResolvedValue({ count: 0 });
 
     const result = await updatePetStatus(PET_ID, "Pending");
 
-    expect(result).toEqual({
-      success: false,
-      error: "This pet was changed or removed since the table loaded. Reload and try again.",
-    });
-    expect(double.pet.update.mock.calls[0][0].where).toEqual({ id: PET_ID, status: "Available" });
+    expect(result).toEqual({ success: false, error: CHANGED_WHILE_SAVING });
+    expect(statusWriteCall().where).toEqual({ id: PET_ID, status: "Available" });
     expect(double.auditLog.create).not.toHaveBeenCalled();
+    // The row still exists, so its mirror copy (the database's, as read) is not dropped, and not
+    // given the status that was refused.
+    expect(findServerPetById(PET_ID)?.status).toBe("Available");
+  });
+
+  it("writes a status move out of a stored status the enum does not know, matching on id", async () => {
+    // `fromDbPetStatus` passes an unrecognised value through, and the state machine lets staff
+    // move it to a canonical one. That used to throw inside the write's `try`, where the outage
+    // swallow turned it into a success that wrote nothing.
+    double.pet.findUnique.mockResolvedValue({ ...newerRow(), status: "Rehab" });
+
+    const result = await updatePetStatus(PET_ID, "Available");
+
+    expect(result).toEqual({ success: true });
+    expect(statusWriteCall()).toEqual({ where: { id: PET_ID }, data: { status: "Available" } });
   });
 });
 
 describe("updateServerPet", () => {
-  it("writes and clears history with the stored id, not a padded spelling of it", async () => {
+  it("refuses an id that is not the baseline's stored id, and writes nothing", async () => {
     const pet = (await findServerPetByIdAsync(PET_ID))!;
-    // Not in the mirror under this spelling, so the repository's own lookup (which trims) finds it.
+
+    const edited = { ...pet, description: "Edited through a padded id." };
+
+    await expect(
+      updateServerPet(` ${PET_ID}`, edited, TEST_ADMIN_ACTOR, { updates: true }, { baseline: pet })
+    ).rejects.toThrow(/is not the stored id/);
+    expect(double.petUpdate.deleteMany).not.toHaveBeenCalled();
+    expect(double.pet.update).not.toHaveBeenCalled();
+  });
+
+  it("reports only what a status write wrote, not the rest of the caller's object", async () => {
+    const pet = (await findServerPetByIdAsync(PET_ID))!;
+
     const stored = await updateServerPet(
-      ` ${PET_ID}`,
-      { ...pet, id: ` ${PET_ID}`, description: "Edited through a padded id." },
+      PET_ID,
+      { ...pet, status: "Pending", description: "Never written by a status change." },
       TEST_ADMIN_ACTOR,
-      { updates: true }
+      {},
+      { baseline: pet, columns: "status" }
     );
 
-    expect(stored?.id).toBe(PET_ID);
-    expect(double.petUpdate.deleteMany).toHaveBeenCalledWith({ where: { petId: PET_ID } });
-    expect(petUpdateCall().where).toEqual({ id: PET_ID });
+    expect(stored).toMatchObject({ status: "Pending", description: pet.description });
+    expect(findServerPetById(PET_ID)?.description).toBe(pet.description);
   });
 
   it("refuses a status-only write that would also replace history", async () => {
     const pet = (await findServerPetByIdAsync(PET_ID))!;
     await expect(
-      updateServerPet(PET_ID, pet, TEST_ADMIN_ACTOR, { updates: true }, { columns: "status" })
+      updateServerPet(PET_ID, pet, TEST_ADMIN_ACTOR, { updates: true }, { baseline: pet, columns: "status" })
     ).rejects.toThrow(/status-only write cannot replace history/);
-    expect(double.pet.update).not.toHaveBeenCalled();
+    expect(double.pet.updateMany).not.toHaveBeenCalled();
   });
 });
 

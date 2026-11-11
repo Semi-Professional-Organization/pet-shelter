@@ -1,6 +1,6 @@
 import initialPetsData from "@/data/pets.json";
 import { Pet } from "@/types/pet";
-import { validatePetTransition } from "@/lib/domain/stateMachine";
+import { isKnownPetStatus, validatePetTransition } from "@/lib/domain/stateMachine";
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
@@ -101,6 +101,20 @@ export class PetStoreUnavailableError extends Error {
 }
 
 /**
+ * The outage answer for a read on a write path: log, and refuse with
+ * {@link PetStoreUnavailableError} rather than answer from the mirror. Strict
+ * persistence rethrows the query's own error, as `handlePersistenceError` does.
+ */
+function refuseForWrite(id: string, err: unknown): never {
+  if (isStrictPersistence()) throw err;
+  console.error(
+    `[Database Store] Pet read for a write path failed for ${JSON.stringify(id)}:`,
+    err instanceof Error ? err.message : err
+  );
+  throw new PetStoreUnavailableError(id, err);
+}
+
+/**
  * Reads one animal with its history, falling back to the mirror when the
  * database cannot answer — unless the caller passes `onOutage: "refuse"`.
  *
@@ -150,16 +164,10 @@ export async function findServerPetByIdAsync(
       serverPets = [pet, ...serverPets.filter((p) => p.id.toLowerCase() !== norm)];
       return pet;
     } catch (err) {
-      handlePersistenceError("Prisma pet find by id", err, "read");
       // The admin edits read their starting copy here and must not start from the mirror, which
       // on a cold instance is `src/data/pets.json`: they ask to be refused instead.
-      if (onOutage === "refuse") {
-        console.error(
-          `[Database Store] Pet read for a write path failed for ${JSON.stringify(id.trim())}:`,
-          err instanceof Error ? err.message : err
-        );
-        throw new PetStoreUnavailableError(id.trim(), err);
-      }
+      if (onOutage === "refuse") refuseForWrite(id.trim(), err);
+      handlePersistenceError("Prisma pet find by id", err, "read");
       return findServerPetById(id);
     }
   }
@@ -193,12 +201,7 @@ export async function findPetForWriteAsync(id: string): Promise<Pet | null> {
   try {
     row = await prisma.pet.findUnique({ where: { id: id.trim() } });
   } catch (err) {
-    if (isStrictPersistence()) throw err;
-    console.error(
-      `[Database Store] Pet read for a write path failed for ${JSON.stringify(id.trim())}:`,
-      err instanceof Error ? err.message : err
-    );
-    throw new PetStoreUnavailableError(id.trim(), err);
+    refuseForWrite(id.trim(), err);
   }
   return row ? mapDbPetToPet(row as unknown as DbPetRecord) : null;
 }
@@ -302,68 +305,84 @@ export async function insertServerPet(newPet: Pet, actor: SessionUser): Promise<
 /**
  * Writes an edit and returns the pet as stored, or `null` when nothing was written.
  *
- * `baseline` is the copy the caller read and edited. The admin actions pass the database copy
- * they read, so the transition check, the audit row's `before` and the conditional status write
- * are all against what the database held, not against this instance's mirror. Without one, the
- * mirror (then the database) is asked, as before.
+ * `baseline` is the copy the caller read and edited: the admin actions pass the database copy
+ * `findServerPetByIdAsync` gave them. The transition check, the audit row's `before`, the status
+ * condition and the stored id all come from it, never from this instance's mirror. `id` must be
+ * that stored id verbatim.
  *
  * `columns: "status"` writes the status column alone, and only while the row still holds
- * `baseline`'s status: a concurrent change (an approval that set Adopted) matches no row, and
- * that is reported as `null` rather than overwritten.
+ * `baseline`'s status. That guards the window between the caller's read and this write (an
+ * approval that set Adopted in between matches no row, and is reported as `null`); it does not
+ * know what an older admin table showed —
+ * `tasks/open/admin-pet-writes-send-no-expected-status.md`.
  */
 export async function updateServerPet(
   id: string,
   updated: Pet,
   actor: SessionUser,
   replaceHistory: PetHistoryReplacement,
-  { columns = "all", baseline }: { columns?: "all" | "status"; baseline?: Pet } = {}
+  { baseline: previous, columns = "all" }: { baseline: Pet; columns?: "all" | "status" }
 ): Promise<Pet | null> {
   if (columns === "status" && (replaceHistory.updates || replaceHistory.medicalTimeline)) {
     throw new Error("updateServerPet: a status-only write cannot replace history");
   }
-  let previous = baseline ?? serverPets.find((p) => p.id === id);
-  if (!previous && isDatabasePersistent()) {
-    const fromDb = await findServerPetByIdAsync(id);
-    if (fromDb) previous = fromDb;
-  }
-  if (!previous) return null;
-  // Every write below uses the id as stored, never the caller's spelling: the database lookup
-  // above trims, so a padded id used to find the row, update nothing, and report success.
+  // Every write below uses the id as stored. A lookup that trims or lowercases used to resolve a
+  // padded or miscased id, update nothing, and report success.
   const storedId = previous.id;
+  if (id !== storedId) {
+    throw new Error(`updateServerPet: ${JSON.stringify(id)} is not the stored id ${JSON.stringify(storedId)}`);
+  }
 
   if (previous.status !== updated.status) {
     validatePetTransition(previous.status, updated.status);
   }
 
   assertKnownPetStatus(updated.status); // before the `try`, as in `insertServerPet`
+  // Before the `try` as well, so a throw here is never swallowed as an outage. A stored status
+  // the enum does not know (`fromDbPetStatus` passes it through, and staff may move it to a
+  // canonical one) has no enum value to match on.
+  // ceiling: such a status write matches on the id alone, so it is unguarded against a
+  // concurrent change; Prisma's enum read normally fails before such a row gets here —
+  // tasks/open/a-drifted-pet-status-fails-the-whole-prisma-read.md.
+  const expectedStatus = isKnownPetStatus(previous.status) ? toDbPetStatus(previous.status) : undefined;
+  const data =
+    columns === "status"
+      ? { status: toDbPetStatus(updated.status) }
+      : buildPetUpdatePayload(updated, replaceHistory);
+
   try {
-    // A collection is cleared and rewritten only when the caller says it is replacing it. The rows
-    // carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is never a
-    // no-op, and the caller's copy may be an in-memory mirror older than the database.
-    await prisma.$transaction([
-      ...(replaceHistory.updates
-        ? [prisma.petUpdate.deleteMany({ where: { petId: storedId } })]
-        : []),
-      ...(replaceHistory.medicalTimeline
-        ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: storedId } })]
-        : []),
-      columns === "status"
-        ? // The one column it changes, and only from the status it was read with, so it cannot
-          // carry any other column back over a newer write, nor overwrite a newer status.
-          prisma.pet.update({
-            where: { id: storedId, status: toDbPetStatus(previous.status) },
-            data: { status: toDbPetStatus(updated.status) },
-          })
-        : prisma.pet.update({
-            where: { id: storedId },
-            data: buildPetUpdatePayload(updated, replaceHistory),
-          }),
-    ]);
+    if (columns === "status") {
+      // `updateMany` reports a miss as `count: 0` rather than an error, as
+      // `atomicUpdateApplicationStatus` relies on. The row may well still exist with a newer
+      // status, so the mirror is left alone.
+      const { count } = await prisma.pet.updateMany({
+        where: { id: storedId, ...(expectedStatus ? { status: expectedStatus } : {}) },
+        data,
+      });
+      if (count === 0) {
+        console.warn(
+          `[Database Store] Pet status write matched no row for ${JSON.stringify(storedId)}: deleted or changed since it was read`
+        );
+        return null;
+      }
+    } else {
+      // A collection is cleared and rewritten only when the caller says it is replacing it. The
+      // rows carry columns the domain model does not (`createdAt`, `updatedAt`), so a rewrite is
+      // never a no-op.
+      await prisma.$transaction([
+        ...(replaceHistory.updates
+          ? [prisma.petUpdate.deleteMany({ where: { petId: storedId } })]
+          : []),
+        ...(replaceHistory.medicalTimeline
+          ? [prisma.medicalTimelineEvent.deleteMany({ where: { petId: storedId } })]
+          : []),
+        prisma.pet.update({ where: { id: storedId }, data }),
+      ]);
+    }
   } catch (err) {
-    // No row matched (deleted since it was read, or, for a status write, its status changed):
-    // nothing was written, and the caller is told so rather than handed a pet as if it had been.
-    // The mirror's copy is dropped, so an outage fallback cannot serve it; the next read refills
-    // it. Any other failure is still swallowed outside strict mode —
+    // The row is gone (deleted since it was read): nothing was written, and the caller is told so
+    // rather than handed a pet as if it had been. Its mirror copy is dropped, so an outage
+    // fallback cannot serve it. Any other failure is still swallowed outside strict mode —
     // tasks/open/admin-pet-writes-succeed-against-the-mirror-during-an-outage.md.
     if (isRecordNotFound(err)) {
       if (isStrictPersistence()) throw err;
@@ -380,13 +399,15 @@ export async function updateServerPet(
   // The server-side home of the keep-when-not-replaced rule; callers pass whatever they hold and
   // get back the pet as stored. A collection this write did not replace keeps the copy the mirror
   // holds *now*: not the caller's copy, and not `previous`, which was read before the await above
-  // and may predate a concurrent write.
-  // The admin actions pass a `baseline` read by `findServerPetByIdAsync`, which also put that
-  // database copy in the mirror, so in database mode this is the stored history unless a write on
-  // this instance has replaced it since.
+  // and may predate a concurrent write on this instance. `findServerPetByIdAsync` put the
+  // baseline in the mirror, so in database mode this is the stored history unless such a write
+  // has replaced it since.
   const keptFrom = serverPets.find((p) => p.id === storedId) ?? previous;
+  // A status write changed one column, so it reports the baseline with that column, not the
+  // caller's whole object: nothing it did not write is reported as stored.
+  const written: Pet = columns === "status" ? { ...previous, status: updated.status } : updated;
   const stored: Pet = {
-    ...updated,
+    ...written,
     id: storedId,
     updates: replaceHistory.updates ? updated.updates : keptFrom.updates,
     medicalTimeline: replaceHistory.medicalTimeline

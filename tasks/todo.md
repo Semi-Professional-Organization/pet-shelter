@@ -20,31 +20,43 @@ Record active multi-step work streams below.
 **Branch:** `fix/pet-edits-read-database` · opened 2026-11-11
 
 - **Done when:** `updatePet` and `updatePetStatus` start from the database, a status change writes
-  only `status`, a miscased or padded id fails, and a write that hits P2025 fails, pinned by
+  only `status`, a miscased or padded id fails, and a write that matched no row fails, pinned by
   `tests/integration/adminPetEditsReadTheDatabase.test.ts`.
-- **In scope:** `src/actions/pets.ts` (`readPetForEdit`), `updateServerPet`'s stored id, status-only
-  write and P2025 result, `findServerPetByIdAsync`'s `onOutage: "refuse"`.
+- **In scope:** `src/actions/pets.ts` (`readPetForEdit`), `updateServerPet` (required `baseline`,
+  stored id, status-only conditional `updateMany`, P2025 / `count: 0` as `null`),
+  `findServerPetByIdAsync`'s `onOutage: "refuse"`.
 - **Not in scope:** outage-mode writes (#204), the client store's merge rules (#212), the archive
-  path (same padded-id shape, recorded in
-  `tasks/open/pet-archive-reports-success-for-an-id-it-did-not-write.md`).
+  path (`tasks/open/pet-archive-reports-success-for-an-id-it-did-not-write.md`), and a stale
+  table or form (`tasks/open/admin-pet-writes-send-no-expected-status.md`).
+- **What the status condition covers, plainly:** only the window between this request's database
+  read and its write. It does **not** protect against an admin table or edit form that was
+  already stale when the admin clicked: neither sends the status it showed, so a stale status
+  dropdown can still move Adopted back to Available (a legal transition), and a stale edit form
+  writes its old status unconditionally.
 
 - [x] Read path, stored-id write, status-only write, P2025 as `null`
-- [x] Tests: mirror/database disagree, miscased and padded ids, P2025, unreadable database
+- [x] Tests: mirror/database disagree, miscased and padded ids, row deleted, status changed in
+  between, off-enum stored status, unreadable database
 - [x] Admin table rollback checked: `usePetTableController` already rolls back on `success: false`
 - [x] Review round 1 (xhigh): status write conditional on the status read; the action's database
-  copy passed in as `updateServerPet`'s `baseline`; status-only write refuses a history
-  replacement; refused outage read logs; P2025 logs, rethrows in strict mode and drops the mirror
-  entry; returned pet carries the stored id; `getStoredGalleryImages` removed (the edit's own
-  read has the gallery); `bulletinRepository` and `transparencyRepository` moved onto the shared
-  `isRecordNotFound`; the #204 entry updated to say only the write side remains.
+  copy passed in as `baseline`; status-only write refuses a history replacement; refused outage
+  read logs; P2025 logs, rethrows in strict mode; returned pet carries the stored id;
+  `getStoredGalleryImages` removed; `isRecordNotFound` shared; the #204 entry updated.
+- [x] Review round 2 (xhigh): status write is an `updateMany` checked on `count` and keeps the
+  mirror on a miss (only an edit's P2025, a deleted row, drops it); an off-enum stored status is
+  matched on id alone instead of throwing inside the `try` (`ceiling:` comment); a status write
+  reports the baseline plus the new status; `baseline` required and the id must equal its stored
+  id; one `refuseForWrite` and one shared `orNullIfMissing`; error text no longer claims to catch
+  a stale table; runbook §1 cross-reference fixed in its own commit.
 
-**Review:** deliberately not done: a write the database refuses for any reason other than P2025 is
-still swallowed outside strict mode and reported as saved (#204, unchanged; the read side now
-refuses, so this fix narrows it rather than widening it). Declined from review round 1: a
-row-only read for the status path (performance only), the archive padded-id bug (already in
-`tasks/open/`), and the dead link in a closed decision entry (decisions are not rewritten). One
-message covers "deleted" and "status changed" for a failed status write; Prisma's P2025 does not
-tell them apart without a second read.
+**Review:** deliberately not done: a write the database refuses for any reason other than a missed
+row is still swallowed outside strict mode and reported as saved (#204, unchanged; the read side
+now refuses, so this narrows it rather than widening it). Declined from review: a row-only read
+for the status path (performance and fault coupling only), the archive padded-id bug (already
+open), the dead link in a closed decision entry (decisions are not rewritten), and sending the
+expected status from the client (new behaviour, recorded for the owner). One message covers
+"deleted" and "status changed" for a failed status write; `count: 0` does not tell them apart
+without a second read.
 
 # Share the registration rate limit across server instances (#213)
 

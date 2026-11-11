@@ -32,7 +32,7 @@ import {
 import { recordAuditLog } from "@/lib/domain/auditLog";
 import { SessionUser } from "@/lib/security/session";
 import { prisma } from "@/lib/server/prisma";
-import { handlePersistenceError, isDatabasePersistent, isRecordNotFound } from "@/lib/persistenceMode";
+import { handlePersistenceError, isDatabasePersistent, orNullIfMissing } from "@/lib/persistenceMode";
 import { registerStateReset } from "@/lib/stateResets";
 
 /**
@@ -139,25 +139,6 @@ registerStateReset("bulletins", resetBulletins);
  * matters here: a renamed or retyped column would have typechecked and then
  * mapped to `undefined` on every card and every audit entry.
  */
-
-/**
- * Resolves to `null` when Prisma reports the row gone (P2025); rethrows
- * anything else.
- *
- * Reached when a notice is deleted between an editor opening it and acting on
- * it, and mapped to the action's "no longer exists" rather than a generic
- * failure with a logged stack. The same shape as the private helper of the same
- * name in `./transparencyRepository`; the P2025 test both use is the shared
- * `isRecordNotFound` in `@/lib/persistenceMode`.
- */
-async function orNullIfMissing<T>(operation: () => Promise<T>): Promise<T | null> {
-  try {
-    return await operation();
-  } catch (err) {
-    if (isRecordNotFound(err)) return null;
-    throw err;
-  }
-}
 
 function prismaCode(err: unknown): unknown {
   return typeof err === "object" && err !== null ? (err as { code?: unknown }).code : undefined;

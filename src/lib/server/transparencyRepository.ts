@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/server/prisma";
-import { isRecordNotFound } from "@/lib/persistenceMode";
+import { orNullIfMissing } from "@/lib/persistenceMode";
 import { getSampleLedger, type SampleLedger } from "../domain/transparencySample";
 import {
   buildSnapshot,
@@ -141,20 +141,6 @@ export function isDatabaseUnavailable(err: unknown): boolean {
   }
 
   return candidate.name === "PrismaClientInitializationError";
-}
-
-/**
- * Resolves to null when the row is gone (P2025, see `isRecordNotFound`); rethrows anything else.
- * That is an ordinary outcome — a stale tab, a double-clicked delete — not a server fault, so it
- * becomes a `null` result and a plain "no longer exists" message instead of an unexpected error.
- */
-async function orNullIfMissing<T>(operation: () => Promise<T>): Promise<T | null> {
-  try {
-    return await operation();
-  } catch (err) {
-    if (isRecordNotFound(err)) return null;
-    throw err;
-  }
 }
 
 /**

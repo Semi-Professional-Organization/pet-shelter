@@ -456,10 +456,12 @@ export async function updatePetStatus(
     });
     if (!stored) {
       // The write is conditional on the status read above, so this is a row deleted or a status
-      // changed (an approval, another admin) since then. One message covers both.
+      // changed (an approval, another admin) between that read and the write. One message covers
+      // both. It says nothing about a table that was already stale when the admin clicked —
+      // tasks/open/admin-pet-writes-send-no-expected-status.md.
       return {
         success: false,
-        error: "This pet was changed or removed since the table loaded. Reload and try again.",
+        error: "This pet was changed or removed while saving. Reload and try again.",
       };
     }
 
