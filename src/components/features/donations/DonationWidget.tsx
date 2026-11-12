@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   QrCode,
@@ -22,6 +22,7 @@ import {
   safeContributionFailureMessage,
 } from "@/lib/domain/contributionFailure";
 import { submitDonationPledgeAction } from "@/actions/donations";
+import { DONATION_DEDICATION_MAX_LENGTH } from "@/lib/domain/donationPledge";
 import type { DonationPledgeDTO } from "@/lib/validations/donation";
 import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel";
 import { BankTransferDetails } from "@/components/features/donations/BankTransferDetails";
@@ -79,14 +80,21 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     return null;
   });
 
-  const [targetPetName, setTargetPetName] = useState(() => {
-    if (urlPetName) return urlPetName;
-    if (urlSponsorPetId) {
-      const p = initialPets.find((pet) => pet.id === urlSponsorPetId);
-      if (p) return p.name;
-    }
-    return "";
-  });
+  // The dedication is derived, never synced: the chosen animal's name, or else the
+  // `?pet=` name as the donor's own note (owner's decision, 2026-11-11; #205). Trimmed
+  // and capped to what the schema accepts, so what is shown is what is sent.
+  const [urlNote, setUrlNote] = useState(
+    () => (urlPetName ?? "").trim().slice(0, DONATION_DEDICATION_MAX_LENGTH)
+  );
+  const targetPetName = selectedPet?.name ?? urlNote;
+  // Set once the donor removes the note or picks in the chooser. Read by the late
+  // catalogue load, which must not re-seed a choice the donor has already made.
+  const urlSeedDismissed = useRef(false);
+  // Whether the chooser holds the catalogue it will hold. Until then a `?pet=` name
+  // cannot be told apart from an animal that has not loaded yet.
+  const [catalogueSettled, setCatalogueSettled] = useState(initialPets.length > 0);
+  const chooserRef = useRef<HTMLDivElement>(null);
+  const [dedicationStatus, setDedicationStatus] = useState("");
 
   const [isCustomTier, setIsCustomTier] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>("100");
@@ -114,28 +122,24 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
   // Fetch public pets if not supplied initially
   useEffect(() => {
-    if (pets.length === 0) {
-      getPublicPets().then((loadedPets) => {
-        if (loadedPets && loadedPets.length > 0) {
-          setPets(loadedPets);
-          if (!selectedPet && (urlSponsorPetId || urlPetName)) {
-            const match = loadedPets.find(
-              (p) =>
-                (urlSponsorPetId && p.id === urlSponsorPetId) ||
-                (urlPetName && p.name.toLowerCase() === urlPetName.toLowerCase())
-            );
-            if (match) {
-              setSelectedPet(match);
-              setTargetPetName(match.name);
-            }
-          }
+    if (pets.length > 0 || catalogueSettled) return;
+    getPublicPets().then((loadedPets) => {
+      if (loadedPets && loadedPets.length > 0) {
+        setPets(loadedPets);
+        if (!urlSeedDismissed.current && (urlSponsorPetId || urlPetName)) {
+          const match = loadedPets.find(
+            (p) =>
+              (urlSponsorPetId && p.id === urlSponsorPetId) ||
+              (urlPetName && p.name.toLowerCase() === urlPetName.toLowerCase())
+          );
+          if (match) setSelectedPet((current) => current ?? match);
         }
-      }).catch((err) => {
-        // The chooser stays empty and the gift goes to general care; not worth an error banner.
-        console.error("[Donation Widget] Could not load the animals to choose from:", err);
-      });
-    }
-  }, [pets.length, selectedPet, urlPetName, urlSponsorPetId]);
+      }
+    }).catch((err) => {
+      // The chooser stays empty and the gift goes to general care; not worth an error banner.
+      console.error("[Donation Widget] Could not load the animals to choose from:", err);
+    }).finally(() => setCatalogueSettled(true));
+  }, [pets.length, catalogueSettled, urlPetName, urlSponsorPetId]);
 
   // Tier prices differ by frequency, so the payable amount follows the toggle
   // rather than the one-time list price.
@@ -144,8 +148,20 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     : tierAmountFor(selectedTier, frequency);
 
   const handleSelectPet = (pet: Pet | null) => {
+    urlSeedDismissed.current = true;
     setSelectedPet(pet);
-    setTargetPetName(pet ? pet.name : "");
+    setUrlNote("");
+  };
+
+  const handleRemoveDedication = () => {
+    urlSeedDismissed.current = true;
+    setUrlNote("");
+    setDedicationStatus(isMs ? "Dedikasi dibuang." : "Dedication removed.");
+    // The Remove button is about to unmount. The general fund is what the gift goes
+    // to now, and it is the chooser's pressed card, so focus lands there.
+    chooserRef.current
+      ?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')
+      ?.focus();
   };
 
   const handleSelectTier = (tier: SponsorshipTier) => {
@@ -223,8 +239,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const handleReset = () => {
     setCompletedPledge(null);
     setPaymentMethod("duitnow_qr");
+    urlSeedDismissed.current = true;
     setSelectedPet(null);
-    setTargetPetName("");
+    setUrlNote("");
     setDonorName("");
     setDonorEmail("");
     setDonorPhone("");
@@ -296,6 +313,15 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
                 {completedPledge.donorName}
               </div>
               <div className="text-muted-foreground">{completedPledge.donorEmail}</div>
+              {completedPledge.targetPetName && (
+                <div className="text-muted-foreground font-medium break-words">
+                  {/* The donor's own words, checked against no animal — so it is
+                      "your dedication", never a confirmed pet, and it sits with what
+                      the donor told us rather than under the allocation. */}
+                  🐾 {isMs ? "Dedikasi Anda" : "Your dedication"}:{" "}
+                  {completedPledge.targetPetName}
+                </div>
+              )}
             </div>
 
             <div>
@@ -305,14 +331,6 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
               <div className="font-bold text-foreground text-sm">
                 {completedPledge.tierName}
               </div>
-              {completedPledge.targetPetName && (
-                <div className="text-muted-foreground font-medium">
-                  {/* The donor's own words, checked against no animal — so it is
-                      "your dedication", never a confirmed pet. */}
-                  🐾 {isMs ? "Dedikasi Anda" : "Your dedication"}:{" "}
-                  {completedPledge.targetPetName}
-                </div>
-              )}
               <div className="text-muted-foreground uppercase text-3xs">
                 {completedPledge.frequency.replace("_", " ")}
               </div>
@@ -429,7 +447,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
       </div>
 
       {/* 2. Interactive Pet Chooser Carousel (FE-06) */}
-      <div className="border-b border-border pb-6">
+      <div ref={chooserRef} className="border-b border-border pb-6">
         <PetChooserCarousel
           pets={pets}
           selectedPetId={selectedPet ? selectedPet.id : "general"}
@@ -439,25 +457,29 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           A `?pet=` name that matches no animal in the catalogue still travels with the
           pledge as the donor's dedication (owner's decision, 2026-11-11; #205). The
           chooser cannot show it, so it is shown here, where the donor can see and
-          remove it before submitting.
+          remove it before submitting. Only once the catalogue has settled: before
+          that, every real animal would flash here as an unmatched name.
         */}
-        {!selectedPet && targetPetName && (
+        {catalogueSettled && !selectedPet && urlNote && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
-            <span className="text-muted-foreground">
+            <span className="min-w-0 break-words text-muted-foreground">
               🐾 {isMs ? "Dedikasi Anda" : "Your dedication"}:{" "}
-              <strong className="text-foreground">{targetPetName}</strong>
+              <strong className="text-foreground">&ldquo;{urlNote}&rdquo;</strong>
             </span>
             <Button
               type="button"
               variant="ghost"
               size="xs"
-              onClick={() => setTargetPetName("")}
+              onClick={handleRemoveDedication}
               aria-label={isMs ? "Buang dedikasi anda" : "Remove your dedication"}
             >
               {isMs ? "Buang" : "Remove"}
             </Button>
           </div>
         )}
+        <p role="status" aria-live="polite" className="sr-only">
+          {dedicationStatus}
+        </p>
       </div>
 
       {/* 3. Select Tier or Custom Amount */}

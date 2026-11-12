@@ -656,9 +656,17 @@ const PAYMENT_RAIL_LABELS: Record<PaymentMethod, string> = {
  * It now states only what the shelter knows: the money arrived, how much, and its
  * reference. The single "not a tax receipt" line is there for donors who were told
  * at checkout, before that date, that a tax receipt would follow.
+ *
+ * `lane` says what `targetPetName` is, which the receipt itself cannot: on a
+ * sponsorship it is the pet the server verified by id ("Sponsored Pet", part of
+ * the allocation); on a general gift it is the donor's own unchecked dedication
+ * ("Dedication", stated with the donor's details and not under the allocation —
+ * tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md). Required,
+ * so a new caller has to say which.
  */
 export async function sendDonationReceiptEmail(
-  receipt: DonationReceipt
+  receipt: DonationReceipt,
+  lane: "general_gift" | "sponsorship"
 ): Promise<EmailResult> {
   // Single source of truth for every value both halves of this mail state. The plain-text and
   // HTML bodies below read from here and never re-derive a value of their own — one field resolved
@@ -671,12 +679,23 @@ export async function sendDonationReceiptEmail(
     paymentRail: PAYMENT_RAIL_LABELS[receipt.paymentMethod],
     donorPhone: receipt.donorPhone ?? "",
     targetPetName: receipt.targetPetName ?? "",
+    targetPetLabel: lane === "sponsorship" ? "Sponsored Pet" : "Dedication",
     notes: receipt.notes ?? "",
     notice:
       "This email acknowledges your gift. It is not a tax receipt and cannot be used to claim tax relief. Reply to this email if you have any questions.",
   };
 
   const subject = `🐾 Thank you, we received your gift of ${fields.amount} - ${receipt.receiptNumber} (${SHELTER_NAME})`;
+
+  // One row, placed by lane: with the donor's details for a dedication, with the
+  // allocation for a sponsored pet. The text half below places its line the same way.
+  const petRow = fields.targetPetName
+    ? `
+        <tr>
+          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>${fields.targetPetLabel}:</strong></td>
+          <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_RECEIPT.inkSoft};">🐾 ${escapeHtml(fields.targetPetName)}</td>
+        </tr>`
+    : "";
 
   const plainText = `
 DONATION RECEIVED: THANK YOU
@@ -692,10 +711,10 @@ Contribution Frequency: ${fields.frequencyLabel}
 DONOR INFORMATION:
 - Name: ${receipt.donorName}
 - Email: ${receipt.donorEmail}
-${fields.donorPhone ? `- Phone: ${fields.donorPhone}\n` : ""}
+${fields.donorPhone ? `- Phone: ${fields.donorPhone}\n` : ""}${fields.targetPetName && lane === "general_gift" ? `- ${fields.targetPetLabel}: ${fields.targetPetName}\n` : ""}
 SPONSORSHIP ALLOCATION:
 - Allocation: ${receipt.tierName}
-${fields.targetPetName ? `- Dedication: ${fields.targetPetName}\n` : ""}- Payment Rail: ${fields.paymentRail}
+${fields.targetPetName && lane === "sponsorship" ? `- ${fields.targetPetLabel}: ${fields.targetPetName}\n` : ""}- Payment Rail: ${fields.paymentRail}
 ${fields.notes ? `- Donor Message: "${fields.notes}"\n` : ""}
 TOTAL RECEIVED: ${fields.amount}
 
@@ -725,16 +744,12 @@ Thank you for your life-saving generosity and support of our shelter animals!
         <tr>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Email / Contact:</strong></td>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.ink};">${escapeHtml(receipt.donorEmail)} ${fields.donorPhone ? `(${escapeHtml(fields.donorPhone)})` : ""}</td>
-        </tr>
+        </tr>${lane === "general_gift" ? petRow : ""}
         <tr>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Allocation Fund:</strong></td>
           <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_RECEIPT.ink};">${escapeHtml(receipt.tierName)}</td>
         </tr>
-        ${fields.targetPetName ? `
-        <tr>
-          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Dedication:</strong></td>
-          <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_RECEIPT.inkSoft};">🐾 ${escapeHtml(fields.targetPetName)}</td>
-        </tr>` : ""}
+        ${lane === "sponsorship" ? petRow : ""}
         <tr>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Payment Rail:</strong></td>
           <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.ink};">${fields.paymentRail}</td>

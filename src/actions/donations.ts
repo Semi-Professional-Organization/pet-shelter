@@ -407,7 +407,7 @@ export async function reconcileDonationPledgeAction(
     },
   });
 
-  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation)));
+  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation), "general_gift"));
 
   return {
     success: true,

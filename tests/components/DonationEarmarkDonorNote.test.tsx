@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 
 vi.mock("@/actions/donations", () => ({
   submitDonationPledgeAction: vi.fn(),
@@ -13,6 +13,7 @@ import {
   listPendingDonationPledgesAction,
   submitDonationPledgeAction,
 } from "@/actions/donations";
+import { getPublicPets } from "@/actions/pets";
 import { DonationWidget } from "@/components/features/donations/DonationWidget";
 import { DonationPledgeReconciliation } from "@/components/admin/DonationPledgeReconciliation";
 import { setMockLocation } from "../setup/nextMocks";
@@ -37,6 +38,26 @@ async function fillAndSubmit(user: ReturnType<typeof setupUser>) {
   await user.click(screen.getByRole("button", { name: /complete donation pledge/i }));
 }
 
+const carousel = () => screen.getByRole("region", { name: /pet selection carousel/i });
+
+/** A promise the test settles, standing in for a catalogue that arrives late. */
+function lateCatalogue() {
+  let resolve!: (pets: ReturnType<typeof makePet>[]) => void;
+  const promise = new Promise<ReturnType<typeof makePet>[]>((fulfil) => {
+    resolve = fulfil;
+  });
+  vi.mocked(getPublicPets).mockReturnValueOnce(promise);
+  return { arrive: (pets: ReturnType<typeof makePet>[]) => act(async () => resolve(pets)) };
+}
+
+/** The queue's bordered block holding a gift's dedication, label and quoted text. */
+async function dedicationBlock() {
+  const label = await screen.findByText("Donor's note (dedication):");
+  const block = label.parentElement!;
+  expect(block).toHaveClass("border");
+  return block;
+}
+
 /** The deepest element whose text contains `needle`, for text split across nodes. */
 function deepestContaining(needle: string) {
   return screen.getByText((_content, element) => {
@@ -55,6 +76,60 @@ const catalogue = [makePet({ id: "pet-001", name: "Bella" }), makePet({ id: "pet
 beforeEach(() => {
   vi.clearAllMocks();
   setMockLocation("/donate", "");
+});
+
+/**
+ * `/donate` mounts the widget with no `initialPets` (DonatePageView), so the catalogue
+ * arrives after the first render. These cases run that path, with the catalogue held back
+ * until the test lets it arrive.
+ */
+describe("the dedication when the catalogue loads late, as in production", () => {
+  it("never shows a real animal as an unmatched dedication, before or after it loads", async () => {
+    const catalogueLoad = lateCatalogue();
+    setMockLocation("/donate", "pet=Bella");
+    renderWithLanguage(<DonationWidget />);
+
+    expect(screen.queryByText(/your dedication/i)).toBeNull();
+    await catalogueLoad.arrive(catalogue);
+
+    expect(within(carousel()).getByRole("button", { name: /bella/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.queryByText(/your dedication/i)).toBeNull();
+  });
+
+  it("shows an unmatched name only once the catalogue has loaded", async () => {
+    const catalogueLoad = lateCatalogue();
+    setMockLocation("/donate", "pet=Tuah");
+    renderWithLanguage(<DonationWidget />);
+
+    expect(screen.queryByText(/your dedication/i)).toBeNull();
+    await catalogueLoad.arrive(catalogue);
+
+    expect(deepestContaining("Your dedication")).toHaveTextContent(/^🐾 Your dedication: “Tuah”$/);
+  });
+
+  it("does not re-seed the name when the donor chose the general fund before it loaded", async () => {
+    // The strip itself only appears once the catalogue has settled, so the choice a donor
+    // can make while it loads is the general-fund card. A late catalogue holding the
+    // `?pet=` animal must not override it.
+    mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
+    const catalogueLoad = lateCatalogue();
+    setMockLocation("/donate", "pet=Bella");
+    renderWithLanguage(<DonationWidget />);
+
+    const user = setupUser();
+    await user.click(within(carousel()).getByRole("button", { name: /general sanctuary fund/i }));
+    await catalogueLoad.arrive(catalogue);
+
+    expect(within(carousel()).getByRole("button", { name: /bella/i })).toHaveAttribute(
+      "aria-pressed",
+      "false"
+    );
+    await fillAndSubmit(user);
+    expect(mockedSubmit.mock.calls[0][0].targetPetName).toBeUndefined();
+  });
 });
 
 describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
@@ -81,7 +156,7 @@ describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
 
     // Before submitting: the chooser cannot show a name it does not hold, so the
     // dedication the pledge will carry is stated beside it.
-    expect(deepestContaining("Your dedication")).toHaveTextContent(/^🐾 Your dedication: Tuah$/);
+    expect(deepestContaining("Your dedication")).toHaveTextContent(/^🐾 Your dedication: “Tuah”$/);
     expect(screen.getByRole("button", { name: /remove your dedication/i })).toBeInTheDocument();
 
     const user = setupUser();
@@ -92,6 +167,8 @@ describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
 
     await screen.findByText("HFS-GFT-20261111-000001");
     expect(deepestContaining("Tuah")).toHaveTextContent(/^🐾 Your dedication: Tuah$/);
+    // Stated with what the donor told us, not under the allocation heading.
+    expect(screen.getByText("Allocation").parentElement).not.toHaveTextContent("Tuah");
     expect(document.body).not.toHaveTextContent(/Dedicated (Pet|Animal)/i);
   });
 
@@ -102,12 +179,34 @@ describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
 
     const user = setupUser();
     await user.click(screen.getByRole("button", { name: /remove your dedication/i }));
-    expect(screen.queryByText(/your dedication/i)).toBeNull();
+    expect(screen.queryByText(/your dedication:/i)).toBeNull();
+    // The button that had focus is gone: focus lands on the general fund the gift now goes
+    // to, and the removal is announced.
+    expect(
+      within(carousel()).getByRole("button", { name: /general sanctuary fund/i })
+    ).toHaveFocus();
+    expect(screen.getByRole("status")).toHaveTextContent("Dedication removed.");
 
     await fillAndSubmit(user);
 
     expect(mockedSubmit).toHaveBeenCalledTimes(1);
     expect(mockedSubmit.mock.calls[0][0].targetPetName).toBeUndefined();
+  });
+
+  it("trims a ?pet= name, caps it at the schema's 100 characters and quotes it", () => {
+    setMockLocation("/donate", `pet=${encodeURIComponent(`  ${"A".repeat(150)}  `)}`);
+    renderWithLanguage(<DonationWidget initialPets={catalogue} />);
+
+    expect(deepestContaining("Your dedication")).toHaveTextContent(
+      new RegExp(`^🐾 Your dedication: “A{100}”$`)
+    );
+  });
+
+  it("shows nothing for a whitespace-only ?pet= name", () => {
+    setMockLocation("/donate", "pet=%20%20%20");
+    renderWithLanguage(<DonationWidget initialPets={catalogue} />);
+
+    expect(screen.queryByText(/your dedication/i)).toBeNull();
   });
 
   it("shows no separate dedication line when the name is an animal in the chooser", () => {
@@ -138,8 +237,8 @@ describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
 
     renderWithLanguage(<DonationPledgeReconciliation />);
 
-    const note = await screen.findByText(/Donor's note \(dedication\):/);
-    expect(note).toHaveTextContent(/^Donor's note \(dedication\): “Tuah”$/);
+    const block = await dedicationBlock();
+    expect(within(block).getByText("“Tuah”")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/in honour of/i);
   });
 
@@ -165,9 +264,9 @@ describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
 
     renderWithLanguage(<DonationPledgeReconciliation />);
 
-    const note = await screen.findByText(/Donor's note \(dedication\):/);
-    // The note's whole text sits inside the quotes, on its own line.
-    expect(note).toHaveTextContent(`Donor's note (dedication): “${forged}”`);
+    const block = await dedicationBlock();
+    // The note's whole text sits inside the quotes, in its own bordered block.
+    expect(within(block).getByText(`“${forged}”`)).toBeInTheDocument();
     // The line the queue states itself begins with the tier and names none of the note.
     const fields = screen.getByText(/^Core Vaccination & Deworming · One-time ·/);
     expect(fields).not.toHaveTextContent(/Tuah|Monthly|Credit/);

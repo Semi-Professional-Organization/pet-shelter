@@ -14,6 +14,9 @@ import { findMemberRow, signInAs, signOut } from "../setup/authSession";
 
 // Every export of the pet repository, wrapped in a spy that still calls through, so
 // "no pet lookup happens" is an observation rather than an assumption.
+// ceiling: watches only the `@/lib/server/petRepository` exports. A direct `prisma.pet`
+// query or a `src/data/pets.json` import on the pledge path would pass unseen; spy on
+// `prisma.pet` and mock the JSON module too if the path ever grows a reason to reach them.
 vi.mock("@/lib/server/petRepository", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return Object.fromEntries(
@@ -25,6 +28,11 @@ vi.mock("@/lib/server/petRepository", async (importOriginal) => {
 });
 
 beforeEach(async () => {
+  // The repository spies are module-level, so each case starts from zero calls.
+  const petRepository = await import("@/lib/server/petRepository");
+  for (const value of Object.values(petRepository)) {
+    if (vi.isMockFunction(value)) value.mockClear();
+  }
   // The coordinator's queue re-reads the signed-in member on every call. Answered with
   // the row the test identity has, so authorization goes through the member check and
   // not the DAL's outage fallback (tasks/open/seven-unit-suites-are-authorized-by-the-dal-fallback.md).

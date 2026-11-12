@@ -168,7 +168,7 @@ describe("Donation Receipt Transactional Email Dispatcher", () => {
       notes: "Thanks for taking care of Luna!",
     };
 
-    const emailResult = await sendDonationReceiptEmail(mockReceipt);
+    const emailResult = await sendDonationReceiptEmail(mockReceipt, "general_gift");
     expect(emailResult.success).toBe(true);
     expect(emailResult.simulated).toBe(true);
   });

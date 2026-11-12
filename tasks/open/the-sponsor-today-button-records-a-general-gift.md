@@ -1,4 +1,4 @@
-# The "Sponsor {pet} Today" button records a general gift, not a sponsorship
+# The "Sponsor {pet} Today" button and the donation form promise a sponsorship but record a general gift
 
 **Status:** ASSERTED · opened 2026-11-11 · found by review of #205, read from the code
 
@@ -23,6 +23,18 @@ What that link records is a general gift, not a sponsorship:
 So a supporter who clicks the button is promised a sponsorship of that animal and its perks. What
 gets recorded is a one-time general gift with the animal's name as an unverified note.
 
-**Settles when:** the button opens the sponsorship flow for that pet, or its copy and the panel
-stop promising a sponsorship and its perks. Either is pinned by a component test of
-`PetDetailView` that asserts where the button leads or what it says.
+The donation form makes the same promise in its own copy:
+
+- The chooser's heading is "Dedicate Sponsorship to a Specific Animal" (`donations.choosePetTitle`,
+  `src/components/features/donations/PetChooserCarousel.tsx`; Malay "Dedikasikan Penajaan Kepada
+  Haiwan Tertentu").
+- The perks panel reads "Rescue Companion & Updates — {pet}"
+  (`src/components/features/donations/DonationWidget.tsx`, `donations.companionTierTitle`) once an
+  animal is chosen, beside the monthly and kibble perks.
+
+Choosing an animal there also records only a dedication on a general gift.
+
+**Settles when:** the button opens the sponsorship flow for that pet, or its copy, the profile's
+panel, the chooser's heading and the widget's perks panel stop promising a sponsorship of an animal.
+Either is pinned by component tests of `PetDetailView` and `DonationWidget` that assert where the
+button leads, or what the copy says.

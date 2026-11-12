@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isGiftRef } from "@/lib/domain/donationPledge";
+import { DONATION_DEDICATION_MAX_LENGTH, isGiftRef } from "@/lib/domain/donationPledge";
 
 export const donationTierEnum = z.enum([
   "kibble",
@@ -39,7 +39,7 @@ export const donationPledgeSchema = z.object({
   // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
   targetPetName: z
     .string()
-    .max(100, "Dedication is too long")
+    .max(DONATION_DEDICATION_MAX_LENGTH, "Dedication is too long")
     .optional()
     .or(z.literal("")),
   paymentMethod: paymentMethodEnum.default("duitnow_qr"),

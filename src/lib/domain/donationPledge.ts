@@ -16,6 +16,12 @@ import { generateContributionRef } from "@/lib/domain/contributionRef";
  * either arrives or does not, so there is no state for it to lapse into and no
  * code that would ever write one.
  */
+/**
+ * The longest dedication a gift may carry. The schema refuses longer, and the donation
+ * form caps a `?pet=` name to it before showing it, so the two cannot disagree.
+ */
+export const DONATION_DEDICATION_MAX_LENGTH = 100;
+
 export type DonationPledgeStatus = "PENDING_PAYMENT" | "ACTIVE" | "CANCELLED";
 
 export const DONATION_PLEDGE_STATUSES: readonly DonationPledgeStatus[] = [

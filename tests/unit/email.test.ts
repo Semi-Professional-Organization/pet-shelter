@@ -111,11 +111,12 @@ describe("donation acknowledgement — the two halves must agree", () => {
    * not a body. Drive the live path with a stubbed key and read both halves off the Resend payload.
    */
   async function renderReceipt(
-    overrides: Partial<DonationReceipt> = {}
+    overrides: Partial<DonationReceipt> = {},
+    lane: "general_gift" | "sponsorship" = "general_gift"
   ): Promise<{ subject: string; text: string; html: string }> {
     const fetchSpy = stubResendAccepts();
 
-    const result = await sendDonationReceiptEmail({ ...baseReceipt, ...overrides });
+    const result = await sendDonationReceiptEmail({ ...baseReceipt, ...overrides }, lane);
     expect(result.success).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
@@ -190,18 +191,36 @@ describe("donation acknowledgement — the two halves must agree", () => {
     }
   });
 
-  // #205: the dedication is the donor's own text, checked against no animal, and on a
-  // sponsorship receipt the sponsored pet's name. "Dedication" claims neither; "Dedicated
+  // #205: on a general gift the name is the donor's own text, checked against no animal, so it
+  // is a "Dedication" stated with the donor's details, not under the allocation. "Dedicated
   // Pet" / "Dedicated Animal" claimed a confirmed animal for a name nobody checked.
-  it("labels the dedication as a dedication, never as a confirmed animal, in both halves", async () => {
+  it("labels a general gift's name as a dedication, outside the allocation, in both halves", async () => {
     const mail = await renderReceipt({ targetPetName: "Tuah", notes: "Keep up the good work" });
 
     expect(mail.text).toContain("- Dedication: Tuah");
     expect(mail.html).toMatch(/<strong>Dedication:<\/strong><\/td>\s*<td[^>]*>🐾 Tuah<\/td>/);
+    // Before the allocation in both halves, so it never reads as part of it.
+    expect(mail.text.indexOf("- Dedication: Tuah")).toBeLessThan(
+      mail.text.indexOf("SPONSORSHIP ALLOCATION:")
+    );
+    expect(mail.html.indexOf("Dedication:")).toBeLessThan(mail.html.indexOf("Allocation Fund:"));
     for (const body of [mail.text, mail.html]) {
-      expect(body).not.toMatch(/Dedicated (Pet|Animal)/i);
+      expect(body).not.toMatch(/Dedicated (Pet|Animal)|Sponsored Pet/i);
       // The separate message to the shelter keeps its own label.
       expect(body).toContain("Donor Message");
+    }
+  });
+
+  // On a sponsorship receipt the name is the pet the server verified by id at checkout, and
+  // it is what the money is for, so it is named as such, with the allocation.
+  it("labels a sponsorship's pet as the sponsored pet, with the allocation, in both halves", async () => {
+    const mail = await renderReceipt({ targetPetName: "Kopi" }, "sponsorship");
+
+    expect(mail.text).toMatch(/SPONSORSHIP ALLOCATION:\n- Allocation: [^\n]+\n- Sponsored Pet: Kopi\n/);
+    expect(mail.html).toMatch(/<strong>Sponsored Pet:<\/strong><\/td>\s*<td[^>]*>🐾 Kopi<\/td>/);
+    expect(mail.html.indexOf("Sponsored Pet:")).toBeGreaterThan(mail.html.indexOf("Allocation Fund:"));
+    for (const body of [mail.text, mail.html]) {
+      expect(body).not.toMatch(/Dedication/);
     }
   });
 
@@ -323,7 +342,7 @@ describe("rendered email colour parity", () => {
         frequency: "one_time",
         paymentMethod: "duitnow_qr",
         targetPetName: "Luna",
-      })
+      }, "general_gift")
     );
 
     expect(html, "the receipt sits on receipt paper").toContain(EMAIL_RECEIPT.paper);

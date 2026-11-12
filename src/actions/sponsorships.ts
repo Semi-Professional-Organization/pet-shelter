@@ -434,7 +434,7 @@ export async function reconcilePetSponsorshipAction(
     },
   });
 
-  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation)));
+  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation), "sponsorship"));
 
   return {
     success: true,

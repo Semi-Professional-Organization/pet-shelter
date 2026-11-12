@@ -57,7 +57,7 @@ const DONATION_PLEDGE_QUEUE: ReconciliationQueueSource = {
           // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md),
           // and kept out of `purpose`, where its text would read as the queue's own.
           purpose: row.tierName,
-          donorNote: row.targetPetName,
+          dedication: row.targetPetName,
           amountDisplay: row.amountDisplay,
           frequency: row.frequency,
           paymentMethod: row.paymentMethod,

@@ -43,6 +43,15 @@ Record active multi-step work streams below.
   the no-lookup test passes on both by design and fails when a `findPetForWriteAsync` call is inserted
 - [x] Ledger: open entry deleted, decision added, three new open entries
 
+**Round 2** (third commit): the strip waits for the catalogue (production mounts the widget
+with no `initialPets`), a late catalogue no longer re-seeds a choice the donor made, the
+dedication is derived instead of synced, the strip trims, caps at the schema's 100 and quotes,
+Remove moves focus and announces; the queue's dedication has its own bordered block and the row
+field is `dedication`; the acknowledgement's caller names its lane ("Sponsored Pet" vs
+"Dedication"); the dedication left the allocation heading on the confirmation and the
+acknowledgement; runbook updated; the no-lookup test has a `ceiling:`. Recorded only: the widget's
+own sponsorship copy, folded into the sponsor-today entry. Declined: a shared dictionary key.
+
 **Review:** round 1 (coordinator) found the `?pet=` name invisible on the form, the note
 concatenated unquoted into the queue's `·` line, a CSV header that mislabelled sponsorship rows
 and collided with `notes`, a unit suite authorized by the DAL fallback and claiming a Tuah-free

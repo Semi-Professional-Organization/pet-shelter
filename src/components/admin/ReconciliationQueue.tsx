@@ -33,11 +33,13 @@ export interface ReconciliationRow {
   /** One line naming what the money is for, e.g. "Vaccine Fund for Barnaby". */
   purpose: string;
   /**
-   * Free text the supporter wrote, shown on its own line and in quotes so its end is
-   * visible: concatenated into the `·`-delimited line above, a note containing
-   * " · Monthly · " would read as fields this screen states itself.
+   * A gift's dedication: free text the supporter wrote, checked against no animal.
+   * Not the pledge's `notes` (the message to the shelter), which never goes here.
+   * Shown in its own bordered block and in quotes: concatenated into the
+   * `·`-delimited line above, a note containing " · Monthly · " would read as fields
+   * this screen states itself, and quotes alone can be forged by a note containing them.
    */
-  donorNote?: string;
+  dedication?: string;
   /** Preformatted MYR. The client never re-derives money from sen. */
   amountDisplay: string;
   frequency: "one_time" | "monthly";
@@ -443,11 +445,11 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
                       day: "numeric",
                     })}
                   </p>
-                  {row.donorNote && (
-                    <p className="text-xs text-muted-foreground break-words">
-                      Donor&apos;s note (dedication):{" "}
-                      <span className="text-foreground">&ldquo;{row.donorNote}&rdquo;</span>
-                    </p>
+                  {row.dedication && (
+                    <div className="mt-1 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      <div>Donor&apos;s note (dedication):</div>
+                      <p className="text-foreground break-words">&ldquo;{row.dedication}&rdquo;</p>
+                    </div>
                   )}
                 </div>
 
