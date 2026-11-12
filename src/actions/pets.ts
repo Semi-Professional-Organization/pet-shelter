@@ -2,14 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  petEditSchema,
   petFormSchema,
   PetFormInput,
   PetFilterInput,
-  sortHistoryByDate,
 } from "@/lib/validations/pet";
 import { Pet } from "@/types/pet";
 import { matchesStatusFilter } from "@/lib/presentation/petStatusPresentation";
-import { withDerivedAge } from "@/lib/domain/petAge";
+import { buildNewPet, mergePetEdit } from "@/lib/domain/petEdit";
 import { matchesPetSearch } from "@/lib/domain/petSearch";
 import { getVerifiedSession } from "@/lib/security/dal";
 import { AdminPrincipal, verifyAdminSession } from "@/lib/security/adminSession";
@@ -208,50 +208,9 @@ export async function createPet(
     const actor = await getAdminActorOrThrow();
     const validated = petFormSchema.parse(data);
 
-    // `age` and `ageCategory` are derived, never submitted: the form now collects the birthday,
-    // and `withDerivedAge` is the single place either is computed from it.
-    const newPet: Pet = withDerivedAge({
-      id: `pet-${Date.now()}`,
-      name: validated.name,
-      species: validated.species,
-      breed: validated.breed,
-      birthDate: validated.birthDate,
-      // A new animal whose intake form said nothing about how the birthday was established is an
-      // estimate. The schema no longer defaults this, so the create path states it.
-      birthDateIsEstimate: validated.birthDateIsEstimate ?? true,
-      gender: validated.gender,
-      size: validated.size,
-      weight: validated.weight,
-      status: validated.status,
-      adoptionFee: validated.adoptionFee,
-      description: validated.description,
-      rescueStory: validated.rescueStory,
-      image: validated.image,
-      galleryImages: validated.galleryImages || [],
-      tags: validated.tags,
-      featured: validated.featured,
-      intakeDate: validated.intakeDate,
-      customQrUrl: validated.customQrUrl || null,
-      rehabStage: validated.rehabStage,
-      rehabStageMs: validated.rehabStageMs,
-      rehabProgressPercent: validated.rehabProgressPercent,
-      updates: sortHistoryByDate(validated.updates),
-      medicalTimeline: sortHistoryByDate(validated.medicalTimeline),
-      isArchived: validated.isArchived ?? false,
-      deletedAt: validated.deletedAt ?? null,
-      medical: {
-        vaccinated: validated.vaccinated,
-        microchipped: validated.microchipped,
-        spayedNeutered: validated.spayedNeutered,
-        specialNeeds: validated.specialNeeds,
-      },
-      compatibility: {
-        goodWithDogs: validated.goodWithDogs,
-        goodWithCats: validated.goodWithCats,
-        goodWithKids: validated.goodWithKids,
-        energyLevel: validated.energyLevel,
-      },
-    });
+    // `buildNewPet`, shared with the browser store: it states a new record's defaults, derives
+    // `age` and `ageCategory` from the birthday, and stores an empty QR as null.
+    const newPet = buildNewPet(`pet-${Date.now()}`, validated);
 
     await insertServerPet(newPet, actor);
 
@@ -285,7 +244,10 @@ export async function updatePet(
 ): Promise<{ success: boolean; data?: Pet; error?: string }> {
   try {
     const actor = await getAdminActorOrThrow();
-    const validated = petFormSchema.parse(data);
+    // `petEditSchema`, not `petFormSchema`: the same rules with no defaults, so a key the caller
+    // left out stays absent and `mergePetEdit` keeps the stored value for it. With the defaults,
+    // an omitted gallery, QR, `featured` or `isArchived` was written as a reset (#212).
+    const validated = petEditSchema.parse(data);
     const existing = await readPetForEdit(id);
 
     if (!existing) {
@@ -325,47 +287,11 @@ export async function updatePet(
       medicalTimeline: validated.medicalTimeline !== undefined,
     };
 
-    // Wrapped, not spread: `existing` still carries the `age` and `ageCategory` the previous read
-    // derived, and a submitted birthday must re-derive both rather than leave last read's prose in
-    // place. `withDerivedAge` recomputes them from whatever `birthDate` ends up on the object.
-    const updated: Pet = withDerivedAge({
-      ...existing,
-      ...validated,
-      // Assigned, not left to the spread. Dropping `.default(true)` from the schema stops an
-      // *absent* key clobbering a stored `false`, but zod keeps a key that is present and
-      // explicitly `undefined` — measured on zod 4.4.3: `parse({a: undefined})` yields an object
-      // where `'a' in out` is true. A Server Action argument is untrusted input, and `{...form,
-      // birthDateIsEstimate: maybeUndefined}` is the shape any spread produces, so the server
-      // needs the same fallback the client store already had. Without it a birthday someone
-      // verified silently goes back to "estimated", which is the one outcome this field exists to
-      // prevent.
-      birthDateIsEstimate:
-        validated.birthDateIsEstimate ?? existing.birthDateIsEstimate ?? true,
-      // The submitted form is authoritative for rehabilitation progress: omitting the
-      // fields clears them, so a cleared animal cannot keep a stale progress bar.
-      rehabStage: validated.rehabStage,
-      rehabStageMs: validated.rehabStageMs,
-      rehabProgressPercent: validated.rehabProgressPercent,
-      // Nested history follows the opposite rule — see `replaceHistory` above. `updateServerPet`
-      // fills in any collection it does not replace, so the pet it returns is the one to report.
-      updates: sortHistoryByDate(validated.updates),
-      medicalTimeline: sortHistoryByDate(validated.medicalTimeline),
-      galleryImages: validated.galleryImages || existing.galleryImages || [],
-      isArchived: validated.isArchived ?? existing.isArchived ?? false,
-      deletedAt: validated.deletedAt !== undefined ? validated.deletedAt : existing.deletedAt,
-      medical: {
-        vaccinated: validated.vaccinated,
-        microchipped: validated.microchipped,
-        spayedNeutered: validated.spayedNeutered,
-        specialNeeds: validated.specialNeeds,
-      },
-      compatibility: {
-        goodWithDogs: validated.goodWithDogs,
-        goodWithCats: validated.goodWithCats,
-        goodWithKids: validated.goodWithKids,
-        energyLevel: validated.energyLevel,
-      },
-    });
+    // The one merge rule, shared with the browser store (`src/lib/domain/petEdit.ts`): an absent
+    // key keeps the stored value, rehabilitation fields follow the form, and age is re-derived.
+    // It carries the stored history for a collection the edit omits; `updateServerPet` rewrites
+    // only the collections `replaceHistory` names and fills the rest from its mirror, as before.
+    const updated = mergePetEdit(existing, validated);
 
     const stored = await updateServerPet(id, updated, actor, replaceHistory, {
       baseline: existing,
