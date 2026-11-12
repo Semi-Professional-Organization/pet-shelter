@@ -31,6 +31,11 @@ longer issues tax receipts. See
    append-only Donation row and emails the donor a thank-you acknowledgement
 ```
 
+A gift's "Donor's note (dedication)" in the queue is the donor's own unverified text, checked
+against no animal, and is not what the money is for: the gift goes to general care. A commitment
+to fund one animal is a `PetSponsorship`, which has its own queue and a verified pet
+(`tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md`).
+
 A pledge that no transfer ever backed is **dismissed** from the same queue, with an optional
 reason that goes to the audit log. A dismissed pledge cannot be confirmed afterwards.
 
@@ -42,8 +47,9 @@ deleting or renumbering it; that decision belongs to the owner.
 On `/admin/audit`:
 
 - **Export Donations CSV** reads the donation ledger and writes one row per recorded donation:
-  record number, date, donor, amount, tier, rail, frequency and dedicated pet. It has no tax
-  columns. If the ledger is empty or capped, the screen says so; read that notice before relying
+  record number, date, donor, amount, tier, rail, frequency and "Dedication / Sponsored Pet".
+  That last column is the donor's own dedication on a general gift and the sponsored animal on a
+  sponsorship; nothing on the row says which. It has no tax columns. If the ledger is empty or capped, the screen says so; read that notice before relying
   on the file.
 - **Export Audit Trail** writes the append-only audit log as it stands.
 

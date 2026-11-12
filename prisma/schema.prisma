@@ -465,8 +465,11 @@ model Donation {
   currency      String  @default("MYR")
   frequency     String  @default("one_time")
   paymentMethod String
-  /// Free-text dedication ("in honour of Barnaby"), not a foreign key — the pledge
-  /// form collects a name, and the dedication should survive the pet being archived.
+  /// Free-text dedication, not a foreign key. On a receipt issued from a
+  /// `DonationPledge` it is the donor's own note, stored as one line, otherwise as
+  /// written, and checked against no animal — "Tuah" here does not mean the shelter holds a Tuah. On a
+  /// receipt issued from a `PetSponsorship` it is that sponsorship's pet name.
+  /// tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md
   targetPetName String?
   notes         String? @db.Text
 
@@ -535,10 +538,16 @@ model DonationPledge {
   /// none of that cost.
   status        String @default("PENDING_PAYMENT")
 
-  /// Free-text dedication ("in honour of Barnaby"), not a foreign key — same
-  /// contract as `Donation.targetPetName`, which this is copied to at issuance.
+  /// The donor's own note naming an animal, stored as one line, otherwise as written
+  /// (`normaliseDedication`, capped at 100 characters). Not a foreign key and
+  /// never checked against the catalogue: `/donate?pet=Tuah` records "Tuah" whether
+  /// or not the shelter holds one, so the staff queue and the donor's confirmation
+  /// and emails label it as the donor's note, not as a confirmed animal (raw audit
+  /// details still show it under the `targetPetName` key). Copied to
+  /// `Donation.targetPetName` at issuance.
   /// A gift naming an animal is still a general gift: a commitment to fund one
   /// animal's care is a `PetSponsorship`.
+  /// tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md
   targetPetName String?
   notes         String? @db.Text
 

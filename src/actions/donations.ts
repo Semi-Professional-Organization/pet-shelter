@@ -138,6 +138,9 @@ export async function submitDonationPledgeAction(
         currency: "MYR",
         frequency: validated.frequency,
         paymentMethod: validated.paymentMethod,
+        // The donor's note, stored as one line, otherwise as written (the schema
+        // normalises it). No pet lookup, by decision: see
+        // tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md.
         targetPetName: optionalText(validated.targetPetName),
         notes: optionalText(validated.notes),
         pledgeRef: generateGiftRef(),
@@ -220,7 +223,11 @@ export interface PendingDonationPledgeDTO {
   amountDisplay: string;
   frequency: "one_time" | "monthly";
   paymentMethod: "duitnow_qr" | "online_banking" | "card";
-  /** The donor's free-text dedication, if they named an animal. */
+  /**
+   * The donor's free-text dedication, if they named an animal. Checked against no
+   * animal, so the queue labels it as the donor's note, never as the pet the gift is
+   * for (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
+   */
   targetPetName?: string;
   /** ISO-8601 UTC, as stored. Rendered in Asia/Kuala_Lumpur at the edge. */
   createdAt: string;
@@ -401,7 +408,7 @@ export async function reconcileDonationPledgeAction(
     },
   });
 
-  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation)));
+  scheduleAfterResponse(() => sendDonationReceiptEmail(toDonationReceiptDTO(donation), "general_gift"));
 
   return {
     success: true,

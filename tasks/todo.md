@@ -15,6 +15,72 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Label a donation earmark as the donor's note (#205)
+
+**Branch:** `claude/donation-earmark-donor-note` · opened 2026-11-11
+
+- **Done when:** `/donate?pet=Tuah`, against a catalogue with no Tuah, shows "Your dedication:
+  Tuah" with a Remove button before submit, records "Tuah" as the donor's text with no pet
+  lookup, and the staff queue shows it on its own line as `Donor's note (dedication): “Tuah”`,
+  never `in honour of` (`tests/components/DonationEarmarkDonorNote.test.tsx`,
+  `tests/unit/donationEarmarkIsDonorNote.test.ts`).
+- **In scope:** the owner's option B (2026-11-11): labels on the staff queue, the receipts CSV,
+  the donor's form, confirmation and both donation emails; contract comments in the schema, the
+  validation and the action; the `?pet=` rows in the architecture contract and BE_02 tutorial;
+  tests; ledger.
+- **Not in scope:** a pet id, a pet lookup, a schema column or migration, renaming
+  `targetPetName`, and `SponsorshipModal`'s "Dedicated Pet" (a verified sponsorship).
+
+- [x] Staff labels: queue `<tier> · in honour of X` -> own line `Donor's note (dedication): “X”`
+  (a new optional `dedication` on `ReconciliationRow`); CSV header `Dedicated Pet` ->
+  `Dedication / Sponsored Pet` with a `ceiling:` comment (nothing parses it by name)
+- [x] Donor labels: form line `Your dedication: X` + Remove when `?pet=` matches no animal;
+  confirmation `Dedicated Pet` / `Dedikasi Haiwan` -> `Your dedication` / `Dedikasi Anda`;
+  receipt email `Dedicated Animal` / `Dedicated Pet` -> `Dedication`; pledge email
+  `In honour of` -> `Your dedication`; validation `Pet dedication name is too long` -> `Dedication is too long`
+- [x] Contract comments; `prisma migrate diff` against `origin/main`'s schema is an empty migration
+- [x] Tests red without the change (round 0 against `origin/main`, round 1 against `a10db38`);
+  the no-lookup test passes on both by design and fails when a `findPetForWriteAsync` call is inserted
+- [x] Ledger: open entry deleted, decision added, four new open entries
+
+**Round 2** (third commit): the strip waits for the catalogue (production mounts the widget
+with no `initialPets`), a late catalogue no longer re-seeds a choice the donor made, the
+dedication is derived instead of synced, the strip trims, caps at the schema's 100 and quotes,
+Remove moves focus and announces; the queue's dedication has its own bordered block and the row
+field is `dedication`; the acknowledgement's caller names its lane ("Sponsored Pet" vs
+"Dedication"); the dedication left the allocation heading on the confirmation and the
+acknowledgement; runbook updated; the no-lookup test has a `ceiling:`. Recorded only: the widget's
+own sponsorship copy, folded into the sponsor-today entry. Declined: a shared dictionary key.
+
+**Round 3** (fourth commit): the note counts toward the payload only once the catalogue has
+settled, as it is shown; `?pet=` is normalised once (`normaliseDedication`: whitespace and control
+runs to one space, trimmed, capped without splitting a surrogate pair) and the schema stores the
+same one-line form; clicking the already-chosen general fund keeps a shown note (before the
+catalogue settles it still counts as a choice against the late load); the status line clears on
+reset and on a pick; the effect lost its redundant `pets.length` guard and `current ??` updater.
+Declined: the lane on the receipt DTO, a carousel focus ref, restructuring the email ternaries.
+
+**Round 4** (fifth commit, last fix round): round 3's withheld note is replaced by holding
+submit while a URL that names an animal waits for the catalogue, so the payload is again what
+the donor sees; a general-fund click with no animal selected never clears the note or the late
+seed (one rule, special case deleted); `normaliseDedication` also strips `\p{Cf}`, and the
+schema now normalises then cuts instead of refusing a raw length; the catalogue match normalises
+both names; the lane each reconcile action passes is pinned; "stored as written" reworded.
+Recorded only: other donor text reaching the plain-text emails raw
+(`tasks/open/donor-text-reaches-plain-text-emails-with-its-newlines.md`). Declined: re-keying
+the widget on a query change without a remount.
+
+**Review:** round 1 (coordinator) found the `?pet=` name invisible on the form, the note
+concatenated unquoted into the queue's `·` line, a CSV header that mislabelled sponsorship rows
+and collided with `notes`, a unit suite authorized by the DAL fallback and claiming a Tuah-free
+catalogue that `pets.json` contradicts, a misplaced describe, and overclaiming comments; all
+fixed in the second commit. Not yet `/code-review`ed. Deliberately not done: splitting the CSV
+column (`tasks/open/donation-receipt-dedication-column-mixes-two-sources.md`); the client-supplied
+`tierName` (`tasks/open/a-gift-pledge-tier-name-is-unbounded-client-text.md`); the "Sponsor {pet}
+Today" button that records a general gift (`tasks/open/the-sponsor-today-button-records-a-general-gift.md`);
+a shared label constant across the literals (declined by review). No lesson: the corrections were
+specific to this change.
+
 # Merge pet edits through one shared rule (#212)
 
 **Branch:** `fix/merge-pet-edit` · opened 2026-11-12

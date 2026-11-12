@@ -47,7 +47,7 @@ describe("email audit rows name their own entity", () => {
   it("files a donation receipt email under its own entity, out of the Adoptions tab", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
 
-    await sendDonationReceiptEmail(receipt);
+    await sendDonationReceiptEmail(receipt, "general_gift");
 
     expect(emailRow("DONATION_RECEIPT")).toMatchObject({ action: "EMAIL_SENT", entity: "DonationReceiptEmail" });
   });
@@ -56,7 +56,7 @@ describe("email audit rows name their own entity", () => {
     vi.stubEnv("RESEND_API_KEY", "re_test_key_not_real");
     vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new Error("Network connection reset"));
 
-    await sendDonationReceiptEmail(receipt);
+    await sendDonationReceiptEmail(receipt, "general_gift");
 
     expect(emailRow("DONATION_RECEIPT")).toMatchObject({ action: "EMAIL_FAILED", entity: "DonationReceiptEmail" });
   });
@@ -66,7 +66,7 @@ describe("email audit rows name their own entity", () => {
     // this: the export counts that entity as a donation, so each email became a zero-amount
     // receipt line in a tax file. The label test above cannot see that; this one can.
     vi.stubEnv("RESEND_API_KEY", "");
-    await sendDonationReceiptEmail(receipt);
+    await sendDonationReceiptEmail(receipt, "general_gift");
     const { generateReceiptsCsvString } = await import("@/lib/presentation/exportCsv");
 
     const lines = generateReceiptsCsvString(getAuditLogs(50)).trim().split(/\r?\n/);
