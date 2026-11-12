@@ -62,6 +62,12 @@ describe("Donation records CSV generator", () => {
 
     const csv = generateReceiptsCsvString(mockReceipts);
     expect(csv).toContain("Record No");
+    // #205: the dedication column is the donor's own text on a general gift, checked
+    // against no animal, so its header must not claim a confirmed pet.
+    const header = csv.split("\r\n")[0];
+    expect(header).toContain("Donor's Note (Dedication)");
+    expect(header).not.toMatch(/Dedicated Pet/i);
+    expect(csv.split("\r\n")[1]).toMatch(/,"?Milo"?$/);
     expect(csv).toContain("HFS-DON-202608-1234");
     expect(csv).toContain('"Dr. Cheryl Tan"');
     expect(csv).toContain('"cheryl.tan@example.com"');

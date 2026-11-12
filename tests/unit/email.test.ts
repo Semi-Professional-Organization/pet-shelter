@@ -3,6 +3,7 @@ import {
   sendApplicationConfirmationEmail,
   sendStaffApplicationAlert,
   sendDonationReceiptEmail,
+  sendDonationPledgeEmail,
 } from "@/lib/email";
 import { AdoptionApplicationRecord } from "@/types/application";
 import { DonationReceipt } from "@/types/sponsorship";
@@ -189,6 +190,21 @@ describe("donation acknowledgement — the two halves must agree", () => {
     }
   });
 
+  // #205: the dedication is the donor's own text, checked against no animal, and on a
+  // sponsorship receipt the sponsored pet's name. "Dedication" claims neither; "Dedicated
+  // Pet" / "Dedicated Animal" claimed a confirmed animal for a name nobody checked.
+  it("labels the dedication as a dedication, never as a confirmed animal, in both halves", async () => {
+    const mail = await renderReceipt({ targetPetName: "Tuah", notes: "Keep up the good work" });
+
+    expect(mail.text).toContain("- Dedication: Tuah");
+    expect(mail.html).toMatch(/<strong>Dedication:<\/strong><\/td>\s*<td[^>]*>🐾 Tuah<\/td>/);
+    for (const body of [mail.text, mail.html]) {
+      expect(body).not.toMatch(/Dedicated (Pet|Animal)/i);
+      // The separate message to the shelter keeps its own label.
+      expect(body).toContain("Donor Message");
+    }
+  });
+
   // #248: the shelter is not a registered society (owner, 2026-11-05; #239), so no half of
   // this mail may claim tax deductibility, ROS registration or LHDN approval, or print the
   // donor's tax number, whatever the caller passes in.
@@ -222,6 +238,33 @@ describe("donation acknowledgement — the two halves must agree", () => {
  *
  * Background: docs/tasks/TARGET_EMAIL_COLOUR_PARITY.md.
  */
+describe("donation pledge email — the dedication is the donor's own note", () => {
+  // #205: `/donate?pet=Tuah` records "Tuah" whether or not the shelter holds one, so the
+  // donor is shown it as their dedication and never told it is "in honour of" an animal.
+  it("states the donor's dedication under that label in both halves", async () => {
+    const fetchSpy = stubResendAccepts();
+    const result = await sendDonationPledgeEmail({
+      pledgeRef: "HFS-GFT-20261111-000001",
+      donorName: "Aisyah Rahman",
+      donorEmail: "aisyah@example.com",
+      tierName: "Core Vaccination & Deworming",
+      amountMYR: 50,
+      frequency: "one_time",
+      paymentMethod: "duitnow_qr",
+      targetPetName: "Tuah",
+      reconciliationNotice: "Our coordinator will match your transfer.",
+    });
+    expect(result.success).toBe(true);
+    const mail = JSON.parse(String(fetchSpy.mock.calls[0][1]?.body));
+
+    expect(mail.text).toContain("- Your dedication: Tuah");
+    expect(mail.html).toMatch(/<strong>Your dedication:<\/strong><\/td>\s*<td[^>]*>🐾 Tuah<\/td>/);
+    for (const body of [mail.text, mail.html]) {
+      expect(body).not.toMatch(/in honour of|Dedicated (Pet|Animal)/i);
+    }
+  });
+});
+
 describe("rendered email colour parity", () => {
   const application: AdoptionApplicationRecord = {
     id: "app-parity-001",

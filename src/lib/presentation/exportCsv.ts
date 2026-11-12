@@ -203,7 +203,9 @@ export function generateReceiptsCsvString(
     "Sponsorship Tier",
     "Payment Method",
     "Frequency",
-    "Dedicated Pet",
+    // The donor's own free text on a general gift, checked against no animal
+    // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
+    "Donor's Note (Dedication)",
   ];
 
   const rows: (string | number | boolean | null | undefined)[][] = [];

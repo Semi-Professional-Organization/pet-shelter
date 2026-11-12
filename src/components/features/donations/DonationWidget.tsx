@@ -307,7 +307,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
               </div>
               {completedPledge.targetPetName && (
                 <div className="text-muted-foreground font-medium">
-                  🐾 {isMs ? "Dedikasi Haiwan" : "Dedicated Pet"}:{" "}
+                  {/* The donor's own words, checked against no animal — so it is
+                      "your dedication", never a confirmed pet. */}
+                  🐾 {isMs ? "Dedikasi Anda" : "Your dedication"}:{" "}
                   {completedPledge.targetPetName}
                 </div>
               )}

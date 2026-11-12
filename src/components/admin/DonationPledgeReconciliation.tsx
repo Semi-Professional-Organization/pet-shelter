@@ -51,10 +51,12 @@ const DONATION_PLEDGE_QUEUE: ReconciliationQueueSource = {
           pledgeRef: row.pledgeRef,
           supporterName: row.donorName,
           supporterEmail: row.donorEmail,
-          // The dedication is the donor's own free text and is not a pet reference,
-          // so it is shown as a dedication rather than as a sponsorship target.
+          // The dedication is the donor's own free text, checked against no animal:
+          // `/donate?pet=Tuah` records "Tuah" whether or not the shelter holds one.
+          // So it is labelled as the donor's note, never as an animal the gift is for
+          // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
           purpose: row.targetPetName
-            ? `${row.tierName} · in honour of ${row.targetPetName}`
+            ? `${row.tierName} · Donor's note (dedication): ${row.targetPetName}`
             : row.tierName,
           amountDisplay: row.amountDisplay,
           frequency: row.frequency,

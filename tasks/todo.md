@@ -15,6 +15,37 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Label a donation earmark as the donor's note (#205)
+
+**Branch:** `claude/donation-earmark-donor-note` · opened 2026-11-11
+
+- **Done when:** `/donate?pet=Tuah`, against a catalogue with no Tuah, records "Tuah" as the
+  donor's text with no pet lookup, and the staff queue shows it as
+  `Donor's note (dedication): Tuah`, never `in honour of`
+  (`tests/components/DonationEarmarkDonorNote.test.tsx`, `tests/unit/donationEarmarkIsDonorNote.test.ts`).
+- **In scope:** the owner's option B (2026-11-11): labels on the staff queue, the receipts CSV,
+  the donor's confirmation and both donation emails; contract comments in the schema, the
+  validation and the action; tests; ledger.
+- **Not in scope:** a pet id, a pet lookup, a schema column or migration, renaming
+  `targetPetName`, and `SponsorshipModal`'s "Dedicated Pet" (a verified sponsorship).
+
+- [x] Staff labels: queue `in honour of X` -> `Donor's note (dedication): X`; CSV header
+  `Dedicated Pet` -> `Donor's Note (Dedication)` (nothing in `src`, `tests` or `scripts` parses it by name)
+- [x] Donor labels: widget `Dedicated Pet` / `Dedikasi Haiwan` -> `Your dedication` / `Dedikasi Anda`;
+  receipt email `Dedicated Animal` / `Dedicated Pet` -> `Dedication`; pledge email `In honour of` -> `Your dedication`
+- [x] Contract comments; `prisma migrate diff` against `origin/main`'s schema is an empty migration
+- [x] Tests red on `origin/main`'s `src` and `prisma` (5 of 6 new assertions; the no-lookup test
+  passes there by design and was shown to fail when a `findPetForWriteAsync` call was inserted)
+- [x] Ledger: open entry deleted, decision added, one new open entry
+
+**Review:** not yet `/code-review`ed; that is the caller's step before a PR. Deliberately not
+done: a per-source label for the receipts CSV column, which holds both donor notes and verified
+sponsorship pet names (the new header understates the second); showing a `?pet=` dedication on
+the form before submission, where the chooser currently shows the general fund. Both in
+`tasks/open/donation-receipt-dedication-column-mixes-two-sources.md`. The architecture contract's
+"Pre-populates the target pet" row and the BE_02 tutorial were left as written: they describe
+the deep link, not what the earmark means. No lesson: there was no correction to learn from.
+
 # Hide database errors from adoption applicants (#201)
 
 **Branch:** `claude/hide-application-db-errors` · opened 2026-11-11

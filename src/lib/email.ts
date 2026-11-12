@@ -695,7 +695,7 @@ DONOR INFORMATION:
 ${fields.donorPhone ? `- Phone: ${fields.donorPhone}\n` : ""}
 SPONSORSHIP ALLOCATION:
 - Allocation: ${receipt.tierName}
-${fields.targetPetName ? `- Dedicated Animal: ${fields.targetPetName}\n` : ""}- Payment Rail: ${fields.paymentRail}
+${fields.targetPetName ? `- Dedication: ${fields.targetPetName}\n` : ""}- Payment Rail: ${fields.paymentRail}
 ${fields.notes ? `- Donor Message: "${fields.notes}"\n` : ""}
 TOTAL RECEIVED: ${fields.amount}
 
@@ -732,7 +732,7 @@ Thank you for your life-saving generosity and support of our shelter animals!
         </tr>
         ${fields.targetPetName ? `
         <tr>
-          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Dedicated Pet:</strong></td>
+          <td style="padding: 4px 0; color: ${EMAIL_RECEIPT.inkFaint};"><strong>Dedication:</strong></td>
           <td style="padding: 4px 0; font-weight: 600; color: ${EMAIL_RECEIPT.inkSoft};">🐾 ${escapeHtml(fields.targetPetName)}</td>
         </tr>` : ""}
         <tr>
@@ -996,7 +996,7 @@ YOUR GIFT:
 - Programme: ${pledge.tierName}
 - Amount: ${fields.amount}${fields.cadence} (${fields.frequencyLabel})
 - Payment Rail: ${fields.paymentRail}
-${fields.dedication ? `- In honour of: ${fields.dedication}\n` : ""}- Pledge Reference: ${pledge.pledgeRef}
+${fields.dedication ? `- Your dedication: ${fields.dedication}\n` : ""}- Pledge Reference: ${pledge.pledgeRef}
 
 WHAT HAPPENS NEXT:
 ${pledge.reconciliationNotice}
@@ -1046,7 +1046,7 @@ The ${SHELTER_NAME} Team
         ${
           fields.dedication
             ? `<tr>
-          <td style="padding: 4px 0; color: ${EMAIL_BRAND.mutedForeground};"><strong>In honour of:</strong></td>
+          <td style="padding: 4px 0; color: ${EMAIL_BRAND.mutedForeground};"><strong>Your dedication:</strong></td>
           <td style="padding: 4px 0; color: ${EMAIL_BRAND.foreground};">🐾 ${escapeHtml(fields.dedication)}</td>
         </tr>`
             : ""
