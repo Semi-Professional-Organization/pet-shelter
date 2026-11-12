@@ -28,8 +28,7 @@ Record active multi-step work streams below.
   update path, and moving `sortHistoryByDate` into the domain file, which may import validations
   for types only.
 - **Not in scope:** outage-mode writes (#204), expected-status or version matching, the archive
-  action, any UI change, and the admin table's own optimistic merge
-  (`tasks/open/the-admin-table-merges-a-pet-edit-a-third-time.md`).
+  action, and any UI change. (The admin table's optimistic merge was added in review round 1.)
 
 - [x] Tests first: the store and action tests were red on main (gallery and QR missing after a
   store reload; the omitted gallery, QR, featured and archive state reset by the action; an empty
@@ -37,15 +36,27 @@ Record active multi-step work streams below.
 - [x] `mergePetEdit` / `buildNewPet`, used by both sides; `petEditSchema` derived from the same
   fields, so `petBaseFormSchema` only `.extend`s it with defaults and one `superRefine` serves both
 - [x] Ledger: both `tasks/open` entries deleted; decision
-  `tasks/decisions/2026-11-12-a-pet-edit-never-invents-a-default.md`; the table's third merge
-  recorded as open
+  `tasks/decisions/2026-11-12-a-pet-edit-never-invents-a-default.md`
+- [x] Review round 1, second commit:
+  - `usePetTableController` builds its optimistic row with `mergePetEdit`. The spread had left
+    the nested `medical` stale, and reopening the row and saving again wrote the old flag back.
+    The new `tests/components/petTableControllerMergesEdits.test.ts` was red on the first commit.
+  - Corrected the comments on default ownership, the dialog-resolver hazard and the archive pair.
+  - `petMappers` uses the domain's `byDateAscending`.
+  - The age test is pinned to a fixed date.
+  - Declined findings recorded in the ledger:
+    - `tasks/open/a-pet-edit-accepts-isarchived-and-deletedat-independently.md`
+    - a dated section on the double-minted create id in `tasks/open/create-pet-uses-a-timestamp-id.md`
+    - `tasks/open/the-browser-pet-store-skips-a-database-only-pet.md`, which also holds the throw
+      on a stored pet with no `medical`
+    - the reviewer's `specialNeeds` counter-argument, in the decision
 
-**Review:** not yet reviewed. The owner runs `/code-review` before the PR. Deliberately not done:
+**Review:** round 1 found no blocking defect. Its in-scope fixes are listed above. The owner runs
+the next `/code-review`. Deliberately not done:
 `specialNeeds` still clears when absent, as both copies did (the decision records it as
 reversible); `createPet` still parses with `petFormSchema`'s defaults, which carry the same values
 `buildNewPet` states, so the defaults are applied twice rather than the dialog's resolver being
-changed; `usePetTableController`'s optimistic row is still built by spreading the form; and the
-store's first-render read of `localStorage` without `withDerivedAge` in its effect was left alone.
+changed; and the store's first-render read of `localStorage` without `withDerivedAge` in its effect was left alone.
 No lesson was written, because no human correction happened this session.
 
 # Hide database errors from adoption applicants (#201)

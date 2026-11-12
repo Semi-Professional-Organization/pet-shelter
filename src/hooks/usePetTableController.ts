@@ -5,7 +5,7 @@ import { Pet } from "@/types/pet";
 import { PetFormInput } from "@/lib/validations/pet";
 import type { PhotoNotificationOptions } from "@/actions/pets";
 import { usePetStore } from "@/lib/client/petStore";
-import { withDerivedAge } from "@/lib/domain/petAge";
+import { mergePetEdit } from "@/lib/domain/petEdit";
 import { matchesAdminPetFilters, scopeByArchiveFilter } from "@/lib/presentation/adminPetFilters";
 import { buildPetStatusFilterOptions } from "@/lib/presentation/petStatusPresentation";
 import { exportPetsToCsv } from "@/lib/presentation/exportCsv";
@@ -101,17 +101,14 @@ export function usePetTableController(initialPets?: (Pet & { applicationCount?: 
       updatePet(editingPet.id, data);
       setLocalPets((prev) => {
         const base = prev || pets;
-        // `withDerivedAge`, not a bare spread. `data` is a `PetFormInput`, which used to carry
-        // `age` and `ageCategory` and so overwrote the row's copies; now it carries `birthDate`
-        // instead and neither of them, so a bare spread leaves last render's age beside the new
-        // birthday — "8 years" next to a 2025 birth date, until the page is reloaded. `localPets`
-        // shadows the correctly-derived store value for the rest of the session and nothing here
-        // calls `router.refresh()`, so the action's `revalidatePath` cannot replace it; the Age
-        // column sorts by it and the CSV export writes it. The create branch below already went
-        // through `withDerivedAge` via `addPet`.
-        return base.map((p) =>
-          p.id === editingPet.id ? withDerivedAge({ ...p, ...data }) : p
-        );
+        // `mergePetEdit`, the rule the store and the server action use, not a spread of the
+        // form. A spread put the form's flat `vaccinated`, `goodWithDogs`, ... keys on the row and
+        // left its nested `medical` / `compatibility` stale, and the dialog resets from those, so
+        // reopening the row and saving again wrote the old flags back (#212). `localPets` shadows
+        // the store for the rest of the session, so this row is what the table, its Age column
+        // and the CSV export read.
+        // `applicationCount` survives: the merge starts from the row it is given.
+        return base.map((p) => (p.id === editingPet.id ? mergePetEdit(p, data) : p));
       });
 
       const rollback = (errorMessage: string) => {

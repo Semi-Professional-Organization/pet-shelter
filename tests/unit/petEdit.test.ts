@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { buildNewPet, mergePetEdit } from "@/lib/domain/petEdit";
 import { petEditSchema, petFormSchema, type PetFormInput } from "@/lib/validations/pet";
 import type { Pet } from "@/types/pet";
@@ -77,10 +77,26 @@ describe("mergePetEdit", () => {
     });
   });
 
-  it("re-derives age and ageCategory from the birthday", () => {
-    const merged = mergePetEdit(stored(), minimalEdit());
-    expect(merged.age).not.toBe("stale prose");
-    expect(merged.ageCategory).not.toBe("senior");
+  describe("age", () => {
+    // Pinned, so the derived values are exact and the test does not age out with the calendar.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-12T00:00:00Z"));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("re-derives age and ageCategory from the submitted birthday, not the stored prose", () => {
+      const merged = mergePetEdit(stored(), { ...minimalEdit(), birthDate: "2025-05-12" });
+      // Eighteen months on the pinned day.
+      expect(merged.age).toBe("1 year");
+      expect(merged.ageCategory).toBe("young");
+    });
+
+    it("derives them for a new record too", () => {
+      const pet = buildNewPet("pet-new", minimalEdit());
+      expect(pet.age).toBe("2 years");
+      expect(pet.ageCategory).toBe("young");
+    });
   });
 
   describe("gallery", () => {
@@ -220,7 +236,6 @@ describe("buildNewPet", () => {
     });
     expect(pet.updates).toBeUndefined();
     expect(pet.medicalTimeline).toBeUndefined();
-    expect(pet.age).toBeTruthy();
   });
 
   it("takes the submitted gallery, QR and flags", () => {

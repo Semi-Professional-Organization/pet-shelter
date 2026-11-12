@@ -9,7 +9,7 @@ import {
  * Notification options passed alongside a pet update.
  *
  * Server Action arguments are untrusted input. `data` goes through
- * `petFormSchema`; this parameter must not skip validation, because an
+ * `petEditSchema`; this parameter must not skip validation, because an
  * arbitrarily long caption would be embedded in every supporter email and
  * serialised into the audit metadata column. The 280 limit matches the
  * textarea's `maxLength`.
@@ -171,9 +171,6 @@ export const petUpdateSchema = z.object({
 
 export type MedicalTimelineEventInput = z.input<typeof medicalTimelineEventSchema>;
 export type PetUpdateInput = z.input<typeof petUpdateSchema>;
-
-// `sortHistoryByDate` moved to `src/lib/domain/petEdit.ts` (#212): the shared edit merge needs it,
-// and the domain layer may import this one for types only.
 
 /** Reports the ids appearing more than once in a history collection. */
 function duplicateIds(events: readonly { id: string }[] | undefined): string[] {

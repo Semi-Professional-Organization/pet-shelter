@@ -16,16 +16,24 @@ import { withDerivedAge } from "@/lib/domain/petAge";
  * groups are deliberately different, because the form is authoritative for them and always has
  * been in both copies: the rehabilitation fields and `specialNeeds` clear when absent.
  *
- * Defaults belong to `buildNewPet` alone. On the server this only holds because the update path
- * parses with `petEditSchema`, which has none; `petFormSchema`'s defaults would otherwise reach
- * this function as if they had been submitted.
+ * The edit states no defaults. On the server this only holds because the update path parses with
+ * `petEditSchema`, which has none; `petFormSchema`'s defaults would otherwise reach this function
+ * as if they had been submitted. A new record's defaults are stated twice, with the same values:
+ * by `petFormSchema`, which `createPet` and the admin dialog's resolver parse with, and by
+ * `buildNewPet`, whose fallbacks therefore only run for a caller that did not parse (the browser
+ * store).
+ *
+ * One hazard follows. `PetFormDialog` resolves *edits* with `petFormSchema` too, so every key
+ * the merge would keep arrives filled in. That is harmless only because the dialog's `reset()`
+ * loads every such key from the row. A defaulted key dropped from that `reset()` would arrive as
+ * its default, indistinguishable from a submitted value, and overwrite the stored one.
  */
 
 /**
  * Ascending comparison on a `YYYY-MM-DD` string. Lexical order and calendar order coincide for
  * that format, so no `Date` parsing is needed.
  */
-function byDateAscending(a: { date: string }, b: { date: string }): number {
+export function byDateAscending(a: { date: string }, b: { date: string }): number {
   return a.date.localeCompare(b.date);
 }
 
@@ -95,7 +103,10 @@ export function mergePetEdit(existing: Pet, input: PetFormInput): Pet {
     // here changes nothing it writes.
     updates: sortHistoryByDate(input.updates) ?? existing.updates,
     medicalTimeline: sortHistoryByDate(input.medicalTimeline) ?? existing.medicalTimeline,
-    // Kept together: un-archiving on an omitted key used to leave `deletedAt` set.
+    // Each resolved on its own: an absent key keeps its stored value, so omitting both keeps the
+    // pair consistent (an omitted `isArchived` used to un-archive and leave `deletedAt` set). A
+    // payload carrying only one of them can still make them disagree:
+    // tasks/open/a-pet-edit-accepts-isarchived-and-deletedat-independently.md.
     isArchived: input.isArchived ?? existing.isArchived ?? false,
     deletedAt: input.deletedAt !== undefined ? input.deletedAt : existing.deletedAt,
     medical: {
