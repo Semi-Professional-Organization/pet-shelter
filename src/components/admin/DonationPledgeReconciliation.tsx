@@ -54,10 +54,10 @@ const DONATION_PLEDGE_QUEUE: ReconciliationQueueSource = {
           // The dedication is the donor's own free text, checked against no animal:
           // `/donate?pet=Tuah` records "Tuah" whether or not the shelter holds one.
           // So it is labelled as the donor's note, never as an animal the gift is for
-          // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
-          purpose: row.targetPetName
-            ? `${row.tierName} · Donor's note (dedication): ${row.targetPetName}`
-            : row.tierName,
+          // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md),
+          // and kept out of `purpose`, where its text would read as the queue's own.
+          purpose: row.tierName,
+          donorNote: row.targetPetName,
           amountDisplay: row.amountDisplay,
           frequency: row.frequency,
           paymentMethod: row.paymentMethod,

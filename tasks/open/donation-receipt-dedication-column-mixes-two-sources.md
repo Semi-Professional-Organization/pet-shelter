@@ -8,16 +8,12 @@ note from its `DonationPledge`, which no one checks against the catalogue
 copies the sponsored pet's name (`receiptDraftFor` in `src/lib/server/sponsorshipLedger.ts`),
 which the server verified by id at checkout. Nothing on the `Donation` row says which.
 
-So one column in the receipts CSV (`generateReceiptsCsvString`) and one row in the
-acknowledgement email cover both. #205 labelled them for the unverified case ("Donor's Note
-(Dedication)" in the CSV, "Dedication" in the email), so a sponsorship row is understated rather
-than a general gift overstated.
+So the receipts CSV (`generateReceiptsCsvString` in `src/lib/presentation/exportCsv.ts`) prints
+both in one column. #205 named that column `Dedication / Sponsored Pet` so it claims neither
+alone, and marked it with a `ceiling:` comment. A coordinator reading one row still cannot tell
+an unchecked name from a verified animal.
 
-A related gap on the donor's side: with `?pet=` naming no animal in the catalogue, the widget's
-chooser shows the general fund as selected while the pledge still carries the name, so the donor
-first sees their dedication on the confirmation screen. Neither is a false claim after #205, so
-both were left alone.
-
-**Settles when:** either staff confirm one column is enough, or the export tells a sponsorship
-receipt from a general gift (for example by the pledge reference prefix) and labels each, and the
-widget shows a `?pet=` dedication before submission or drops it.
+**Settles when:** the receipts CSV has a separate dedication column and sponsored-pet column,
+each filled only for its own kind of receipt, pinned by a test in `tests/unit/exportCsv.test.ts`
+that exports one general gift and one sponsorship receipt; or the owner records in
+`tasks/decisions/` that one column is enough.

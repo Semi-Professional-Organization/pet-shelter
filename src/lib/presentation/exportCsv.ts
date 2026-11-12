@@ -203,9 +203,16 @@ export function generateReceiptsCsvString(
     "Sponsorship Tier",
     "Payment Method",
     "Frequency",
-    // The donor's own free text on a general gift, checked against no animal
-    // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
-    "Donor's Note (Dedication)",
+    // `targetPetName` has two sources: on a general gift it is the donor's own
+    // dedication, checked against no animal
+    // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md); on a
+    // sponsorship receipt it is the sponsored pet's name, verified by id at checkout
+    // (`receiptDraftFor` in src/lib/server/sponsorshipLedger.ts). Not "Donor's Note",
+    // which would collide with the separate `notes` field.
+    // ceiling: one column, two sources, and nothing on the row says which. Split it
+    // into a dedication and a sponsored-pet column when staff need to tell them apart
+    // (tasks/open/donation-receipt-dedication-column-mixes-two-sources.md).
+    "Dedication / Sponsored Pet",
   ];
 
   const rows: (string | number | boolean | null | undefined)[][] = [];

@@ -435,6 +435,29 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
           selectedPetId={selectedPet ? selectedPet.id : "general"}
           onSelectPet={handleSelectPet}
         />
+        {/*
+          A `?pet=` name that matches no animal in the catalogue still travels with the
+          pledge as the donor's dedication (owner's decision, 2026-11-11; #205). The
+          chooser cannot show it, so it is shown here, where the donor can see and
+          remove it before submitting.
+        */}
+        {!selectedPet && targetPetName && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+            <span className="text-muted-foreground">
+              🐾 {isMs ? "Dedikasi Anda" : "Your dedication"}:{" "}
+              <strong className="text-foreground">{targetPetName}</strong>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => setTargetPetName("")}
+              aria-label={isMs ? "Buang dedikasi anda" : "Remove your dedication"}
+            >
+              {isMs ? "Buang" : "Remove"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 3. Select Tier or Custom Amount */}

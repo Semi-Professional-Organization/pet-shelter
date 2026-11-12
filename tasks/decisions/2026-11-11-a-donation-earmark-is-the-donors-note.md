@@ -13,13 +13,21 @@ pet id that the server checks with `findPetForWriteAsync`, refusing or dropping 
 The owner chose **B**. The earmark stays free text in `targetPetName`, with no pet id, no lookup,
 no schema change and no read of `src/data/pets.json`. What changed is how it is labelled:
 
-- **Staff** see it as the donor's unverified text. The general-gift queue says
-  `<tier> · Donor's note (dedication): Tuah` where it said `in honour of Tuah`, and the receipts
-  CSV column is `Donor's Note (Dedication)` where it was `Dedicated Pet`.
+- **Staff** see it as the donor's unverified text. The general-gift queue shows it on its own
+  line, `Donor's note (dedication): “Tuah”`, where it said `<tier> · in honour of Tuah`. It is
+  quoted and kept off the queue's `·`-delimited field line, so a note containing ` · Monthly · `
+  cannot read as fields the queue states itself. The receipts CSV column is
+  `Dedication / Sponsored Pet` where it was `Dedicated Pet` (see "Known imprecision").
 - **The donor** sees "Your dedication" (Malay: "Dedikasi Anda") on the confirmation and in the
   pledge email, and "Dedication" on the acknowledgement, where these said "Dedicated Pet",
   "Dedicated Animal" or "In honour of". None of them claims a confirmed animal. The separate
   `notes` field keeps its own label ("Donor Message") so the two stay distinguishable.
+- **On the form**, a `?pet=` name that matches no animal in the chooser is shown beside it as
+  "Your dedication: Tuah" with a Remove button. Before this the chooser showed the general fund
+  while the pledge still carried the name, so the donor first saw it after submitting. Choosing
+  an animal or the general fund behaves as before.
+- **Raw audit details** still show the value under its `targetPetName` key. The field is not
+  renamed, by the same decision.
 - **The contract** is written where the field is: `prisma/schema.prisma` (comments only, no
   migration), `src/lib/validations/donation.ts` and `src/actions/donations.ts`.
 
@@ -50,11 +58,13 @@ sending them to the sponsorship flow.
 `Donation.targetPetName` holds both kinds of value: the donor's note, copied from a
 `DonationPledge` at reconciliation, and a sponsorship's verified pet name, copied by
 `receiptDraftFor` in `src/lib/server/sponsorshipLedger.ts`. The receipts CSV prints both under
-one column, so its new header understates a sponsorship row, calling it a donor's note. That is
-the safe direction of error, and the brief asked for this header. Recorded in
-`tasks/open/donation-receipt-dedication-column-mixes-two-sources.md`.
+one column, so its header names both, `Dedication / Sponsored Pet`, and nothing on a row says
+which it is. It is not called "Donor's Note", which would collide with the separate `notes`
+field. Recorded in `tasks/open/donation-receipt-dedication-column-mixes-two-sources.md`.
 
 Pinned by `tests/components/DonationEarmarkDonorNote.test.tsx` (the widget with `?pet=Tuah`
-against a catalogue with no Tuah, and the staff queue), `tests/unit/donationEarmarkIsDonorNote.test.ts`
-(the action stores "Tuah" and calls no pet-repository function), and the label assertions in
+against a catalogue with no Tuah, before and after submitting and after Remove, and the staff
+queue, including a note containing ` · `), `tests/unit/donationEarmarkIsDonorNote.test.ts` (the
+action stores "Tuah", and "Kenanga", which no fixture holds, as written and calls no
+pet-repository function), and the label assertions in
 `tests/unit/email.test.ts` and `tests/unit/exportCsv.test.ts`.

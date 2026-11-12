@@ -32,6 +32,12 @@ export interface ReconciliationRow {
   supporterEmail: string;
   /** One line naming what the money is for, e.g. "Vaccine Fund for Barnaby". */
   purpose: string;
+  /**
+   * Free text the supporter wrote, shown on its own line and in quotes so its end is
+   * visible: concatenated into the `·`-delimited line above, a note containing
+   * " · Monthly · " would read as fields this screen states itself.
+   */
+  donorNote?: string;
   /** Preformatted MYR. The client never re-derives money from sen. */
   amountDisplay: string;
   frequency: "one_time" | "monthly";
@@ -437,6 +443,12 @@ export function ReconciliationQueue({ source }: { source: ReconciliationQueueSou
                       day: "numeric",
                     })}
                   </p>
+                  {row.donorNote && (
+                    <p className="text-xs text-muted-foreground break-words">
+                      Donor&apos;s note (dedication):{" "}
+                      <span className="text-foreground">&ldquo;{row.donorNote}&rdquo;</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">

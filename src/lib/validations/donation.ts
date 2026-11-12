@@ -34,11 +34,12 @@ export const donationPledgeSchema = z.object({
   frequency: donationFrequencyEnum.default("one_time"),
   // The donor's own dedication, free text. Bounded here and nothing more: it is
   // deliberately never checked against the catalogue, because it is the donor's
-  // note and not a pet reference — every surface labels it that way
+  // note and not a pet reference. The staff queue and the donor's confirmation and
+  // emails label it that way; raw audit details still show the `targetPetName` key
   // (tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md).
   targetPetName: z
     .string()
-    .max(100, "Pet dedication name is too long")
+    .max(100, "Dedication is too long")
     .optional()
     .or(z.literal("")),
   paymentMethod: paymentMethodEnum.default("duitnow_qr"),

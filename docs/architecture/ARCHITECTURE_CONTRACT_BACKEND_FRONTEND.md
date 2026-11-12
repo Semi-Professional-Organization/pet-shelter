@@ -119,7 +119,7 @@ export interface Pet {
 | **Meet Our Animals** | `/pets` | `?status=In+Rehabilitation` | Filter directly to animals in rehabilitation. |
 | **Meet Our Animals** | `/pets` | `?status=Available` | Filter directly to adoptable animals. |
 | **Pet Profile** | `/pets/[id]` | None | Displays the 4-part profile for a specific pet. |
-| **Sponsor Dedicated Pet** | `/donate` | `?pet=Kopi&tier=kibble` | Pre-populates the target pet and the RM30 tier. |
+| **Dedicate a Gift** | `/donate` | `?pet=Kopi&tier=kibble` | Pre-fills the gift's dedication with the name as the donor's own unverified note (preselecting the animal in the chooser when the catalogue holds one by that name) and the RM30 tier. The name is not checked against any animal; see `tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md`. |
 | **Track Application** | `/applications/track` | `?ref=HFS-202608-XXXX` | Pre-fills the application lookup ID. |
 | **Rehab Needs** | `/#rehab-needs` or `/needs` | None | Direct anchor link to shelter needs section. |
 | **Our Work** | `/#our-work` | None | Direct anchor link to TNRM, Education, Rehab section. |

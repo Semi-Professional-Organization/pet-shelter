@@ -540,8 +540,10 @@ model DonationPledge {
 
   /// The donor's own note naming an animal, stored as written. Not a foreign key and
   /// never checked against the catalogue: `/donate?pet=Tuah` records "Tuah" whether
-  /// or not the shelter holds one, so every surface labels it as the donor's note,
-  /// not as a confirmed animal. Copied to `Donation.targetPetName` at issuance.
+  /// or not the shelter holds one, so the staff queue and the donor's confirmation
+  /// and emails label it as the donor's note, not as a confirmed animal (raw audit
+  /// details still show it under the `targetPetName` key). Copied to
+  /// `Donation.targetPetName` at issuance.
   /// A gift naming an animal is still a general gift: a commitment to fund one
   /// animal's care is a `PetSponsorship`.
   /// tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md

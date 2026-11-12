@@ -19,32 +19,40 @@ Record active multi-step work streams below.
 
 **Branch:** `claude/donation-earmark-donor-note` · opened 2026-11-11
 
-- **Done when:** `/donate?pet=Tuah`, against a catalogue with no Tuah, records "Tuah" as the
-  donor's text with no pet lookup, and the staff queue shows it as
-  `Donor's note (dedication): Tuah`, never `in honour of`
-  (`tests/components/DonationEarmarkDonorNote.test.tsx`, `tests/unit/donationEarmarkIsDonorNote.test.ts`).
+- **Done when:** `/donate?pet=Tuah`, against a catalogue with no Tuah, shows "Your dedication:
+  Tuah" with a Remove button before submit, records "Tuah" as the donor's text with no pet
+  lookup, and the staff queue shows it on its own line as `Donor's note (dedication): “Tuah”`,
+  never `in honour of` (`tests/components/DonationEarmarkDonorNote.test.tsx`,
+  `tests/unit/donationEarmarkIsDonorNote.test.ts`).
 - **In scope:** the owner's option B (2026-11-11): labels on the staff queue, the receipts CSV,
-  the donor's confirmation and both donation emails; contract comments in the schema, the
-  validation and the action; tests; ledger.
+  the donor's form, confirmation and both donation emails; contract comments in the schema, the
+  validation and the action; the `?pet=` rows in the architecture contract and BE_02 tutorial;
+  tests; ledger.
 - **Not in scope:** a pet id, a pet lookup, a schema column or migration, renaming
   `targetPetName`, and `SponsorshipModal`'s "Dedicated Pet" (a verified sponsorship).
 
-- [x] Staff labels: queue `in honour of X` -> `Donor's note (dedication): X`; CSV header
-  `Dedicated Pet` -> `Donor's Note (Dedication)` (nothing in `src`, `tests` or `scripts` parses it by name)
-- [x] Donor labels: widget `Dedicated Pet` / `Dedikasi Haiwan` -> `Your dedication` / `Dedikasi Anda`;
-  receipt email `Dedicated Animal` / `Dedicated Pet` -> `Dedication`; pledge email `In honour of` -> `Your dedication`
+- [x] Staff labels: queue `<tier> · in honour of X` -> own line `Donor's note (dedication): “X”`
+  (a new optional `donorNote` on `ReconciliationRow`); CSV header `Dedicated Pet` ->
+  `Dedication / Sponsored Pet` with a `ceiling:` comment (nothing parses it by name)
+- [x] Donor labels: form line `Your dedication: X` + Remove when `?pet=` matches no animal;
+  confirmation `Dedicated Pet` / `Dedikasi Haiwan` -> `Your dedication` / `Dedikasi Anda`;
+  receipt email `Dedicated Animal` / `Dedicated Pet` -> `Dedication`; pledge email
+  `In honour of` -> `Your dedication`; validation `Pet dedication name is too long` -> `Dedication is too long`
 - [x] Contract comments; `prisma migrate diff` against `origin/main`'s schema is an empty migration
-- [x] Tests red on `origin/main`'s `src` and `prisma` (5 of 6 new assertions; the no-lookup test
-  passes there by design and was shown to fail when a `findPetForWriteAsync` call was inserted)
-- [x] Ledger: open entry deleted, decision added, one new open entry
+- [x] Tests red without the change (round 0 against `origin/main`, round 1 against `a10db38`);
+  the no-lookup test passes on both by design and fails when a `findPetForWriteAsync` call is inserted
+- [x] Ledger: open entry deleted, decision added, three new open entries
 
-**Review:** not yet `/code-review`ed; that is the caller's step before a PR. Deliberately not
-done: a per-source label for the receipts CSV column, which holds both donor notes and verified
-sponsorship pet names (the new header understates the second); showing a `?pet=` dedication on
-the form before submission, where the chooser currently shows the general fund. Both in
-`tasks/open/donation-receipt-dedication-column-mixes-two-sources.md`. The architecture contract's
-"Pre-populates the target pet" row and the BE_02 tutorial were left as written: they describe
-the deep link, not what the earmark means. No lesson: there was no correction to learn from.
+**Review:** round 1 (coordinator) found the `?pet=` name invisible on the form, the note
+concatenated unquoted into the queue's `·` line, a CSV header that mislabelled sponsorship rows
+and collided with `notes`, a unit suite authorized by the DAL fallback and claiming a Tuah-free
+catalogue that `pets.json` contradicts, a misplaced describe, and overclaiming comments; all
+fixed in the second commit. Not yet `/code-review`ed. Deliberately not done: splitting the CSV
+column (`tasks/open/donation-receipt-dedication-column-mixes-two-sources.md`); the client-supplied
+`tierName` (`tasks/open/a-gift-pledge-tier-name-is-unbounded-client-text.md`); the "Sponsor {pet}
+Today" button that records a general gift (`tasks/open/the-sponsor-today-button-records-a-general-gift.md`);
+a shared label constant across the literals (declined by review). No lesson: the corrections were
+specific to this change.
 
 # Hide database errors from adoption applicants (#201)
 

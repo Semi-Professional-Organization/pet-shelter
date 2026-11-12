@@ -7,7 +7,7 @@
 
 ## 🎯 1. Business Logic & Requirements
 
-1. **Dedicated Pet Sponsorship**: Donors can attach their donation/monthly pledge to a specific animal (e.g. Kopi, Milo, Bella) or contribute to the general shelter fund.
+1. **Dedications**: Donors can add a dedication naming an animal (e.g. Kopi, Milo, Bella) to a general gift, or give to the general shelter fund. A `/donate?pet=` link pre-fills that dedication. It is the donor's own unverified note, not a verified animal; a commitment to one animal is a `PetSponsorship`, which carries a verified pet id (`tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md`).
 2. **RM30 "Rescue Companion & Updates" Tier Perks**:
    - Monthly progress update with photos and videos dispatched to the sponsor's email/WhatsApp.
    - Invitation to arrange occasional visits to spend time with the sponsored animal (subject to sanctuary guidelines).
