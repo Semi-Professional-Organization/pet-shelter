@@ -208,7 +208,9 @@ describe("an edit that omits a key the form usually sends (#212)", () => {
       featured: true,
     });
     // The stored archive time, in what is written and in what is returned: not cleared, and not
-    // replaced by another moment.
+    // replaced by another moment. Exact to the second only: the kept value round-trips through
+    // `Date.toString()` and loses its milliseconds, which this whole-second fixture cannot see
+    // (tasks/open/a-pet-edit-round-trips-deletedat-through-date-tostring.md).
     expect(new Date(data.deletedAt as Date).toISOString()).toBe(new Date(archivedAt).toISOString());
     expect(new Date(result.data!.deletedAt!).toISOString()).toBe(new Date(archivedAt).toISOString());
   });

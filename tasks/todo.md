@@ -59,8 +59,12 @@ Record active multi-step work streams below.
   timestamp-id entry so it has its own settle condition), the public profile preferring the
   store's QR (in the store entry), and the rehabilitation counter-argument (in the decision).
 
-**Review:** round 1 found no blocking defect. Its in-scope fixes are listed above. The owner runs
-the next `/code-review`. Deliberately not done:
+- [x] Review round 3: no in-scope correctness finding, the second such round in a row, so the
+  loop stops here. Comment wording only: the archive-time test says it is exact to the second,
+  and the `medical` ceiling says when it throws. Cleanup declined and recorded once in
+  `tasks/open/the-pet-edit-module-states-its-field-list-and-defaults-more-than-once.md`.
+
+**Review:** round 1 found no blocking defect. Its in-scope fixes are listed above. Rounds 2 and 3 found no in-scope correctness bug. Deliberately not done:
 `specialNeeds` still clears when absent, as both copies did (the decision records it as
 reversible); `createPet` still parses with `petFormSchema`'s defaults, which carry the same values
 `buildNewPet` states, so the defaults are applied twice rather than the dialog's resolver being

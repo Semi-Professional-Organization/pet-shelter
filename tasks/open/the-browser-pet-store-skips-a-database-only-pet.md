@@ -10,8 +10,9 @@ reports it. The rollback's `replacePet(prevPet)` does nothing for the same reaso
 optimistic row is unaffected: since #212 it is built with the shared `mergePetEdit`.
 
 A related hazard in the same store: `mergePetEdit` reads `existing.medical` and
-`existing.compatibility` without a guard, so it throws on a stored pet that lacks either object.
-Only an unvalidated `localStorage` entry could hold such a pet. The store parses the saved JSON
+`existing.compatibility` without a guard, so it throws on a stored pet that lacks either object
+when the edit also omits one of that object's flags (probed in review round 3: a full dialog form
+on such a pet does not throw). Only an unvalidated `localStorage` entry could hold such a pet. The store parses the saved JSON
 without validating it, and none is known to exist.
 
 A third: the public profile prefers the store's copy over the server's

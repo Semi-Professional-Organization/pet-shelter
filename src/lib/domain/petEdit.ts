@@ -90,7 +90,8 @@ function submittedFields(input: PetFormInput) {
 export function mergePetEdit(existing: Pet, input: PetFormInput): Pet {
   // ceiling: assumes a well-formed stored pet. `Pet` requires both objects and every database
   // read supplies them; only an unvalidated `localStorage` entry could lack one, and this throws
-  // on it. Upgrade path: validate the saved list in `usePetStore`
+  // on it when the edit also omits one of that object's flags (the admin dialog sends them all,
+  // so it never does). Upgrade path: validate the saved list in `usePetStore`
   // (tasks/open/the-browser-pet-store-skips-a-database-only-pet.md).
   const { medical, compatibility } = existing;
   return withDerivedAge({
