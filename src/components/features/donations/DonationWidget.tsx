@@ -38,6 +38,17 @@ interface DonationWidgetProps {
   initialPets?: Pet[];
 }
 
+/** The animal the URL names, by id or by name, both names normalised the same way. */
+function findUrlPet(catalogue: Pet[], urlPetName: string, urlSponsorPetId: string | null) {
+  return (
+    catalogue.find(
+      (p) =>
+        (urlSponsorPetId && p.id === urlSponsorPetId) ||
+        (urlPetName && normaliseDedication(p.name).toLowerCase() === urlPetName.toLowerCase())
+    ) ?? null
+  );
+}
+
 export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const { t, isMs } = useLanguage();
   const searchParams = useSearchParams();
@@ -69,29 +80,23 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     return SPONSORSHIP_TIERS[1]; // Default RM 50 Vaccine
   });
 
-  const [selectedPet, setSelectedPet] = useState<Pet | null>(() => {
-    if (urlSponsorPetId || urlPetName) {
-      return (
-        initialPets.find(
-          (p) =>
-            (urlSponsorPetId && p.id === urlSponsorPetId) ||
-            (urlPetName && p.name.toLowerCase() === urlPetName.toLowerCase())
-        ) || null
-      );
-    }
-    return null;
-  });
+  const [selectedPet, setSelectedPet] = useState<Pet | null>(() =>
+    findUrlPet(initialPets, urlPetName, urlSponsorPetId)
+  );
 
   // Whether the chooser holds the catalogue it will hold. Until then a `?pet=` name
   // cannot be told apart from an animal that has not loaded yet.
   const [catalogueSettled, setCatalogueSettled] = useState(initialPets.length > 0);
   // The dedication is derived, never synced: the chosen animal's name, or else the
-  // `?pet=` name as the donor's own note (owner's decision, 2026-11-11; #205). The note
-  // counts only once the catalogue has settled, which is when the form shows it.
+  // `?pet=` name as the donor's own note (owner's decision, 2026-11-11; #205).
   const [urlNote, setUrlNote] = useState(urlPetName);
-  const targetPetName = selectedPet?.name ?? (catalogueSettled ? urlNote : "");
-  // Set once the donor removes the note or picks in the chooser. Read by the late
-  // catalogue load, which must not re-seed a choice the donor has already made.
+  const targetPetName = selectedPet?.name ?? urlNote;
+  // A URL that names an animal cannot be submitted until the form shows what it became:
+  // the selected card or the dedication strip. The load settles on failure too, so
+  // this cannot stay true.
+  const awaitingUrlPet = !catalogueSettled && Boolean(urlPetName || urlSponsorPetId);
+  // Set once the donor removes the note or picks an animal. Read by the late catalogue
+  // load, which must not re-seed a choice the donor has already made.
   const urlSeedDismissed = useRef(false);
   const chooserRef = useRef<HTMLDivElement>(null);
   const [dedicationStatus, setDedicationStatus] = useState("");
@@ -126,14 +131,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     getPublicPets().then((loadedPets) => {
       if (loadedPets && loadedPets.length > 0) {
         setPets(loadedPets);
-        if (!urlSeedDismissed.current && (urlSponsorPetId || urlPetName)) {
-          const match = loadedPets.find(
-            (p) =>
-              (urlSponsorPetId && p.id === urlSponsorPetId) ||
-              (urlPetName && p.name.toLowerCase() === urlPetName.toLowerCase())
-          );
-          if (match) setSelectedPet(match);
-        }
+        const match = findUrlPet(loadedPets, urlPetName, urlSponsorPetId);
+        if (match && !urlSeedDismissed.current) setSelectedPet(match);
       }
       setCatalogueSettled(true);
     }).catch((err) => {
@@ -150,10 +149,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     : tierAmountFor(selectedTier, frequency);
 
   const handleSelectPet = (pet: Pet | null) => {
-    // The general fund is already chosen and the note is on screen: only Remove clears
-    // it. Before the catalogue settles the note is not shown, so a click on the general
-    // fund is a choice made without it and stands against the late load.
-    if (!pet && !selectedPet && catalogueSettled) return;
+    // The general fund is already chosen: the click changes nothing. Only Remove, or
+    // picking an animal, clears the note or stops a late load selecting the linked animal.
+    if (!pet && !selectedPet) return;
     urlSeedDismissed.current = true;
     setSelectedPet(pet);
     setUrlNote("");
@@ -166,6 +164,8 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     setDedicationStatus(isMs ? "Dedikasi dibuang." : "Dedication removed.");
     // The Remove button is about to unmount. The general fund is what the gift goes
     // to now, and it is the chooser's pressed card, so focus lands there.
+    // ceiling: couples to PetChooserCarousel's markup (a `button[aria-pressed="true"]`);
+    // expose a ref to the general-fund card from the carousel if that markup changes.
     chooserRef.current
       ?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')
       ?.focus();
@@ -817,7 +817,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
           <Button
             type="submit"
-            disabled={isProcessing}
+            disabled={isProcessing || awaitingUrlPet}
             size="lg"
             className="gap-2 font-bold px-8 rounded-xl cursor-pointer shadow-xs"
           >

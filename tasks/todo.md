@@ -41,7 +41,7 @@ Record active multi-step work streams below.
 - [x] Contract comments; `prisma migrate diff` against `origin/main`'s schema is an empty migration
 - [x] Tests red without the change (round 0 against `origin/main`, round 1 against `a10db38`);
   the no-lookup test passes on both by design and fails when a `findPetForWriteAsync` call is inserted
-- [x] Ledger: open entry deleted, decision added, three new open entries
+- [x] Ledger: open entry deleted, decision added, four new open entries
 
 **Round 2** (third commit): the strip waits for the catalogue (production mounts the widget
 with no `initialPets`), a late catalogue no longer re-seeds a choice the donor made, the
@@ -59,6 +59,16 @@ same one-line form; clicking the already-chosen general fund keeps a shown note 
 catalogue settles it still counts as a choice against the late load); the status line clears on
 reset and on a pick; the effect lost its redundant `pets.length` guard and `current ??` updater.
 Declined: the lane on the receipt DTO, a carousel focus ref, restructuring the email ternaries.
+
+**Round 4** (fifth commit, last fix round): round 3's withheld note is replaced by holding
+submit while a URL that names an animal waits for the catalogue, so the payload is again what
+the donor sees; a general-fund click with no animal selected never clears the note or the late
+seed (one rule, special case deleted); `normaliseDedication` also strips `\p{Cf}`, and the
+schema now normalises then cuts instead of refusing a raw length; the catalogue match normalises
+both names; the lane each reconcile action passes is pinned; "stored as written" reworded.
+Recorded only: other donor text reaching the plain-text emails raw
+(`tasks/open/donor-text-reaches-plain-text-emails-with-its-newlines.md`). Declined: re-keying
+the widget on a query change without a remount.
 
 **Review:** round 1 (coordinator) found the `?pet=` name invisible on the form, the note
 concatenated unquoted into the queue's `·` line, a CSV header that mislabelled sponsorship rows

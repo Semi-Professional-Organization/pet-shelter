@@ -466,8 +466,8 @@ model Donation {
   frequency     String  @default("one_time")
   paymentMethod String
   /// Free-text dedication, not a foreign key. On a receipt issued from a
-  /// `DonationPledge` it is the donor's own note, copied as written and checked
-  /// against no animal — "Tuah" here does not mean the shelter holds a Tuah. On a
+  /// `DonationPledge` it is the donor's own note, stored as one line, otherwise as
+  /// written, and checked against no animal — "Tuah" here does not mean the shelter holds a Tuah. On a
   /// receipt issued from a `PetSponsorship` it is that sponsorship's pet name.
   /// tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md
   targetPetName String?
@@ -538,7 +538,8 @@ model DonationPledge {
   /// none of that cost.
   status        String @default("PENDING_PAYMENT")
 
-  /// The donor's own note naming an animal, stored as written. Not a foreign key and
+  /// The donor's own note naming an animal, stored as one line, otherwise as written
+  /// (`normaliseDedication`, capped at 100 characters). Not a foreign key and
   /// never checked against the catalogue: `/donate?pet=Tuah` records "Tuah" whether
   /// or not the shelter holds one, so the staff queue and the donor's confirmation
   /// and emails label it as the donor's note, not as a confirmed animal (raw audit

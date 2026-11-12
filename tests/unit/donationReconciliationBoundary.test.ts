@@ -55,6 +55,14 @@ vi.mock("@/lib/security/session", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
+// The acknowledgement is shared by both lanes and names the dedication by the lane its
+// caller passes, so the lane is pinned here. Spied, not sent: the mail itself is
+// tests/unit/email.test.ts's subject.
+vi.mock("@/lib/email", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/email")>()),
+  sendDonationReceiptEmail: vi.fn(async () => ({ success: true })),
+}));
+
 const RECEIPT_NUMBER = /^HFS-DON-\d{6}-\d{4}$/;
 const GIFT_REF = /^HFS-GFT-\d{8}-\d{6}$/;
 
@@ -112,6 +120,15 @@ describe("the receipt series is untouched until reconciliation", () => {
     const ledger = await listDonations();
     expect(ledger).toHaveLength(1);
     expect(ledger[0].receiptNumber).toBe(outcome.receiptNumber);
+
+    // A general gift's acknowledgement names its dedication as the donor's, not as a pet.
+    const { sendDonationReceiptEmail } = await import("@/lib/email");
+    await vi.waitFor(() =>
+      expect(sendDonationReceiptEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ receiptNumber: outcome.receiptNumber }),
+        "general_gift"
+      )
+    );
   });
 
   it("draws the number from the same gapless monthly series", async () => {

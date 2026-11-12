@@ -60,6 +60,14 @@ vi.mock("@/lib/security/session", () => ({
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
+// The acknowledgement is shared by both lanes and names the dedication by the lane its
+// caller passes, so the lane is pinned here. Spied, not sent: the mail itself is
+// tests/unit/email.test.ts's subject.
+vi.mock("@/lib/email", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/email")>()),
+  sendDonationReceiptEmail: vi.fn(async () => ({ success: true })),
+}));
+
 /**
  * Mirrors the tier catalogue's shape without depending on its prices.
  *
@@ -294,6 +302,15 @@ describe("reconcilePetSponsorshipAction issues exactly one receipt per pledge", 
     expect(second.success).toBe(true);
     // The loser is told the number that exists, not a number of its own.
     expect(first.receiptNumber).toBe(second.receiptNumber);
+
+    // A sponsorship's acknowledgement names the verified animal as the sponsored pet.
+    const { sendDonationReceiptEmail } = await import("@/lib/email");
+    await vi.waitFor(() =>
+      expect(sendDonationReceiptEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ receiptNumber: first.receiptNumber }),
+        "sponsorship"
+      )
+    );
     expect(
       [first, second]
         .map((result) => (result as typeof result & { outcome?: string }).outcome)

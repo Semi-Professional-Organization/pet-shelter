@@ -25,19 +25,26 @@ export const DONATION_PLEDGE_STATUSES: readonly DonationPledgeStatus[] = [
 ] as const;
 
 /**
- * The longest dedication a gift may carry. The schema refuses longer, and the donation
- * form caps a `?pet=` name to it before showing it, so the two cannot disagree.
+ * The longest dedication a gift may carry. Both the donation form and the schema cut
+ * a longer one to this through `normaliseDedication`, so the two cannot disagree.
  */
 export const DONATION_DEDICATION_MAX_LENGTH = 100;
 
 /**
- * A dedication as one line: every run of whitespace or control characters becomes a
- * single space, then it is trimmed and capped. A newline in it would otherwise start a
- * line of its own in the plain-text emails, where it can pose as a field of the mail.
- * The cap never leaves half of a surrogate pair at the end.
+ * A dedication as one line: format characters (zero-width, bidi overrides) are removed,
+ * every run of whitespace or control characters becomes a single space, then it is
+ * trimmed and capped. A newline would otherwise start a line of its own in the
+ * plain-text emails, where it can pose as a field of the mail, and a right-to-left
+ * override would reorder what staff read. The cap never leaves half of a surrogate pair.
+ * ceiling: removing `\p{Cf}` also removes the zero-width joiner, so a joined emoji
+ * sequence is stored as its separate emoji.
  */
 export function normaliseDedication(value: string): string {
-  let text = value.replace(/[\s\p{Cc}]+/gu, " ").trim().slice(0, DONATION_DEDICATION_MAX_LENGTH);
+  let text = value
+    .replace(/\p{Cf}/gu, "")
+    .replace(/[\s\p{Cc}]+/gu, " ")
+    .trim()
+    .slice(0, DONATION_DEDICATION_MAX_LENGTH);
   if (/[\uD800-\uDBFF]$/.test(text)) text = text.slice(0, -1);
   return text.trimEnd();
 }

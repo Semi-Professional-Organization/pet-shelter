@@ -4,7 +4,7 @@
 this file.
 
 `DonationWidget` seeds `targetPetName` from the `?pet=` query string, and
-`submitDonationPledgeAction` stores it as written. So `/donate?pet=Tuah` records a gift
+`submitDonationPledgeAction` stored it without checking it against any animal. So `/donate?pet=Tuah` records a gift
 naming Tuah whether or not the shelter holds an animal by that name. The open entry this
 settles (`donation-earmarks-are-free-text.md`, #205) asked whether the earmark should become a
 pet id that the server checks with `findPetForWriteAsync`, refusing or dropping an unknown one
@@ -29,14 +29,24 @@ no schema change and no read of `src/data/pets.json`. What changed is how it is 
   is, and a sponsorship receipt names the verified animal "Sponsored Pet", with the allocation.
 - **On the form**, a `?pet=` name that matches no animal in the chooser is shown beside it as
   `Your dedication: “Tuah”` with a Remove button, once the catalogue has loaded (before that a
-  real animal would flash as unmatched), and it is sent only from then on. The name goes through
-  `normaliseDedication` (one line, trimmed, capped at the schema's 100 characters), which the
-  schema also applies, so what is shown is what is stored and a newline cannot forge a line of
-  the plain-text emails. Clicking the general fund that is already chosen leaves it alone. Remove moves
-  focus to the general-fund card and announces itself. Before this the chooser showed the general
-  fund while the pledge still carried the name, so the donor first saw it after submitting. The
-  dedication is derived (`selectedPet?.name ?? note`) rather than kept in sync, and a choice the
-  donor made, Remove or a card, is not overridden by a catalogue that loads later.
+  real animal would flash as unmatched). While a URL that names an animal waits for the
+  catalogue, the submit button is disabled, so nothing is sent before the donor can see the
+  selected card or the strip; the load settles on failure too. Before this the chooser showed
+  the general fund while the pledge still carried the name, so the donor first saw it after
+  submitting. Remove moves focus to the general-fund card and announces itself.
+- **One line, at most 100 characters, cut rather than refused.** `normaliseDedication` removes
+  format characters (zero-width, bidi overrides), turns every run of whitespace or control
+  characters into one space, trims, and cuts to 100 characters without splitting a surrogate
+  pair. The form applies it to the `?pet=` name before showing it, and the schema applies it to
+  whatever is posted, so what is shown is what is stored and the two cannot disagree. A longer
+  name is cut, not refused: the form's only source is the URL, which it has already cut visibly,
+  so a refusal could only ever reach a caller that is not the form. A newline cannot forge a line
+  of the plain-text emails, and a right-to-left override cannot reorder what staff read.
+- **Who clears it.** The dedication is derived (`selectedPet?.name ?? note`) rather than kept in
+  sync. Only Remove, or picking an animal, clears the note or stops a late catalogue from
+  selecting the linked animal. Clicking the general fund while no animal is selected changes
+  nothing, before or after the load, so a late catalogue may still select the linked animal,
+  visibly, and the donor can change it.
 - **Raw audit details** still show the value under its `targetPetName` key. The field is not
   renamed, by the same decision.
 - **The contract** is written where the field is: `prisma/schema.prisma` (comments only, no
@@ -77,7 +87,8 @@ Pinned by `tests/components/DonationEarmarkDonorNote.test.tsx` (the widget with 
 against a catalogue with no Tuah, before and after submitting and after Remove; the late-loading
 catalogue production uses; and the staff queue, including a note containing ` · `),
 `tests/unit/donationEarmarkIsDonorNote.test.ts` (the
-action stores "Tuah", and "Kenanga", which no fixture holds, as written and calls no
+action stores "Tuah", and "Kenanga", which no fixture holds, as one line, otherwise as
+written, and calls no
 pet-repository function), and the label assertions in
 `tests/unit/email.test.ts` (both receipt lanes and the pledge email) and
 `tests/unit/exportCsv.test.ts`.

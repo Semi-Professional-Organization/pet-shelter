@@ -110,22 +110,35 @@ describe("the dedication when the catalogue loads late, as in production", () =>
     expect(deepestContaining("Your dedication")).toHaveTextContent(/^🐾 Your dedication: “Tuah”$/);
   });
 
-  it("sends no note the form has not shown yet, if submitted while the catalogue loads", async () => {
+  it("holds submit while a ?pet= link waits for the catalogue, then sends the name", async () => {
+    // Nothing can be sent before the donor can see what the link became: the selected
+    // card or the dedication strip.
     mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
-    lateCatalogue();
+    const catalogueLoad = lateCatalogue();
     setMockLocation("/donate", "pet=Tuah");
     renderWithLanguage(<DonationWidget />);
 
-    await fillAndSubmit(setupUser());
+    const submit = () => screen.getByRole("button", { name: /complete donation pledge/i });
+    expect(submit()).toBeDisabled();
 
-    expect(mockedSubmit).toHaveBeenCalledTimes(1);
-    expect(mockedSubmit.mock.calls[0][0].targetPetName).toBeUndefined();
+    await catalogueLoad.arrive(catalogue);
+    expect(submit()).toBeEnabled();
+    await fillAndSubmit(setupUser());
+    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ targetPetName: "Tuah" });
   });
 
-  it("does not re-seed the name when the donor chose the general fund before it loaded", async () => {
-    // The strip itself only appears once the catalogue has settled, so the choice a donor
-    // can make while it loads is the general-fund card. A late catalogue holding the
-    // `?pet=` animal must not override it.
+  it("does not hold submit for a link that names no animal", () => {
+    lateCatalogue();
+    setMockLocation("/donate", "tier=kibble");
+    renderWithLanguage(<DonationWidget />);
+
+    expect(screen.getByRole("button", { name: /complete donation pledge/i })).toBeEnabled();
+  });
+
+  it("lets a late catalogue select the linked animal after a click on the general fund", async () => {
+    // One rule: clicking the general fund while no animal is selected changes nothing,
+    // before or after the load. Only Remove, or picking an animal, stops the late load,
+    // so here it selects Bella, visibly, and the donor can still change it.
     mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
     const catalogueLoad = lateCatalogue();
     setMockLocation("/donate", "pet=Bella");
@@ -137,10 +150,23 @@ describe("the dedication when the catalogue loads late, as in production", () =>
 
     expect(within(carousel()).getByRole("button", { name: /bella/i })).toHaveAttribute(
       "aria-pressed",
-      "false"
+      "true"
     );
     await fillAndSubmit(user);
-    expect(mockedSubmit.mock.calls[0][0].targetPetName).toBeUndefined();
+    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ targetPetName: "Bella" });
+  });
+
+  it("matches ?pet=Bella to a catalogue animal stored as \"Bella \"", async () => {
+    const catalogueLoad = lateCatalogue();
+    setMockLocation("/donate", "pet=Bella");
+    renderWithLanguage(<DonationWidget />);
+    await catalogueLoad.arrive([makePet({ id: "pet-001", name: "Bella " }), catalogue[1]]);
+
+    expect(within(carousel()).getByRole("button", { name: /bella/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.queryByText(/your dedication/i)).toBeNull();
   });
 });
 

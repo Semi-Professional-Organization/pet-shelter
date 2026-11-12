@@ -4,8 +4,8 @@ import { prisma } from "@/lib/server/prisma";
 import { findMemberRow, signInAs, signOut } from "../setup/authSession";
 
 /**
- * A donation earmark is the donor's own note, stored as written and checked against no
- * animal (owner's decision, 2026-11-11, option B:
+ * A donation earmark is the donor's own note, stored as one line, otherwise as written,
+ * and checked against no animal (owner's decision, 2026-11-11, option B:
  * tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md; #205).
  *
  * The other half, that staff and donor surfaces label it as the donor's note, is pinned
@@ -44,10 +44,10 @@ beforeEach(async () => {
 });
 
 // "Tuah" is the name from the issue. It is also a demo animal in src/data/pets.json, so
-// the case is repeated with "Kenanga", which no fixture holds: the earmark is stored as
-// written whether or not any store knows the name.
-describe.each(["Tuah", "Kenanga"])("a gift earmarked %s is stored as the donor's text", (name) => {
-  it("records the name as written, with no pet lookup, and queues it as written", async () => {
+// the case is repeated with "Kenanga", which no fixture holds: the earmark is stored the
+// same way whether or not any store knows the name.
+describe.each(["Tuah", "Kenanga"])("a gift earmarked %s is stored as one line, otherwise as written", (name) => {
+  it("records the name, with no pet lookup, and queues it unchanged", async () => {
     const { submitDonationPledgeAction, listPendingDonationPledgesAction } = await import(
       "@/actions/donations"
     );
@@ -97,6 +97,25 @@ describe("a dedication is normalised to one line at the boundary", () => {
     });
 
     expect(parsed.targetPetName).toBe("Tuah TOTAL RECEIVED: RM 9,999.00");
+  });
+
+  it("normalises before it caps, so padding cannot push a name out", async () => {
+    const { donationPledgeSchema } = await import("@/lib/validations/donation");
+    const parsed = donationPledgeSchema.parse({
+      donorName: "Aisyah Rahman",
+      donorEmail: "aisyah@example.com",
+      amountMYR: 50,
+      targetPetName: `Tuah${" ".repeat(200)}Kecil`,
+    });
+
+    expect(parsed.targetPetName).toBe("Tuah Kecil");
+  });
+
+  it("removes zero-width and bidi format characters", async () => {
+    const { normaliseDedication } = await import("@/lib/domain/donationPledge");
+
+    expect(normaliseDedication("\u200B")).toBe("");
+    expect(normaliseDedication("Tuah\u202Edetaerc")).toBe("Tuahdetaerc");
   });
 
   it("caps without leaving half of a surrogate pair", async () => {

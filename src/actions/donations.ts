@@ -138,7 +138,8 @@ export async function submitDonationPledgeAction(
         currency: "MYR",
         frequency: validated.frequency,
         paymentMethod: validated.paymentMethod,
-        // The donor's note, stored as written. No pet lookup, by decision: see
+        // The donor's note, stored as one line, otherwise as written (the schema
+        // normalises it). No pet lookup, by decision: see
         // tasks/decisions/2026-11-11-a-donation-earmark-is-the-donors-note.md.
         targetPetName: optionalText(validated.targetPetName),
         notes: optionalText(validated.notes),
