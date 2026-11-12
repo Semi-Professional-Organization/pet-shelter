@@ -15,6 +15,62 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Merge pet edits through one shared rule (#212)
+
+**Branch:** `fix/merge-pet-edit` · opened 2026-11-12
+
+- **Done when:** the browser store and the Server Actions build an edited pet with one
+  `mergePetEdit` and a new one with one `buildNewPet` (`src/lib/domain/petEdit.ts`); a saved
+  gallery and QR survive a store reload (`tests/components/petStoreKeepsGalleryAndQr.test.ts`); and
+  an `updatePet` payload that omits `galleryImages`, `customQrUrl`, `isArchived` and `featured`
+  keeps the stored values (`tests/integration/adminPetEditsReadTheDatabase.test.ts`).
+- **In scope:** the two merge copies, the two create copies, a no-defaults `petEditSchema` for the
+  update path, and moving `sortHistoryByDate` into the domain file, which may import validations
+  for types only.
+- **Not in scope:** outage-mode writes (#204), expected-status or version matching, the archive
+  action, and any UI change. (The admin table's optimistic merge was added in review round 1.)
+
+- [x] Tests first: the store and action tests were red on main (gallery and QR missing after a
+  store reload; the omitted gallery, QR, featured and archive state reset by the action; an empty
+  QR returned as `""` rather than `null`)
+- [x] `mergePetEdit` / `buildNewPet`, used by both sides; `petEditSchema` derived from the same
+  fields, so `petBaseFormSchema` only `.extend`s it with defaults and one `superRefine` serves both
+- [x] Ledger: both `tasks/open` entries deleted; decision
+  `tasks/decisions/2026-11-12-a-pet-edit-never-invents-a-default.md`
+- [x] Review round 1, second commit:
+  - `usePetTableController` builds its optimistic row with `mergePetEdit`. The spread had left
+    the nested `medical` stale, and reopening the row and saving again wrote the old flag back.
+    The new `tests/components/petTableControllerMergesEdits.test.ts` was red on the first commit.
+  - Corrected the comments on default ownership, the dialog-resolver hazard and the archive pair.
+  - `petMappers` uses the domain's `byDateAscending`.
+  - The age test is pinned to a fixed date.
+  - Declined findings recorded in the ledger:
+    - `tasks/open/a-pet-edit-accepts-isarchived-and-deletedat-independently.md`
+    - a dated section on the double-minted create id in `tasks/open/create-pet-uses-a-timestamp-id.md`
+    - `tasks/open/the-browser-pet-store-skips-a-database-only-pet.md`, which also holds the throw
+      on a stored pet with no `medical`
+    - the reviewer's `specialNeeds` counter-argument, in the decision
+
+- [x] Review round 2, third commit: no in-scope correctness finding. `ceiling:` markers on the
+  two known limits in `mergePetEdit`; the keep-on-absent action test now pins the archive time
+  written and returned. Declined and recorded:
+  `tasks/open/the-admin-pet-dialog-submits-archive-state-it-has-no-control-for.md`,
+  `tasks/open/a-new-pet-gets-one-id-in-the-table-and-another-in-the-database.md` (moved out of the
+  timestamp-id entry so it has its own settle condition), the public profile preferring the
+  store's QR (in the store entry), and the rehabilitation counter-argument (in the decision).
+
+- [x] Review round 3: no in-scope correctness finding, the second such round in a row, so the
+  loop stops here. Comment wording only: the archive-time test says it is exact to the second,
+  and the `medical` ceiling says when it throws. Cleanup declined and recorded once in
+  `tasks/open/the-pet-edit-module-states-its-field-list-and-defaults-more-than-once.md`.
+
+**Review:** round 1 found no blocking defect. Its in-scope fixes are listed above. Rounds 2 and 3 found no in-scope correctness bug. Deliberately not done:
+`specialNeeds` still clears when absent, as both copies did (the decision records it as
+reversible); `createPet` still parses with `petFormSchema`'s defaults, which carry the same values
+`buildNewPet` states, so the defaults are applied twice rather than the dialog's resolver being
+changed; and the store's first-render read of `localStorage` without `withDerivedAge` in its effect was left alone.
+No lesson was written, because no human correction happened this session.
+
 # Hide database errors from adoption applicants (#201)
 
 **Branch:** `claude/hide-application-db-errors` · opened 2026-11-11

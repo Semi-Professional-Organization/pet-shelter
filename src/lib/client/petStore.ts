@@ -4,10 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { Pet } from "@/types/pet";
 import initialPetsData from "@/data/pets.json";
 import { withDerivedAge } from "@/lib/domain/petAge";
-import {
-  PetFormInput,
-  sortHistoryByDate,
-} from "@/lib/validations/pet";
+import type { PetFormInput } from "@/lib/validations/pet";
+import { buildNewPet, mergePetEdit } from "@/lib/domain/petEdit";
 
 const STORAGE_KEY = "hope_for_strays_pets_v1";
 
@@ -55,47 +53,9 @@ export function usePetStore() {
 
   const addPet = useCallback(
     (input: PetFormInput): Pet => {
-      // Derived here for the same reason the server action derives: the form submits a birthday,
-      // and storing prose alongside it would let the two disagree the moment the calendar moved.
-      const newPet: Pet = withDerivedAge({
-        id: `pet-${Date.now()}`,
-        name: input.name,
-        species: input.species,
-        breed: input.breed,
-        birthDate: input.birthDate,
-        birthDateIsEstimate: input.birthDateIsEstimate ?? true,
-        gender: input.gender,
-        size: input.size,
-        weight: input.weight,
-        status: input.status,
-        adoptionFee: input.adoptionFee || "Free",
-        description: input.description,
-        rescueStory: input.rescueStory,
-        image: input.image,
-        tags: input.tags,
-        featured: input.featured,
-        intakeDate: input.intakeDate,
-        rehabStage: input.rehabStage,
-        rehabStageMs: input.rehabStageMs,
-        rehabProgressPercent: input.rehabProgressPercent,
-        updates: sortHistoryByDate(input.updates),
-        medicalTimeline: sortHistoryByDate(input.medicalTimeline),
-        isArchived: input.isArchived ?? false,
-        deletedAt: input.deletedAt || null,
-        medical: {
-          vaccinated: input.vaccinated ?? true,
-          microchipped: input.microchipped ?? true,
-          spayedNeutered: input.spayedNeutered ?? true,
-          specialNeeds: input.specialNeeds,
-        },
-        compatibility: {
-          goodWithDogs: input.goodWithDogs ?? true,
-          goodWithCats: input.goodWithCats ?? true,
-          goodWithKids: input.goodWithKids ?? true,
-          energyLevel: input.energyLevel || "Moderate",
-        },
-      });
-
+      // The same builder `createPet` uses, so a new record gets the same defaults and keeps its
+      // gallery and QR on both sides (#212).
+      const newPet = buildNewPet(`pet-${Date.now()}`, input);
       const updated = [newPet, ...pets];
       savePets(updated);
       return newPet;
@@ -108,48 +68,9 @@ export function usePetStore() {
       const index = pets.findIndex((p) => p.id === id);
       if (index === -1) return null;
 
-      const updatedPet: Pet = withDerivedAge({
-        ...pets[index],
-        name: input.name,
-        species: input.species,
-        breed: input.breed,
-        birthDate: input.birthDate,
-        // Falls back to what is stored, not to `true`: an edit that does not mention the flag must
-        // not demote a birthday someone knew. Only a genuinely new record defaults to "estimated".
-        birthDateIsEstimate: input.birthDateIsEstimate ?? pets[index].birthDateIsEstimate ?? true,
-        gender: input.gender,
-        size: input.size,
-        weight: input.weight,
-        status: input.status,
-        adoptionFee: input.adoptionFee || "Free",
-        description: input.description,
-        rescueStory: input.rescueStory,
-        image: input.image,
-        tags: input.tags,
-        featured: input.featured ?? false,
-        intakeDate: input.intakeDate,
-        rehabStage: input.rehabStage,
-        rehabStageMs: input.rehabStageMs,
-        rehabProgressPercent: input.rehabProgressPercent,
-        // Matches the server action: an absent collection keeps what is stored, and only a
-        // submitted list (an explicit `[]` included) replaces it — issue #107.
-        updates: sortHistoryByDate(input.updates) ?? pets[index].updates,
-        medicalTimeline: sortHistoryByDate(input.medicalTimeline) ?? pets[index].medicalTimeline,
-        isArchived: input.isArchived ?? pets[index].isArchived ?? false,
-        deletedAt: input.deletedAt !== undefined ? input.deletedAt : pets[index].deletedAt,
-        medical: {
-          vaccinated: input.vaccinated ?? true,
-          microchipped: input.microchipped ?? true,
-          spayedNeutered: input.spayedNeutered ?? true,
-          specialNeeds: input.specialNeeds,
-        },
-        compatibility: {
-          goodWithDogs: input.goodWithDogs ?? true,
-          goodWithCats: input.goodWithCats ?? true,
-          goodWithKids: input.goodWithKids ?? true,
-          energyLevel: input.energyLevel || "Moderate",
-        },
-      });
+      // The server action's merge, not a copy of it: an absent key keeps the stored value, and a
+      // submitted gallery or QR replaces it (#212).
+      const updatedPet = mergePetEdit(pets[index], input);
 
       const updated = [...pets];
       updated[index] = updatedPet;

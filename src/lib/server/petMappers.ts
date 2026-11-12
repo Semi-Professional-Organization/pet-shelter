@@ -11,6 +11,9 @@ import {
   formatAgeString,
   deriveBirthDate,
 } from "@/lib/domain/petAge";
+// The same order the edit merge sorts a submitted history into, so a pet reads back identically
+// from the database and from the in-memory store.
+import { byDateAscending } from "@/lib/domain/petEdit";
 
 /**
  * Refuses an unrecognised status before it is written. Writes used to default it to Available, so
@@ -186,14 +189,6 @@ export interface PetPersistencePayload {
   goodWithCats: boolean;
   goodWithKids: boolean;
   energyLevel: string;
-}
-
-/**
- * Ascending comparison on a `YYYY-MM-DD` string. Lexical order and calendar
- * order coincide for that format, so no `Date` parsing is needed.
- */
-function byDateAscending(a: { date: string }, b: { date: string }): number {
-  return a.date.localeCompare(b.date);
 }
 
 /**
