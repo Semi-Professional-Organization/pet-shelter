@@ -1,7 +1,7 @@
 import * as z from "zod";
 import {
-  optionalQrImageUrl,
   optionalUploadedImageUrl,
+  qrImageUrlOrEmpty,
   uploadedImageUrl,
 } from "@/lib/validations/qrImage";
 
@@ -172,27 +172,8 @@ export const petUpdateSchema = z.object({
 export type MedicalTimelineEventInput = z.input<typeof medicalTimelineEventSchema>;
 export type PetUpdateInput = z.input<typeof petUpdateSchema>;
 
-/**
- * Ascending comparison on a `YYYY-MM-DD` string. Lexical order and calendar
- * order coincide for that format, so no `Date` parsing is needed.
- */
-function byDateAscending(a: { date: string }, b: { date: string }): number {
-  return a.date.localeCompare(b.date);
-}
-
-/**
- * Orders a submitted history collection by date, leaving an absent collection
- * absent.
- *
- * Ordering is applied here rather than only in the Prisma `orderBy` because the
- * dual-layer store also serves pets straight from memory, and a pet must read
- * back the same way from either layer.
- */
-export function sortHistoryByDate<T extends { date: string }>(
-  events: T[] | undefined
-): T[] | undefined {
-  return events?.slice().sort(byDateAscending);
-}
+// `sortHistoryByDate` moved to `src/lib/domain/petEdit.ts` (#212): the shared edit merge needs it,
+// and the domain layer may import this one for types only.
 
 /** Reports the ids appearing more than once in a history collection. */
 function duplicateIds(events: readonly { id: string }[] | undefined): string[] {
@@ -206,7 +187,14 @@ function duplicateIds(events: readonly { id: string }[] | undefined): string[] {
   return [...duplicates];
 }
 
-export const petBaseFormSchema = z.object({
+/**
+ * Every admin pet form field, validated, with **no defaults**: a key the caller leaves out stays
+ * out of the parsed result. The update path parses with this (as `petEditSchema` below), so the
+ * shared merge in `src/lib/domain/petEdit.ts` can read an absent key as "keep what is stored".
+ * `petBaseFormSchema` adds the defaults a new record's form gets, by extension rather than by a
+ * second copy, so a validator is written once and a rule change reaches both.
+ */
+const petEditBaseSchema = z.object({
   name: z.string().min(1, "Pet name is required").max(60, "Name is too long"),
   species: z.enum(SPECIES_VALUES),
   breed: z.string().min(1, "Breed is required"),
@@ -230,14 +218,14 @@ export const petBaseFormSchema = z.object({
   birthDate: z.string().min(1, "Birth date is required").pipe(isoDateSchema),
 
   /**
-   * Optional with NO `.default(true)`, deliberately.
+   * Optional with NO `.default(true)`, deliberately, and not given one by `petBaseFormSchema`
+   * either.
    *
-   * A default here is applied on every parse, so the key is always present in the output — and
-   * `updatePet` merges `{ ...existing, ...validated }`. A caller that simply did not mention the
-   * flag would therefore overwrite a stored `false` with `true`, silently demoting a birthday
-   * someone actually knew to a guess, which is the one thing this field exists to prevent.
-   * Measured, not theorised. Leaving it absent lets `existing` survive the spread; the two create
-   * paths apply `?? true` themselves, where defaulting to "estimated" is the honest choice.
+   * A default here is applied on every parse, so the key is always present in the output. A
+   * caller that simply did not mention the flag would therefore overwrite a stored `false` with
+   * `true`, silently demoting a birthday someone actually knew to a guess, which is the one thing
+   * this field exists to prevent. Measured, not theorised. `buildNewPet` applies `?? true`
+   * itself, where defaulting to "estimated" is the honest choice.
    */
   birthDateIsEstimate: z.boolean().optional(),
 
@@ -249,25 +237,25 @@ export const petBaseFormSchema = z.object({
   description: z.string().min(10, "Please provide at least a brief description (10+ characters)"),
   rescueStory: z.string().min(10, "Please provide the rescue background story"),
   image: uploadedImageUrl,
-  galleryImages: z.array(uploadedImageUrl).optional().default([]),
+  galleryImages: z.array(uploadedImageUrl).optional(),
   tags: z.array(z.string()).min(1, "Please provide at least 1 characteristic tag"),
-  featured: z.boolean().default(false),
+  featured: z.boolean().optional(),
   intakeDate: z.string().min(4, "Intake date is required"),
 
   /// Dedicated donation QR for this animal's medical fund drive.
-  customQrUrl: optionalQrImageUrl,
+  customQrUrl: qrImageUrlOrEmpty.optional(),
 
   // Medical
-  vaccinated: z.boolean().default(true),
-  microchipped: z.boolean().default(true),
-  spayedNeutered: z.boolean().default(true),
+  vaccinated: z.boolean().optional(),
+  microchipped: z.boolean().optional(),
+  spayedNeutered: z.boolean().optional(),
   specialNeeds: z.string().optional(),
 
   // Compatibility
-  goodWithDogs: z.boolean().default(true),
-  goodWithCats: z.boolean().default(true),
-  goodWithKids: z.boolean().default(true),
-  energyLevel: z.enum(["Low", "Moderate", "High"]).default("Moderate"),
+  goodWithDogs: z.boolean().optional(),
+  goodWithCats: z.boolean().optional(),
+  goodWithKids: z.boolean().optional(),
+  energyLevel: z.enum(["Low", "Moderate", "High"]).optional(),
 
   // Rehabilitation progress (only valid while the pet is under care)
   rehabStage: z.string().min(1, "Rehabilitation stage cannot be blank").optional(),
@@ -281,20 +269,45 @@ export const petBaseFormSchema = z.object({
 
   // Nested history. Left without a default on purpose: an absent key must stay
   // absent so the action layer can tell "not supplied" from "supplied empty".
-  // Absent leaves the stored rows untouched; `[]` clears them — see updatePet in src/actions/pets.ts.
+  // Absent leaves the stored rows untouched; `[]` clears them — see `mergePetEdit`.
   updates: z.array(petUpdateSchema).optional(),
   medicalTimeline: z.array(medicalTimelineEventSchema).optional(),
 
   // Soft Delete
-  isArchived: z.boolean().optional().default(false),
+  isArchived: z.boolean().optional(),
   deletedAt: z.string().nullable().optional(),
 });
 
+const editFields = petEditBaseSchema.shape;
+
 /**
- * Full pet form contract. Rehabilitation details are rejected on pets that are
- * not under care, so a cleared animal cannot keep a stale progress bar.
+ * The form a new record is parsed with: the fields above, plus the defaults the admin dialog has
+ * always been parsed with. `buildNewPet` states the same defaults for the browser store, which
+ * does not parse. `birthDateIsEstimate`, the history lists and `deletedAt` deliberately get none.
  */
-export const petFormSchema = petBaseFormSchema.superRefine((data, ctx) => {
+export const petBaseFormSchema = petEditBaseSchema.extend({
+  galleryImages: editFields.galleryImages.default([]),
+  featured: editFields.featured.default(false),
+  customQrUrl: editFields.customQrUrl.default(""),
+  vaccinated: editFields.vaccinated.default(true),
+  microchipped: editFields.microchipped.default(true),
+  spayedNeutered: editFields.spayedNeutered.default(true),
+  goodWithDogs: editFields.goodWithDogs.default(true),
+  goodWithCats: editFields.goodWithCats.default(true),
+  goodWithKids: editFields.goodWithKids.default(true),
+  energyLevel: editFields.energyLevel.default("Moderate"),
+  isArchived: editFields.isArchived.default(false),
+});
+
+/**
+ * The cross-field rules every pet form is held to, with or without defaults. Rehabilitation
+ * details are rejected on pets that are not under care, so a cleared animal cannot keep a stale
+ * progress bar.
+ */
+function refinePetForm<T extends z.output<typeof petEditBaseSchema>>(
+  data: T,
+  ctx: z.RefinementCtx<T>
+): void {
   // History ids become primary keys verbatim, so a repeat within one payload
   // would collide on insert — which the fallback store would then swallow.
   for (const field of ["updates", "medicalTimeline"] as const) {
@@ -372,7 +385,17 @@ export const petFormSchema = petBaseFormSchema.superRefine((data, ctx) => {
       message: `'${field}' is only allowed while the pet status is 'In Rehabilitation' (received '${data.status}')`,
     });
   }
-});
+}
+
+/** Full pet form contract for a new record, defaults included. */
+export const petFormSchema = petBaseFormSchema.superRefine(refinePetForm);
+
+/**
+ * The same contract for an edit, with no defaults: an omitted key stays absent, and
+ * `mergePetEdit` keeps the stored value for it. Every validation and cross-field rule is shared
+ * with `petFormSchema`.
+ */
+export const petEditSchema = petEditBaseSchema.superRefine(refinePetForm);
 
 export type PetFormInput = z.input<typeof petBaseFormSchema>;
 export type PetFormOutput = z.output<typeof petBaseFormSchema>;

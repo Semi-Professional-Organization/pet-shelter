@@ -15,6 +15,39 @@ Historical completed work streams (August-September 2026) have been archived to 
 
 Record active multi-step work streams below.
 
+# Merge pet edits through one shared rule (#212)
+
+**Branch:** `fix/merge-pet-edit` · opened 2026-11-12
+
+- **Done when:** the browser store and the Server Actions build an edited pet with one
+  `mergePetEdit` and a new one with one `buildNewPet` (`src/lib/domain/petEdit.ts`); a saved
+  gallery and QR survive a store reload (`tests/components/petStoreKeepsGalleryAndQr.test.ts`); and
+  an `updatePet` payload that omits `galleryImages`, `customQrUrl`, `isArchived` and `featured`
+  keeps the stored values (`tests/integration/adminPetEditsReadTheDatabase.test.ts`).
+- **In scope:** the two merge copies, the two create copies, a no-defaults `petEditSchema` for the
+  update path, and moving `sortHistoryByDate` into the domain file, which may import validations
+  for types only.
+- **Not in scope:** outage-mode writes (#204), expected-status or version matching, the archive
+  action, any UI change, and the admin table's own optimistic merge
+  (`tasks/open/the-admin-table-merges-a-pet-edit-a-third-time.md`).
+
+- [x] Tests first: the store and action tests were red on main (gallery and QR missing after a
+  store reload; the omitted gallery, QR, featured and archive state reset by the action; an empty
+  QR returned as `""` rather than `null`)
+- [x] `mergePetEdit` / `buildNewPet`, used by both sides; `petEditSchema` derived from the same
+  fields, so `petBaseFormSchema` only `.extend`s it with defaults and one `superRefine` serves both
+- [x] Ledger: both `tasks/open` entries deleted; decision
+  `tasks/decisions/2026-11-12-a-pet-edit-never-invents-a-default.md`; the table's third merge
+  recorded as open
+
+**Review:** not yet reviewed. The owner runs `/code-review` before the PR. Deliberately not done:
+`specialNeeds` still clears when absent, as both copies did (the decision records it as
+reversible); `createPet` still parses with `petFormSchema`'s defaults, which carry the same values
+`buildNewPet` states, so the defaults are applied twice rather than the dialog's resolver being
+changed; `usePetTableController`'s optimistic row is still built by spreading the form; and the
+store's first-render read of `localStorage` without `withDerivedAge` in its effect was left alone.
+No lesson was written, because no human correction happened this session.
+
 # Hide database errors from adoption applicants (#201)
 
 **Branch:** `claude/hide-application-db-errors` · opened 2026-11-11

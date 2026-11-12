@@ -38,13 +38,18 @@ export const optionalUploadedImageUrl = z
   .optional()
   .default("");
 
-/** An optional donation QR image location. Empty string means "not set". */
-export const optionalQrImageUrl = z
+/**
+ * A donation QR image location, or `""` for "not set". Required as written; `optionalQrImageUrl`
+ * below is the usual form. The pet edit schema uses this bare one so that an omitted QR stays
+ * absent rather than defaulting to `""`, which the edit would read as "clear it".
+ */
+export const qrImageUrlOrEmpty = z
   .string()
   .trim()
-  .refine((value) => value === "" || isSafeQrImageUrl(value), QR_URL_MESSAGE)
-  .optional()
-  .default("");
+  .refine((value) => value === "" || isSafeQrImageUrl(value), QR_URL_MESSAGE);
+
+/** An optional donation QR image location. Empty string means "not set". */
+export const optionalQrImageUrl = qrImageUrlOrEmpty.optional().default("");
 
 /**
  * An optional payment payload rendered into a QR code.

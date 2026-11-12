@@ -48,9 +48,8 @@ const PET_ID = "pet-001";
 const fixture = initialPets.find((p) => p.id === PET_ID)!;
 
 /**
- * The database's copy: newer than the fixture in every column a status change must not touch.
- * An edit is another matter: the form schema defaults the gallery and QR code, so an edit that
- * omits them still overwrites both (`tasks/open/the-client-pet-store-drops-gallery-and-qr-edits.md`).
+ * The database's copy: newer than the fixture in every column a status change must not touch,
+ * and every column an edit that omits it must keep (#212).
  */
 const newerRow = () =>
   makeDbPet({
@@ -168,6 +167,64 @@ describe("when the mirror and the database disagree", () => {
       description: "Submitted by this edit.",
       birthDateIsEstimate: false,
     });
+  });
+});
+
+describe("an edit that omits a key the form usually sends (#212)", () => {
+  it("keeps the stored gallery, QR, archive state and featured flag", async () => {
+    const archivedAt = new Date("2026-10-01T00:00:00.000Z");
+    double.pet.findUnique.mockResolvedValue({
+      ...newerRow(),
+      featured: true,
+      isArchived: true,
+      deletedAt: archivedAt,
+      vaccinated: false,
+      energyLevel: "High",
+    });
+    // `editForm()` carries none of galleryImages, customQrUrl, isArchived, featured, the
+    // medical or compatibility flags, or energyLevel.
+    const form = editForm();
+    for (const key of ["galleryImages", "customQrUrl", "isArchived", "featured", "vaccinated", "energyLevel"]) {
+      expect(form).not.toHaveProperty(key);
+    }
+
+    const result = await updatePet(PET_ID, form);
+
+    expect(result.success).toBe(true);
+    const { data } = petUpdateCall();
+    expect(data).toMatchObject({
+      galleryImages: ["https://example.test/newer-gallery.jpg"],
+      customQrUrl: "https://example.test/newer-qr.png",
+      isArchived: true,
+      featured: true,
+      vaccinated: false,
+      energyLevel: "High",
+      description: "Submitted by this edit.",
+    });
+    expect(result.data).toMatchObject({
+      galleryImages: ["https://example.test/newer-gallery.jpg"],
+      customQrUrl: "https://example.test/newer-qr.png",
+      isArchived: true,
+      featured: true,
+    });
+    // Still set: un-archiving here used to leave it behind.
+    expect(result.data?.deletedAt).toBeTruthy();
+  });
+
+  it("clears the gallery and QR when the edit submits them empty", async () => {
+    const result = await updatePet(PET_ID, { ...editForm(), galleryImages: [], customQrUrl: "" });
+
+    expect(result.success).toBe(true);
+    expect(petUpdateCall().data).toMatchObject({ galleryImages: [], customQrUrl: null });
+    expect(result.data).toMatchObject({ galleryImages: [], customQrUrl: null });
+  });
+
+  it("still refuses rehabilitation fields on a pet that is not under care", async () => {
+    const result = await updatePet(PET_ID, { ...editForm(), rehabStage: "Hydrotherapy" });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/only allowed while the pet status/);
+    expect(double.pet.update).not.toHaveBeenCalled();
   });
 });
 

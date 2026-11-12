@@ -121,7 +121,7 @@ Two further properties are enforced structurally rather than by convention:
 
 |  |  |
 |---|---|
-| **Files** | `src/lib/domain/stateMachine.ts` · `auditLog.ts` · `sponsorshipTiers.ts` · `matchEngine.ts` · `medicalTimeline.ts` · `money.ts` · `shelterIdentity.ts` |
+| **Files** | `src/lib/domain/stateMachine.ts` · `auditLog.ts` · `sponsorshipTiers.ts` · `matchEngine.ts` · `medicalTimeline.ts` · `money.ts` · `shelterIdentity.ts` · `petEdit.ts` |
 | **Owns** | Legal status transitions, `DomainValidationError`, the audit trail |
 | **May import** | L-B4 (types only) |
 
@@ -148,7 +148,7 @@ Zod 4. The rule (Blueprint Tenet 3): **every value crossing into a Server Action
 
 `PET_STATUS_VALUES` is the canonical status tuple, and `PET_STATUS_FILTER_VALUES` is derived from it — extend the former and the filter follows automatically. `src/types/*` is shared with the frontend; see §4.
 
-`petFormSchema` wraps `petBaseFormSchema` in a `superRefine` that rejects `rehabStage`, `rehabStageMs`, and `rehabProgressPercent` on any pet whose status is not a rehabilitation status, so a cleared animal cannot keep a stale progress bar. `isRehabilitationStatus()` delegates to L-B3's `normalizePetStatus`, which is the correct direction of dependency.
+`petFormSchema` (a new record, with defaults) and `petEditSchema` (an edit, the same fields with no defaults, so an omitted key stays absent) share one `superRefine` that rejects `rehabStage`, `rehabStageMs`, and `rehabProgressPercent` on any pet whose status is not a rehabilitation status, so a cleared animal cannot keep a stale progress bar. `isRehabilitationStatus()` delegates to L-B3's `normalizePetStatus`, which is the correct direction of dependency.
 
 > **Layering judgment call**: "rehab fields are only meaningful under care" is arguably a *domain* invariant (L-B3) implemented in the *validation* layer (L-B4). It is fine where it is — it is a shape constraint on input, and it defers to L-B3 for the status semantics. But if a second such rule appears, that is the signal to move both into `stateMachine.ts`.
 
