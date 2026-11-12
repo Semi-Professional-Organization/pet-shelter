@@ -22,7 +22,7 @@ import {
   safeContributionFailureMessage,
 } from "@/lib/domain/contributionFailure";
 import { submitDonationPledgeAction } from "@/actions/donations";
-import { DONATION_DEDICATION_MAX_LENGTH } from "@/lib/domain/donationPledge";
+import { normaliseDedication } from "@/lib/domain/donationPledge";
 import type { DonationPledgeDTO } from "@/lib/validations/donation";
 import { DonationQrPanel } from "@/components/features/donations/DonationQrPanel";
 import { BankTransferDetails } from "@/components/features/donations/BankTransferDetails";
@@ -42,7 +42,9 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
   const { t, isMs } = useLanguage();
   const searchParams = useSearchParams();
 
-  const urlPetName = searchParams.get("pet");
+  // Normalised once, here, and used for both the catalogue match and the note, so
+  // `?pet=Bella%20` matches Bella and what is shown is what the schema will store.
+  const urlPetName = normaliseDedication(searchParams.get("pet") ?? "");
   const urlSponsorPetId = searchParams.get("sponsorPetId");
   const urlTier = searchParams.get("tier");
   const urlFreq = searchParams.get("freq");
@@ -80,19 +82,17 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     return null;
   });
 
-  // The dedication is derived, never synced: the chosen animal's name, or else the
-  // `?pet=` name as the donor's own note (owner's decision, 2026-11-11; #205). Trimmed
-  // and capped to what the schema accepts, so what is shown is what is sent.
-  const [urlNote, setUrlNote] = useState(
-    () => (urlPetName ?? "").trim().slice(0, DONATION_DEDICATION_MAX_LENGTH)
-  );
-  const targetPetName = selectedPet?.name ?? urlNote;
-  // Set once the donor removes the note or picks in the chooser. Read by the late
-  // catalogue load, which must not re-seed a choice the donor has already made.
-  const urlSeedDismissed = useRef(false);
   // Whether the chooser holds the catalogue it will hold. Until then a `?pet=` name
   // cannot be told apart from an animal that has not loaded yet.
   const [catalogueSettled, setCatalogueSettled] = useState(initialPets.length > 0);
+  // The dedication is derived, never synced: the chosen animal's name, or else the
+  // `?pet=` name as the donor's own note (owner's decision, 2026-11-11; #205). The note
+  // counts only once the catalogue has settled, which is when the form shows it.
+  const [urlNote, setUrlNote] = useState(urlPetName);
+  const targetPetName = selectedPet?.name ?? (catalogueSettled ? urlNote : "");
+  // Set once the donor removes the note or picks in the chooser. Read by the late
+  // catalogue load, which must not re-seed a choice the donor has already made.
+  const urlSeedDismissed = useRef(false);
   const chooserRef = useRef<HTMLDivElement>(null);
   const [dedicationStatus, setDedicationStatus] = useState("");
 
@@ -122,7 +122,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
 
   // Fetch public pets if not supplied initially
   useEffect(() => {
-    if (pets.length > 0 || catalogueSettled) return;
+    if (catalogueSettled) return;
     getPublicPets().then((loadedPets) => {
       if (loadedPets && loadedPets.length > 0) {
         setPets(loadedPets);
@@ -132,14 +132,16 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
               (urlSponsorPetId && p.id === urlSponsorPetId) ||
               (urlPetName && p.name.toLowerCase() === urlPetName.toLowerCase())
           );
-          if (match) setSelectedPet((current) => current ?? match);
+          if (match) setSelectedPet(match);
         }
       }
+      setCatalogueSettled(true);
     }).catch((err) => {
       // The chooser stays empty and the gift goes to general care; not worth an error banner.
       console.error("[Donation Widget] Could not load the animals to choose from:", err);
-    }).finally(() => setCatalogueSettled(true));
-  }, [pets.length, catalogueSettled, urlPetName, urlSponsorPetId]);
+      setCatalogueSettled(true);
+    });
+  }, [catalogueSettled, urlPetName, urlSponsorPetId]);
 
   // Tier prices differ by frequency, so the payable amount follows the toggle
   // rather than the one-time list price.
@@ -148,9 +150,14 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     : tierAmountFor(selectedTier, frequency);
 
   const handleSelectPet = (pet: Pet | null) => {
+    // The general fund is already chosen and the note is on screen: only Remove clears
+    // it. Before the catalogue settles the note is not shown, so a click on the general
+    // fund is a choice made without it and stands against the late load.
+    if (!pet && !selectedPet && catalogueSettled) return;
     urlSeedDismissed.current = true;
     setSelectedPet(pet);
     setUrlNote("");
+    setDedicationStatus("");
   };
 
   const handleRemoveDedication = () => {
@@ -242,6 +249,7 @@ export function DonationWidget({ initialPets = [] }: DonationWidgetProps) {
     urlSeedDismissed.current = true;
     setSelectedPet(null);
     setUrlNote("");
+    setDedicationStatus("");
     setDonorName("");
     setDonorEmail("");
     setDonorPhone("");

@@ -29,8 +29,10 @@ no schema change and no read of `src/data/pets.json`. What changed is how it is 
   is, and a sponsorship receipt names the verified animal "Sponsored Pet", with the allocation.
 - **On the form**, a `?pet=` name that matches no animal in the chooser is shown beside it as
   `Your dedication: “Tuah”` with a Remove button, once the catalogue has loaded (before that a
-  real animal would flash as unmatched). The name is trimmed and capped at the schema's 100
-  characters (`DONATION_DEDICATION_MAX_LENGTH`), so what is shown is what is sent. Remove moves
+  real animal would flash as unmatched), and it is sent only from then on. The name goes through
+  `normaliseDedication` (one line, trimmed, capped at the schema's 100 characters), which the
+  schema also applies, so what is shown is what is stored and a newline cannot forge a line of
+  the plain-text emails. Clicking the general fund that is already chosen leaves it alone. Remove moves
   focus to the general-fund card and announces itself. Before this the chooser showed the general
   fund while the pledge still carried the name, so the donor first saw it after submitting. The
   dedication is derived (`selectedPet?.name ?? note`) rather than kept in sync, and a choice the

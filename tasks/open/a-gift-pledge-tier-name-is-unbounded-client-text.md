@@ -2,7 +2,7 @@
 
 **Status:** ASSERTED · opened 2026-11-11 · found by review of #205, read from the code
 
-`donationSubmissionSchema` in `src/lib/validations/donation.ts` accepts `tierName` as
+`donationPledgeSchema` in `src/lib/validations/donation.ts` accepts `tierName` as
 `z.string().optional()`, with no maximum length. `submitDonationPledgeAction` in
 `src/actions/donations.ts` then prefers it over the catalogue's own name:
 `optionalText(validated.tierName) ?? matchedTier?.name ?? "Custom Rescue Donation"`. The donation

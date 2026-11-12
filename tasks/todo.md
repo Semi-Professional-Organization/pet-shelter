@@ -32,7 +32,7 @@ Record active multi-step work streams below.
   `targetPetName`, and `SponsorshipModal`'s "Dedicated Pet" (a verified sponsorship).
 
 - [x] Staff labels: queue `<tier> · in honour of X` -> own line `Donor's note (dedication): “X”`
-  (a new optional `donorNote` on `ReconciliationRow`); CSV header `Dedicated Pet` ->
+  (a new optional `dedication` on `ReconciliationRow`); CSV header `Dedicated Pet` ->
   `Dedication / Sponsored Pet` with a `ceiling:` comment (nothing parses it by name)
 - [x] Donor labels: form line `Your dedication: X` + Remove when `?pet=` matches no animal;
   confirmation `Dedicated Pet` / `Dedikasi Haiwan` -> `Your dedication` / `Dedikasi Anda`;
@@ -51,6 +51,14 @@ field is `dedication`; the acknowledgement's caller names its lane ("Sponsored P
 "Dedication"); the dedication left the allocation heading on the confirmation and the
 acknowledgement; runbook updated; the no-lookup test has a `ceiling:`. Recorded only: the widget's
 own sponsorship copy, folded into the sponsor-today entry. Declined: a shared dictionary key.
+
+**Round 3** (fourth commit): the note counts toward the payload only once the catalogue has
+settled, as it is shown; `?pet=` is normalised once (`normaliseDedication`: whitespace and control
+runs to one space, trimmed, capped without splitting a surrogate pair) and the schema stores the
+same one-line form; clicking the already-chosen general fund keeps a shown note (before the
+catalogue settles it still counts as a choice against the late load); the status line clears on
+reset and on a pick; the effect lost its redundant `pets.length` guard and `current ??` updater.
+Declined: the lane on the receipt DTO, a carousel focus ref, restructuring the email ternaries.
 
 **Review:** round 1 (coordinator) found the `?pet=` name invisible on the form, the note
 concatenated unquoted into the queue's `·` line, a CSV header that mislabelled sponsorship rows

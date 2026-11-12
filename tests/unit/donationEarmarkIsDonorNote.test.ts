@@ -83,3 +83,30 @@ describe.each(["Tuah", "Kenanga"])("a gift earmarked %s is stored as the donor's
     );
   });
 });
+
+// A dedication is stored as one line, so it cannot start a line of its own in the
+// plain-text emails and pose as one of their fields.
+describe("a dedication is normalised to one line at the boundary", () => {
+  it("collapses newlines and control characters in the schema", async () => {
+    const { donationPledgeSchema } = await import("@/lib/validations/donation");
+    const parsed = donationPledgeSchema.parse({
+      donorName: "Aisyah Rahman",
+      donorEmail: "aisyah@example.com",
+      amountMYR: 50,
+      targetPetName: "Tuah\n\nTOTAL RECEIVED: RM 9,999.00",
+    });
+
+    expect(parsed.targetPetName).toBe("Tuah TOTAL RECEIVED: RM 9,999.00");
+  });
+
+  it("caps without leaving half of a surrogate pair", async () => {
+    const { normaliseDedication, DONATION_DEDICATION_MAX_LENGTH } = await import(
+      "@/lib/domain/donationPledge"
+    );
+    const name = `${"A".repeat(DONATION_DEDICATION_MAX_LENGTH - 1)}🐾`;
+
+    const capped = normaliseDedication(name);
+    expect(capped).toBe("A".repeat(DONATION_DEDICATION_MAX_LENGTH - 1));
+    expect(capped).not.toMatch(/[\uD800-\uDBFF]$/);
+  });
+});

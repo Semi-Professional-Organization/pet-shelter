@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { DONATION_DEDICATION_MAX_LENGTH, isGiftRef } from "@/lib/domain/donationPledge";
+import {
+  DONATION_DEDICATION_MAX_LENGTH,
+  isGiftRef,
+  normaliseDedication,
+} from "@/lib/domain/donationPledge";
 
 export const donationTierEnum = z.enum([
   "kibble",
@@ -32,7 +36,7 @@ export const donationPledgeSchema = z.object({
     .min(5, "Minimum donation amount is RM 5.00")
     .max(100000, "Maximum single donation amount is RM 100,000.00"),
   frequency: donationFrequencyEnum.default("one_time"),
-  // The donor's own dedication, free text. Bounded here and nothing more: it is
+  // The donor's own dedication, free text. Bounded and made one line here, nothing more: it is
   // deliberately never checked against the catalogue, because it is the donor's
   // note and not a pet reference. The staff queue and the donor's confirmation and
   // emails label it that way; raw audit details still show the `targetPetName` key
@@ -40,6 +44,8 @@ export const donationPledgeSchema = z.object({
   targetPetName: z
     .string()
     .max(DONATION_DEDICATION_MAX_LENGTH, "Dedication is too long")
+    // Stored as one line, so it cannot forge a line of the plain-text emails.
+    .transform(normaliseDedication)
     .optional()
     .or(z.literal("")),
   paymentMethod: paymentMethodEnum.default("duitnow_qr"),

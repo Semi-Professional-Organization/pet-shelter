@@ -16,12 +16,6 @@ import { generateContributionRef } from "@/lib/domain/contributionRef";
  * either arrives or does not, so there is no state for it to lapse into and no
  * code that would ever write one.
  */
-/**
- * The longest dedication a gift may carry. The schema refuses longer, and the donation
- * form caps a `?pet=` name to it before showing it, so the two cannot disagree.
- */
-export const DONATION_DEDICATION_MAX_LENGTH = 100;
-
 export type DonationPledgeStatus = "PENDING_PAYMENT" | "ACTIVE" | "CANCELLED";
 
 export const DONATION_PLEDGE_STATUSES: readonly DonationPledgeStatus[] = [
@@ -29,6 +23,24 @@ export const DONATION_PLEDGE_STATUSES: readonly DonationPledgeStatus[] = [
   "ACTIVE",
   "CANCELLED",
 ] as const;
+
+/**
+ * The longest dedication a gift may carry. The schema refuses longer, and the donation
+ * form caps a `?pet=` name to it before showing it, so the two cannot disagree.
+ */
+export const DONATION_DEDICATION_MAX_LENGTH = 100;
+
+/**
+ * A dedication as one line: every run of whitespace or control characters becomes a
+ * single space, then it is trimmed and capped. A newline in it would otherwise start a
+ * line of its own in the plain-text emails, where it can pose as a field of the mail.
+ * The cap never leaves half of a surrogate pair at the end.
+ */
+export function normaliseDedication(value: string): string {
+  let text = value.replace(/[\s\p{Cc}]+/gu, " ").trim().slice(0, DONATION_DEDICATION_MAX_LENGTH);
+  if (/[\uD800-\uDBFF]$/.test(text)) text = text.slice(0, -1);
+  return text.trimEnd();
+}
 
 /**
  * Reference handed to the donor at checkout, to quote on their transfer.

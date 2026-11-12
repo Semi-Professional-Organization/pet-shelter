@@ -110,6 +110,18 @@ describe("the dedication when the catalogue loads late, as in production", () =>
     expect(deepestContaining("Your dedication")).toHaveTextContent(/^🐾 Your dedication: “Tuah”$/);
   });
 
+  it("sends no note the form has not shown yet, if submitted while the catalogue loads", async () => {
+    mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
+    lateCatalogue();
+    setMockLocation("/donate", "pet=Tuah");
+    renderWithLanguage(<DonationWidget />);
+
+    await fillAndSubmit(setupUser());
+
+    expect(mockedSubmit).toHaveBeenCalledTimes(1);
+    expect(mockedSubmit.mock.calls[0][0].targetPetName).toBeUndefined();
+  });
+
   it("does not re-seed the name when the donor chose the general fund before it loaded", async () => {
     // The strip itself only appears once the catalogue has settled, so the choice a donor
     // can make while it loads is the general-fund card. A late catalogue holding the
@@ -200,6 +212,53 @@ describe("/donate?pet=Tuah when the catalogue holds no Tuah", () => {
     expect(deepestContaining("Your dedication")).toHaveTextContent(
       new RegExp(`^🐾 Your dedication: “A{100}”$`)
     );
+  });
+
+  it("matches ?pet=Bella%20 to Bella rather than showing it as a note", () => {
+    setMockLocation("/donate", "pet=Bella%20&freq=monthly");
+    renderWithLanguage(<DonationWidget initialPets={catalogue} />);
+
+    expect(within(carousel()).getByRole("button", { name: /bella/i })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    expect(screen.queryByText(/your dedication/i)).toBeNull();
+  });
+
+  it("keeps the note when the donor clicks the general fund that is already chosen", async () => {
+    mockedSubmit.mockResolvedValue({ success: false, error: "stubbed" });
+    setMockLocation("/donate", "pet=Tuah");
+    renderWithLanguage(<DonationWidget initialPets={catalogue} />);
+
+    const user = setupUser();
+    await user.click(within(carousel()).getByRole("button", { name: /general sanctuary fund/i }));
+    expect(deepestContaining("Your dedication")).toHaveTextContent("“Tuah”");
+
+    await fillAndSubmit(user);
+    expect(mockedSubmit.mock.calls[0][0]).toMatchObject({ targetPetName: "Tuah" });
+  });
+
+  it("clears the removal announcement once the donor picks an animal", async () => {
+    setMockLocation("/donate", "pet=Tuah");
+    renderWithLanguage(<DonationWidget initialPets={catalogue} />);
+
+    const user = setupUser();
+    await user.click(screen.getByRole("button", { name: /remove your dedication/i }));
+    expect(screen.getByRole("status")).toHaveTextContent("Dedication removed.");
+    await user.click(within(carousel()).getByRole("button", { name: /bella/i }));
+    expect(screen.getByRole("status")).toHaveTextContent(/^$/);
+  });
+
+  it("states the strip, its button and the announcement in Malay", async () => {
+    setMockLocation("/donate", "pet=Tuah");
+    renderWithLanguage(<DonationWidget initialPets={catalogue} />, { language: "ms" });
+
+    expect(deepestContaining("Dedikasi Anda")).toHaveTextContent(/^🐾 Dedikasi Anda: “Tuah”$/);
+    const remove = screen.getByRole("button", { name: "Buang dedikasi anda" });
+    expect(remove).toHaveTextContent("Buang");
+
+    await setupUser().click(remove);
+    expect(screen.getByRole("status")).toHaveTextContent("Dedikasi dibuang.");
   });
 
   it("shows nothing for a whitespace-only ?pet= name", () => {
