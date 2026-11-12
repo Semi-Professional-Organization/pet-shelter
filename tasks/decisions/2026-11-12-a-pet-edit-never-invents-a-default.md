@@ -31,6 +31,11 @@ Someone could reasonably reverse part of this.
   partial payload silently loses the note. It was kept as it is because both copies already
   behaved this way, and #212 changed only where the copies disagreed. That argument is the
   reason to reverse it.
+- **The rehabilitation fields could keep on absent while the animal stays under care.** Review
+  round 2 argued for it: the reason to clear them is a stale progress bar on an animal that has
+  left rehabilitation, which does not apply when the edited status is still a rehabilitation one,
+  and a partial payload there loses the stage and percentage. Kept for the same reason as
+  `specialNeeds`: both copies already agreed.
 - **The edit path could require every key**, which would make a partial payload an error rather
   than a merge.
 

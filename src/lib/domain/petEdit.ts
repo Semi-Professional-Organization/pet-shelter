@@ -88,6 +88,10 @@ function submittedFields(input: PetFormInput) {
  * previous read's prose and the edit may have changed the birthday.
  */
 export function mergePetEdit(existing: Pet, input: PetFormInput): Pet {
+  // ceiling: assumes a well-formed stored pet. `Pet` requires both objects and every database
+  // read supplies them; only an unvalidated `localStorage` entry could lack one, and this throws
+  // on it. Upgrade path: validate the saved list in `usePetStore`
+  // (tasks/open/the-browser-pet-store-skips-a-database-only-pet.md).
   const { medical, compatibility } = existing;
   return withDerivedAge({
     ...existing,
@@ -104,9 +108,10 @@ export function mergePetEdit(existing: Pet, input: PetFormInput): Pet {
     updates: sortHistoryByDate(input.updates) ?? existing.updates,
     medicalTimeline: sortHistoryByDate(input.medicalTimeline) ?? existing.medicalTimeline,
     // Each resolved on its own: an absent key keeps its stored value, so omitting both keeps the
-    // pair consistent (an omitted `isArchived` used to un-archive and leave `deletedAt` set). A
-    // payload carrying only one of them can still make them disagree:
-    // tasks/open/a-pet-edit-accepts-isarchived-and-deletedat-independently.md.
+    // pair consistent (an omitted `isArchived` used to un-archive and leave `deletedAt` set).
+    // ceiling: a payload carrying only one of them can still make them disagree. Upgrade path:
+    // derive `deletedAt` from the archive transition
+    // (tasks/open/a-pet-edit-accepts-isarchived-and-deletedat-independently.md).
     isArchived: input.isArchived ?? existing.isArchived ?? false,
     deletedAt: input.deletedAt !== undefined ? input.deletedAt : existing.deletedAt,
     medical: {

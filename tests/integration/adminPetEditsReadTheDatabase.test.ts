@@ -207,8 +207,10 @@ describe("an edit that omits a key the form usually sends (#212)", () => {
       isArchived: true,
       featured: true,
     });
-    // Still set: un-archiving here used to leave it behind.
-    expect(result.data?.deletedAt).toBeTruthy();
+    // The stored archive time, in what is written and in what is returned: not cleared, and not
+    // replaced by another moment.
+    expect(new Date(data.deletedAt as Date).toISOString()).toBe(new Date(archivedAt).toISOString());
+    expect(new Date(result.data!.deletedAt!).toISOString()).toBe(new Date(archivedAt).toISOString());
   });
 
   it("clears the gallery and QR when the edit submits them empty", async () => {

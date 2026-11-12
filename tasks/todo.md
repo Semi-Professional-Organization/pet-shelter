@@ -51,6 +51,14 @@ Record active multi-step work streams below.
       on a stored pet with no `medical`
     - the reviewer's `specialNeeds` counter-argument, in the decision
 
+- [x] Review round 2, third commit: no in-scope correctness finding. `ceiling:` markers on the
+  two known limits in `mergePetEdit`; the keep-on-absent action test now pins the archive time
+  written and returned. Declined and recorded:
+  `tasks/open/the-admin-pet-dialog-submits-archive-state-it-has-no-control-for.md`,
+  `tasks/open/a-new-pet-gets-one-id-in-the-table-and-another-in-the-database.md` (moved out of the
+  timestamp-id entry so it has its own settle condition), the public profile preferring the
+  store's QR (in the store entry), and the rehabilitation counter-argument (in the decision).
+
 **Review:** round 1 found no blocking defect. Its in-scope fixes are listed above. The owner runs
 the next `/code-review`. Deliberately not done:
 `specialNeeds` still clears when absent, as both copies did (the decision records it as
