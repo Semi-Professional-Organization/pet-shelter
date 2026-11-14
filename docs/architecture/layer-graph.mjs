@@ -24,7 +24,7 @@ for (const f of files) {
   meta[f] = {
     client: /^\s*["']use client["']/m.test(head),
     server: /^\s*["']use server["']/m.test(head),
-    prisma: /from ["']@\/lib\/prisma["']|from ["']\.\/prisma["']|from ["']\.\.\/prisma["']/.test(src),
+    prisma: /from ["'](?:@\/lib\/server\/prisma|(?:\.\.?\/)+prisma)["']/.test(src),
     browserApi: /\b(document|window|localStorage|navigator)\b/.test(src),
     loc: src.split("\n").length,
     imports: [],
