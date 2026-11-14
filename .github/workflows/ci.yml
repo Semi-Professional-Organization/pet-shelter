@@ -59,8 +59,7 @@ jobs:
         run: npm run lint
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Layer boundaries
-        run: node docs/architecture/layer-graph.mjs
+      # The real architecture gate is tests/unit/layerBoundaries.test.ts, run via npm run test:all.
       - name: Doc invariants
         run: npm run docs:check
 
