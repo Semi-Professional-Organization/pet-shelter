@@ -358,6 +358,8 @@ Every structural claim above came from [`layer-graph.mjs`](layer-graph.mjs) — 
 | No `"use server"` module transitively reaches a `"use client"` module | §5.1 |
 | `@/lib/server/prisma` is imported only from `src/lib/server/` plus `domain/auditLog.ts` | L-B2 |
 
+This test is the enforcing gate: no `"use server"` module may reach a `"use client"` module, and `@/lib/server/prisma` may be imported only from `src/lib/server/` plus `domain/auditLog.ts`. [`layer-graph.mjs`](layer-graph.mjs), or `npm run arch:check`, is informational only.
+
 It carries a third case — a sanity check that the walker actually found the modules — because a broken resolver would make the other two pass vacuously. Changing the repository trio deliberately means updating both the `allowed` list in that test and L-B2 above, which is the intended friction.
 
 The script and the test duplicate a little resolver logic on purpose: the script is the exploratory tool that answers all seven questions, the test is the narrow guard that runs in CI with no dependency on `docs/`.
@@ -368,7 +370,7 @@ The script and the test duplicate a little resolver logic on purpose: the script
 
 ## ✅ 9. Rules of Thumb
 
-1. **Prisma imports live in exactly three files.** A fourth is a design decision, not a detail.
+1. **Prisma imports stay inside the repository layer.** An exception outside it is a design decision, not a detail.
 2. **No backend module imports a `"use client"` module.** Enforced in CI (§8) — if you need a value on both sides, put it in a directive-free module.
 3. **Parse at the edge.** External input hits a Zod schema in L-B4 before any other layer sees it.
 4. **Authorize in the action, not the layout.** A section page's `requireAdminSection` decides what renders; the action decides what happens.
